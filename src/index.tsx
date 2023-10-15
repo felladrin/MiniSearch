@@ -372,11 +372,18 @@ async function main() {
             if (e.progress) {
               updateResponse(`Loading model: ${e.progress.toFixed(0)}%`);
             } else {
-              updateResponse("Loading...");
+              updateResponse("Analyzing links...");
             }
           },
         },
       );
+
+      updateResponse("Analyzing links...");
+
+      const generate = async (...args: unknown[]) => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        return generator(...args);
+      };
 
       for (const [title, snippet, url] of getSearchResults()) {
         const request = dedent`
@@ -387,7 +394,7 @@ async function main() {
 
           Start your response with "This link is about".
         `;
-        const [output] = await generator(request, {
+        const [output] = await generate(request, {
           max_new_tokens: snippet.length,
         });
         updateUrlsDescriptions({
@@ -396,11 +403,11 @@ async function main() {
         });
       }
 
-      const [initialResponse] = await generator(query, {
+      const [initialResponse] = await generate(query, {
         max_new_tokens: defaultMaxNewTokens,
       });
 
-      const [secondResponse] = await generator(
+      const [secondResponse] = await generate(
         dedent`
           The links below that are related to the query "${query}".
 
@@ -420,7 +427,7 @@ async function main() {
         },
       );
 
-      const [finalResponse] = await generator(
+      const [finalResponse] = await generate(
         dedent`
           Check the following info:
 
