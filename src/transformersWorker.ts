@@ -50,8 +50,8 @@ async function processQueue() {
     });
   } catch (error) {
     self.postMessage({
-      status: "update",
-      output: `Error: ${error}`,
+      status: "error",
+      error,
       id: message.id,
     });
   } finally {

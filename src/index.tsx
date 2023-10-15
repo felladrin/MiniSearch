@@ -266,16 +266,29 @@ async function main() {
         },
       );
 
+      const disableWorkers = () => {
+        worker.terminate();
+        window.location.href = `${window.location.href}&disableWorkers`;
+      };
+
+      let disableWorkersTimeoutId = 0;
+
       worker.addEventListener("message", (e: MessageEvent) => {
         switch (e.data.status) {
           case "initiate":
             break;
 
           case "progress":
-            updateResponse(`Loading: ${e.data.progress.toFixed(0)}%`);
+            if (disableWorkersTimeoutId) clearTimeout(disableWorkersTimeoutId);
+            disableWorkersTimeoutId = window.setTimeout(
+              () => disableWorkers(),
+              3000,
+            );
+            updateResponse(`Loading model: ${e.data.progress.toFixed(0)}%`);
             break;
 
           case "done":
+            if (disableWorkersTimeoutId) clearTimeout(disableWorkersTimeoutId);
             updateResponse(`Model file ${e.data.file} loaded`);
             break;
 
@@ -300,6 +313,11 @@ async function main() {
             } else if (Object.keys(getUrlsDescriptions()).includes(e.data.id)) {
               updateLinkDescriptionsComplete(getLinkDescriptionsComplete() + 1);
             }
+            break;
+
+          case "error":
+            console.error(e.data.error);
+            disableWorkers();
             break;
         }
       });
@@ -351,7 +369,7 @@ async function main() {
         {
           progress_callback: (e: { progress: number }) => {
             if (e.progress) {
-              updateResponse(`Loading: ${e.progress.toFixed(0)}%`);
+              updateResponse(`Loading model: ${e.progress.toFixed(0)}%`);
             } else {
               updateResponse("Loading...");
             }
