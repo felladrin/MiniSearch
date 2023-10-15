@@ -310,6 +310,7 @@ async function main() {
           case "complete":
             if (e.data.id === "query") {
               updateFinishedResponding(true);
+              worker.terminate();
             } else if (Object.keys(getUrlsDescriptions()).includes(e.data.id)) {
               updateLinkDescriptionsComplete(getLinkDescriptionsComplete() + 1);
             }
