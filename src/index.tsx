@@ -151,6 +151,19 @@ async function main() {
       appConfig,
     );
 
+    updateResponse("Preparing response...");
+
+    await chat.generate(dedent`
+      Keep in mind the following links. They might be useful for your response later, ok?
+
+      ${getSearchResults()
+        .map(
+          ([title, snippet, url], index) =>
+            `${index + 1}. [${title}](${url} "${snippet}")`,
+        )
+        .join("\n")}
+    `);
+
     await chat.generate(query, (_, message) => {
       if (message.length === 0) {
         chat.interruptGenerate();
@@ -161,22 +174,32 @@ async function main() {
 
     await chat.resetChat();
 
-    const previousResponse = getResponse();
+    let responseWithoutSearchResults = "";
+    await chat.generate(query, (_, message) => {
+      if (message.length === 0) {
+        chat.interruptGenerate();
+      } else {
+        responseWithoutSearchResults = message;
+      }
+    });
+
+    await chat.resetChat();
 
     updateResponse(dedent`
-      ${previousResponse}
-      
-      Now, let me review the links to provide a better response.
+      ${getResponse()}
+
+      <details>
+        <summary>Response without considering the search results</summary>
+        ${responseWithoutSearchResults}
+      </details>
     `);
 
     for (const [title, snippet, url] of getSearchResults()) {
       const request = dedent`
-        What is this link about?
+        In summary, what is this link about?
 
         Link title: ${title}
         Link snippet: ${snippet}
-
-        Start your response with the word "This".
       `;
 
       await chat.generate(request, (_, message) => {
@@ -192,34 +215,6 @@ async function main() {
 
       await chat.resetChat();
     }
-
-    await chat.generate(dedent`
-      Keep in mind the following links. They might be useful for your response later, ok?
-
-      ${getSearchResults()
-        .map(
-          ([title, , url], index) =>
-            `${index + 1}. ${title} - ${getUrlsDescriptions()[url]}`,
-        )
-        .join("\n")}
-    `);
-
-    await chat.generate(query, (_, message) => {
-      if (message.length === 0) {
-        chat.interruptGenerate();
-      } else {
-        updateResponse(message);
-      }
-    });
-
-    updateResponse(dedent`
-      ${getResponse()}
-
-      <details>
-        <summary>Previous response</summary>
-        ${previousResponse}
-      </details>
-    `);
 
     if (debug) {
       console.info(await chat.runtimeStatsText());
@@ -305,61 +300,46 @@ async function main() {
         min_length: 32,
         max_new_tokens: 256,
         no_repeat_ngram_size: 2,
-        repetition_penalty: 1.2,
-        do_sample: true,
-        temperature: 0.35,
-        top_p: 0.95,
       });
     };
 
-    const [preliminaryResponse] = await generate(query);
+    const [response] = await generate(
+      dedent`
+        REQUEST:
+        ${query}
 
-    await updateResponseWithTypingEffect(dedent`
-      ${preliminaryResponse}
-      
-      Now, let me review the links to provide a better response.
+        RELATED LINKS:
+        ${getSearchResults()
+          .map(
+            ([title, snippet, url], index) =>
+              `${index + 1}. [${title}](${url} "${snippet}")`,
+          )
+          .join("\n")}
+      `,
+    );
+
+    await updateResponseWithTypingEffect(response);
+
+    const [responseWithoutSearchResults] = await generate(query);
+
+    updateResponse(dedent`
+      ${response}
+
+      <details>
+        <summary>Response without considering the search results</summary>
+        ${responseWithoutSearchResults}
+      </details>
     `);
 
     for (const [title, snippet, url] of getSearchResults()) {
       const request = dedent`
-        What is this link about?
+        [${title}](${url} "${snippet}")
 
-        Link title: ${title}
-        Link snippet: ${snippet}
-
-        Start your response with the word "This".
+        This link is about...
       `;
       const [output] = await generate(request);
       await updateUrlsDescriptionsWithTypingEffect(url, output);
     }
-
-    const [finalResponse] = await generate(
-      dedent`
-        Below are a request and a list of links found in the Web.
-
-        Request:
-        ${query}
-
-        Links found in the Web:
-        ${getSearchResults()
-          .map(
-            ([title, , url], index) =>
-              `${index + 1}. ${title} - ${getUrlsDescriptions()[url]}`,
-          )
-          .join("\n")}
-        
-        Pretend you are the knowledgeable and helpful AI assistant and respond to the request the best you can.
-      `,
-    );
-
-    updateResponseWithTypingEffect(dedent`
-      ${finalResponse}
-
-      <details>
-        <summary>Previous response</summary>
-        ${preliminaryResponse}
-      </details>
-    `);
 
     updateFinishedResponding(true);
 
