@@ -21,8 +21,6 @@ const loadBar = new LoadBar({
   startPoint: 1,
 });
 
-const defaultMaxNewTokens = 256;
-
 type SearchResults = [title: string, snippet: string, url: string][];
 
 const promptPubSub = createPubSub("Analyzing query...");
@@ -33,11 +31,6 @@ const searchResultsPubSub = createPubSub<SearchResults>([]);
 const [updateSearchResults, , getSearchResults] = searchResultsPubSub;
 const urlsDescriptionsPubSub = createPubSub<Record<string, string>>({});
 const [updateUrlsDescriptions, , getUrlsDescriptions] = urlsDescriptionsPubSub;
-const [
-  updateLinkDescriptionsComplete,
-  onLinkDescriptionsCompleteUpdated,
-  getLinkDescriptionsComplete,
-] = createPubSub(0);
 const finishedRespondingPubSub = createPubSub(false);
 const [updateFinishedResponding] = finishedRespondingPubSub;
 
@@ -108,8 +101,8 @@ async function main() {
       temperature: 0,
       repetition_penalty: 1.2,
       top_p: 1,
-      mean_gen_len: 512,
-      max_gen_len: 1024,
+      mean_gen_len: 32,
+      max_gen_len: 256,
       conv_template: "llama-2",
       conv_config: {
         system: dedent`
@@ -181,7 +174,7 @@ async function main() {
         Link title: ${title}
         Link snippet: ${snippet}
 
-        Start your response with "This link is about".
+        Start your response with the word "This".
       `;
 
       await chat.generate(request, (_, message) => {
@@ -203,12 +196,10 @@ async function main() {
 
       ${getSearchResults()
         .map(
-          ([title, , url]) => dedent`
-            Link title: ${title}
-            Link description: ${getUrlsDescriptions()[url]}
-          `,
+          ([title, , url], index) =>
+            `${index + 1}. ${title} - ${getUrlsDescriptions()[url]}`,
         )
-        .join("\n\n")}
+        .join("\n")}
     `);
 
     await chat.generate(query, (_, message) => {
@@ -258,194 +249,88 @@ async function main() {
       ? largerModel
       : defaultModel;
 
-    if (Worker) {
-      const worker = new Worker(
-        new URL("./transformersWorker.ts", import.meta.url),
-        {
-          type: "module",
+    const generator = await pipeline(
+      "text2text-generation",
+      text2TextGenerationModel,
+      {
+        progress_callback: (e: { progress: number }) => {
+          updateResponse(
+            `Loading model: ${e.progress ? e.progress.toFixed(0) : 100}%`,
+          );
         },
-      );
+      },
+    );
 
-      const disableWorkers = () => {
-        worker.terminate();
-        window.location.href = `${window.location.href}&disableWorkers`;
-      };
+    updateResponse("Preparing response...");
 
-      let disableWorkersTimeoutId = 0;
-
-      worker.addEventListener("message", (e: MessageEvent) => {
-        switch (e.data.status) {
-          case "initiate":
-            break;
-
-          case "progress":
-            if (disableWorkersTimeoutId) clearTimeout(disableWorkersTimeoutId);
-            disableWorkersTimeoutId = window.setTimeout(
-              () => disableWorkers(),
-              3000,
-            );
-            updateResponse(`Loading model: ${e.data.progress.toFixed(0)}%`);
-            break;
-
-          case "done":
-            if (disableWorkersTimeoutId) clearTimeout(disableWorkersTimeoutId);
-            updateResponse(`Model file ${e.data.file} loaded`);
-            break;
-
-          case "ready":
-            updateResponse("Analyzing links...");
-            break;
-
-          case "update":
-            if (e.data.id === "query") {
-              updateResponse(e.data.output);
-            } else {
-              updateUrlsDescriptions({
-                ...getUrlsDescriptions(),
-                [e.data.id]: e.data.output,
-              });
-            }
-            break;
-
-          case "complete":
-            if (e.data.id === "query") {
-              updateFinishedResponding(true);
-              worker.terminate();
-            } else if (Object.keys(getUrlsDescriptions()).includes(e.data.id)) {
-              updateLinkDescriptionsComplete(getLinkDescriptionsComplete() + 1);
-            }
-            break;
-
-          case "error":
-            console.error(e.data.error);
-            disableWorkers();
-            break;
-        }
+    const generate = async (input: string): Promise<string> => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return generator(input, {
+        min_length: 32,
+        max_new_tokens: 256,
+        no_repeat_ngram_size: 2,
+        repetition_penalty: 1.2,
+        do_sample: true,
+        temperature: 0.35,
+        top_p: 0.95,
       });
+    };
 
-      onLinkDescriptionsCompleteUpdated((linkDescriptionsComplete) => {
-        if (linkDescriptionsComplete !== searchResults.length) return;
+    const [preliminaryResponse] = await generate(query);
 
-        worker.postMessage({
-          id: "query",
-          text: dedent`
-            Provide a response to the query: ${query}
-  
-            If you don't know how to respond, you can paraphrase the links below:
-  
-            ${getSearchResults()
-              .map(
-                ([title, , url]) => dedent`
-                  Link title: ${title}
-                  Link description: ${getUrlsDescriptions()[url]}
-                `,
-              )
-              .join("\n\n")}
-            `,
-          max_new_tokens: defaultMaxNewTokens,
-          model: text2TextGenerationModel,
-        });
+    updateResponse(dedent`
+      ${preliminaryResponse}
+      
+      Now, let me review the links to provide a better response.
+    `);
+
+    for (const [title, snippet, url] of getSearchResults()) {
+      const request = dedent`
+        What is this link about?
+
+        Link title: ${title}
+        Link snippet: ${snippet}
+
+        Start your response with the word "This".
+      `;
+      const [output] = await generate(request);
+      updateUrlsDescriptions({
+        ...getUrlsDescriptions(),
+        [url]: output,
       });
-
-      for (const [title, snippet, url] of getSearchResults()) {
-        const request = dedent`
-            What is this link about?
-  
-            Link title: ${title}
-            Link snippet: ${snippet}
-  
-            Start your response with "This link is about".
-          `;
-        worker.postMessage({
-          id: url,
-          text: request,
-          max_new_tokens: snippet.length,
-          model: text2TextGenerationModel,
-        });
-      }
-    } else {
-      const generator = await pipeline(
-        "text2text-generation",
-        text2TextGenerationModel,
-        {
-          progress_callback: (e: { progress: number }) => {
-            if (e.progress) {
-              updateResponse(`Loading model: ${e.progress.toFixed(0)}%`);
-            } else {
-              updateResponse("Analyzing links...");
-            }
-          },
-        },
-      );
-
-      updateResponse("Analyzing links...");
-
-      const generate = async (...args: unknown[]) => {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        return generator(...args);
-      };
-
-      for (const [title, snippet, url] of getSearchResults()) {
-        const request = dedent`
-          What is this link about?
-
-          Link title: ${title}
-          Link snippet: ${snippet}
-
-          Start your response with "This link is about".
-        `;
-        const [output] = await generate(request, {
-          max_new_tokens: snippet.length,
-        });
-        updateUrlsDescriptions({
-          ...getUrlsDescriptions(),
-          [url]: output,
-        });
-      }
-
-      const [initialResponse] = await generate(query, {
-        max_new_tokens: defaultMaxNewTokens,
-      });
-
-      const [secondResponse] = await generate(
-        dedent`
-          The links below that are related to the query "${query}".
-
-          ${getSearchResults()
-            .map(
-              ([title, , url]) => dedent`
-                Link title: ${title}
-                Link description: ${getUrlsDescriptions()[url]}
-              `,
-            )
-            .join("\n\n")}
-
-          Summarize them in a single paragraph.
-        `,
-        {
-          max_new_tokens: defaultMaxNewTokens,
-        },
-      );
-
-      const [finalResponse] = await generate(
-        dedent`
-          Check the following info:
-
-          1. ${initialResponse}
-
-          2. ${secondResponse}
-
-          Now answer: ${query}
-        `,
-        {
-          max_new_tokens: defaultMaxNewTokens,
-        },
-      );
-
-      updateResponse(finalResponse);
-
-      updateFinishedResponding(true);
     }
+
+    const [finalResponse] = await generate(
+      dedent`
+        Below are a request and a list of links found in the Web.
+
+        Request:
+        ${query}
+
+        Links found in the Web:
+        ${getSearchResults()
+          .map(
+            ([title, , url], index) =>
+              `${index + 1}. ${title} - ${getUrlsDescriptions()[url]}`,
+          )
+          .join("\n")}
+        
+        Pretend you are the knowledgeable and helpful AI assistant and respond to the request the best you can.
+      `,
+    );
+
+    updateResponse(dedent`
+      ${finalResponse}
+
+      <details>
+        <summary>Previous response</summary>
+        ${preliminaryResponse}
+      </details>
+    `);
+
+    updateFinishedResponding(true);
+
+    await generator.dispose();
   }
 
   loadBar.done();
