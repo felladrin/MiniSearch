@@ -87,7 +87,9 @@ async function main() {
       : new webLLM.ChatModule();
 
     chat.setInitProgressCallback((report) =>
-      updateResponse(report.text.replaceAll("[", "(").replaceAll("]", ")")),
+      updateResponse(
+        `Loading: ${report.text.replaceAll("[", "(").replaceAll("]", ")")}`,
+      ),
     );
 
     const availableModels = {
@@ -261,14 +263,20 @@ async function main() {
       await sleep(description.length);
     };
 
+    const filesProgress: Record<string, number> = {};
+
     const generator = await pipeline(
       "text2text-generation",
       text2TextGenerationModel,
       {
-        progress_callback: (e: { progress: number }) => {
-          updateResponse(
-            `Loading model: ${e.progress ? e.progress.toFixed(0) : 100}%`,
-          );
+        progress_callback: (e: { file: string; progress: number }) => {
+          filesProgress[e.file] = e.progress ?? 100;
+          const lowestProgress = Math.min(...Object.values(filesProgress));
+          updateResponse(dedent`
+            Loading: ${lowestProgress.toFixed(0)}%
+
+            It may take a while to load for the first time, but next time it will load instantly.
+          `);
         },
       },
     );
