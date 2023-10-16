@@ -254,11 +254,14 @@ async function main() {
     const updateResponseWithTypingEffect = async (text: string) => {
       let response = "";
       updateResponse(response);
+
       for (const character of text) {
         response = response + character;
         updateResponse(response);
         await sleep(5);
       }
+
+      await sleep(text.length);
     };
 
     const updateUrlsDescriptionsWithTypingEffect = async (
@@ -279,6 +282,8 @@ async function main() {
         });
         await sleep(5);
       }
+
+      await sleep(description.length);
     };
 
     const generator = await pipeline(
