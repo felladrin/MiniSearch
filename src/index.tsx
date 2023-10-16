@@ -42,6 +42,8 @@ const query = urlParams.get("q");
 const Worker = urlParams.has("disableWorkers") ? undefined : window.Worker;
 const useLargerModel = urlParams.has("useLargerModel");
 
+const sleep = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function search(query: string, limit?: number) {
   const searchUrl = new URL("/search", window.location.origin);
   searchUrl.searchParams.set("q", query);
@@ -249,6 +251,36 @@ async function main() {
       ? largerModel
       : defaultModel;
 
+    const updateResponseWithTypingEffect = async (text: string) => {
+      let response = "";
+      updateResponse(response);
+      for (const character of text) {
+        response = response + character;
+        updateResponse(response);
+        await sleep(5);
+      }
+    };
+
+    const updateUrlsDescriptionsWithTypingEffect = async (
+      url: string,
+      description: string,
+    ) => {
+      let newDescription = "";
+      updateUrlsDescriptions({
+        ...getUrlsDescriptions(),
+        [url]: newDescription,
+      });
+
+      for (const character of description) {
+        newDescription = newDescription + character;
+        updateUrlsDescriptions({
+          ...getUrlsDescriptions(),
+          [url]: newDescription,
+        });
+        await sleep(5);
+      }
+    };
+
     const generator = await pipeline(
       "text2text-generation",
       text2TextGenerationModel,
@@ -261,10 +293,9 @@ async function main() {
       },
     );
 
-    updateResponse("Preparing response...");
+    updateResponseWithTypingEffect("Preparing response...");
 
     const generate = async (input: string): Promise<string> => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
       return generator(input, {
         min_length: 32,
         max_new_tokens: 256,
@@ -278,7 +309,7 @@ async function main() {
 
     const [preliminaryResponse] = await generate(query);
 
-    updateResponse(dedent`
+    await updateResponseWithTypingEffect(dedent`
       ${preliminaryResponse}
       
       Now, let me review the links to provide a better response.
@@ -294,10 +325,7 @@ async function main() {
         Start your response with the word "This".
       `;
       const [output] = await generate(request);
-      updateUrlsDescriptions({
-        ...getUrlsDescriptions(),
-        [url]: output,
-      });
+      await updateUrlsDescriptionsWithTypingEffect(url, output);
     }
 
     const [finalResponse] = await generate(
@@ -319,7 +347,7 @@ async function main() {
       `,
     );
 
-    updateResponse(dedent`
+    updateResponseWithTypingEffect(dedent`
       ${finalResponse}
 
       <details>
