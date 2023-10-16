@@ -26,7 +26,7 @@ type SearchResults = [title: string, snippet: string, url: string][];
 const promptPubSub = createPubSub("Analyzing query...");
 const [updatePrompt] = promptPubSub;
 const responsePubSub = createPubSub("Loading...");
-const [updateResponse, , getResponse] = responsePubSub;
+const [updateResponse] = responsePubSub;
 const searchResultsPubSub = createPubSub<SearchResults>([]);
 const [updateSearchResults, , getSearchResults] = searchResultsPubSub;
 const urlsDescriptionsPubSub = createPubSub<Record<string, string>>({});
@@ -174,26 +174,6 @@ async function main() {
 
     await chat.resetChat();
 
-    let responseWithoutSearchResults = "";
-    await chat.generate(query, (_, message) => {
-      if (message.length === 0) {
-        chat.interruptGenerate();
-      } else {
-        responseWithoutSearchResults = message;
-      }
-    });
-
-    await chat.resetChat();
-
-    updateResponse(dedent`
-      ${getResponse()}
-
-      <details>
-        <summary>Response without considering the search results</summary>
-        ${responseWithoutSearchResults}
-      </details>
-    `);
-
     for (const [title, snippet, url] of getSearchResults()) {
       const request = dedent`
         In summary, what is this link about?
@@ -319,17 +299,6 @@ async function main() {
     );
 
     await updateResponseWithTypingEffect(response);
-
-    const [responseWithoutSearchResults] = await generate(query);
-
-    updateResponse(dedent`
-      ${response}
-
-      <details>
-        <summary>Response without considering the search results</summary>
-        ${responseWithoutSearchResults}
-      </details>
-    `);
 
     for (const [title, snippet, url] of getSearchResults()) {
       const request = dedent`
