@@ -281,7 +281,7 @@ async function main() {
       },
     );
 
-    updateResponseWithTypingEffect("Preparing response...");
+    await updateResponseWithTypingEffect("Preparing response...");
 
     const generate = async (input: string): Promise<string> => {
       return generator(input, {
