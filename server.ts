@@ -6,7 +6,7 @@ type SearchResults = [title: string, abstract: string, url: string][];
 
 async function search(query: string, limit?: number) {
   try {
-    query = encodeURIComponent(query);
+    query = encodeURIComponent(query.replace(/"/g, '\\"'));
     const html = await fetch(`https://duckduckgo.com/?q=${query}`).then((res) =>
       res.text(),
     );
