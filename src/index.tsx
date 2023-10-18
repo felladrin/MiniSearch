@@ -266,6 +266,39 @@ async function main() {
 
     const filesProgress: Record<string, number> = {};
 
+    const answerer = await pipeline(
+      "question-answering",
+      "Xenova/distilbert-base-cased-distilled-squad",
+      {
+        progress_callback: (e: { file: string; progress: number }) => {
+          filesProgress[e.file] = e.progress ?? 100;
+          const lowestProgress = Math.min(...Object.values(filesProgress));
+          updateResponse(dedent`
+            Loading: ${lowestProgress.toFixed(0)}%
+
+            It may take a while to load for the first time, but next time it will load instantly.
+          `);
+        },
+      },
+    );
+
+    const textGenerationConfig = {
+      min_length: 32,
+      max_new_tokens: 256,
+      no_repeat_ngram_size: 2,
+      num_beams: 2,
+    };
+
+    const { answer } = await answerer(
+      query,
+      getSearchResults()
+        .map(([title, snippet], index) => `${index + 1}. ${title} - ${snippet}`)
+        .join("\n"),
+      textGenerationConfig,
+    );
+
+    answerer.dispose();
+
     const generator = await pipeline(
       "text2text-generation",
       text2TextGenerationModel,
@@ -285,27 +318,26 @@ async function main() {
     await updateResponseWithTypingEffect("Preparing response...");
 
     const generate = async (input: string): Promise<string> => {
-      return generator(input, {
-        min_length: 32,
-        max_new_tokens: 256,
-        no_repeat_ngram_size: 2,
-      });
+      return generator(input, textGenerationConfig);
     };
 
-    const [response] = await generate(
-      dedent`
-        REQUEST:
-        ${query}
+    const [response] = await generate(dedent`
+      QUESTION:
+      ${query}
+      
+      PROBABLE ANSWER:
+      ${answer}
 
-        RELATED LINKS:
-        ${getSearchResults()
-          .map(
-            ([title, snippet, url], index) =>
-              `${index + 1}. [${title}](${url} "${snippet}")`,
-          )
-          .join("\n")}
-      `,
-    );
+      RELATED LINKS FROM WEB:
+      ${getSearchResults()
+        .map(
+          ([title, snippet, url], index) =>
+            `${index + 1}. [${title}](${url} "${snippet}")`,
+        )
+        .join("\n")}
+      
+      YOUR ANSWER:
+    `);
 
     await updateResponseWithTypingEffect(response);
 
