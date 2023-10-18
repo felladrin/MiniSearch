@@ -178,10 +178,11 @@ async function main() {
 
     for (const [title, snippet, url] of getSearchResults()) {
       const request = dedent`
-        In summary, what is this link about?
+        Check this link:
 
-        Link title: ${title}
-        Link snippet: ${snippet}
+        [${title}](${url} "${snippet}")
+
+        Now tell me, what is this link about?
       `;
 
       await chat.generate(request, (_, message) => {
