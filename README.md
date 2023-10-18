@@ -15,6 +15,14 @@ A minimalist search engine with integrated browser-based AI.
 
 ## Getting Started
 
+### With Docker
+
+Start developing by running `docker-compose up`.
+
+When ready for production, run `docker-compose -f docker-compose.production.yml up`.
+
+### Without Docker
+
 After cloning the repository, run `npm ci` to install the dependencies.
 
 Start developing by running `npm run dev`.
