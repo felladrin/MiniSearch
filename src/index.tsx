@@ -1,6 +1,6 @@
 import * as webLLM from "@mlc-ai/web-llm";
 import { dedent } from "ts-dedent";
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef, FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { createPubSub } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
@@ -10,6 +10,33 @@ import LoadBar from "loadbar";
 import { pipeline } from "@xenova/transformers";
 import MobileDetect from "mobile-detect";
 import "water.css/out/water.css";
+
+function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
+  const localStorageValue = localStorage.getItem(localStorageKey);
+  const localStoragePubSub = createPubSub(
+    localStorageValue ? (JSON.parse(localStorageValue) as T) : defaultValue,
+  );
+
+  const [, onValueChange] = localStoragePubSub;
+
+  onValueChange((value) =>
+    localStorage.setItem(localStorageKey, JSON.stringify(value)),
+  );
+
+  return localStoragePubSub;
+}
+
+const summarizeLinksSettingPubSub = createLocalStoragePubSub(
+  "summarizeLinks",
+  false,
+);
+const [, , getSummarizeLinksSetting] = summarizeLinksSettingPubSub;
+
+const useLargerModelSettingPubSub = createLocalStoragePubSub(
+  "useLargerModel",
+  false,
+);
+const [, , getUseLargerModelSetting] = useLargerModelSettingPubSub;
 
 if (import.meta.env.DEV) import("./devTools");
 
@@ -31,8 +58,6 @@ const searchResultsPubSub = createPubSub<SearchResults>([]);
 const [updateSearchResults, , getSearchResults] = searchResultsPubSub;
 const urlsDescriptionsPubSub = createPubSub<Record<string, string>>({});
 const [updateUrlsDescriptions, , getUrlsDescriptions] = urlsDescriptionsPubSub;
-const finishedRespondingPubSub = createPubSub(false);
-const [updateFinishedResponding] = finishedRespondingPubSub;
 
 const searchQueryKey = "searchQuery";
 
@@ -40,7 +65,6 @@ const urlParams = new URLSearchParams(window.location.search);
 const debug = urlParams.has("debug");
 const query = urlParams.get("q");
 const Worker = urlParams.has("disableWorkers") ? undefined : window.Worker;
-const useLargerModel = urlParams.has("useLargerModel");
 
 const sleep = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -97,7 +121,7 @@ async function main() {
       TinyLlama: "TinyLlama-1.1B-1T-OpenOrca-q4f32_1",
     };
 
-    const selectedModel = useLargerModel
+    const selectedModel = getUseLargerModelSetting()
       ? availableModels.Mistral
       : availableModels.TinyLlama;
 
@@ -176,8 +200,9 @@ async function main() {
 
     await chat.resetChat();
 
-    for (const [title, snippet, url] of getSearchResults()) {
-      const request = dedent`
+    if (getSummarizeLinksSetting()) {
+      for (const [title, snippet, url] of getSearchResults()) {
+        const request = dedent`
         Check this link:
 
         [${title}](${url} "${snippet}")
@@ -185,18 +210,19 @@ async function main() {
         Now tell me, what is this link about?
       `;
 
-      await chat.generate(request, (_, message) => {
-        if (message.length === 0) {
-          chat.interruptGenerate();
-        } else {
-          updateUrlsDescriptions({
-            ...getUrlsDescriptions(),
-            [url]: message,
-          });
-        }
-      });
+        await chat.generate(request, (_, message) => {
+          if (message.length === 0) {
+            chat.interruptGenerate();
+          } else {
+            updateUrlsDescriptions({
+              ...getUrlsDescriptions(),
+              [url]: message,
+            });
+          }
+        });
 
-      await chat.resetChat();
+        await chat.resetChat();
+      }
     }
 
     if (debug) {
@@ -206,8 +232,6 @@ async function main() {
     }
 
     chat.unload();
-
-    updateFinishedResponding(true);
   } catch (error) {
     if (error instanceof Error) {
       console.warn(dedent`
@@ -225,7 +249,7 @@ async function main() {
       ? "Xenova/LaMini-Flan-T5-248M"
       : "Xenova/LaMini-Flan-T5-783M";
 
-    const text2TextGenerationModel = useLargerModel
+    const text2TextGenerationModel = getUseLargerModelSetting()
       ? largerModel
       : defaultModel;
 
@@ -240,28 +264,6 @@ async function main() {
       }
 
       await sleep(text.length);
-    };
-
-    const updateUrlsDescriptionsWithTypingEffect = async (
-      url: string,
-      description: string,
-    ) => {
-      let newDescription = "";
-      updateUrlsDescriptions({
-        ...getUrlsDescriptions(),
-        [url]: newDescription,
-      });
-
-      for (const character of description) {
-        newDescription = newDescription + character;
-        updateUrlsDescriptions({
-          ...getUrlsDescriptions(),
-          [url]: newDescription,
-        });
-        await sleep(5);
-      }
-
-      await sleep(description.length);
     };
 
     const filesProgress: Record<string, number> = {};
@@ -341,17 +343,39 @@ async function main() {
 
     await updateResponseWithTypingEffect(response);
 
-    for (const [title, snippet, url] of getSearchResults()) {
-      const request = dedent`
+    if (getSummarizeLinksSetting()) {
+      const updateUrlsDescriptionsWithTypingEffect = async (
+        url: string,
+        description: string,
+      ) => {
+        let newDescription = "";
+        updateUrlsDescriptions({
+          ...getUrlsDescriptions(),
+          [url]: newDescription,
+        });
+
+        for (const character of description) {
+          newDescription = newDescription + character;
+          updateUrlsDescriptions({
+            ...getUrlsDescriptions(),
+            [url]: newDescription,
+          });
+          await sleep(5);
+        }
+
+        await sleep(description.length);
+      };
+
+      for (const [title, snippet, url] of getSearchResults()) {
+        const request = dedent`
         [${title}](${url} "${snippet}")
 
         This link is about...
       `;
-      const [output] = await generate(request);
-      await updateUrlsDescriptionsWithTypingEffect(url, output);
+        const [output] = await generate(request);
+        await updateUrlsDescriptionsWithTypingEffect(url, output);
+      }
     }
-
-    updateFinishedResponding(true);
 
     await generator.dispose();
   }
@@ -360,6 +384,45 @@ async function main() {
 }
 
 main();
+
+function ConfigForm() {
+  const [summarizeLinks, setSummarizeLinks] = usePubSub(
+    summarizeLinksSettingPubSub,
+  );
+  const [useLargerModel, setUseLargerModel] = usePubSub(
+    useLargerModelSettingPubSub,
+  );
+
+  return (
+    <details>
+      <summary>Settings</summary>
+      <div>
+        <label>
+          <input
+            type="checkbox"
+            checked={summarizeLinks}
+            onChange={(event) => {
+              setSummarizeLinks(event.target.checked);
+            }}
+          />
+          Summarize links
+        </label>
+      </div>
+      <div>
+        <label>
+          <input
+            type="checkbox"
+            checked={useLargerModel}
+            onChange={(event) => {
+              setUseLargerModel(event.target.checked);
+            }}
+          />
+          Use a larger model
+        </label>
+      </div>
+    </details>
+  );
+}
 
 function SearchForm() {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -372,7 +435,7 @@ function SearchForm() {
     }
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     localStorage.removeItem(searchQueryKey);
     startSearching();
@@ -438,13 +501,11 @@ function ResponseView({
   response,
   searchResults,
   urlsDescriptions,
-  finishedResponding,
 }: {
   prompt: string;
   response: string;
   searchResults: SearchResults;
   urlsDescriptions: Record<string, string>;
-  finishedResponding: boolean;
 }) {
   return (
     <>
@@ -472,29 +533,6 @@ function ResponseView({
           "Searching the Web..."
         )}
       </div>
-      {finishedResponding && !useLargerModel && (
-        <>
-          <hr />
-          <div
-            style={{
-              marginTop: "15px",
-              textAlign: "center",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "0.6em",
-                fontStyle: "italic",
-              }}
-            >
-              Not the response you were looking for?{" "}
-              <a href={`${window.location.search}&useLargerModel`}>
-                Try again with a larger model
-              </a>
-            </span>
-          </div>
-        </>
-      )}
     </>
   );
 }
@@ -504,7 +542,6 @@ function App() {
   const [response] = usePubSub(responsePubSub);
   const [searchResults] = usePubSub(searchResultsPubSub);
   const [urlsDescriptions] = usePubSub(urlsDescriptionsPubSub);
-  const [finishedResponding] = usePubSub(finishedRespondingPubSub);
 
   return (
     <>
@@ -514,10 +551,12 @@ function App() {
           response={response}
           searchResults={searchResults}
           urlsDescriptions={urlsDescriptions}
-          finishedResponding={finishedResponding}
         />
       ) : (
-        <SearchForm />
+        <>
+          <SearchForm />
+          <ConfigForm />
+        </>
       )}
     </>
   );
