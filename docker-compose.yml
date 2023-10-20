@@ -2,7 +2,7 @@ version: "3"
 
 services:
   development-server:
-    image: node:20
+    image: node:21
     volumes:
       - .:/home/node/app
     working_dir: /home/node/app

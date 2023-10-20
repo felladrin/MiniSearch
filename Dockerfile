@@ -1,4 +1,4 @@
-FROM node:20
+FROM node:21
 WORKDIR /home/node/app
 COPY . .
 RUN chown -R node:node /home/node/app
