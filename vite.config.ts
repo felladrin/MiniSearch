@@ -4,7 +4,7 @@ import { VitePluginNode } from "vite-plugin-node";
 
 export default defineConfig(({ command }) => ({
   build: {
-    target: 'esnext'
+    target: "esnext",
   },
   plugins: [
     react(),
