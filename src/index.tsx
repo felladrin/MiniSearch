@@ -295,11 +295,7 @@ async function main() {
         progress_callback: (e: { file: string; progress: number }) => {
           filesProgress[e.file] = e.progress ?? 100;
           const lowestProgress = Math.min(...Object.values(filesProgress));
-          updateResponse(dedent`
-            Loading: ${lowestProgress.toFixed(0)}%
-
-            It may take a while to load for the first time, but next time it will load instantly.
-          `);
+          updateResponse(`Loading: ${lowestProgress.toFixed(0)}%`);
         },
       },
     );
@@ -328,11 +324,7 @@ async function main() {
         progress_callback: (e: { file: string; progress: number }) => {
           filesProgress[e.file] = e.progress ?? 100;
           const lowestProgress = Math.min(...Object.values(filesProgress));
-          updateResponse(dedent`
-            Loading: ${lowestProgress.toFixed(0)}%
-
-            It may take a while to load for the first time, but next time it will load instantly.
-          `);
+          updateResponse(`Loading: ${lowestProgress.toFixed(0)}%`);
         },
       },
     );
