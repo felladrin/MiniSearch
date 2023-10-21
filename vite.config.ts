@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 import { VitePluginNode } from "vite-plugin-node";
 
 export default defineConfig(({ command }) => ({
+  build: {
+    target: 'esnext'
+  },
   plugins: [
     react(),
     ...(command === "serve"
