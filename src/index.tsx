@@ -11,6 +11,24 @@ import { pipeline } from "@xenova/transformers";
 import MobileDetect from "mobile-detect";
 import "water.css/out/water.css";
 
+let isWebGPUAvailable = "gpu" in navigator;
+
+if (isWebGPUAvailable) {
+  try {
+    const adapter = await (
+      navigator as unknown as {
+        gpu: { requestAdapter: () => Promise<never> };
+      }
+    ).gpu.requestAdapter();
+    if (!adapter) {
+      throw Error("Couldn't request WebGPU adapter.");
+    }
+    isWebGPUAvailable = true;
+  } catch (error) {
+    isWebGPUAvailable = false;
+  }
+}
+
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   const localStorageValue = localStorage.getItem(localStorageKey);
   const localStoragePubSub = createPubSub(
@@ -102,6 +120,8 @@ async function main() {
   updateSearchResults(decodeSearchResults(searchResults));
 
   try {
+    if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
+
     const chat = Worker
       ? new webLLM.ChatWorkerClient(
           new Worker(new URL("./webLlmWorker.ts", import.meta.url), {
