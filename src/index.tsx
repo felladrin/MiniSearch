@@ -288,16 +288,19 @@ async function main() {
 
     const filesProgress: Record<string, number> = {};
 
+    const handleModelLoadingProgress = (e: {
+      file: string;
+      progress: number;
+    }) => {
+      filesProgress[e.file] = e.progress ?? 100;
+      const lowestProgress = Math.min(...Object.values(filesProgress));
+      updateResponse(`Loading: ${lowestProgress.toFixed(0)}%`);
+    };
+
     const answerer = await pipeline(
       "question-answering",
       "Xenova/distilbert-base-cased-distilled-squad",
-      {
-        progress_callback: (e: { file: string; progress: number }) => {
-          filesProgress[e.file] = e.progress ?? 100;
-          const lowestProgress = Math.min(...Object.values(filesProgress));
-          updateResponse(`Loading: ${lowestProgress.toFixed(0)}%`);
-        },
-      },
+      { progress_callback: handleModelLoadingProgress },
     );
 
     const textGenerationConfig = {
@@ -320,13 +323,7 @@ async function main() {
     const generator = await pipeline(
       "text2text-generation",
       text2TextGenerationModel,
-      {
-        progress_callback: (e: { file: string; progress: number }) => {
-          filesProgress[e.file] = e.progress ?? 100;
-          const lowestProgress = Math.min(...Object.values(filesProgress));
-          updateResponse(`Loading: ${lowestProgress.toFixed(0)}%`);
-        },
-      },
+      { progress_callback: handleModelLoadingProgress },
     );
 
     await updateResponseWithTypingEffect("Preparing response...");
