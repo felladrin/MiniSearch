@@ -441,7 +441,7 @@ function SearchForm() {
   const searchQuery = localStorage.getItem(searchQueryKey) ?? "";
 
   const startSearching = () => {
-    if (textAreaRef.current) {
+    if (textAreaRef.current && textAreaRef.current.value.trim().length > 0) {
       const encodedQuery = encodeURIComponent(textAreaRef.current?.value);
       window.location.href = `./?q=${encodedQuery}`;
     }
