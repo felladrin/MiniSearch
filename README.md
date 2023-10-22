@@ -13,18 +13,8 @@ A minimalist search engine with integrated browser-based AI.
 - Optimized: Aims for the balance between size and performance
 - Open-source: The code is available for inspection and contribution
 
-## Getting Started
-
-### With Docker
+## Getting Started With Docker Compose
 
 Start developing by running `docker-compose up`.
 
 When ready for production, run `docker-compose -f docker-compose.production.yml up`.
-
-### Without Docker
-
-After cloning the repository, run `npm ci` to install the dependencies.
-
-Start developing by running `npm run dev`.
-
-When ready for production, run `npm start`.

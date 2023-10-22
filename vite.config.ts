@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 import { VitePluginNode } from "vite-plugin-node";
 
 export default defineConfig(({ command }) => ({
+  server: {
+    port: process.env.PORT ? Number(process.env.PORT) : undefined,
+  },
   build: {
     target: "esnext",
   },
