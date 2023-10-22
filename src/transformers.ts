@@ -18,13 +18,13 @@ export async function preloadModels(params: {
     "question-answering",
     "Xenova/distilbert-base-cased-distilled-squad",
     { progress_callback: params.handleModelLoadingProgress },
-  ).then((answerer) => answerer.dispose());
+  ).then(async (answerer) => await answerer.dispose());
 
   const generatorPromise = pipeline(
     "text2text-generation",
     params.textToTextGenerationModel,
     { progress_callback: params.handleModelLoadingProgress },
-  ).then((generator) => generator.dispose());
+  ).then(async (generator) => await generator.dispose());
 
   await Promise.allSettled([answererPromise, generatorPromise]);
 }
@@ -44,7 +44,7 @@ export async function runQuestionAnsweringPipeline(params: {
     textGenerationConfig,
   );
 
-  answerer.dispose();
+  await answerer.dispose();
 
   return answer as string;
 }
@@ -60,7 +60,7 @@ export async function runTextToTextGenerationPipeline(params: {
 
   const [response] = await generator(params.input, textGenerationConfig);
 
-  generator.dispose();
+  await generator.dispose();
 
   return response as string;
 }
