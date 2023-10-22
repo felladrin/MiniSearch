@@ -4,7 +4,7 @@ import open from "open";
 
 async function search(query: string, limit?: number) {
   try {
-    const url = new URL("http://localhost:8080/search");
+    const url = new URL("http://0.0.0.0:8080/search");
     url.search = new URLSearchParams({
       q: query,
       language: "auto",
