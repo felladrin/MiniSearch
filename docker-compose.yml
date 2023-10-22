@@ -13,5 +13,5 @@ services:
       - .:/app
     command:
       [
-        "/sbin/tini -- /usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & npm install && npm run dev -- --host",
+        "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & npm install && npm run dev -- --host",
       ]

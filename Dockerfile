@@ -7,4 +7,4 @@ WORKDIR /app
 COPY . .
 RUN npm ci
 ENTRYPOINT [ "/bin/sh", "-c" ]
-CMD [ "/sbin/tini -- /usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & npm start" ]
+CMD [ "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & npm start" ]
