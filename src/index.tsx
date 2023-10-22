@@ -339,22 +339,15 @@ async function main() {
 
     const paramsForResponse = {
       input: dedent`
-          QUESTION:
-          ${query}
-          
-          PROBABLE ANSWER:
-          ${answer}
-  
-          RELATED LINKS FROM WEB:
-          ${getSearchResults()
-            .map(
-              ([title, snippet, url], index) =>
-                `${index + 1}. [${title}](${url} "${snippet}")`,
-            )
-            .join("\n")}
-          
-          YOUR ANSWER:
-        `,
+        Context:
+        ${getSearchResults()
+          .map(([title, snippet]) => `- ${title}: ${snippet}`)
+          .join("\n")}
+        - ${answer}
+        
+        Question:
+        ${query}
+      `,
       textToTextGenerationModel,
     };
 
@@ -392,9 +385,12 @@ async function main() {
 
       for (const [title, snippet, url] of getSearchResults()) {
         const request = dedent`
-          [${title}](${url} "${snippet}")
+          Context:
+          Link title: ${title}
+          Link snippet: ${snippet}
 
-          This link is about...
+          Question:
+          What is this link about?
         `;
         const paramsForOutput = {
           input: request,
