@@ -7,7 +7,13 @@ import { usePubSub } from "create-pubsub/react";
 import Markdown from "markdown-to-jsx";
 import he from "he";
 import LoadBar from "loadbar";
-import { pipeline } from "@xenova/transformers";
+import {
+  preloadModels,
+  runQuestionAnsweringPipeline,
+  runTextToTextGenerationPipeline,
+} from "./transformers";
+import { createWorker } from "../node_modules/typed-worker/dist";
+import { type Actions } from "./transformersWorker";
 import MobileDetect from "mobile-detect";
 import "water.css/out/water.css";
 
@@ -269,7 +275,7 @@ async function main() {
       ? "Xenova/LaMini-Flan-T5-248M"
       : "Xenova/LaMini-Flan-T5-783M";
 
-    const text2TextGenerationModel = getUseLargerModelSetting()
+    const textToTextGenerationModel = getUseLargerModelSetting()
       ? largerModel
       : defaultModel;
 
@@ -297,58 +303,67 @@ async function main() {
       updateResponse(`Loading: ${lowestProgress.toFixed(0)}%`);
     };
 
-    const answerer = await pipeline(
-      "question-answering",
-      "Xenova/distilbert-base-cased-distilled-squad",
-      { progress_callback: handleModelLoadingProgress },
-    );
-
-    const textGenerationConfig = {
-      min_length: 32,
-      max_new_tokens: 256,
-      no_repeat_ngram_size: 2,
-      num_beams: 2,
-    };
-
-    const { answer } = await answerer(
-      query,
-      getSearchResults()
-        .map(([title, snippet], index) => `${index + 1}. ${title} - ${snippet}`)
-        .join("\n"),
-      textGenerationConfig,
-    );
-
-    answerer.dispose();
-
-    const generator = await pipeline(
-      "text2text-generation",
-      text2TextGenerationModel,
-      { progress_callback: handleModelLoadingProgress },
-    );
+    await preloadModels({
+      handleModelLoadingProgress,
+      textToTextGenerationModel,
+    });
 
     await updateResponseWithTypingEffect("Preparing response...");
 
-    const generate = async (input: string): Promise<string> => {
-      return generator(input, textGenerationConfig);
+    let transformersWorker:
+      | ReturnType<typeof createWorker<Actions>>
+      | undefined;
+
+    if (Worker) {
+      transformersWorker = createWorker<Actions>(
+        () =>
+          new Worker(new URL("./transformersWorker", import.meta.url), {
+            type: "module",
+          }),
+      );
+    }
+
+    const paramsForAnswer = {
+      question: query,
+      context: getSearchResults()
+        .map(([title, snippet], index) => `${index + 1}. ${title} - ${snippet}`)
+        .join("\n"),
     };
 
-    const [response] = await generate(dedent`
-      QUESTION:
-      ${query}
-      
-      PROBABLE ANSWER:
-      ${answer}
-
-      RELATED LINKS FROM WEB:
-      ${getSearchResults()
-        .map(
-          ([title, snippet, url], index) =>
-            `${index + 1}. [${title}](${url} "${snippet}")`,
+    const answer = transformersWorker
+      ? await transformersWorker.run(
+          "runQuestionAnsweringPipeline",
+          paramsForAnswer,
         )
-        .join("\n")}
-      
-      YOUR ANSWER:
-    `);
+      : await runQuestionAnsweringPipeline(paramsForAnswer);
+
+    const paramsForResponse = {
+      input: dedent`
+          QUESTION:
+          ${query}
+          
+          PROBABLE ANSWER:
+          ${answer}
+  
+          RELATED LINKS FROM WEB:
+          ${getSearchResults()
+            .map(
+              ([title, snippet, url], index) =>
+                `${index + 1}. [${title}](${url} "${snippet}")`,
+            )
+            .join("\n")}
+          
+          YOUR ANSWER:
+        `,
+      textToTextGenerationModel,
+    };
+
+    const response = transformersWorker
+      ? await transformersWorker.run(
+          "runTextToTextGenerationPipeline",
+          paramsForResponse,
+        )
+      : await runTextToTextGenerationPipeline(paramsForResponse);
 
     await updateResponseWithTypingEffect(response);
 
@@ -377,16 +392,27 @@ async function main() {
 
       for (const [title, snippet, url] of getSearchResults()) {
         const request = dedent`
-        [${title}](${url} "${snippet}")
+          [${title}](${url} "${snippet}")
 
-        This link is about...
-      `;
-        const [output] = await generate(request);
+          This link is about...
+        `;
+        const paramsForOutput = {
+          input: request,
+          textToTextGenerationModel,
+        };
+        const output = transformersWorker
+          ? await transformersWorker.run(
+              "runTextToTextGenerationPipeline",
+              paramsForOutput,
+            )
+          : await runTextToTextGenerationPipeline(paramsForOutput);
         await updateUrlsDescriptionsWithTypingEffect(url, output);
       }
-    }
 
-    await generator.dispose();
+      if (transformersWorker) {
+        transformersWorker.destroy();
+      }
+    }
   }
 
   loadBar.done();

@@ -27,6 +27,7 @@
     "react-dom": "^18.2.0",
     "ts-dedent": "^2.2.0",
     "tsx": "^3.13.0",
+    "typed-worker": "^1.0.4",
     "vconsole": "^3.15.1",
     "water.css": "^2.1.1"
   },
