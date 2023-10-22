@@ -2,47 +2,38 @@ import fetch from "node-fetch";
 import express from "express";
 import open from "open";
 
-type SearchResults = [title: string, abstract: string, url: string][];
-
 async function search(query: string, limit?: number) {
   try {
-    query = encodeURIComponent(query.replace(/"/g, '\\"'));
-    const html = await fetch(`https://duckduckgo.com/?q=${query}`).then((res) =>
-      res.text(),
-    );
-    const matches = html.match(/vqd=['"](\d+-\d+(?:-\d+)?)['"]/);
-    const vqd = matches ? matches[1] : null;
-    if (!vqd) {
-      return [];
-    }
-    const url = `https://links.duckduckgo.com/d.js?q=${query}&o=json&vqd=${vqd}`;
-    const res = await fetch(url).then((res) => res.text());
-    const result = JSON.parse(res);
-    const searchResults: SearchResults = [];
-    if (result.results) {
-      let results = result.results;
-
+    const url = new URL("http://localhost:8080/search");
+    url.search = new URLSearchParams({
+      q: query,
+      language: "auto",
+      safesearch: "0",
+      format: "json",
+    }).toString();
+    const response = await fetch(url);
+    let { results } = (await response.json()) as {
+      results: { url: string; title: string; content: string }[];
+    };
+    const searchResults: [title: string, content: string, url: string][] = [];
+    if (results) {
       if (limit && limit > 0) {
         results = results.slice(0, limit);
       }
 
       for (const result of results) {
-        if (result.n) continue;
-
-        let abstract = result.a as string;
-
-        if (!abstract || abstract === "") continue;
-
         const stripHtmlTags = (str: string) => str.replace(/<[^>]*>?/gm, "");
 
-        const title = stripHtmlTags(result.t);
-        abstract = stripHtmlTags(abstract);
-        const url = result.u as string;
+        const content = stripHtmlTags(result.content).trim();
 
-        searchResults.push([title, abstract, url]);
+        if (content === "") continue;
+
+        const title = stripHtmlTags(result.title);
+        const url = result.url as string;
+
+        searchResults.push([title, content, url]);
       }
     }
-
     return searchResults;
   } catch (e) {
     console.error(e);

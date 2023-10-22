@@ -2,13 +2,16 @@ version: "3"
 
 services:
   development-server:
-    image: node:20
-    volumes:
-      - .:/home/node/app
-    working_dir: /home/node/app
+    environment:
+      - PORT=${PORT:-7860}
     ports:
       - "${PORT:-7860}:7860"
+    build:
+      dockerfile: Dockerfile
+      context: .
+    volumes:
+      - .:/app
     command:
-      - "sh"
-      - "-c"
-      - "npm install && npm run dev"
+      [
+        "/sbin/tini -- /usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & npm install && npm run dev -- --host",
+      ]

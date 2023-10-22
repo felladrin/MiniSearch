@@ -2,6 +2,8 @@ version: "3"
 
 services:
   production-server:
+    environment:
+      - PORT=${PORT:-7860}
     ports:
       - "${PORT:-7860}:7860"
     build:
