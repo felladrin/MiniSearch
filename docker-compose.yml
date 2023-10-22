@@ -10,7 +10,7 @@ services:
       dockerfile: Dockerfile
       context: .
     volumes:
-      - .:/app
+      - .:/home/user/app/
     command:
       [
         "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & npm install && npm run dev -- --host",
