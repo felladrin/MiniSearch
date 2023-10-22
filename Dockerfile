@@ -3,6 +3,7 @@ ENV PORT ${PORT:-7860}
 EXPOSE ${PORT}
 RUN sed -i 's/- html/- json/' /usr/local/searxng/searx/settings.yml
 RUN sed -i 's/su-exec searxng:searxng //' /usr/local/searxng/dockerfiles/docker-entrypoint.sh
+RUN mkdir -p /etc/searxng && chmod 777 /etc/searxng
 RUN apk add --update nodejs npm
 RUN adduser -D -u 1000 user
 USER user
