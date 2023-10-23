@@ -7,11 +7,7 @@ import { usePubSub } from "create-pubsub/react";
 import Markdown from "markdown-to-jsx";
 import he from "he";
 import LoadBar from "loadbar";
-import {
-  preloadModels,
-  runQuestionAnsweringPipeline,
-  runTextToTextGenerationPipeline,
-} from "./transformers";
+import { preloadModels, runTextToTextGenerationPipeline } from "./transformers";
 import { createWorker } from "../node_modules/typed-worker/dist";
 import { type Actions } from "./transformersWorker";
 import MobileDetect from "mobile-detect";
@@ -323,27 +319,12 @@ async function main() {
       );
     }
 
-    const paramsForAnswer = {
-      question: query,
-      context: getSearchResults()
-        .map(([title, snippet], index) => `${index + 1}. ${title} - ${snippet}`)
-        .join("\n"),
-    };
-
-    const answer = transformersWorker
-      ? await transformersWorker.run(
-          "runQuestionAnsweringPipeline",
-          paramsForAnswer,
-        )
-      : await runQuestionAnsweringPipeline(paramsForAnswer);
-
     const paramsForResponse = {
       input: dedent`
         Context:
         ${getSearchResults()
           .map(([title, snippet]) => `- ${title}: ${snippet}`)
           .join("\n")}
-        - ${answer}
         
         Question:
         ${query}
