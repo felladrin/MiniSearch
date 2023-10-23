@@ -66,8 +66,6 @@ const [, , getUseLargerModelSetting] = useLargerModelSettingPubSub;
 
 if (import.meta.env.DEV) import("./devTools");
 
-const mobileDetect = new MobileDetect(window.navigator.userAgent);
-
 const loadBar = new LoadBar({
   height: "4px",
   backgroundColor: "var(--focus)",
@@ -91,6 +89,10 @@ const urlParams = new URLSearchParams(window.location.search);
 const debug = urlParams.has("debug");
 const query = urlParams.get("q");
 const Worker = urlParams.has("disableWorkers") ? undefined : window.Worker;
+
+const mobileDetect = new MobileDetect(window.navigator.userAgent);
+const isRunningOnMobile =
+  mobileDetect.mobile() !== null && !urlParams.has("desktopMode");
 
 const sleep = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -271,13 +273,9 @@ async function main() {
       `);
     }
 
-    const defaultModel = mobileDetect.mobile()
-      ? "Xenova/LaMini-Flan-T5-77M"
-      : "Xenova/LaMini-Flan-T5-248M";
+    const defaultModel = "Xenova/LaMini-Flan-T5-77M";
 
-    const largerModel = mobileDetect.mobile()
-      ? "Xenova/LaMini-Flan-T5-248M"
-      : "Xenova/LaMini-Flan-T5-783M";
+    const largerModel = "Xenova/LaMini-Flan-T5-248M";
 
     const textToTextGenerationModel = getUseLargerModelSetting()
       ? largerModel
@@ -310,6 +308,7 @@ async function main() {
     await preloadModels({
       handleModelLoadingProgress,
       textToTextGenerationModel,
+      quantized: isRunningOnMobile,
     });
 
     await updateResponseWithTypingEffect("Preparing response...");
@@ -339,6 +338,7 @@ async function main() {
         ${query}
       `,
         textToTextGenerationModel,
+        quantized: isRunningOnMobile,
       };
 
       const response = transformersWorker
@@ -383,16 +383,20 @@ async function main() {
           Question:
           What is this link about?
         `;
+
         const paramsForOutput = {
           input: request,
           textToTextGenerationModel,
+          quantized: isRunningOnMobile,
         };
+
         const output = transformersWorker
           ? await transformersWorker.run(
               "runTextToTextGenerationPipeline",
               paramsForOutput,
             )
           : await runTextToTextGenerationPipeline(paramsForOutput);
+
         await updateUrlsDescriptionsWithTypingEffect(url, output);
       }
 
