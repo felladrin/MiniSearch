@@ -46,6 +46,12 @@ function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   return localStoragePubSub;
 }
 
+const disableAiResponseSettingPubSub = createLocalStoragePubSub(
+  "disableAiResponse",
+  false,
+);
+const [, , getDisableAiResponseSetting] = disableAiResponseSettingPubSub;
+
 const summarizeLinksSettingPubSub = createLocalStoragePubSub(
   "summarizeLinks",
   false,
@@ -109,10 +115,6 @@ function decodeSearchResults(searchResults: SearchResults): SearchResults {
 async function main() {
   if (query === null) return;
 
-  if (debug) console.time("Time Taken");
-
-  loadBar.start();
-
   document.title = query;
 
   updatePrompt(query);
@@ -120,6 +122,12 @@ async function main() {
   const searchResults: SearchResults = await search(query, 6);
 
   updateSearchResults(decodeSearchResults(searchResults));
+
+  if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
+
+  if (debug) console.time("Response Generation Time");
+
+  loadBar.start();
 
   try {
     if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
@@ -199,9 +207,10 @@ async function main() {
       appConfig,
     );
 
-    updateResponse("Preparing response...");
+    if (!getDisableAiResponseSetting()) {
+      updateResponse("Preparing response...");
 
-    await chat.generate(dedent`
+      await chat.generate(dedent`
       Keep in mind the following links. They might be useful for your response later, ok?
 
       ${getSearchResults()
@@ -212,15 +221,16 @@ async function main() {
         .join("\n")}
     `);
 
-    await chat.generate(query, (_, message) => {
-      if (message.length === 0) {
-        chat.interruptGenerate();
-      } else {
-        updateResponse(message);
-      }
-    });
+      await chat.generate(query, (_, message) => {
+        if (message.length === 0) {
+          chat.interruptGenerate();
+        } else {
+          updateResponse(message);
+        }
+      });
 
-    await chat.resetChat();
+      await chat.resetChat();
+    }
 
     if (getSummarizeLinksSetting()) {
       for (const [title, snippet, url] of getSearchResults()) {
@@ -249,8 +259,6 @@ async function main() {
 
     if (debug) {
       console.info(await chat.runtimeStatsText());
-
-      console.timeEnd("Time Taken");
     }
 
     chat.unload();
@@ -319,8 +327,9 @@ async function main() {
       );
     }
 
-    const paramsForResponse = {
-      input: dedent`
+    if (!getDisableAiResponseSetting()) {
+      const paramsForResponse = {
+        input: dedent`
         Context:
         ${getSearchResults()
           .map(([title, snippet]) => `- ${title}: ${snippet}`)
@@ -329,17 +338,18 @@ async function main() {
         Question:
         ${query}
       `,
-      textToTextGenerationModel,
-    };
+        textToTextGenerationModel,
+      };
 
-    const response = transformersWorker
-      ? await transformersWorker.run(
-          "runTextToTextGenerationPipeline",
-          paramsForResponse,
-        )
-      : await runTextToTextGenerationPipeline(paramsForResponse);
+      const response = transformersWorker
+        ? await transformersWorker.run(
+            "runTextToTextGenerationPipeline",
+            paramsForResponse,
+          )
+        : await runTextToTextGenerationPipeline(paramsForResponse);
 
-    await updateResponseWithTypingEffect(response);
+      await updateResponseWithTypingEffect(response);
+    }
 
     if (getSummarizeLinksSetting()) {
       const updateUrlsDescriptionsWithTypingEffect = async (
@@ -393,11 +403,18 @@ async function main() {
   }
 
   loadBar.done();
+
+  if (debug) {
+    console.timeEnd("Response Generation Time");
+  }
 }
 
 main();
 
 function ConfigForm() {
+  const [disableAiResponse, setDisableAiResponse] = usePubSub(
+    disableAiResponseSettingPubSub,
+  );
   const [summarizeLinks, setSummarizeLinks] = usePubSub(
     summarizeLinksSettingPubSub,
   );
@@ -412,10 +429,18 @@ function ConfigForm() {
         <label>
           <input
             type="checkbox"
+            checked={disableAiResponse}
+            onChange={(event) => setDisableAiResponse(event.target.checked)}
+          />
+          Disable AI response
+        </label>
+      </div>
+      <div>
+        <label>
+          <input
+            type="checkbox"
             checked={summarizeLinks}
-            onChange={(event) => {
-              setSummarizeLinks(event.target.checked);
-            }}
+            onChange={(event) => setSummarizeLinks(event.target.checked)}
           />
           Summarize links
         </label>
@@ -425,9 +450,7 @@ function ConfigForm() {
           <input
             type="checkbox"
             checked={useLargerModel}
-            onChange={(event) => {
-              setUseLargerModel(event.target.checked);
-            }}
+            onChange={(event) => setUseLargerModel(event.target.checked)}
           />
           Use a larger model
         </label>
@@ -531,10 +554,14 @@ function ResponseView({
       >
         <Markdown>{prompt}</Markdown>
       </blockquote>
-      <div>
-        <Markdown>{response}</Markdown>
-      </div>
-      <hr />
+      {!getDisableAiResponseSetting() && (
+        <>
+          <div>
+            <Markdown>{response}</Markdown>
+          </div>
+          <hr />
+        </>
+      )}
       <div>
         {searchResults.length > 0 ? (
           <SearchResultsList
