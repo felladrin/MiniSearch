@@ -17,4 +17,4 @@ A minimalist search engine with integrated browser-based AI.
 
 Start developing by running `docker-compose up`.
 
-When ready for production, run `docker-compose -f docker-compose.production.yml up`.
+When ready for production, run `docker-compose -f docker-compose.production.yml up --build`.
