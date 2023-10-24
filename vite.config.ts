@@ -4,7 +4,10 @@ import { VitePluginNode } from "vite-plugin-node";
 
 export default defineConfig(({ command }) => ({
   server: {
-    port: process.env.PORT ? Number(process.env.PORT) : undefined,
+    port: process.env.PORT ? Number(process.env.PORT) : 7860,
+    hmr: {
+      port: process.env.HMR_PORT ? Number(process.env.HMR_PORT) : 7861,
+    },
   },
   build: {
     target: "esnext",

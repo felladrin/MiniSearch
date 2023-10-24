@@ -4,8 +4,10 @@ services:
   development-server:
     environment:
       - PORT=${PORT:-7860}
+      - HMR_PORT=${HMR_PORT:-7861}
     ports:
       - "${PORT:-7860}:7860"
+      - "${HMR_PORT:-7861}:7861"
     build:
       dockerfile: Dockerfile
       context: .
