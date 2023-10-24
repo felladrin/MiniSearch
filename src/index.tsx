@@ -430,7 +430,7 @@ function ConfigForm() {
     <details>
       <summary>Settings</summary>
       <div>
-        <label>
+        <label title="Disables the AI response, in case you only want to see the links from the web search results">
           <input
             type="checkbox"
             checked={disableAiResponse}
@@ -440,7 +440,7 @@ function ConfigForm() {
         </label>
       </div>
       <div>
-        <label>
+        <label title="Provides a short overview for each of the links from the web search results">
           <input
             type="checkbox"
             checked={summarizeLinks}
@@ -450,13 +450,13 @@ function ConfigForm() {
         </label>
       </div>
       <div>
-        <label>
+        <label title="Generates better responses, but takes longer to load">
           <input
             type="checkbox"
             checked={useLargerModel}
             onChange={(event) => setUseLargerModel(event.target.checked)}
           />
-          Use a larger model
+          Use a better AI model
         </label>
       </div>
     </details>
