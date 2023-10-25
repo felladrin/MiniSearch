@@ -166,10 +166,14 @@ async function main() {
       conv_template: "llama-2",
       conv_config: {
         system: dedent`
-          <|im_start|>user: Hi!<|im_end|>
-          <|im_start|>assistant: Hello! How can I help you?<|im_end|>
-          <|im_start|>user: I'll ask and request a few things, and I'll need you to provide responses always formatted in Markdown, so that they can be easily read, ok?<|im_end|>
-          <|im_start|>assistant: Ok!
+          <|im_start|>user: You are a helpful assistant.<|im_end|>
+          <|im_start|>assistant: Yeah!<|im_end|>
+          <|im_start|>user: You feel happy to help with almost anything and will do your best to understand exactly what is needed.<|im_end|>
+          <|im_start|>assistant: Ok!<|im_end|>
+          <|im_start|>user: You also try to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer.<|im_end|>
+          <|im_start|>assistant: Sure!<|im_end|>
+          <|im_start|>user: That said, you are practical, do your best, and don't let caution get too much in the way of being useful.<|im_end|>
+          <|im_start|>assistant: I'll do my best to help you.
         `,
         roles: ["<|im_start|>user", "<|im_start|>assistant"],
         seps: ["<|im_end|>\n"],
@@ -212,24 +216,26 @@ async function main() {
     if (!getDisableAiResponseSetting()) {
       updateResponse("Preparing response...");
 
-      await chat.generate(dedent`
-      Keep in mind the following links. They might be useful for your response later, ok?
-
-      ${getSearchResults()
-        .map(
-          ([title, snippet, url], index) =>
-            `${index + 1}. [${title}](${url} "${snippet}")`,
-        )
-        .join("\n")}
-    `);
-
-      await chat.generate(query, (_, message) => {
-        if (message.length === 0) {
-          chat.interruptGenerate();
-        } else {
-          updateResponse(message);
-        }
-      });
+      await chat.generate(
+        dedent`
+          Context:
+          ${getSearchResults()
+            .map(([title, snippet]) => `- ${title}: ${snippet}`)
+            .join("\n")}
+          
+          Provide an answer for the question below. If you don't know the answer, you can base your answer on the context above.
+          
+          Question:
+          ${query}
+        `,
+        (_, message) => {
+          if (message.length === 0) {
+            chat.interruptGenerate();
+          } else {
+            updateResponse(message);
+          }
+        },
+      );
 
       await chat.resetChat();
     }
@@ -237,12 +243,13 @@ async function main() {
     if (getSummarizeLinksSetting()) {
       for (const [title, snippet, url] of getSearchResults()) {
         const request = dedent`
-        Check this link:
+          Context:
+          Link title: ${title}
+          Link snippet: ${snippet}
 
-        [${title}](${url} "${snippet}")
-
-        Now tell me, what is this link about?
-      `;
+          Question:
+          What is this link about?
+        `;
 
         await chat.generate(request, (_, message) => {
           if (message.length === 0) {
@@ -266,8 +273,8 @@ async function main() {
     chat.unload();
   } catch (error) {
     if (error instanceof Error) {
-      console.warn(dedent`
-        Failed to load web-llm chat module: ${error.message}
+      console.info(dedent`
+        Could not load web-llm chat module: ${error.message}
 
         Falling back to transformers.js.
       `);
