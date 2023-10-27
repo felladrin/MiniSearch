@@ -1,4 +1,3 @@
-import * as webLLM from "@mlc-ai/web-llm";
 import { dedent } from "ts-dedent";
 import { useEffect, useRef, FormEvent } from "react";
 import { createRoot } from "react-dom/client";
@@ -7,10 +6,6 @@ import { usePubSub } from "create-pubsub/react";
 import Markdown from "markdown-to-jsx";
 import he from "he";
 import LoadBar from "loadbar";
-import { preloadModels, runTextToTextGenerationPipeline } from "./transformers";
-import { createWorker } from "../node_modules/typed-worker/dist";
-import { type Actions } from "./transformersWorker";
-import MobileDetect from "mobile-detect";
 import "water.css/out/water.css";
 
 let isWebGPUAvailable = "gpu" in navigator;
@@ -90,10 +85,6 @@ const debug = urlParams.has("debug");
 const query = urlParams.get("q");
 const Worker = urlParams.has("disableWorkers") ? undefined : window.Worker;
 
-const mobileDetect = new MobileDetect(window.navigator.userAgent);
-const isRunningOnMobile =
-  mobileDetect.mobile() !== null && !urlParams.has("desktopMode");
-
 const sleep = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function search(query: string, limit?: number) {
@@ -134,19 +125,17 @@ async function main() {
   try {
     if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
 
+    const { ChatWorkerClient, ChatModule, hasModelInCache } = await import(
+      "@mlc-ai/web-llm"
+    );
+
     const chat = Worker
-      ? new webLLM.ChatWorkerClient(
+      ? new ChatWorkerClient(
           new Worker(new URL("./webLlmWorker.ts", import.meta.url), {
             type: "module",
           }),
         )
-      : new webLLM.ChatModule();
-
-    chat.setInitProgressCallback((report) =>
-      updateResponse(
-        `Loading: ${report.text.replaceAll("[", "(").replaceAll("]", ")")}`,
-      ),
-    );
+      : new ChatModule();
 
     const availableModels = {
       Mistral: "Mistral-7B-OpenOrca-q4f32_1",
@@ -206,6 +195,14 @@ async function main() {
           "https://huggingface.co/Felladrin/mlc-chat-TinyLlama-1.1B-1T-OpenOrca-q4f32_1/resolve/main/TinyLlama-1.1B-1T-OpenOrca-q4f32_1-webgpu.wasm",
       },
     };
+
+    if (!(await hasModelInCache(selectedModel, appConfig))) {
+      chat.setInitProgressCallback((report) =>
+        updateResponse(
+          `Loading: ${report.text.replaceAll("[", "(").replaceAll("]", ")")}`,
+        ),
+      );
+    }
 
     await chat.reload(
       selectedModel,
@@ -280,6 +277,17 @@ async function main() {
       `);
     }
 
+    const { preloadModels, runTextToTextGenerationPipeline } = await import(
+      "./transformers"
+    );
+
+    const { createWorker } = await import("../node_modules/typed-worker/dist");
+
+    const MobileDetect = (await import("mobile-detect")).default;
+
+    const isRunningOnMobile =
+      new MobileDetect(window.navigator.userAgent).mobile() !== null;
+
     const defaultModel = "Xenova/LaMini-Flan-T5-77M";
 
     const largerModel = "Xenova/LaMini-Flan-T5-248M";
@@ -319,6 +327,8 @@ async function main() {
     });
 
     await updateResponseWithTypingEffect("Preparing response...");
+
+    type Actions = import("./transformersWorker").Actions;
 
     let transformersWorker:
       | ReturnType<typeof createWorker<Actions>>
