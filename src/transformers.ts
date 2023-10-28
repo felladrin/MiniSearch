@@ -12,23 +12,36 @@ env.backends.onnx.wasm.wasmPaths = {
 };
 
 export async function preloadModels(params: {
-  handleModelLoadingProgress: (event: {
+  handleModelLoadingProgress?: (event: {
     file: string;
     progress: number;
   }) => void;
   textToTextGenerationModel: string;
   quantized: boolean;
 }) {
-  const generator = await pipeline(
-    "text2text-generation",
-    params.textToTextGenerationModel,
-    {
-      quantized: params.quantized,
-      progress_callback: params.handleModelLoadingProgress,
-    },
-  );
+  try {
+    const generator = await pipeline(
+      "text2text-generation",
+      params.textToTextGenerationModel,
+      {
+        quantized: params.quantized,
+        progress_callback:
+          params.handleModelLoadingProgress ??
+          ((event: { file: string; progress: number }) => {
+            self.postMessage({
+              type: "model-loading-progress",
+              payload: event,
+            });
+          }),
+      },
+    );
 
-  await generator.dispose();
+    await generator.dispose();
+
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 export async function runTextToTextGenerationPipeline(params: {
