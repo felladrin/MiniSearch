@@ -277,10 +277,6 @@ async function main() {
       `);
     }
 
-    const { preloadModels, runTextToTextGenerationPipeline } = await import(
-      "./transformers"
-    );
-
     const { createWorker } = await import("../node_modules/typed-worker/dist");
 
     const MobileDetect = (await import("mobile-detect")).default;
@@ -320,14 +316,6 @@ async function main() {
       updateResponse(`Loading: ${lowestProgress.toFixed(0)}%`);
     };
 
-    await preloadModels({
-      handleModelLoadingProgress,
-      textToTextGenerationModel,
-      quantized: isRunningOnMobile,
-    });
-
-    await updateResponseWithTypingEffect("Preparing response...");
-
     type Actions = import("./transformersWorker").Actions;
 
     let transformersWorker:
@@ -335,13 +323,47 @@ async function main() {
       | undefined;
 
     if (Worker) {
-      transformersWorker = createWorker<Actions>(
-        () =>
-          new Worker(new URL("./transformersWorker", import.meta.url), {
+      transformersWorker = createWorker<Actions>(() => {
+        const worker = new Worker(
+          new URL("./transformersWorker", import.meta.url),
+          {
             type: "module",
-          }),
-      );
+          },
+        );
+
+        worker.onmessage = (event) => {
+          if (event.data.type === "model-loading-progress") {
+            handleModelLoadingProgress(event.data.payload);
+          }
+        };
+
+        return worker;
+      });
     }
+
+    let preloadModels!: typeof import("./transformers").preloadModels;
+    let runTextToTextGenerationPipeline!: typeof import("./transformers").runTextToTextGenerationPipeline;
+
+    if (!transformersWorker) {
+      const transformersModule = await import("./transformers");
+      preloadModels = transformersModule.preloadModels;
+      runTextToTextGenerationPipeline =
+        transformersModule.runTextToTextGenerationPipeline;
+    }
+
+    const paramsForPreload = {
+      handleModelLoadingProgress: transformersWorker
+        ? undefined
+        : handleModelLoadingProgress,
+      textToTextGenerationModel,
+      quantized: isRunningOnMobile,
+    };
+
+    transformersWorker
+      ? await transformersWorker.run("preloadModels", paramsForPreload)
+      : await preloadModels(paramsForPreload);
+
+    await updateResponseWithTypingEffect("Preparing response...");
 
     if (!getDisableAiResponseSetting()) {
       const paramsForResponse = {

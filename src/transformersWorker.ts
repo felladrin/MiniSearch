@@ -1,7 +1,8 @@
 import { handleActions } from "../node_modules/typed-worker/dist";
-import { runTextToTextGenerationPipeline } from "./transformers";
+import { preloadModels, runTextToTextGenerationPipeline } from "./transformers";
 
 export const actions = {
+  preloadModels,
   runTextToTextGenerationPipeline,
 };
 
