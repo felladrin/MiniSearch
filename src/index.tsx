@@ -330,11 +330,14 @@ async function main() {
           },
         );
 
-        worker.onmessage = (event) => {
-          if (event.data.type === "model-loading-progress") {
-            handleModelLoadingProgress?.(event.data.payload);
+        worker.addEventListener("message", (event) => {
+          if (
+            handleModelLoadingProgress &&
+            event.data.type === "model-loading-progress"
+          ) {
+            handleModelLoadingProgress(event.data.payload);
           }
-        };
+        });
 
         return worker;
       });
