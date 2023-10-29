@@ -307,10 +307,9 @@ async function main() {
 
     const filesProgress: Record<string, number> = {};
 
-    const handleModelLoadingProgress = (e: {
-      file: string;
-      progress: number;
-    }) => {
+    let handleModelLoadingProgress:
+      | ((e: { file: string; progress: number }) => void)
+      | undefined = (e: { file: string; progress: number }) => {
       filesProgress[e.file] = e.progress ?? 100;
       const lowestProgress = Math.min(...Object.values(filesProgress));
       updateResponse(`Loading: ${lowestProgress.toFixed(0)}%`);
@@ -333,7 +332,7 @@ async function main() {
 
         worker.onmessage = (event) => {
           if (event.data.type === "model-loading-progress") {
-            handleModelLoadingProgress(event.data.payload);
+            handleModelLoadingProgress?.(event.data.payload);
           }
         };
 
@@ -341,41 +340,30 @@ async function main() {
       });
     }
 
-    let preloadModels!: typeof import("./transformers").preloadModels;
     let runTextToTextGenerationPipeline!: typeof import("./transformers").runTextToTextGenerationPipeline;
 
     if (!transformersWorker) {
       const transformersModule = await import("./transformers");
-      preloadModels = transformersModule.preloadModels;
       runTextToTextGenerationPipeline =
         transformersModule.runTextToTextGenerationPipeline;
     }
-
-    const paramsForPreload = {
-      handleModelLoadingProgress: transformersWorker
-        ? undefined
-        : handleModelLoadingProgress,
-      textToTextGenerationModel,
-      quantized: isRunningOnMobile,
-    };
-
-    transformersWorker
-      ? await transformersWorker.run("preloadModels", paramsForPreload)
-      : await preloadModels(paramsForPreload);
 
     await updateResponseWithTypingEffect("Preparing response...");
 
     if (!getDisableAiResponseSetting()) {
       const paramsForResponse = {
+        handleModelLoadingProgress: transformersWorker
+          ? undefined
+          : handleModelLoadingProgress,
         input: dedent`
-        Context:
-        ${getSearchResults()
-          .map(([title, snippet]) => `- ${title}: ${snippet}`)
-          .join("\n")}
-        
-        Question:
-        ${query}
-      `,
+          Context:
+          ${getSearchResults()
+            .map(([title, snippet]) => `- ${title}: ${snippet}`)
+            .join("\n")}
+          
+          Question:
+          ${query}
+        `,
         textToTextGenerationModel,
         quantized: isRunningOnMobile,
       };
@@ -386,6 +374,8 @@ async function main() {
             paramsForResponse,
           )
         : await runTextToTextGenerationPipeline(paramsForResponse);
+
+      handleModelLoadingProgress = undefined;
 
       await updateResponseWithTypingEffect(response);
     }
@@ -424,6 +414,9 @@ async function main() {
         `;
 
         const paramsForOutput = {
+          handleModelLoadingProgress: transformersWorker
+            ? undefined
+            : handleModelLoadingProgress,
           input: request,
           textToTextGenerationModel,
           quantized: isRunningOnMobile,
