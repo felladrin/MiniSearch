@@ -1,4 +1,4 @@
-import { handleActions } from "../node_modules/typed-worker/dist";
+import { handleActions } from "../../node_modules/typed-worker/dist";
 import { runTextToTextGenerationPipeline } from "./transformers";
 
 export const actions = {
