@@ -1,7 +1,15 @@
+import { pipeline, env } from "@xenova/transformers";
 import ortWasmUrl from "@xenova/transformers/dist/ort-wasm.wasm?url";
 import ortWasmThreadedUrl from "@xenova/transformers/dist/ort-wasm-threaded.wasm?url";
 import ortWasmSimdUrl from "@xenova/transformers/dist/ort-wasm-simd.wasm?url";
 import ortWasmSimdThreadedUrl from "@xenova/transformers/dist/ort-wasm-simd-threaded.wasm?url";
+
+env.backends.onnx.wasm.wasmPaths = {
+  "ort-wasm.wasm": ortWasmUrl,
+  "ort-wasm-threaded.wasm": ortWasmThreadedUrl,
+  "ort-wasm-simd.wasm": ortWasmSimdUrl,
+  "ort-wasm-simd-threaded.wasm": ortWasmSimdThreadedUrl,
+};
 
 export async function runTextToTextGenerationPipeline(params: {
   handleModelLoadingProgress?: (event: {
@@ -12,15 +20,6 @@ export async function runTextToTextGenerationPipeline(params: {
   quantized: boolean;
   input: string;
 }) {
-  const { pipeline, env } = await import("@xenova/transformers");
-
-  env.backends.onnx.wasm.wasmPaths = {
-    "ort-wasm.wasm": ortWasmUrl,
-    "ort-wasm-threaded.wasm": ortWasmThreadedUrl,
-    "ort-wasm-simd.wasm": ortWasmSimdUrl,
-    "ort-wasm-simd-threaded.wasm": ortWasmSimdThreadedUrl,
-  };
-
   const generator = await pipeline(
     "text2text-generation",
     params.textToTextGenerationModel,
