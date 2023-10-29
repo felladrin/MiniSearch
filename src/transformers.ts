@@ -4,6 +4,7 @@ import ortWasmThreadedUrl from "@xenova/transformers/dist/ort-wasm-threaded.wasm
 import ortWasmSimdUrl from "@xenova/transformers/dist/ort-wasm-simd.wasm?url";
 import ortWasmSimdThreadedUrl from "@xenova/transformers/dist/ort-wasm-simd-threaded.wasm?url";
 
+env.backends.onnx.wasm.numThreads = 4;
 env.backends.onnx.wasm.wasmPaths = {
   "ort-wasm.wasm": ortWasmUrl,
   "ort-wasm-threaded.wasm": ortWasmThreadedUrl,
