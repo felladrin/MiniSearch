@@ -284,8 +284,7 @@ async function main() {
     const isRunningOnMobile =
       new MobileDetect(window.navigator.userAgent).mobile() !== null;
 
-    const shouldUseQuantizedModels =
-      isRunningOnMobile || window.navigator.userAgent.includes("Firefox");
+    const shouldUseQuantizedModels = isRunningOnMobile;
 
     const defaultModel = "Xenova/LaMini-Flan-T5-77M";
 
