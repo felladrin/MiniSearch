@@ -284,6 +284,9 @@ async function main() {
     const isRunningOnMobile =
       new MobileDetect(window.navigator.userAgent).mobile() !== null;
 
+    const shouldUseQuantizedModels =
+      isRunningOnMobile || window.navigator.userAgent.includes("Firefox");
+
     const defaultModel = "Xenova/LaMini-Flan-T5-77M";
 
     const largerModel = "Xenova/LaMini-Flan-T5-248M";
@@ -368,7 +371,7 @@ async function main() {
           ${query}
         `,
         textToTextGenerationModel,
-        quantized: isRunningOnMobile,
+        quantized: shouldUseQuantizedModels,
       };
 
       const response = transformersWorker
@@ -422,7 +425,7 @@ async function main() {
             : handleModelLoadingProgress,
           input: request,
           textToTextGenerationModel,
-          quantized: isRunningOnMobile,
+          quantized: shouldUseQuantizedModels,
         };
 
         const output = transformersWorker
