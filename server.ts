@@ -1,6 +1,5 @@
 import fetch from "node-fetch";
 import express from "express";
-import open from "open";
 
 async function search(query: string, limit?: number) {
   try {
@@ -65,5 +64,4 @@ if (process.env.NODE_ENV !== "development") {
   const url = `http://localhost:${port}/`;
   app.listen(port);
   console.log(`Server started! ${url}`);
-  await open(url);
 }
