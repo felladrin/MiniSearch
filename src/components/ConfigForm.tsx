@@ -4,6 +4,7 @@ import {
   summarizeLinksSettingPubSub,
   useLargerModelSettingPubSub,
 } from "../modules/pubSub";
+import { Tooltip } from "react-tooltip";
 
 export function ConfigForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -20,7 +21,17 @@ export function ConfigForm() {
     <details>
       <summary>Settings</summary>
       <div>
-        <label title="Disables the AI response, in case you only want to see the links from the web search results">
+        <Tooltip
+          id="disable-ai-setting-tooltip"
+          place="top-start"
+          variant="info"
+          opacity="1"
+          style={{ width: "75vw", maxWidth: "600px" }}
+        />
+        <label
+          data-tooltip-id="disable-ai-setting-tooltip"
+          data-tooltip-content="Disables the AI response, in case you only want to see the links from the web search results"
+        >
           <input
             type="checkbox"
             checked={disableAiResponse}
@@ -30,7 +41,17 @@ export function ConfigForm() {
         </label>
       </div>
       <div>
-        <label title="Provides a short overview for each of the links from the web search results">
+        <Tooltip
+          id="summarize-links-setting-tooltip"
+          place="top-start"
+          variant="info"
+          opacity="1"
+          style={{ width: "75vw", maxWidth: "600px" }}
+        />
+        <label
+          data-tooltip-id="summarize-links-setting-tooltip"
+          data-tooltip-content="Provides a short overview for each of the links from the web search results"
+        >
           <input
             type="checkbox"
             checked={summarizeLinks}
@@ -40,7 +61,17 @@ export function ConfigForm() {
         </label>
       </div>
       <div>
-        <label title="Generates better responses, but takes longer to load">
+        <Tooltip
+          id="use-large-model-setting-tooltip"
+          place="top-start"
+          variant="info"
+          opacity="1"
+          style={{ width: "75vw", maxWidth: "600px" }}
+        />
+        <label
+          data-tooltip-id="use-large-model-setting-tooltip"
+          data-tooltip-content="Generates better responses, but takes longer to load"
+        >
           <input
             type="checkbox"
             checked={useLargerModel}

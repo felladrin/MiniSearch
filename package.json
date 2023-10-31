@@ -25,6 +25,7 @@
     "prettier": "^3.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-tooltip": "^5.21.6",
     "ts-dedent": "^2.2.0",
     "tsx": "^3.13.0",
     "typed-worker": "^1.0.4",

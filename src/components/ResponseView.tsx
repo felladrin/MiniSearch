@@ -2,6 +2,7 @@ import Markdown from "markdown-to-jsx";
 import { SearchResults, searchQueryKey } from "../modules/search";
 import { getDisableAiResponseSetting } from "../modules/pubSub";
 import { SearchResultsList } from "./SearchResultsList";
+import { Tooltip } from "react-tooltip";
 
 export function ResponseView({
   prompt,
@@ -16,13 +17,21 @@ export function ResponseView({
 }) {
   return (
     <>
+      <Tooltip
+        id="query-tooltip"
+        place="bottom-start"
+        variant="info"
+        opacity="1"
+        float
+      />
       <blockquote
         style={{ cursor: "pointer" }}
         onClick={() => {
           localStorage.setItem(searchQueryKey, prompt);
           window.location.href = window.location.origin;
         }}
-        title="Click to edit the query"
+        data-tooltip-id="query-tooltip"
+        data-tooltip-content="Click to edit the query"
       >
         <Markdown>{prompt}</Markdown>
       </blockquote>
