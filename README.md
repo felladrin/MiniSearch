@@ -2,6 +2,8 @@
 
 A minimalist search engine with integrated browser-based AI.
 
+Live demo: https://felladrin-minisearch.hf.space
+
 ## Features
 
 - Easy to use: Minimalist yet intuitive interface for all users
@@ -13,8 +15,36 @@ A minimalist search engine with integrated browser-based AI.
 - Optimized: Aims for the balance between size and performance
 - Open-source: The code is available for inspection and contribution
 
-## Getting Started With Docker Compose
+## Prerequisites
 
-Start developing by running `docker-compose up`.
+- [Docker](https://docs.docker.com/get-docker/)
 
-When ready for production, run `docker-compose -f docker-compose.production.yml up --build`.
+## Getting started
+
+The easiest way to get started is by using [MiniSearch's Docker Image](https://github.com/felladrin/MiniSearch/pkgs/container/minisearch) by running the following command:
+
+```bash
+docker run -p 7860:7860 ghcr.io/felladrin/minisearch:main
+```
+
+Then, open http://localhost:7860 in your browser and start searching!
+
+## Building and running from source
+
+You can build and run it from the source if you don't want to use MiniSearch's Docker Image. For that, clone this repository and run the following command:
+
+```bash
+docker-compose -f docker-compose.production.yml up --build
+```
+
+## Contributing
+
+MiniSearch is open-source and contributions are welcome!
+
+Fork this repository and clone it. Then, start the development server by running the following command:
+
+```bash
+docker-compose up
+```
+
+Make your changes, push them to your fork, and open a pull request!
