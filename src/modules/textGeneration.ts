@@ -268,34 +268,44 @@ export async function prepareTextGeneration() {
         transformersModule.runTextToTextGenerationPipeline;
     }
 
-    await updateResponseWithTypingEffect("Preparing response...");
-
-    if (!getDisableAiResponseSetting()) {
+    const generateResponse = async (input: string) => {
       const paramsForResponse = {
         handleModelLoadingProgress: transformersWorker
           ? undefined
           : handleModelLoadingProgress,
-        input: dedent`
-          Context:
-          ${getSearchResults()
-            .map(([title, snippet]) => `- ${title}: ${snippet}`)
-            .join("\n")}
-          
-          Question:
-          ${query}
-        `,
+        input: input,
         textToTextGenerationModel,
         quantized: shouldUseQuantizedModels,
       };
 
-      const response = transformersWorker
-        ? await transformersWorker.run(
+      return transformersWorker
+        ? transformersWorker.run(
             "runTextToTextGenerationPipeline",
             paramsForResponse,
           )
-        : await runTextToTextGenerationPipeline(paramsForResponse);
+        : runTextToTextGenerationPipeline(paramsForResponse);
+    };
 
-      handleModelLoadingProgress = undefined;
+    await generateResponse("Hi!");
+
+    handleModelLoadingProgress = undefined;
+
+    await updateResponseWithTypingEffect("Preparing response...");
+
+    if (!getDisableAiResponseSetting()) {
+      const request = dedent`
+        Question:
+        ${query}
+
+        Context:
+        ${getSearchResults()
+          .map(([title, snippet]) => `- "${title}: ${snippet}"`)
+          .join("\n")}
+
+        Answer:
+      `;
+
+      const response = await generateResponse(request);
 
       await updateResponseWithTypingEffect(response);
     }
@@ -325,31 +335,19 @@ export async function prepareTextGeneration() {
 
       for (const [title, snippet, url] of getSearchResults()) {
         const request = dedent`
-          Context:
-          Link title: ${title}
-          Link snippet: ${snippet}
-
           Question:
           What is this link about?
+
+          Context:
+          Link title: "${title}"
+          Link snippet: "${snippet}"
+
+          Answer:
         `;
 
-        const paramsForOutput = {
-          handleModelLoadingProgress: transformersWorker
-            ? undefined
-            : handleModelLoadingProgress,
-          input: request,
-          textToTextGenerationModel,
-          quantized: shouldUseQuantizedModels,
-        };
+        const response = await generateResponse(request);
 
-        const output = transformersWorker
-          ? await transformersWorker.run(
-              "runTextToTextGenerationPipeline",
-              paramsForOutput,
-            )
-          : await runTextToTextGenerationPipeline(paramsForOutput);
-
-        await updateUrlsDescriptionsWithTypingEffect(url, output);
+        await updateUrlsDescriptionsWithTypingEffect(url, response);
       }
 
       if (transformersWorker) {
