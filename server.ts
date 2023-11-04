@@ -3,7 +3,7 @@ import express from "express";
 
 async function search(query: string, limit?: number) {
   try {
-    const url = new URL("http://0.0.0.0:8080/search");
+    const url = new URL("http://127.0.0.1:8080/search");
     url.search = new URLSearchParams({
       q: query,
       language: "auto",
