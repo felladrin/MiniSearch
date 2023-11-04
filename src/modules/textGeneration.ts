@@ -268,21 +268,23 @@ export async function prepareTextGeneration() {
         transformersModule.runTextToTextGenerationPipeline;
     }
 
-    const generateResponse = async (input: string) => {
+    const generateResponse = async <T extends string | string[]>(
+      input: T,
+    ): Promise<T> => {
       const paramsForResponse = {
         handleModelLoadingProgress: transformersWorker
           ? undefined
           : handleModelLoadingProgress,
-        input: input,
+        input,
         textToTextGenerationModel,
         quantized: shouldUseQuantizedModels,
       };
 
       return transformersWorker
-        ? transformersWorker.run(
+        ? (transformersWorker.run(
             "runTextToTextGenerationPipeline",
             paramsForResponse,
-          )
+          ) as unknown as Promise<T>)
         : runTextToTextGenerationPipeline(paramsForResponse);
     };
 
@@ -333,6 +335,8 @@ export async function prepareTextGeneration() {
         await sleep(description.length);
       };
 
+      const requestPerUrl: Record<string, string> = {};
+
       for (const [title, snippet, url] of getSearchResults()) {
         const request = dedent`
           Question:
@@ -345,8 +349,13 @@ export async function prepareTextGeneration() {
           Answer:
         `;
 
-        const response = await generateResponse(request);
+        requestPerUrl[url] = request;
+      }
 
+      const responses = await generateResponse(Object.values(requestPerUrl));
+
+      for (const [index, response] of responses.entries()) {
+        const url = Object.keys(requestPerUrl)[index];
         await updateUrlsDescriptionsWithTypingEffect(url, response);
       }
 

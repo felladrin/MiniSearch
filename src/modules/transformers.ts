@@ -36,15 +36,17 @@ env.backends.onnx.wasm.wasmPaths = {
   "ort-wasm-simd-threaded.wasm": ortWasmSimdThreadedUrl,
 };
 
-export async function runTextToTextGenerationPipeline(params: {
+export async function runTextToTextGenerationPipeline<
+  T extends string | string[],
+>(params: {
   handleModelLoadingProgress?: (event: {
     file: string;
     progress: number;
   }) => void;
   textToTextGenerationModel: string;
   quantized: boolean;
-  input: string;
-}) {
+  input: T;
+}): Promise<T> {
   const generator = await pipeline(
     "text2text-generation",
     params.textToTextGenerationModel,
@@ -61,7 +63,7 @@ export async function runTextToTextGenerationPipeline(params: {
     },
   );
 
-  const [response] = await generator(params.input, {
+  const responses = await generator(params.input, {
     min_length: 32,
     max_new_tokens: 512,
     do_sample: true,
@@ -71,5 +73,10 @@ export async function runTextToTextGenerationPipeline(params: {
 
   await generator.dispose();
 
-  return response as string;
+  if (Array.isArray(params.input)) {
+    return responses;
+  }
+
+  const [response] = responses;
+  return response;
 }
