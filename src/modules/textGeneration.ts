@@ -296,15 +296,13 @@ export async function prepareTextGeneration() {
 
     if (!getDisableAiResponseSetting()) {
       const request = dedent`
-        Question:
+        Write everything you know about the following:
         ${query}
 
         Context:
         ${getSearchResults()
           .map(([title, snippet]) => `- "${title}: ${snippet}"`)
           .join("\n")}
-
-        Answer:
       `;
 
       const response = await generateResponse(request);
