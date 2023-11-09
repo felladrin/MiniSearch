@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.8",
-    "@xenova/transformers": "^2.6.2",
+    "@xenova/transformers": "^2.8.0",
     "console-panel": "^1.0.4",
     "create-pubsub": "^1.6.3",
     "express": "^4.18.2",

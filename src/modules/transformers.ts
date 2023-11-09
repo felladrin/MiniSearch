@@ -4,31 +4,6 @@ import ortWasmThreadedUrl from "@xenova/transformers/dist/ort-wasm-threaded.wasm
 import ortWasmSimdUrl from "@xenova/transformers/dist/ort-wasm-simd.wasm?url";
 import ortWasmSimdThreadedUrl from "@xenova/transformers/dist/ort-wasm-simd-threaded.wasm?url";
 
-const cacheName = "transformers-cache";
-env.useBrowserCache = false;
-// @ts-expect-error wrong useCustomCache type.
-env.useCustomCache = true;
-// @ts-expect-error wrong customCache type.
-env.customCache = {
-  match: async (request: Request | string) => {
-    const cache = await caches.open(cacheName);
-    const cachedResponse = await cache.match(request);
-    if (!cachedResponse) return;
-    const cachedResponseBody = await cachedResponse.arrayBuffer();
-    return new Response(cachedResponseBody, {
-      headers: cachedResponse.headers,
-    });
-  },
-  put: async (request: Request | string, response: Response) => {
-    const cache = await caches.open(cacheName);
-    await cache.put(
-      request,
-      new Response(response.body, {
-        headers: response.headers,
-      }),
-    );
-  },
-};
 env.backends.onnx.wasm.wasmPaths = {
   "ort-wasm.wasm": ortWasmUrl,
   "ort-wasm-threaded.wasm": ortWasmThreadedUrl,
@@ -74,9 +49,11 @@ export async function runTextToTextGenerationPipeline<
   await generator.dispose();
 
   if (Array.isArray(params.input)) {
-    return responses;
+    return responses.map(
+      ({ generated_text }: { generated_text: string }) => generated_text,
+    );
   }
 
   const [response] = responses;
-  return response;
+  return response.generated_text;
 }
