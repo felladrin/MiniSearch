@@ -182,13 +182,14 @@ export async function prepareTextGeneration() {
 
     chat.unload();
   } catch (error) {
-    if (error instanceof Error) {
-      console.info(dedent`
-        Could not load web-llm chat module: ${error.message}
+    const errorMessage =
+      error instanceof Error ? error.message : (error as string);
+
+    console.info(dedent`
+        Could not load web-llm chat module: ${errorMessage}
 
         Falling back to transformers.js.
       `);
-    }
 
     const { createWorker } = await import(
       "../../node_modules/typed-worker/dist"
