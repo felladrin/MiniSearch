@@ -297,8 +297,11 @@ export async function prepareTextGeneration() {
 
     if (!getDisableAiResponseSetting()) {
       const request = dedent`
-        Write everything you know about the following:
-        ${query}
+        I want you to act as a research assistant and tell me all you know about the following topic.
+
+        Topic: ${query}
+
+        After you answer it using your own knowledge, write a second paragraph about the same topic, but this time with information from the context.
 
         Context:
         ${getSearchResults()
@@ -344,8 +347,6 @@ export async function prepareTextGeneration() {
           Context:
           Link title: "${title}"
           Link snippet: "${snippet}"
-
-          Answer:
         `;
 
         requestPerUrl[url] = request;

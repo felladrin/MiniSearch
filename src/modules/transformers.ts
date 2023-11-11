@@ -41,9 +41,10 @@ export async function runTextToTextGenerationPipeline<
   const responses = await generator(params.input, {
     min_length: 32,
     max_new_tokens: 512,
-    do_sample: true,
-    no_repeat_ngram_size: 2,
-    num_beams: 3,
+    temperature: 0.2,
+    repetition_penalty: 1.1,
+    top_k: 40,
+    top_p: 0.9,
   });
 
   await generator.dispose();
