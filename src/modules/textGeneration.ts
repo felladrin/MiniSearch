@@ -51,7 +51,7 @@ export async function prepareTextGeneration() {
       : new ChatModule();
 
     const availableModels = {
-      Mistral: "Mistral-7B-OpenOrca-q4f32_1",
+      Mistral: "Mistral-7B-Instruct-v0.1-q4f32_1",
       TinyLlama: "TinyLlama-1.1B-1T-OpenOrca-q4f32_1",
     };
 
@@ -59,40 +59,44 @@ export async function prepareTextGeneration() {
       ? availableModels.Mistral
       : availableModels.TinyLlama;
 
-    const chatMlConfig = {
+    const commonChatMlConfig = {
       temperature: 0,
-      repetition_penalty: 1.2,
+      repetition_penalty: 1.1,
       top_p: 1,
-      mean_gen_len: 32,
-      max_gen_len: 256,
-      conv_template: "llama-2",
-      conv_config: {
-        system: dedent`
-          <|im_start|>user: You are a helpful assistant.<|im_end|>
-          <|im_start|>assistant: Yeah!<|im_end|>
-          <|im_start|>user: You feel happy to help with almost anything and will do your best to understand exactly what is needed.<|im_end|>
-          <|im_start|>assistant: Ok!<|im_end|>
-          <|im_start|>user: You also try to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer.<|im_end|>
-          <|im_start|>assistant: Sure!<|im_end|>
-          <|im_start|>user: That said, you are practical, do your best, and don't let caution get too much in the way of being useful.<|im_end|>
-          <|im_start|>assistant: I'll do my best to help you.
-        `,
-        roles: ["<|im_start|>user", "<|im_start|>assistant"],
-        seps: ["<|im_end|>\n"],
-        stop_str: "<|im_end|>",
-      },
     };
 
     const chatConfigPerModel = {
-      [availableModels.Mistral]: chatMlConfig,
-      [availableModels.TinyLlama]: chatMlConfig,
+      [availableModels.Mistral]: {
+        ...commonChatMlConfig,
+      },
+      [availableModels.TinyLlama]: {
+        ...commonChatMlConfig,
+        mean_gen_len: 32,
+        max_gen_len: 256,
+        conv_template: "llama-2",
+        conv_config: {
+          system: dedent`
+            <|im_start|>user: You are a helpful assistant.<|im_end|>
+            <|im_start|>assistant: Yeah!<|im_end|>
+            <|im_start|>user: You feel happy to help with almost anything and will do your best to understand exactly what is needed.<|im_end|>
+            <|im_start|>assistant: Ok!<|im_end|>
+            <|im_start|>user: You also try to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer.<|im_end|>
+            <|im_start|>assistant: Sure!<|im_end|>
+            <|im_start|>user: That said, you are practical, do your best, and don't let caution get too much in the way of being useful.<|im_end|>
+            <|im_start|>assistant: I'll do my best to help you.
+          `,
+          roles: ["<|im_start|>user", "<|im_start|>assistant"],
+          seps: ["<|im_end|>\n"],
+          stop_str: "<|im_end|>",
+        },
+      },
     };
 
     const appConfig = {
       model_list: [
         {
           model_url:
-            "https://huggingface.co/Felladrin/mlc-chat-Mistral-7B-OpenOrca-q4f32_1/resolve/main/params/",
+            "https://huggingface.co/mlc-ai/mlc-chat-Mistral-7B-Instruct-v0.1-q4f32_1/resolve/main/",
           local_id: availableModels.Mistral,
         },
         {
@@ -103,7 +107,7 @@ export async function prepareTextGeneration() {
       ],
       model_lib_map: {
         [availableModels.Mistral]:
-          "https://huggingface.co/Felladrin/mlc-chat-Mistral-7B-OpenOrca-q4f32_1/resolve/main/Mistral-7B-OpenOrca-q4f32_1-webgpu.wasm",
+          "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/Mistral-7B-Instruct-v0.1-q4f32_1-sw4096_cs1024-webgpu.wasm",
         [availableModels.TinyLlama]:
           "https://huggingface.co/Felladrin/mlc-chat-TinyLlama-1.1B-1T-OpenOrca-q4f32_1/resolve/main/TinyLlama-1.1B-1T-OpenOrca-q4f32_1-webgpu.wasm",
       },
@@ -146,8 +150,6 @@ export async function prepareTextGeneration() {
           }
         },
       );
-
-      await chat.resetChat();
     }
 
     if (getSummarizeLinksSetting()) {
@@ -171,8 +173,6 @@ export async function prepareTextGeneration() {
             });
           }
         });
-
-        await chat.resetChat();
       }
     }
 
