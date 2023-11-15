@@ -152,6 +152,10 @@ export async function prepareTextGeneration() {
       );
     }
 
+    if (selectedModel !== availableModels.Mistral) {
+      await chat.resetChat();
+    }
+
     if (getSummarizeLinksSetting()) {
       for (const [title, snippet, url] of getSearchResults()) {
         const request = dedent`
@@ -173,6 +177,10 @@ export async function prepareTextGeneration() {
             });
           }
         });
+
+        if (selectedModel !== availableModels.Mistral) {
+          await chat.resetChat();
+        }
       }
     }
 
