@@ -96,7 +96,7 @@ export async function prepareTextGeneration() {
       model_list: [
         {
           model_url:
-            "https://huggingface.co/mlc-ai/mlc-chat-Mistral-7B-Instruct-v0.1-q4f32_1/resolve/main/",
+            "https://huggingface.co/Felladrin/mlc-chat-Mistral-7B-Instruct-v0.1-q4f32_1/resolve/main/params/",
           local_id: availableModels.Mistral,
         },
         {
@@ -107,7 +107,7 @@ export async function prepareTextGeneration() {
       ],
       model_lib_map: {
         [availableModels.Mistral]:
-          "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/Mistral-7B-Instruct-v0.1-q4f32_1-sw4096_cs1024-webgpu.wasm",
+          "https://huggingface.co/Felladrin/mlc-chat-Mistral-7B-Instruct-v0.1-q4f32_1/resolve/main/Mistral-7B-Instruct-v0.1-q4f32_1-webgpu.wasm",
         [availableModels.TinyLlama]:
           "https://huggingface.co/Felladrin/mlc-chat-TinyLlama-1.1B-1T-OpenOrca-q4f32_1/resolve/main/TinyLlama-1.1B-1T-OpenOrca-q4f32_1-webgpu.wasm",
       },
@@ -152,9 +152,7 @@ export async function prepareTextGeneration() {
       );
     }
 
-    if (selectedModel !== availableModels.Mistral) {
-      await chat.resetChat();
-    }
+    await chat.resetChat();
 
     if (getSummarizeLinksSetting()) {
       for (const [title, snippet, url] of getSearchResults()) {
@@ -178,9 +176,7 @@ export async function prepareTextGeneration() {
           }
         });
 
-        if (selectedModel !== availableModels.Mistral) {
-          await chat.resetChat();
-        }
+        await chat.resetChat();
       }
     }
 
