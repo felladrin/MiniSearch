@@ -199,6 +199,8 @@ export async function prepareTextGeneration() {
       "../../node_modules/typed-worker/dist"
     );
 
+    const textToTextGenerationModel = "Felladrin/onnx-Llama-160M-Chat-v1";
+
     const MobileDetect = (await import("mobile-detect")).default;
 
     const isRunningOnMobile =
@@ -206,13 +208,7 @@ export async function prepareTextGeneration() {
 
     const shouldUseQuantizedModels = isRunningOnMobile;
 
-    const defaultModel = "Xenova/LaMini-Flan-T5-77M";
-
-    const largerModel = "Xenova/LaMini-Flan-T5-248M";
-
-    const textToTextGenerationModel = getUseLargerModelSetting()
-      ? largerModel
-      : defaultModel;
+    const shouldUseBeamSearch = shouldUseQuantizedModels;
 
     const updateResponseWithTypingEffect = async (text: string) => {
       let response = "";
@@ -275,6 +271,7 @@ export async function prepareTextGeneration() {
 
     const generateResponse = async <T extends string | string[]>(
       input: T,
+      pipelineArguments?: Record<string, unknown>,
     ): Promise<T> => {
       const paramsForResponse = {
         handleModelLoadingProgress: transformersWorker
@@ -283,6 +280,7 @@ export async function prepareTextGeneration() {
         input,
         textToTextGenerationModel,
         quantized: shouldUseQuantizedModels,
+        pipelineArguments,
       };
 
       return transformersWorker
@@ -293,7 +291,7 @@ export async function prepareTextGeneration() {
         : runTextToTextGenerationPipeline(paramsForResponse);
     };
 
-    await generateResponse("Hi!");
+    await generateResponse("Hi!", { max_length: 1 });
 
     handleModelLoadingProgress = undefined;
 
@@ -301,21 +299,41 @@ export async function prepareTextGeneration() {
 
     if (!getDisableAiResponseSetting()) {
       const request = dedent`
-        I want you to act as a research assistant and tell me all you know about the following topic.
-
-        Topic: ${query}
-
-        After you answer it using your own knowledge, write a second paragraph about the same topic, but this time with information from the context.
-
-        Context:
+        <|im_start|>system
+        You are a helpful assistant who provides answers to user's questions. If you don't know the answer, you can base your answer on the links provided in the context.<|im_end|>
+        <|im_start|>user
+        CONTEXT:
         ${getSearchResults()
-          .map(([title, snippet]) => `- "${title}: ${snippet}"`)
+          .map(([title, snippet, url]) => `- [${title}](${url} "${snippet}")`)
           .join("\n")}
+        
+        QUESTION:
+        ${query}<|im_end|>
+        <|im_start|>assistant
       `;
 
-      const response = await generateResponse(request);
+      const response = await generateResponse(
+        request,
+        shouldUseBeamSearch
+          ? {
+              max_length: 2048,
+              repetition_penalty: 1.01,
+              num_beams: 3,
+              early_stopping: true,
+            }
+          : {
+              max_length: 2048,
+              repetition_penalty: 1.01,
+              penalty_alpha: 0.5,
+              top_k: 5,
+            },
+      );
+      const formattedResponse = response
+        .substring(response.indexOf("<|im_start|>assistant"))
+        .replace("<|im_start|>assistant", "")
+        .replace("<|im_end|>", "");
 
-      await updateResponseWithTypingEffect(response);
+      await updateResponseWithTypingEffect(formattedResponse);
     }
 
     if (getSummarizeLinksSetting()) {
@@ -341,26 +359,44 @@ export async function prepareTextGeneration() {
         await sleep(description.length);
       };
 
-      const requestPerUrl: Record<string, string> = {};
-
       for (const [title, snippet, url] of getSearchResults()) {
         const request = dedent`
-          Question:
-          What is this link about?
+          <|im_start|>system
+          You are a helpful assistant, who summarizes a link related to a context. Both are provided by the user. Answer the best you can.<|im_end|>
+          <|im_start|>user
+          CONTEXT:
+          "${query}"
 
-          Context:
-          Link title: "${title}"
-          Link snippet: "${snippet}"
+          LINK:
+          [${title}](${url} "${snippet}")<|im_end|>
+          <|im_start|>assistant
+          This link is about
         `;
 
-        requestPerUrl[url] = request;
-      }
+        const response = await generateResponse(
+          request,
+          shouldUseBeamSearch
+            ? {
+                max_new_tokens: 250,
+                repetition_penalty: 1.01,
+                num_beams: 3,
+                early_stopping: true,
+              }
+            : {
+                max_new_tokens: 250,
+                max_length: 2048,
+                repetition_penalty: 1.01,
+                penalty_alpha: 0.5,
+                top_k: 5,
+              },
+        );
 
-      const responses = await generateResponse(Object.values(requestPerUrl));
+        const formattedResponse = response
+          .substring(response.indexOf("<|im_start|>assistant"))
+          .replace("<|im_start|>assistant", "")
+          .replace("<|im_end|>", "");
 
-      for (const [index, response] of responses.entries()) {
-        const url = Object.keys(requestPerUrl)[index];
-        await updateUrlsDescriptionsWithTypingEffect(url, response);
+        await updateUrlsDescriptionsWithTypingEffect(url, formattedResponse);
       }
 
       if (transformersWorker) {

@@ -4,6 +4,7 @@ import ortWasmThreadedUrl from "@xenova/transformers/dist/ort-wasm-threaded.wasm
 import ortWasmSimdUrl from "@xenova/transformers/dist/ort-wasm-simd.wasm?url";
 import ortWasmSimdThreadedUrl from "@xenova/transformers/dist/ort-wasm-simd-threaded.wasm?url";
 
+env.allowLocalModels = false;
 env.backends.onnx.wasm.wasmPaths = {
   "ort-wasm.wasm": ortWasmUrl,
   "ort-wasm-threaded.wasm": ortWasmThreadedUrl,
@@ -13,7 +14,7 @@ env.backends.onnx.wasm.wasmPaths = {
 
 export async function runTextToTextGenerationPipeline<
   T extends string | string[],
->(params: {
+>(parameters: {
   handleModelLoadingProgress?: (event: {
     file: string;
     progress: number;
@@ -21,14 +22,15 @@ export async function runTextToTextGenerationPipeline<
   textToTextGenerationModel: string;
   quantized: boolean;
   input: T;
+  pipelineArguments?: Record<string, unknown>;
 }): Promise<T> {
   const generator = await pipeline(
-    "text2text-generation",
-    params.textToTextGenerationModel,
+    "text-generation",
+    parameters.textToTextGenerationModel,
     {
-      quantized: params.quantized,
+      quantized: parameters.quantized,
       progress_callback:
-        params.handleModelLoadingProgress ??
+        parameters.handleModelLoadingProgress ??
         ((event: { file: string; progress: number }) => {
           self.postMessage({
             type: "model-loading-progress",
@@ -38,20 +40,16 @@ export async function runTextToTextGenerationPipeline<
     },
   );
 
-  const responses = await generator(params.input, {
-    min_length: 32,
-    max_new_tokens: 512,
-    temperature: 0.2,
-    repetition_penalty: 1.1,
-    top_k: 40,
-    top_p: 0.9,
-  });
+  const responses = await generator(
+    parameters.input,
+    parameters.pipelineArguments,
+  );
 
   await generator.dispose();
 
-  if (Array.isArray(params.input)) {
+  if (Array.isArray(parameters.input)) {
     return responses.map(
-      ({ generated_text }: { generated_text: string }) => generated_text,
+      ([response]: { generated_text: string }[]) => response.generated_text,
     );
   }
 
