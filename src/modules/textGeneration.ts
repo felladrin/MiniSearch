@@ -316,13 +316,13 @@ export async function prepareTextGeneration() {
         request,
         shouldUseBeamSearch
           ? {
-              max_length: 2048,
+              max_new_tokens: 256,
               repetition_penalty: 1.01,
               num_beams: 3,
               early_stopping: true,
             }
           : {
-              max_length: 2048,
+              max_new_tokens: 256,
               repetition_penalty: 1.01,
               penalty_alpha: 0.5,
               top_k: 5,
@@ -377,13 +377,13 @@ export async function prepareTextGeneration() {
           request,
           shouldUseBeamSearch
             ? {
-                max_new_tokens: 250,
+                max_new_tokens: 128,
                 repetition_penalty: 1.01,
                 num_beams: 3,
                 early_stopping: true,
               }
             : {
-                max_new_tokens: 250,
+                max_new_tokens: 128,
                 max_length: 2048,
                 repetition_penalty: 1.01,
                 penalty_alpha: 0.5,
