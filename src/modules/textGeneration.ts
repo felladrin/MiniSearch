@@ -208,7 +208,7 @@ export async function prepareTextGeneration() {
 
     const shouldUseQuantizedModels = isRunningOnMobile;
 
-    const shouldUseBeamSearch = shouldUseQuantizedModels;
+    const shouldUseBeamSearch = true;
 
     const updateResponseWithTypingEffect = async (text: string) => {
       let response = "";
@@ -317,13 +317,14 @@ export async function prepareTextGeneration() {
         shouldUseBeamSearch
           ? {
               add_special_tokens: true,
-              max_new_tokens: 256,
+              max_length: 1024,
               num_beams: 3,
+              repetition_penalty: 1.01,
               early_stopping: true,
             }
           : {
               add_special_tokens: true,
-              max_new_tokens: 256,
+              max_length: 1024,
               repetition_penalty: 1.01,
               penalty_alpha: 0.5,
               top_k: 5,
