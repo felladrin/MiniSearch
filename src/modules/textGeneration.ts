@@ -199,7 +199,7 @@ export async function prepareTextGeneration() {
       "../../node_modules/typed-worker/dist"
     );
 
-    const textToTextGenerationModel = "Felladrin/onnx-Llama-160M-Chat-v1";
+    const textToTextGenerationModel = "Felladrin/onnx-Smol-Llama-101M-Chat-v1";
 
     const MobileDetect = (await import("mobile-detect")).default;
 
@@ -300,14 +300,14 @@ export async function prepareTextGeneration() {
     if (!getDisableAiResponseSetting()) {
       const request = dedent`
         <|im_start|>system
-        You are a helpful assistant who provides answers to user's questions. If you don't know the answer, you can base your answer on the links provided in the context.<|im_end|>
+        You are a helpful assistant. You will analyze markdown links in a given context and then respond to a question.<|im_end|>
         <|im_start|>user
-        CONTEXT:
+        Context:
         ${getSearchResults()
           .map(([title, snippet, url]) => `- [${title}](${url} "${snippet}")`)
           .join("\n")}
         
-        QUESTION:
+        Question:
         ${query}<|im_end|>
         <|im_start|>assistant
       `;
@@ -316,12 +316,13 @@ export async function prepareTextGeneration() {
         request,
         shouldUseBeamSearch
           ? {
+              add_special_tokens: true,
               max_new_tokens: 256,
-              repetition_penalty: 1.01,
               num_beams: 3,
               early_stopping: true,
             }
           : {
+              add_special_tokens: true,
               max_new_tokens: 256,
               repetition_penalty: 1.01,
               penalty_alpha: 0.5,
@@ -362,13 +363,9 @@ export async function prepareTextGeneration() {
       for (const [title, snippet, url] of getSearchResults()) {
         const request = dedent`
           <|im_start|>system
-          You are a helpful assistant, who summarizes a link related to a context. Both are provided by the user. Answer the best you can.<|im_end|>
+          You are a helpful assistant. You will summarize a link.<|im_end|>
           <|im_start|>user
-          CONTEXT:
-          "${query}"
-
-          LINK:
-          [${title}](${url} "${snippet}")<|im_end|>
+          Link: [${title}](${url} "${snippet}")<|im_end|>
           <|im_start|>assistant
           This link is about
         `;
@@ -377,15 +374,16 @@ export async function prepareTextGeneration() {
           request,
           shouldUseBeamSearch
             ? {
+                add_special_tokens: true,
                 max_new_tokens: 128,
-                repetition_penalty: 1.01,
+                repetition_penalty: 1.02,
                 num_beams: 3,
                 early_stopping: true,
               }
             : {
+                add_special_tokens: true,
                 max_new_tokens: 128,
-                max_length: 2048,
-                repetition_penalty: 1.01,
+                repetition_penalty: 1.02,
                 penalty_alpha: 0.5,
                 top_k: 5,
               },
