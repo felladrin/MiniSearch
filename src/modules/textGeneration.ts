@@ -208,8 +208,6 @@ export async function prepareTextGeneration() {
 
     const shouldUseQuantizedModels = isRunningOnMobile;
 
-    const shouldUseBeamSearch = true;
-
     const updateResponseWithTypingEffect = async (text: string) => {
       let response = "";
       updateResponse(response);
@@ -300,11 +298,11 @@ export async function prepareTextGeneration() {
     if (!getDisableAiResponseSetting()) {
       const request = dedent`
         <|im_start|>system
-        You are a helpful assistant. You will analyze markdown links in a given context and then respond to a question.<|im_end|>
+        You are a friendly assistant who does your best to help the user. Start by providing an answer for the question below. If you don't know the answer, you can base your answer on the given context.<|im_end|>
         <|im_start|>user
         Context:
         ${getSearchResults()
-          .map(([title, snippet, url]) => `- [${title}](${url} "${snippet}")`)
+          .map(([title, snippet]) => `- ${title}: "${snippet}"`)
           .join("\n")}
         
         Question:
@@ -312,26 +310,16 @@ export async function prepareTextGeneration() {
         <|im_start|>assistant
       `;
 
-      const response = await generateResponse(
-        request,
-        shouldUseBeamSearch
-          ? {
-              add_special_tokens: true,
-              max_length: 1024,
-              num_beams: 3,
-              repetition_penalty: 1.01,
-              early_stopping: true,
-            }
-          : {
-              add_special_tokens: true,
-              max_length: 1024,
-              repetition_penalty: 1.01,
-              penalty_alpha: 0.5,
-              top_k: 5,
-            },
-      );
+      const response = await generateResponse(request, {
+        add_special_tokens: true,
+        max_length: 1024,
+        repetition_penalty: 1.01,
+        penalty_alpha: 0.5,
+        top_k: 5,
+      });
+
       const formattedResponse = response
-        .substring(response.indexOf("<|im_start|>assistant"))
+        .substring(response.lastIndexOf("<|im_start|>assistant"))
         .replace("<|im_start|>assistant", "")
         .replace("<|im_end|>", "");
 
@@ -364,35 +352,28 @@ export async function prepareTextGeneration() {
       for (const [title, snippet, url] of getSearchResults()) {
         const request = dedent`
           <|im_start|>system
-          You are a helpful assistant. You will summarize a link.<|im_end|>
+          You are a friendly assistant who does your best to help the user.<|im_end|>
           <|im_start|>user
-          Link: [${title}](${url} "${snippet}")<|im_end|>
+          What is this text about?
+          ${title}: "${snippet}"<|im_end|>
           <|im_start|>assistant
-          This link is about
+          This text is about
         `;
 
-        const response = await generateResponse(
-          request,
-          shouldUseBeamSearch
-            ? {
-                add_special_tokens: true,
-                max_new_tokens: 128,
-                repetition_penalty: 1.02,
-                num_beams: 3,
-                early_stopping: true,
-              }
-            : {
-                add_special_tokens: true,
-                max_new_tokens: 128,
-                repetition_penalty: 1.02,
-                penalty_alpha: 0.5,
-                top_k: 5,
-              },
-        );
+        const response = await generateResponse(request, {
+          add_special_tokens: true,
+          max_new_tokens: 128,
+          repetition_penalty: 1.01,
+          num_beams: 3,
+          early_stopping: true,
+        });
 
         const formattedResponse = response
-          .substring(response.indexOf("<|im_start|>assistant"))
-          .replace("<|im_start|>assistant", "")
+          .substring(response.lastIndexOf("<|im_start|>assistant"))
+          .replace(
+            "<|im_start|>assistant\nThis text is about",
+            "This link is about",
+          )
           .replace("<|im_end|>", "");
 
         await updateUrlsDescriptionsWithTypingEffect(url, formattedResponse);
