@@ -199,7 +199,7 @@ export async function prepareTextGeneration() {
       "../../node_modules/typed-worker/dist"
     );
 
-    const textToTextGenerationModel = "Felladrin/onnx-Smol-Llama-101M-Chat-v1";
+    const textGenerationModel = "Felladrin/onnx-Smol-Llama-101M-Chat-v1";
 
     const MobileDetect = (await import("mobile-detect")).default;
 
@@ -261,10 +261,13 @@ export async function prepareTextGeneration() {
 
     let runTextToTextGenerationPipeline!: typeof import("./transformers").runTextToTextGenerationPipeline;
 
+    let applyChatTemplate!: typeof import("./transformers").applyChatTemplate;
+
     if (!transformersWorker) {
       const transformersModule = await import("./transformers");
       runTextToTextGenerationPipeline =
         transformersModule.runTextToTextGenerationPipeline;
+      applyChatTemplate = transformersModule.applyChatTemplate;
     }
 
     const generateResponse = async <T extends string | string[]>(
@@ -276,7 +279,7 @@ export async function prepareTextGeneration() {
           ? undefined
           : handleModelLoadingProgress,
         input,
-        textToTextGenerationModel,
+        model: textGenerationModel,
         quantized: shouldUseQuantizedModels,
         pipelineArguments,
       };
@@ -289,6 +292,22 @@ export async function prepareTextGeneration() {
         : runTextToTextGenerationPipeline(paramsForResponse);
     };
 
+    const formatChatMessages = async (
+      chat: {
+        role: string;
+        content: string;
+      }[],
+    ) => {
+      const parameters = {
+        modelNameOrPath: textGenerationModel,
+        chat,
+        addGenerationPrompt: true,
+      };
+      return transformersWorker
+        ? transformersWorker.run("applyChatTemplate", parameters)
+        : applyChatTemplate(parameters);
+    };
+
     await generateResponse("Hi!", { max_length: 1 });
 
     handleModelLoadingProgress = undefined;
@@ -296,19 +315,25 @@ export async function prepareTextGeneration() {
     await updateResponseWithTypingEffect("Preparing response...");
 
     if (!getDisableAiResponseSetting()) {
-      const request = dedent`
-        <|im_start|>system
-        You are a friendly assistant who does your best to help the user. Start by providing an answer for the question below. If you don't know the answer, you can base your answer on the given context.<|im_end|>
-        <|im_start|>user
-        Context:
-        ${getSearchResults()
-          .map(([title, snippet]) => `- ${title}: "${snippet}"`)
-          .join("\n")}
-        
-        Question:
-        ${query}<|im_end|>
-        <|im_start|>assistant
-      `;
+      const request = await formatChatMessages([
+        {
+          role: "system",
+          content:
+            "You are a friendly assistant who does your best to help the user. Start by providing an answer for the question below. If you don't know the answer, you can base your answer on the given context.",
+        },
+        {
+          role: "user",
+          content: dedent`
+            Context:
+            ${getSearchResults()
+              .map(([title, snippet]) => `- ${title}: "${snippet}"`)
+              .join("\n")}
+            
+            Question:
+            ${query}
+          `,
+        },
+      ]);
 
       const response = await generateResponse(request, {
         add_special_tokens: true,
@@ -320,7 +345,7 @@ export async function prepareTextGeneration() {
 
       const formattedResponse = response
         .substring(response.lastIndexOf("<|im_start|>assistant"))
-        .replace("<|im_start|>assistant", "")
+        .replace("<|im_start|>assistant\n", "")
         .replace("<|im_end|>", "");
 
       await updateResponseWithTypingEffect(formattedResponse);
@@ -350,15 +375,19 @@ export async function prepareTextGeneration() {
       };
 
       for (const [title, snippet, url] of getSearchResults()) {
-        const request = dedent`
-          <|im_start|>system
-          You are a friendly assistant who does your best to help the user.<|im_end|>
-          <|im_start|>user
-          What is this text about?
-          ${title}: "${snippet}"<|im_end|>
-          <|im_start|>assistant
-          This text is about
-        `;
+        const formattedChat = await formatChatMessages([
+          {
+            role: "system",
+            content:
+              "You are a friendly assistant who does your best to help the user.",
+          },
+          {
+            role: "user",
+            content: `What is this text about?\n${title}: "${snippet}"`,
+          },
+        ]);
+
+        const request = `${formattedChat}This text is about`;
 
         const response = await generateResponse(request, {
           add_special_tokens: true,
