@@ -199,7 +199,13 @@ export async function prepareTextGeneration() {
       "../../node_modules/typed-worker/dist"
     );
 
-    const textGenerationModel = "Felladrin/onnx-Smol-Llama-101M-Chat-v1";
+    const defaultModel = "Felladrin/onnx-Smol-Llama-101M-Chat-v1";
+
+    const largerModel = "Felladrin/onnx-Llama-160M-Chat-v1";
+
+    const textGenerationModel = getUseLargerModelSetting()
+      ? largerModel
+      : defaultModel;
 
     const MobileDetect = (await import("mobile-detect")).default;
 
