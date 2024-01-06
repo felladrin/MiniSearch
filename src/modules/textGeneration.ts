@@ -199,20 +199,13 @@ export async function prepareTextGeneration() {
       "../../node_modules/typed-worker/dist"
     );
 
-    const defaultModel = "Felladrin/onnx-Smol-Llama-101M-Chat-v1";
+    const defaultModel = "Felladrin/onnx-Pythia-31M-Chat-v1";
 
     const largerModel = "Felladrin/onnx-Llama-160M-Chat-v1";
 
     const textGenerationModel = getUseLargerModelSetting()
       ? largerModel
       : defaultModel;
-
-    const MobileDetect = (await import("mobile-detect")).default;
-
-    const isRunningOnMobile =
-      new MobileDetect(window.navigator.userAgent).mobile() !== null;
-
-    const shouldUseQuantizedModels = isRunningOnMobile;
 
     const updateResponseWithTypingEffect = async (text: string) => {
       let response = "";
@@ -286,7 +279,7 @@ export async function prepareTextGeneration() {
           : handleModelLoadingProgress,
         input,
         model: textGenerationModel,
-        quantized: shouldUseQuantizedModels,
+        quantized: false,
         pipelineArguments,
       };
 
@@ -343,10 +336,10 @@ export async function prepareTextGeneration() {
 
       const response = await generateResponse(request, {
         add_special_tokens: true,
-        max_length: 1024,
-        repetition_penalty: 1.01,
-        penalty_alpha: 0.5,
-        top_k: 5,
+        max_new_tokens: 256,
+        repetition_penalty: getUseLargerModelSetting() ? 1.04 : 1.00008,
+        num_beams: 3,
+        early_stopping: true,
       });
 
       const formattedResponse = response
@@ -395,13 +388,25 @@ export async function prepareTextGeneration() {
 
         const request = `${formattedChat}This text is about`;
 
-        const response = await generateResponse(request, {
-          add_special_tokens: true,
-          max_new_tokens: 128,
-          repetition_penalty: 1.01,
-          num_beams: 3,
-          early_stopping: true,
-        });
+        const response = await generateResponse(
+          request,
+          getUseLargerModelSetting()
+            ? {
+                add_special_tokens: true,
+                max_new_tokens: 128,
+                repetition_penalty: 1.04,
+                penalty_alpha: 0.5,
+                top_k: 5,
+              }
+            : {
+                max_new_tokens: 128,
+                do_sample: true,
+                temperature: 0.4,
+                top_p: 0.25,
+                top_k: 7,
+                repetition_penalty: 1.0008,
+              },
+        );
 
         const formattedResponse = response
           .substring(response.lastIndexOf("<|im_start|>assistant"))

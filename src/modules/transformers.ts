@@ -24,6 +24,8 @@ export async function applyChatTemplate(parameters: {
   const tokenizer = await AutoTokenizer.from_pretrained(
     parameters.modelNameOrPath,
   );
+  tokenizer.chat_template =
+    "{% for message in messages %}{{'<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>' + '\\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\\n' }}{% endif %}";
   return tokenizer.apply_chat_template(parameters.chat, {
     tokenize: false,
     add_generation_prompt: parameters.addGenerationPrompt,
