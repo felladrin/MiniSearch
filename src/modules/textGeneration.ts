@@ -52,7 +52,7 @@ export async function prepareTextGeneration() {
 
     const availableModels = {
       Mistral: "Mistral-7B-Instruct-v0.1-q4f32_1",
-      TinyLlama: "TinyLlama-1.1B-1T-OpenOrca-q4f32_1",
+      TinyLlama: "TinyLlama-1.1B-Chat-v1.0-q4f32_1",
     };
 
     const selectedModel = getUseLargerModelSetting()
@@ -76,18 +76,18 @@ export async function prepareTextGeneration() {
         conv_template: "llama-2",
         conv_config: {
           system: dedent`
-            <|im_start|>user: You are a helpful assistant.<|im_end|>
-            <|im_start|>assistant: Yeah!<|im_end|>
-            <|im_start|>user: You feel happy to help with almost anything and will do your best to understand exactly what is needed.<|im_end|>
-            <|im_start|>assistant: Ok!<|im_end|>
-            <|im_start|>user: You also try to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer.<|im_end|>
-            <|im_start|>assistant: Sure!<|im_end|>
-            <|im_start|>user: That said, you are practical, do your best, and don't let caution get too much in the way of being useful.<|im_end|>
-            <|im_start|>assistant: I'll do my best to help you.
+            <|user|>: You are a helpful assistant.</s>
+            <|assistant|>: Yeah!</s>
+            <|user|>: You feel happy to help with almost anything and will do your best to understand exactly what is needed.</s>
+            <|assistant|>: Ok!</s>
+            <|user|>: You also try to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer.</s>
+            <|assistant|>: Sure!</s>
+            <|user|>: That said, you are practical, do your best, and don't let caution get too much in the way of being useful.</s>
+            <|assistant|>: I'll do my best to help you.
           `,
-          roles: ["<|im_start|>user", "<|im_start|>assistant"],
-          seps: ["<|im_end|>\n"],
-          stop_str: "<|im_end|>",
+          roles: ["<|user|>", "<|assistant|>"],
+          seps: ["</s>\n"],
+          stop_str: "</s>",
         },
       },
     };
@@ -101,7 +101,7 @@ export async function prepareTextGeneration() {
         },
         {
           model_url:
-            "https://huggingface.co/Felladrin/mlc-chat-TinyLlama-1.1B-1T-OpenOrca-q4f32_1/resolve/main/params/",
+            "https://huggingface.co/cfahlgren1/wasm-TinyLlama-1.1B-Chat-q4f342_1/resolve/main/params/",
           local_id: availableModels.TinyLlama,
         },
       ],
@@ -109,7 +109,7 @@ export async function prepareTextGeneration() {
         [availableModels.Mistral]:
           "https://huggingface.co/Felladrin/mlc-chat-Mistral-7B-Instruct-v0.1-q4f32_1/resolve/main/Mistral-7B-Instruct-v0.1-q4f32_1-webgpu.wasm",
         [availableModels.TinyLlama]:
-          "https://huggingface.co/Felladrin/mlc-chat-TinyLlama-1.1B-1T-OpenOrca-q4f32_1/resolve/main/TinyLlama-1.1B-1T-OpenOrca-q4f32_1-webgpu.wasm",
+          "https://huggingface.co/cfahlgren1/wasm-TinyLlama-1.1B-Chat-q4f342_1/resolve/main/TinyLlama-1.1B-Chat-v1.0-q4f32_1-webgpu.wasm",
       },
     };
 
