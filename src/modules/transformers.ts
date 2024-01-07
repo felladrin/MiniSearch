@@ -1,4 +1,9 @@
-import { pipeline, env, AutoTokenizer } from "@xenova/transformers";
+import {
+  pipeline,
+  env,
+  AutoTokenizer,
+  TextGenerationOutput,
+} from "@xenova/transformers";
 import ortWasmUrl from "@xenova/transformers/dist/ort-wasm.wasm?url";
 import ortWasmThreadedUrl from "@xenova/transformers/dist/ort-wasm-threaded.wasm?url";
 import ortWasmSimdUrl from "@xenova/transformers/dist/ort-wasm-simd.wasm?url";
@@ -64,11 +69,11 @@ export async function runTextToTextGenerationPipeline<
   await generator.dispose();
 
   if (Array.isArray(parameters.input)) {
-    return responses.map(
-      ([response]: { generated_text: string }[]) => response.generated_text,
-    );
+    return (responses as TextGenerationOutput[]).map(
+      ([response]) => response.generated_text,
+    ) as T;
   }
 
-  const [response] = responses;
-  return response.generated_text;
+  const [response] = responses as TextGenerationOutput;
+  return response.generated_text as T;
 }
