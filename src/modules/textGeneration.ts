@@ -199,13 +199,28 @@ export async function prepareTextGeneration() {
       "../../node_modules/typed-worker/dist"
     );
 
-    const defaultModel = "Felladrin/onnx-Pythia-31M-Chat-v1";
+    const MobileDetect = (await import("mobile-detect")).default;
 
-    const largerModel = "Felladrin/onnx-Llama-160M-Chat-v1";
+    const isRunningOnMobile =
+      new MobileDetect(window.navigator.userAgent).mobile() !== null;
 
-    const textGenerationModel = getUseLargerModelSetting()
+    const models = {
+      small: "Felladrin/onnx-Pythia-31M-Chat-v1",
+      medium: "Felladrin/onnx-Smol-Llama-101M-Chat-v1",
+      large: "Felladrin/onnx-Llama-160M-Chat-v1",
+    } as const;
+
+    const defaultModel = isRunningOnMobile ? models.small : models.medium;
+
+    const largerModel = isRunningOnMobile ? models.medium : models.large;
+
+    const shouldUserLargerModel = getUseLargerModelSetting();
+
+    const textGenerationModel = shouldUserLargerModel
       ? largerModel
       : defaultModel;
+
+    const shouldUseQuantizedModels = isRunningOnMobile && shouldUserLargerModel;
 
     const updateResponseWithTypingEffect = async (text: string) => {
       let response = "";
@@ -279,7 +294,7 @@ export async function prepareTextGeneration() {
           : handleModelLoadingProgress,
         input,
         model: textGenerationModel,
-        quantized: false,
+        quantized: shouldUseQuantizedModels,
         pipelineArguments,
       };
 
@@ -337,7 +352,12 @@ export async function prepareTextGeneration() {
       const response = await generateResponse(request, {
         add_special_tokens: true,
         max_new_tokens: 256,
-        repetition_penalty: getUseLargerModelSetting() ? 1.04 : 1.00008,
+        repetition_penalty:
+          textGenerationModel === models.small
+            ? 1.0001
+            : textGenerationModel === models.medium
+              ? 1.02
+              : 1.01,
         num_beams: 3,
         early_stopping: true,
       });
@@ -390,22 +410,26 @@ export async function prepareTextGeneration() {
 
         const response = await generateResponse(
           request,
-          getUseLargerModelSetting()
+          textGenerationModel === models.small
             ? {
-                add_special_tokens: true,
                 max_new_tokens: 128,
-                repetition_penalty: 1.04,
+                repetition_penalty: 1.0005,
                 penalty_alpha: 0.5,
-                top_k: 5,
+                top_k: 2,
               }
-            : {
-                max_new_tokens: 128,
-                do_sample: true,
-                temperature: 0.4,
-                top_p: 0.25,
-                top_k: 7,
-                repetition_penalty: 1.0008,
-              },
+            : textGenerationModel === models.medium
+              ? {
+                  max_new_tokens: 128,
+                  repetition_penalty: 1.04,
+                  penalty_alpha: 0.5,
+                  top_k: 4,
+                }
+              : {
+                  max_new_tokens: 128,
+                  repetition_penalty: 1.025,
+                  penalty_alpha: 0.5,
+                  top_k: 4,
+                },
         );
 
         const formattedResponse = response

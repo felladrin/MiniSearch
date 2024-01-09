@@ -20,6 +20,7 @@
     "he": "^1.2.0",
     "loadbar": "^0.2.2",
     "markdown-to-jsx": "^7.3.2",
+    "mobile-detect": "^1.4.5",
     "node-fetch": "^3.3.2",
     "prettier": "^3.0.3",
     "react": "^18.2.0",
