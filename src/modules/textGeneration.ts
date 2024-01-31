@@ -51,43 +51,53 @@ export async function prepareTextGeneration() {
       : new ChatModule();
 
     const availableModels = {
-      Mistral: "Mistral-7B-Instruct-v0.1-q4f32_1",
-      TinyLlama: "TinyLlama-1.1B-Chat-v1.0-q4f32_1",
+      Phi: "Phi2-q4f32_1-1k",
+      TinyLlama: "TinyLlama-1.1B-Chat-v0.4-q4f32_1-1k",
     };
 
     const selectedModel = getUseLargerModelSetting()
-      ? availableModels.Mistral
+      ? availableModels.Phi
       : availableModels.TinyLlama;
 
     const commonChatMlConfig = {
       temperature: 0,
       repetition_penalty: 1.1,
-      top_p: 1,
+      max_gen_len: 256,
     };
 
     const chatConfigPerModel = {
-      [availableModels.Mistral]: {
+      [availableModels.Phi]: {
         ...commonChatMlConfig,
       },
       [availableModels.TinyLlama]: {
         ...commonChatMlConfig,
-        mean_gen_len: 32,
-        max_gen_len: 256,
-        conv_template: "llama-2",
+        conv_template: "custom",
         conv_config: {
           system: dedent`
-            <|user|>: You are a helpful assistant.</s>
-            <|assistant|>: Yeah!</s>
-            <|user|>: You feel happy to help with almost anything and will do your best to understand exactly what is needed.</s>
-            <|assistant|>: Ok!</s>
-            <|user|>: You also try to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer.</s>
-            <|assistant|>: Sure!</s>
-            <|user|>: That said, you are practical, do your best, and don't let caution get too much in the way of being useful.</s>
-            <|assistant|>: I'll do my best to help you.
+            <|im_start|>user
+            You are a helpful assistant.<|im_end|>
+            <|im_start|>assistant
+            Yeah!<|im_end|>
+            <|im_start|>user
+            You feel happy to help with almost anything and will do your best to understand exactly what is needed.<|im_end|>
+            <|im_start|>assistant
+            Ok!<|im_end|>
+            <|im_start|>user
+            You also try to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer.<|im_end|>
+            <|im_start|>assistant
+            Sure!<|im_end|>
+            <|im_start|>user
+            That said, you are practical, do your best, and don't let caution get too much in the way of being useful.<|im_end|>
+            <|im_start|>assistant
+            I'll do my best to help you.
           `,
-          roles: ["<|user|>", "<|assistant|>"],
-          seps: ["</s>\n"],
-          stop_str: "</s>",
+          roles: ["<|im_start|>user", "<|im_start|>assistant"],
+          offset: 0,
+          seps: ["<|im_end|>\n"],
+          separator_style: "Two",
+          stop_str: "<|im_end|>",
+          add_bos: false,
+          stop_tokens: [2, 32002],
         },
       },
     };
@@ -95,22 +105,20 @@ export async function prepareTextGeneration() {
     const appConfig = {
       model_list: [
         {
+          local_id: availableModels.Phi,
           model_url:
-            "https://huggingface.co/Felladrin/mlc-chat-Mistral-7B-Instruct-v0.1-q4f32_1/resolve/main/params/",
-          local_id: availableModels.Mistral,
+            "https://huggingface.co/mlc-ai/phi-2-q4f32_1-MLC/resolve/main/",
+          model_lib_url:
+            "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/phi-2/phi-2-q4f32_1-ctx2k-webgpu.wasm",
         },
         {
-          model_url:
-            "https://huggingface.co/cfahlgren1/wasm-TinyLlama-1.1B-Chat-q4f342_1/resolve/main/params/",
           local_id: availableModels.TinyLlama,
+          model_url:
+            "https://huggingface.co/mlc-ai/TinyLlama-1.1B-Chat-v0.4-q0f32-MLC/resolve/main/",
+          model_lib_url:
+            "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/TinyLlama-1.1B-Chat-v0.4/TinyLlama-1.1B-Chat-v0.4-q0f32-ctx2k-webgpu.wasm",
         },
       ],
-      model_lib_map: {
-        [availableModels.Mistral]:
-          "https://huggingface.co/Felladrin/mlc-chat-Mistral-7B-Instruct-v0.1-q4f32_1/resolve/main/Mistral-7B-Instruct-v0.1-q4f32_1-webgpu.wasm",
-        [availableModels.TinyLlama]:
-          "https://huggingface.co/cfahlgren1/wasm-TinyLlama-1.1B-Chat-q4f342_1/resolve/main/TinyLlama-1.1B-Chat-v1.0-q4f32_1-webgpu.wasm",
-      },
     };
 
     if (!(await hasModelInCache(selectedModel, appConfig))) {
@@ -157,12 +165,9 @@ export async function prepareTextGeneration() {
     if (getSummarizeLinksSetting()) {
       for (const [title, snippet, url] of getSearchResults()) {
         const request = dedent`
-          Context:
-          Link title: ${title}
-          Link snippet: ${snippet}
-
-          Question:
-          What is this link about?
+          This a link: [${title}](${url} "${snippet}")
+          
+          Now, tell me: What is this link about?
         `;
 
         await chat.generate(request, (_, message) => {
