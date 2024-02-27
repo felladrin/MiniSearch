@@ -210,14 +210,19 @@ export async function prepareTextGeneration() {
       new MobileDetect(window.navigator.userAgent).mobile() !== null;
 
     const models = {
-      small: "Felladrin/onnx-Pythia-31M-Chat-v1",
-      medium: "Felladrin/onnx-Smol-Llama-101M-Chat-v1",
-      large: "Felladrin/onnx-Llama-160M-Chat-v1",
+      mobileDefault: "Felladrin/onnx-Pythia-31M-Chat-v1",
+      mobileLarger: "Felladrin/onnx-Smol-Llama-101M-Chat-v1",
+      desktopDefault: "Felladrin/onnx-Llama-160M-Chat-v1",
+      desktopLarger: "Xenova/Qwen1.5-0.5B-Chat",
     } as const;
 
-    const defaultModel = isRunningOnMobile ? models.small : models.medium;
+    const defaultModel = isRunningOnMobile
+      ? models.mobileDefault
+      : models.desktopDefault;
 
-    const largerModel = isRunningOnMobile ? models.medium : models.large;
+    const largerModel = isRunningOnMobile
+      ? models.mobileLarger
+      : models.desktopLarger;
 
     const shouldUserLargerModel = getUseLargerModelSetting();
 
@@ -225,7 +230,7 @@ export async function prepareTextGeneration() {
       ? largerModel
       : defaultModel;
 
-    const shouldUseQuantizedModels = isRunningOnMobile && shouldUserLargerModel;
+    const shouldUseQuantizedModels = shouldUserLargerModel;
 
     const updateResponseWithTypingEffect = async (text: string) => {
       let response = "";
@@ -355,21 +360,22 @@ export async function prepareTextGeneration() {
       ]);
 
       const response = await generateResponse(request, {
-        add_special_tokens: true,
         max_new_tokens: 256,
         repetition_penalty:
-          textGenerationModel === models.small
+          textGenerationModel === models.mobileDefault
             ? 1.0001
-            : textGenerationModel === models.medium
+            : textGenerationModel === models.mobileLarger
               ? 1.02
-              : 1.01,
+              : textGenerationModel === models.desktopDefault
+                ? 1.01
+                : 1.0,
         num_beams: 3,
         early_stopping: true,
       });
 
       const formattedResponse = response
-        .substring(response.lastIndexOf("<|im_start|>assistant"))
-        .replace("<|im_start|>assistant\n", "")
+        .substring(response.lastIndexOf("assistant\n"))
+        .replace("assistant\n", "")
         .replace("<|im_end|>", "");
 
       await updateResponseWithTypingEffect(formattedResponse);
@@ -415,34 +421,38 @@ export async function prepareTextGeneration() {
 
         const response = await generateResponse(
           request,
-          textGenerationModel === models.small
+          textGenerationModel === models.mobileDefault
             ? {
                 max_new_tokens: 128,
                 repetition_penalty: 1.0005,
                 penalty_alpha: 0.5,
                 top_k: 2,
               }
-            : textGenerationModel === models.medium
+            : textGenerationModel === models.mobileLarger
               ? {
                   max_new_tokens: 128,
-                  repetition_penalty: 1.04,
+                  repetition_penalty: 1.06,
                   penalty_alpha: 0.5,
                   top_k: 4,
                 }
-              : {
-                  max_new_tokens: 128,
-                  repetition_penalty: 1.025,
-                  penalty_alpha: 0.5,
-                  top_k: 4,
-                },
+              : textGenerationModel === models.desktopDefault
+                ? {
+                    max_new_tokens: 128,
+                    repetition_penalty: 1.035,
+                    penalty_alpha: 0.5,
+                    top_k: 4,
+                  }
+                : {
+                    max_new_tokens: 128,
+                    repetition_penalty: 1.0,
+                    penalty_alpha: 0.5,
+                    top_k: 4,
+                  },
         );
 
         const formattedResponse = response
-          .substring(response.lastIndexOf("<|im_start|>assistant"))
-          .replace(
-            "<|im_start|>assistant\nThis text is about",
-            "This link is about",
-          )
+          .substring(response.lastIndexOf("assistant\n"))
+          .replace("assistant\nThis text is about", "This link is about")
           .replace("<|im_end|>", "");
 
         await updateUrlsDescriptionsWithTypingEffect(url, formattedResponse);
