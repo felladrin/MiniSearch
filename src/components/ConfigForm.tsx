@@ -77,7 +77,7 @@ export function ConfigForm() {
             checked={useLargerModel}
             onChange={(event) => setUseLargerModel(event.target.checked)}
           />
-          Use a better AI model
+          Use a larger AI model
         </label>
       </div>
     </details>
