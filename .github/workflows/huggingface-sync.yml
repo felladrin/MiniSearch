@@ -17,8 +17,11 @@ jobs:
           user: ${{ vars.HF_SPACE_OWNER }}
           space: ${{ vars.HF_SPACE_NAME }}
           token: ${{ secrets.HF_TOKEN }}
-          emoji: 🔍
-          colorFrom: purple
-          colorTo: blue
+          title: Mini[Web]Search
+          emoji: 👌🌏🔍
+          short_description: Minimalist web-searching app with browser-based AI assistant
+          colorFrom: yellow
+          colorTo: yellow
           sdk: docker
           pinned: true
+          header: mini
