@@ -17,8 +17,8 @@ jobs:
           user: ${{ vars.HF_SPACE_OWNER }}
           space: ${{ vars.HF_SPACE_NAME }}
           token: ${{ secrets.HF_TOKEN }}
-          title: Mini[Web]Search
-          emoji: 👌🌏🔍
+          title: MiniSearch
+          emoji: 👌🔍
           short_description: Minimalist web-searching app with browser-based AI assistant
           colorFrom: yellow
           colorTo: yellow
