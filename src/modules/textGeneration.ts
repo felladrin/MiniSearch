@@ -15,6 +15,7 @@ import { loadBar } from "./loadBar";
 import { SearchResults, search, decodeSearchResults } from "./search";
 import { sleep } from "./sleep";
 import { query, debug, disableWorkers } from "./urlParams";
+import { rank } from "./transformers";
 
 const Worker = disableWorkers ? undefined : window.Worker;
 
@@ -123,6 +124,7 @@ async function generateTextWithWebLlm() {
       dedent`
         Context:
         ${getSearchResults()
+          .slice(0, 5)
           .map(([title, snippet]) => `- ${title}: ${snippet}`)
           .join("\n")}
         
@@ -146,9 +148,8 @@ async function generateTextWithWebLlm() {
   if (getSummarizeLinksSetting()) {
     for (const [title, snippet, url] of getSearchResults()) {
       const request = dedent`
-        This a link: [${title}](${url} "${snippet}")
-        
-        Now, tell me: What is this link about?
+        When I searched for "${query}", I found this link: [${title}](${url} "${snippet}")
+        Now, tell me: What is this link about and how is it related to what I searched for?
       `;
 
       await chat.generate(request, (_, message) => {
@@ -320,6 +321,7 @@ async function generateTextWithTransformersJs() {
         content: dedent`
           Context:
           ${getSearchResults()
+            .slice(0, 5)
             .map(([title, snippet]) => `- ${title}: "${snippet}"`)
             .join("\n")}
           
@@ -441,9 +443,20 @@ export async function prepareTextGeneration() {
 
   updatePrompt(query);
 
-  const searchResults: SearchResults = await search(query, 6);
+  const searchResults: SearchResults = decodeSearchResults(
+    await search(query, 30),
+  );
 
-  updateSearchResults(decodeSearchResults(searchResults));
+  updateSearchResults(searchResults);
+
+  const rankedSearchResults = (
+    await rank(
+      query,
+      searchResults.map(([, snippet]) => snippet),
+    )
+  ).map(({ corpus_id }) => searchResults[corpus_id]);
+
+  updateSearchResults(rankedSearchResults);
 
   if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
 
