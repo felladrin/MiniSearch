@@ -1,8 +1,9 @@
-import he from "he";
+import { convert as convertHtmlToPlainText } from "html-to-text";
 
 export type SearchResults = [title: string, snippet: string, url: string][];
 
 export const searchQueryKey = "searchQuery";
+
 export async function search(query: string, limit?: number) {
   const searchUrl = new URL("/search", window.location.origin);
   searchUrl.searchParams.set("q", query);
@@ -12,12 +13,13 @@ export async function search(query: string, limit?: number) {
   const response = await fetch(searchUrl.toString());
   return await response.json();
 }
+
 export function decodeSearchResults(
   searchResults: SearchResults,
 ): SearchResults {
   return searchResults.map(([title, snippet, url]) => [
-    he.decode(title),
-    he.decode(snippet),
+    convertHtmlToPlainText(title),
+    convertHtmlToPlainText(snippet),
     url,
   ]);
 }
