@@ -182,7 +182,7 @@ async function generateTextWithTransformersJs() {
     new MobileDetect(window.navigator.userAgent).mobile() !== null;
 
   const models = {
-    mobileDefault: "Felladrin/onnx-Pythia-31M-Chat-v1",
+    mobileDefault: "Felladrin/onnx-Minueza-32M-UltraChat",
     mobileLarger: "Felladrin/onnx-Minueza-32M-UltraChat",
     desktopDefault: "Felladrin/onnx-TinyMistral-248M-Chat-v1",
     desktopLarger: "Xenova/Qwen1.5-0.5B-Chat",
@@ -202,7 +202,7 @@ async function generateTextWithTransformersJs() {
     ? largerModel
     : defaultModel;
 
-  const shouldUseQuantizedModels = true;
+  const shouldUseQuantizedModels = isRunningOnMobile && !shouldUserLargerModel;
 
   const updateResponseWithTypingEffect = async (text: string) => {
     let response = "";
@@ -334,12 +334,10 @@ async function generateTextWithTransformersJs() {
       max_new_tokens: 256,
       repetition_penalty:
         textGenerationModel === models.mobileDefault
-          ? 1.0001
-          : textGenerationModel === models.mobileLarger
-            ? 1.02
-            : textGenerationModel === models.desktopDefault
-              ? 1.01
-              : 1.0,
+          ? 1.02
+          : textGenerationModel === models.desktopDefault
+            ? 1.01
+            : 1.0,
       num_beams: 3,
       early_stopping: true,
     });
@@ -395,30 +393,23 @@ async function generateTextWithTransformersJs() {
         textGenerationModel === models.mobileDefault
           ? {
               max_new_tokens: 128,
-              repetition_penalty: 1.0005,
+              repetition_penalty: 1.06,
               penalty_alpha: 0.5,
-              top_k: 2,
+              top_k: 4,
             }
-          : textGenerationModel === models.mobileLarger
+          : textGenerationModel === models.desktopDefault
             ? {
                 max_new_tokens: 128,
-                repetition_penalty: 1.06,
+                repetition_penalty: 1.035,
                 penalty_alpha: 0.5,
                 top_k: 4,
               }
-            : textGenerationModel === models.desktopDefault
-              ? {
-                  max_new_tokens: 128,
-                  repetition_penalty: 1.035,
-                  penalty_alpha: 0.5,
-                  top_k: 4,
-                }
-              : {
-                  max_new_tokens: 128,
-                  repetition_penalty: 1.0,
-                  penalty_alpha: 0.5,
-                  top_k: 4,
-                },
+            : {
+                max_new_tokens: 128,
+                repetition_penalty: 1.0,
+                penalty_alpha: 0.5,
+                top_k: 4,
+              },
       );
 
       const formattedResponse = response
