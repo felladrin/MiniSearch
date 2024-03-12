@@ -202,7 +202,7 @@ async function generateTextWithTransformersJs() {
     ? largerModel
     : defaultModel;
 
-  const shouldUseQuantizedModels = isRunningOnMobile && !shouldUserLargerModel;
+  const shouldUseQuantizedModels = !isRunningOnMobile || !shouldUserLargerModel;
 
   const updateResponseWithTypingEffect = async (text: string) => {
     let response = "";
