@@ -453,17 +453,14 @@ async function rankSearchResults(searchResults: SearchResults, query: string) {
     rank = transformersModule.rank;
   }
 
+  const snippets = searchResults.map(
+    ([title, snippet]) => `${title}: "${snippet}"`,
+  );
+
   const rankedSearchResults: SearchResults = (
     await (transformersWorker
-      ? transformersWorker.run(
-          "rank",
-          query,
-          searchResults.map(([, snippet]) => snippet),
-        )
-      : rank(
-          query,
-          searchResults.map(([, snippet]) => snippet),
-        ))
+      ? transformersWorker.run("rank", query, snippets)
+      : rank(query, snippets))
   ).map(({ corpus_id }) => searchResults[corpus_id]);
 
   if (transformersWorker) {
