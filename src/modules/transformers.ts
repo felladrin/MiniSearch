@@ -110,7 +110,7 @@ export async function rank(
 
   const { logits } = await model(inputs);
 
-  model.dispose();
+  await model.dispose();
 
   return logits
     .sigmoid()
