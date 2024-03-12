@@ -12,7 +12,7 @@ import {
   getUrlsDescriptions,
 } from "./pubSub";
 import { loadBar } from "./loadBar";
-import { SearchResults, search, decodeSearchResults } from "./search";
+import { search } from "./search";
 import { sleep } from "./sleep";
 import { query, debug, disableWorkers } from "./urlParams";
 import { rank } from "./transformers";
@@ -443,9 +443,7 @@ export async function prepareTextGeneration() {
 
   updatePrompt(query);
 
-  const searchResults: SearchResults = decodeSearchResults(
-    await search(query, 30),
-  );
+  const searchResults = await search(query, 30);
 
   updateSearchResults(searchResults);
 
