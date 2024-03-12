@@ -183,8 +183,8 @@ async function generateTextWithTransformersJs() {
 
   const models = {
     mobileDefault: "Felladrin/onnx-Pythia-31M-Chat-v1",
-    mobileLarger: "Felladrin/onnx-Smol-Llama-101M-Chat-v1",
-    desktopDefault: "Felladrin/onnx-Llama-160M-Chat-v1",
+    mobileLarger: "Felladrin/onnx-Minueza-32M-UltraChat",
+    desktopDefault: "Felladrin/onnx-TinyMistral-248M-Chat-v1",
     desktopLarger: "Xenova/Qwen1.5-0.5B-Chat",
   } as const;
 
@@ -202,7 +202,7 @@ async function generateTextWithTransformersJs() {
     ? largerModel
     : defaultModel;
 
-  const shouldUseQuantizedModels = isRunningOnMobile || shouldUserLargerModel;
+  const shouldUseQuantizedModels = true;
 
   const updateResponseWithTypingEffect = async (text: string) => {
     let response = "";
