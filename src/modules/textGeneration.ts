@@ -12,10 +12,9 @@ import {
   getUrlsDescriptions,
 } from "./pubSub";
 import { loadBar } from "./loadBar";
-import { search } from "./search";
+import { SearchResults, search } from "./search";
 import { sleep } from "./sleep";
 import { query, debug, disableWorkers } from "./urlParams";
-import { rank } from "./transformers";
 
 const Worker = disableWorkers ? undefined : window.Worker;
 
@@ -436,6 +435,53 @@ async function generateTextWithTransformersJs() {
   }
 }
 
+async function rankSearchResults(searchResults: SearchResults, query: string) {
+  const { createWorker } = await import("../../node_modules/typed-worker/dist");
+
+  type Actions = import("./transformersWorker").Actions;
+
+  let transformersWorker: ReturnType<typeof createWorker<Actions>> | undefined;
+
+  if (Worker) {
+    transformersWorker = createWorker<Actions>(() => {
+      const worker = new Worker(
+        new URL("./transformersWorker", import.meta.url),
+        {
+          type: "module",
+        },
+      );
+
+      return worker;
+    });
+  }
+
+  let rank!: typeof import("./transformers").rank;
+
+  if (!transformersWorker) {
+    const transformersModule = await import("./transformers");
+    rank = transformersModule.rank;
+  }
+
+  const rankedSearchResults: SearchResults = (
+    await (transformersWorker
+      ? transformersWorker.run(
+          "rank",
+          query,
+          searchResults.map(([, snippet]) => snippet),
+        )
+      : rank(
+          query,
+          searchResults.map(([, snippet]) => snippet),
+        ))
+  ).map(({ corpus_id }) => searchResults[corpus_id]);
+
+  if (transformersWorker) {
+    transformersWorker.destroy();
+  }
+
+  return rankedSearchResults;
+}
+
 export async function prepareTextGeneration() {
   if (query === null) return;
 
@@ -447,12 +493,7 @@ export async function prepareTextGeneration() {
 
   updateSearchResults(searchResults);
 
-  const rankedSearchResults = (
-    await rank(
-      query,
-      searchResults.map(([, snippet]) => snippet),
-    )
-  ).map(({ corpus_id }) => searchResults[corpus_id]);
+  const rankedSearchResults = await rankSearchResults(searchResults, query);
 
   updateSearchResults(rankedSearchResults);
 
