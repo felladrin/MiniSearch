@@ -1,6 +1,6 @@
 import { SearchResults } from "../modules/search";
 import { Tooltip } from "react-tooltip";
-
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 export function SearchResultsList({
   searchResults,
   urlsDescriptions,
@@ -8,10 +8,12 @@ export function SearchResultsList({
   searchResults: SearchResults;
   urlsDescriptions: Record<string, string>;
 }) {
+  const [parent] = useAutoAnimate({ duration: 1000 });
+
   return (
-    <ul>
+    <ul ref={parent}>
       {searchResults.map(([title, snippet, url], index) => (
-        <li key={index}>
+        <li key={url}>
           <Tooltip
             id={`search-result-${index}`}
             place="top-start"

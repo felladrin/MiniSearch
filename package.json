@@ -12,6 +12,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@formkit/auto-animate": "^0.8.1",
     "@mlc-ai/web-llm": "0.2.28",
     "@xenova/transformers": "^2.8.0",
     "console-panel": "^1.0.4",

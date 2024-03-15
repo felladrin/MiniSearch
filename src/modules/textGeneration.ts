@@ -481,6 +481,13 @@ export async function prepareTextGeneration() {
 
   updateSearchResults(searchResults);
 
+  updateUrlsDescriptions(
+    searchResults.reduce(
+      (acc, [, snippet, url]) => ({ ...acc, [url]: snippet }),
+      {},
+    ),
+  );
+
   const rankedSearchResults = await rankSearchResults(searchResults, query);
 
   updateSearchResults(rankedSearchResults);
