@@ -1,7 +1,7 @@
-import { LoadModelConfig, SamplingConfig, Wllama } from "@wllama/wllama";
-import wllamaSingle from "@wllama/wllama/src/single-thread/wllama.wasm?url";
-import wllamaMulti from "@wllama/wllama/src/multi-thread/wllama.wasm?url";
-import wllamaMultiWorker from "@wllama/wllama/src/multi-thread/wllama.worker.mjs?url";
+import { LoadModelConfig, SamplingConfig, Wllama } from "@wllama/wllama/esm";
+import wllamaSingle from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
+import wllamaMulti from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
+import wllamaMultiWorker from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
 
 const configPaths = {
   "single-thread/wllama.wasm": wllamaSingle,
