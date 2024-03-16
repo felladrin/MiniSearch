@@ -176,8 +176,9 @@ async function generateTextWithWebLlm() {
 async function generateTextWithWllama() {
   const { runCompletion } = await import("./wllama");
 
-  const modelUrl =
-    "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf";
+  const modelUrl = getUseLargerModelSetting()
+    ? "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q5_k_m.gguf"
+    : "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf";
 
   if (!getDisableAiResponseSetting()) {
     updateResponse("Preparing response...");
@@ -190,16 +191,13 @@ async function generateTextWithWllama() {
       <|im_start|>assistant
       Hi! How can I help you today?<|im_end|>
       <|im_start|>user
-      Provide a concise response to the request below.
-      If the information from the Web Search Results below is useful, you can use it to complement your response. Otherwise, ignore it.
-
-      Web Search Results:
+      Context:
       ${getSearchResults()
         .slice(0, 5)
         .map(([title, snippet]) => `- ${title}: ${snippet}`)
         .join("\n")}<|im_end|>
       
-      Request:
+      Question:
       ${query}<|im_end|>
       <|im_start|>assistant
 
@@ -207,24 +205,22 @@ async function generateTextWithWllama() {
 
     if (!query) return;
 
-    await runCompletion({
+    const completion = await runCompletion({
       modelUrl,
-      modelConfig: {
-        n_ctx: 1024,
-        n_batch: 1024,
-      },
       prompt,
       nPredict: 512,
       sampling: {
-        temp: 0.2,
+        temp: 0.3,
         top_k: 0,
         top_p: 1,
         min_p: 0.1,
       },
       onNewToken: (_token, _piece, currentText) => {
-        updateResponse(currentText.replace("<|im_end|>", ""));
+        updateResponse(currentText);
       },
     });
+
+    updateResponse(completion.replaceAll("<|im_end|>", ""));
   }
 
   if (getSummarizeLinksSetting()) {
@@ -246,12 +242,12 @@ async function generateTextWithWllama() {
         This text is about
       `;
 
-      await runCompletion({
+      const completion = await runCompletion({
         modelUrl,
         prompt,
         nPredict: 128,
         sampling: {
-          temp: 0.2,
+          temp: 0.3,
           top_k: 0,
           top_p: 1,
           min_p: 0.1,
@@ -259,9 +255,14 @@ async function generateTextWithWllama() {
         onNewToken: (_token, _piece, currentText) => {
           updateUrlsDescriptions({
             ...getUrlsDescriptions(),
-            [url]: `This link is about ${currentText.replace("<|im_end|>", "")}`,
+            [url]: `This link is about ${currentText}`,
           });
         },
+      });
+
+      updateUrlsDescriptions({
+        ...getUrlsDescriptions(),
+        [url]: `This link is about ${completion.replaceAll("<|im_end|>", "")}`,
       });
     }
   }
@@ -595,12 +596,11 @@ export async function prepareTextGeneration() {
   try {
     if (beta) {
       await generateTextWithWllama();
-      return;
+    } else {
+      if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
+
+      await generateTextWithWebLlm();
     }
-
-    if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
-
-    await generateTextWithWebLlm();
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : (error as string);
