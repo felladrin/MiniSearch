@@ -36,7 +36,7 @@ export async function runCompletion(config: {
   let Wllama!: typeof WllamaType;
 
   if (process.env.NODE_ENV === "development") {
-    Wllama = (await import("@wllama/wllama/esm")).Wllama;
+    Wllama = (await import("@wllama/wllama/esm/index.js")).Wllama;
   } else {
     Wllama = (await import("/wllama/esm/index.js" as string)).Wllama;
   }
@@ -45,9 +45,13 @@ export async function runCompletion(config: {
 
   await wllama.loadModelFromUrl(config.modelUrl, config.modelConfig ?? {});
 
-  return wllama.createCompletion(config.prompt, {
+  const completion = await wllama.createCompletion(config.prompt, {
     nPredict: config.nPredict,
     sampling: config.sampling,
     onNewToken: config.onNewToken,
   });
+
+  await wllama.exit();
+
+  return completion;
 }

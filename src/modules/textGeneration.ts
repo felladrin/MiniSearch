@@ -594,7 +594,7 @@ export async function prepareTextGeneration() {
 
   try {
     if (beta) {
-      generateTextWithWllama();
+      await generateTextWithWllama();
       return;
     }
 
