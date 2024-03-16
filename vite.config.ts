@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePluginNode } from "vite-plugin-node";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 
 export default defineConfig(({ command }) => ({
   server: {
@@ -17,6 +18,14 @@ export default defineConfig(({ command }) => ({
   },
   plugins: [
     react(),
+    viteStaticCopy({
+      targets: [
+        {
+          src: "./node_modules/@wllama/wllama/esm",
+          dest: "wllama",
+        },
+      ],
+    }),
     ...(command === "serve"
       ? VitePluginNode({
           adapter: ({ app, req, res, next }) => {
