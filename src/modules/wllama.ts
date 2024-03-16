@@ -38,7 +38,7 @@ export async function runCompletion(config: {
   if (process.env.NODE_ENV === "development") {
     Wllama = (await import("@wllama/wllama/esm")).Wllama;
   } else {
-    Wllama = (await import("/wllama/esm" as string)).Wllama;
+    Wllama = (await import("/wllama/esm/index.js" as string)).Wllama;
   }
 
   const wllama = new Wllama(configPaths);
