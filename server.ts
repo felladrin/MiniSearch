@@ -44,6 +44,12 @@ export const app = express();
 
 app.use(express.static("dist"));
 
+app.use((_, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+  next();
+});
+
 app.get("/search", async (request, response) => {
   const query = request.query.q as string;
 

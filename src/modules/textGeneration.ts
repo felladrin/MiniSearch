@@ -14,7 +14,7 @@ import {
 import { loadBar } from "./loadBar";
 import { SearchResults, search } from "./search";
 import { sleep } from "./sleep";
-import { query, debug, disableWorkers } from "./urlParams";
+import { query, debug, disableWorkers, beta } from "./urlParams";
 
 const Worker = disableWorkers ? undefined : window.Worker;
 
@@ -173,6 +173,100 @@ async function generateTextWithWebLlm() {
   chat.unload();
 }
 
+async function generateTextWithWllama() {
+  const { runCompletion } = await import("./wllama");
+
+  const modelUrl =
+    "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf";
+
+  if (!getDisableAiResponseSetting()) {
+    updateResponse("Preparing response...");
+
+    const prompt = dedent`
+      <|im_start|>system
+      You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity. Your interactions are always respectful, helpful, and focused on delivering the most accurate information to the user.<|im_end|>
+      <|im_start|>user
+      Hello!<|im_end|>
+      <|im_start|>assistant
+      Hi! How can I help you today?<|im_end|>
+      <|im_start|>user
+      Provide a concise response to the request below.
+      If the information from the Web Search Results below is useful, you can use it to complement your response. Otherwise, ignore it.
+
+      Web Search Results:
+      ${getSearchResults()
+        .slice(0, 5)
+        .map(([title, snippet]) => `- ${title}: ${snippet}`)
+        .join("\n")}<|im_end|>
+      
+      Request:
+      ${query}<|im_end|>
+      <|im_start|>assistant
+
+    `;
+
+    if (!query) return;
+
+    await runCompletion({
+      modelUrl,
+      modelConfig: {
+        n_ctx: 1024,
+        n_batch: 1024,
+      },
+      prompt,
+      nPredict: 512,
+      sampling: {
+        temp: 0.2,
+        top_k: 0,
+        top_p: 1,
+        min_p: 0.1,
+      },
+      onNewToken: (_token, _piece, currentText) => {
+        updateResponse(currentText.replace("<|im_end|>", ""));
+      },
+    });
+  }
+
+  if (getSummarizeLinksSetting()) {
+    for (const [title, snippet, url] of getSearchResults()) {
+      const prompt = dedent`
+        <|im_start|>system
+        You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity. Your interactions are always respectful, helpful, and focused on delivering the most accurate information to the user.<|im_end|>
+        <|im_start|>user
+        Hello!<|im_end|>
+        <|im_start|>assistant
+        Hi! How can I help you today?<|im_end|>
+        <|im_start|>user
+        Context:
+        ${title}: ${snippet}
+
+        Question:
+        What is this text about?<|im_end|>
+        <|im_start|>assistant
+        This text is about
+      `;
+
+      await runCompletion({
+        modelUrl,
+        prompt,
+        nPredict: 128,
+        sampling: {
+          temp: 0.2,
+          top_k: 0,
+          top_p: 1,
+          min_p: 0.1,
+        },
+        onNewToken: (_token, _piece, currentText) => {
+          updateUrlsDescriptions({
+            ...getUrlsDescriptions(),
+            [url]: `This link is about ${currentText.replace("<|im_end|>", "")}`,
+          });
+        },
+      });
+    }
+  }
+}
+
 async function generateTextWithTransformersJs() {
   const { createWorker } = await import("../../node_modules/typed-worker/dist");
 
@@ -321,7 +415,7 @@ async function generateTextWithTransformersJs() {
           Context:
           ${getSearchResults()
             .slice(0, 5)
-            .map(([title, snippet]) => `- ${title}: "${snippet}"`)
+            .map(([title, snippet]) => `- ${title}: ${snippet}`)
             .join("\n")}
           
           Question:
@@ -382,7 +476,7 @@ async function generateTextWithTransformersJs() {
         },
         {
           role: "user",
-          content: `What is this text about?\n${title}: "${snippet}"`,
+          content: `What is this text about?\n${title}: ${snippet}`,
         },
       ]);
 
@@ -454,7 +548,7 @@ async function rankSearchResults(searchResults: SearchResults, query: string) {
   }
 
   const snippets = searchResults.map(
-    ([title, snippet]) => `${title}: "${snippet}"`,
+    ([title, snippet]) => `${title}: ${snippet}`,
   );
 
   const rankedSearchResults: SearchResults = (
@@ -499,6 +593,11 @@ export async function prepareTextGeneration() {
   loadBar.start();
 
   try {
+    if (beta) {
+      generateTextWithWllama();
+      return;
+    }
+
     if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
 
     await generateTextWithWebLlm();
