@@ -12,6 +12,9 @@ export default defineConfig(({ command }) => ({
   },
   build: {
     target: "esnext",
+    rollupOptions: {
+      external: ["/wllama/esm"],
+    },
   },
   worker: {
     format: "es",
