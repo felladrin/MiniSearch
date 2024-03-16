@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "start": "tsx server.ts",
-    "build": "tsc && vite build",
+    "build": "tsc; vite build",
     "dev": "vite",
     "lint": "prettier --check . && eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write ."

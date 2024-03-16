@@ -12,6 +12,9 @@ export default defineConfig(({ command }) => ({
   build: {
     target: "esnext",
   },
+  worker: {
+    format: "es",
+  },
   plugins: [
     react(),
     ...(command === "serve"
