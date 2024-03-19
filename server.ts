@@ -42,6 +42,13 @@ async function search(query: string, limit?: number) {
 
 export const app = express();
 
+app.use((_, res, next) => {
+  res.header("Cross-Origin-Embedder-Policy", "require-corp");
+  res.header("Cross-Origin-Opener-Policy", "same-origin");
+  res.header("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
+
 app.use(express.static("dist"));
 
 app.get("/search", async (request, response) => {
