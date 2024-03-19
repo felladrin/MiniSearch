@@ -174,11 +174,15 @@ async function generateTextWithWebLlm() {
 }
 
 async function generateTextWithWllama() {
-  const { runCompletion } = await import("./wllama");
+  const { initializeWllama, runCompletion, exitWllama } = await import(
+    "./wllama"
+  );
 
-  const modelUrl = getUseLargerModelSetting()
-    ? "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q5_k_m.gguf"
-    : "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf";
+  await initializeWllama({
+    modelUrl: getUseLargerModelSetting()
+      ? "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q5_k_m.gguf"
+      : "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf",
+  });
 
   if (!getDisableAiResponseSetting()) {
     updateResponse("Preparing response...");
@@ -206,7 +210,6 @@ async function generateTextWithWllama() {
     if (!query) return;
 
     const completion = await runCompletion({
-      modelUrl,
       prompt,
       nPredict: 512,
       sampling: {
@@ -243,7 +246,6 @@ async function generateTextWithWllama() {
       `;
 
       const completion = await runCompletion({
-        modelUrl,
         prompt,
         nPredict: 128,
         sampling: {
@@ -266,6 +268,8 @@ async function generateTextWithWllama() {
       });
     }
   }
+
+  await exitWllama();
 }
 
 async function generateTextWithTransformersJs() {

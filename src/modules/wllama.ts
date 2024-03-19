@@ -8,13 +8,11 @@ import wllamaSingle from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
 import wllamaMulti from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
 import wllamaMultiWorker from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
 
-export async function runCompletion(config: {
+let wllama: WllamaType | null = null;
+
+export async function initializeWllama(config: {
   modelUrl: string;
   modelConfig?: LoadModelConfig;
-  prompt: string;
-  nPredict?: number;
-  sampling?: SamplingConfig;
-  onNewToken: (token: number, piece: Uint8Array, currentText: string) => void;
 }) {
   let configPaths: AssetsPathConfig;
 
@@ -41,17 +39,30 @@ export async function runCompletion(config: {
     Wllama = (await import("/wllama/esm/index.js" as string)).Wllama;
   }
 
-  const wllama = new Wllama(configPaths);
+  wllama = new Wllama(configPaths);
 
-  await wllama.loadModelFromUrl(config.modelUrl, config.modelConfig ?? {});
+  return wllama.loadModelFromUrl(config.modelUrl, config.modelConfig ?? {});
+}
 
-  const completion = await wllama.createCompletion(config.prompt, {
+export async function runCompletion(config: {
+  prompt: string;
+  nPredict?: number;
+  sampling?: SamplingConfig;
+  onNewToken: (token: number, piece: Uint8Array, currentText: string) => void;
+}) {
+  if (!wllama) throw new Error("Wllama is not initialized.");
+
+  return wllama.createCompletion(config.prompt, {
     nPredict: config.nPredict,
     sampling: config.sampling,
     onNewToken: config.onNewToken,
   });
+}
+
+export async function exitWllama() {
+  if (!wllama) throw new Error("Wllama is not initialized.");
 
   await wllama.exit();
 
-  return completion;
+  wllama = null;
 }
