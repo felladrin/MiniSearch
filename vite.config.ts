@@ -16,6 +16,11 @@ export default defineConfig(({ command }) => ({
       external: ["/wllama/esm/index.js"],
     },
   },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: "esnext",
+    },
+  },
   worker: {
     format: "es",
   },
