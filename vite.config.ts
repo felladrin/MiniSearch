@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePluginNode } from "vite-plugin-node";
 import { viteStaticCopy } from "vite-plugin-static-copy";
+import crossOriginIsolation from "vite-plugin-cross-origin-isolation";
 
 export default defineConfig(({ command }) => ({
   server: {
@@ -34,6 +35,7 @@ export default defineConfig(({ command }) => ({
         },
       ],
     }),
+    crossOriginIsolation(),
     ...(command === "serve"
       ? VitePluginNode({
           adapter: ({ app, req, res, next }) => {
