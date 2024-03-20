@@ -25,13 +25,12 @@ export async function initializeWllama(config: {
     ).href,
   };
 
-  let Wllama!: typeof WllamaType;
-
-  if (process.env.NODE_ENV === "development") {
-    Wllama = (await import("@wllama/wllama/esm/index.js")).Wllama;
-  } else {
-    Wllama = (await import("/wllama/esm/index.js" as string)).Wllama;
-  }
+  const Wllama: typeof WllamaType = (
+    await import(
+      new URL("../../node_modules/@wllama/wllama/esm/index.js", import.meta.url)
+        .href
+    )
+  ).Wllama;
 
   wllama = new Wllama(configPaths);
 
