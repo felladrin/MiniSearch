@@ -175,15 +175,24 @@ async function generateTextWithWllama() {
     "./wllama"
   );
 
+  updateResponse("Loading AI model...");
+
+  const MobileDetect = (await import("mobile-detect")).default;
+
+  const isRunningOnMobile =
+    new MobileDetect(window.navigator.userAgent).mobile() !== null;
+
+  const largerModel = isRunningOnMobile
+    ? "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q2_k.gguf"
+    : "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q8_0.gguf";
+
   await initializeWllama({
     modelUrl: getUseLargerModelSetting()
-      ? "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q5_k_m.gguf"
-      : "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf",
+      ? largerModel
+      : "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf",
   });
 
   if (!getDisableAiResponseSetting()) {
-    updateResponse("Preparing response...");
-
     const prompt = dedent`
       <|im_start|>system
       You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity. Your interactions are always respectful, helpful, and focused on delivering the most accurate information to the user.<|im_end|>
@@ -206,25 +215,25 @@ async function generateTextWithWllama() {
 
     if (!query) throw Error("Query is empty.");
 
-    try {
-      const completion = await runCompletion({
-        prompt,
-        nPredict: 512,
-        sampling: {
-          temp: 0.3,
-          top_k: 0,
-          top_p: 1,
-          min_p: 0.1,
-        },
-        onNewToken: (_token, _piece, currentText) => {
-          updateResponse(currentText);
-        },
-      });
+    updateResponse("Preparing response...");
 
-      updateResponse(completion.replaceAll("<|im_end|>", ""));
-    } catch (error) {
-      console.error("Error while generating response:", error);
-    }
+    const completion = await runCompletion({
+      prompt,
+      nPredict: 512,
+      sampling: {
+        temp: 0.15,
+        top_k: 40,
+        top_p: 0.95,
+        min_p: 0.1,
+        typical_p: 0.85,
+        penalty_repeat: 1.0,
+      },
+      onNewToken: (_token, _piece, currentText) => {
+        updateResponse(currentText);
+      },
+    });
+
+    updateResponse(completion.replaceAll("<|im_end|>", ""));
   }
 
   if (getSummarizeLinksSetting()) {
@@ -246,31 +255,29 @@ async function generateTextWithWllama() {
         This text is about
       `;
 
-      try {
-        const completion = await runCompletion({
-          prompt,
-          nPredict: 128,
-          sampling: {
-            temp: 0.3,
-            top_k: 0,
-            top_p: 1,
-            min_p: 0.1,
-          },
-          onNewToken: (_token, _piece, currentText) => {
-            updateUrlsDescriptions({
-              ...getUrlsDescriptions(),
-              [url]: `This link is about ${currentText}`,
-            });
-          },
-        });
+      const completion = await runCompletion({
+        prompt,
+        nPredict: 128,
+        sampling: {
+          temp: 0.15,
+          top_k: 40,
+          top_p: 0.95,
+          min_p: 0.1,
+          typical_p: 0.85,
+          penalty_repeat: 1.0,
+        },
+        onNewToken: (_token, _piece, currentText) => {
+          updateUrlsDescriptions({
+            ...getUrlsDescriptions(),
+            [url]: `This link is about ${currentText}`,
+          });
+        },
+      });
 
-        updateUrlsDescriptions({
-          ...getUrlsDescriptions(),
-          [url]: `This link is about ${completion.replaceAll("<|im_end|>", "")}`,
-        });
-      } catch (error) {
-        console.error("Error while generating response:", error);
-      }
+      updateUrlsDescriptions({
+        ...getUrlsDescriptions(),
+        [url]: `This link is about ${completion.replaceAll("<|im_end|>", "")}`,
+      });
     }
   }
 
@@ -627,12 +634,17 @@ export async function prepareTextGeneration() {
       try {
         await generateTextWithWllama();
       } catch (error) {
+        console.error("Error while generating response with wllama:", error);
         await generateTextWithTransformersJs();
       }
     } else {
       try {
         await generateTextWithTransformersJs();
       } catch (error) {
+        console.error(
+          "Error while generating response with transformers.js:",
+          error,
+        );
         await generateTextWithWllama();
       }
     }
