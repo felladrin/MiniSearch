@@ -584,13 +584,20 @@ export async function prepareTextGeneration() {
     ),
   );
 
-  const rankedSearchResults = await rankSearchResults(searchResults, query);
-
-  updateSearchResults(rankedSearchResults);
+  try {
+    updateResponse("Analyzing search results...");
+    const rankedSearchResults = await rankSearchResults(searchResults, query);
+    updateSearchResults(rankedSearchResults);
+    updateResponse("");
+  } catch (error) {
+    console.info(`Skipping search ranking due to error: ${error}`);
+  }
 
   if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
 
   if (debug) console.time("Response Generation Time");
+
+  updateResponse("Preparing response...");
 
   loadBar.start();
 
