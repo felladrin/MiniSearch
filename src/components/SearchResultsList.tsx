@@ -26,7 +26,11 @@ export function SearchResultsList({
             <br />
             {url}
           </Tooltip>
-          <a href={url} data-tooltip-id={`search-result-${index}`}>
+          <a
+            href={url}
+            data-tooltip-id={`search-result-${index}`}
+            target="_blank"
+          >
             {title}
           </a>
           {urlsDescriptions[url] && (
