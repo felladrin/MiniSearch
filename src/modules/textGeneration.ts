@@ -14,7 +14,7 @@ import {
 import { loadBar } from "./loadBar";
 import { SearchResults, search } from "./search";
 import { sleep } from "./sleep";
-import { query, debug, disableWorkers, beta } from "./urlParams";
+import { query, debug, disableWorkers } from "./urlParams";
 
 const Worker = disableWorkers ? undefined : window.Worker;
 
@@ -610,13 +610,9 @@ export async function prepareTextGeneration() {
   loadBar.start();
 
   try {
-    if (beta) {
-      await generateTextWithWllama();
-    } else {
-      if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
+    if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
 
-      await generateTextWithWebLlm();
-    }
+    await generateTextWithWebLlm();
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : (error as string);
@@ -624,10 +620,22 @@ export async function prepareTextGeneration() {
     console.info(dedent`
         Could not load web-llm chat module: ${errorMessage}
 
-        Falling back to transformers.js.
+        Falling back to transformers.js and wllama.
       `);
 
-    await generateTextWithTransformersJs();
+    if ("SharedArrayBuffer" in window) {
+      try {
+        await generateTextWithWllama();
+      } catch (error) {
+        await generateTextWithTransformersJs();
+      }
+    } else {
+      try {
+        await generateTextWithTransformersJs();
+      } catch (error) {
+        await generateTextWithWllama();
+      }
+    }
   }
 
   loadBar.done();
