@@ -204,23 +204,27 @@ async function generateTextWithWllama() {
 
     `;
 
-    if (!query) return;
+    if (!query) throw Error("Query is empty.");
 
-    const completion = await runCompletion({
-      prompt,
-      nPredict: 512,
-      sampling: {
-        temp: 0.3,
-        top_k: 0,
-        top_p: 1,
-        min_p: 0.1,
-      },
-      onNewToken: (_token, _piece, currentText) => {
-        updateResponse(currentText);
-      },
-    });
+    try {
+      const completion = await runCompletion({
+        prompt,
+        nPredict: 512,
+        sampling: {
+          temp: 0.3,
+          top_k: 0,
+          top_p: 1,
+          min_p: 0.1,
+        },
+        onNewToken: (_token, _piece, currentText) => {
+          updateResponse(currentText);
+        },
+      });
 
-    updateResponse(completion.replaceAll("<|im_end|>", ""));
+      updateResponse(completion.replaceAll("<|im_end|>", ""));
+    } catch (error) {
+      console.error("Error while generating response:", error);
+    }
   }
 
   if (getSummarizeLinksSetting()) {
@@ -242,27 +246,31 @@ async function generateTextWithWllama() {
         This text is about
       `;
 
-      const completion = await runCompletion({
-        prompt,
-        nPredict: 128,
-        sampling: {
-          temp: 0.3,
-          top_k: 0,
-          top_p: 1,
-          min_p: 0.1,
-        },
-        onNewToken: (_token, _piece, currentText) => {
-          updateUrlsDescriptions({
-            ...getUrlsDescriptions(),
-            [url]: `This link is about ${currentText}`,
-          });
-        },
-      });
+      try {
+        const completion = await runCompletion({
+          prompt,
+          nPredict: 128,
+          sampling: {
+            temp: 0.3,
+            top_k: 0,
+            top_p: 1,
+            min_p: 0.1,
+          },
+          onNewToken: (_token, _piece, currentText) => {
+            updateUrlsDescriptions({
+              ...getUrlsDescriptions(),
+              [url]: `This link is about ${currentText}`,
+            });
+          },
+        });
 
-      updateUrlsDescriptions({
-        ...getUrlsDescriptions(),
-        [url]: `This link is about ${completion.replaceAll("<|im_end|>", "")}`,
-      });
+        updateUrlsDescriptions({
+          ...getUrlsDescriptions(),
+          [url]: `This link is about ${completion.replaceAll("<|im_end|>", "")}`,
+        });
+      } catch (error) {
+        console.error("Error while generating response:", error);
+      }
     }
   }
 
