@@ -23,6 +23,8 @@ async function generateTextWithWebLlm() {
     "@mlc-ai/web-llm"
   );
 
+  type ChatOptions = import("@mlc-ai/web-llm").ChatOptions;
+
   const chat = Worker
     ? new ChatWorkerClient(
         new Worker(new URL("./webLlmWorker.ts", import.meta.url), {
@@ -40,13 +42,13 @@ async function generateTextWithWebLlm() {
     ? availableModels.Phi
     : availableModels.TinyLlama;
 
-  const commonChatMlConfig = {
+  const commonChatMlConfig: ChatOptions = {
     temperature: 0,
     repetition_penalty: 1.1,
     max_gen_len: 256,
   };
 
-  const chatConfigPerModel = {
+  const chatConfigPerModel: { [x: string]: ChatOptions } = {
     [availableModels.Phi]: {
       ...commonChatMlConfig,
     },
@@ -54,31 +56,25 @@ async function generateTextWithWebLlm() {
       ...commonChatMlConfig,
       conv_template: "custom",
       conv_config: {
-        system: dedent`
+        system_template: "{system_message}",
+        system_message: dedent`
+          <|im_start|>system
+          You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity. Your interactions are always respectful, helpful, and focused on delivering the most accurate information to the user.<|im_end|>
           <|im_start|>user
-          You are a helpful assistant.<|im_end|>
+          Hello!<|im_end|>
           <|im_start|>assistant
-          Yeah!<|im_end|>
-          <|im_start|>user
-          You feel happy to help with almost anything and will do your best to understand exactly what is needed.<|im_end|>
-          <|im_start|>assistant
-          Ok!<|im_end|>
-          <|im_start|>user
-          You also try to avoid giving false or misleading information, and it caveats when it isn't entirely sure about the right answer.<|im_end|>
-          <|im_start|>assistant
-          Sure!<|im_end|>
-          <|im_start|>user
-          That said, you are practical, do your best, and don't let caution get too much in the way of being useful.<|im_end|>
-          <|im_start|>assistant
-          I'll do my best to help you.
+          Hi! How can I help you today?
         `,
-        roles: ["<|im_start|>user", "<|im_start|>assistant"],
+        roles: {
+          user: "<|im_start|>user",
+          assistant: "<|im_start|>assistant",
+        },
         offset: 0,
         seps: ["<|im_end|>\n"],
-        separator_style: "Two",
-        stop_str: "<|im_end|>",
-        add_bos: false,
-        stop_tokens: [2, 32002],
+        role_content_sep: "\n",
+        role_empty_sep: "\n",
+        stop_str: ["<|im_end|>"],
+        stop_token_ids: [2, 32002],
       },
     },
   };
@@ -147,8 +143,9 @@ async function generateTextWithWebLlm() {
   if (getSummarizeLinksSetting()) {
     for (const [title, snippet, url] of getSearchResults()) {
       const request = dedent`
-        When I searched for "${query}", I found this link: [${title}](${url} "${snippet}")
-        Now, tell me: What is this link about and how is it related to what I searched for?
+        When searching for "${query}", this link was found: [${title}](${url} "${snippet}")
+        Now, tell me: What is this link about and how is it related to the search?
+        Note: Don't cite the link in your response. Just summarize it and let me know if it's worth visiting.
       `;
 
       await chat.generate(request, (_, message) => {
