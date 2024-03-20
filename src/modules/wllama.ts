@@ -1,10 +1,10 @@
-import type {
-  LoadModelConfig,
-  SamplingConfig,
-  Wllama as WllamaType,
+import {
+  type LoadModelConfig,
+  type SamplingConfig,
+  Wllama,
 } from "@wllama/wllama/esm";
 
-let wllama: WllamaType | null = null;
+let wllama: Wllama | null = null;
 
 export async function initializeWllama(config: {
   modelUrl: string;
@@ -24,13 +24,6 @@ export async function initializeWllama(config: {
       import.meta.url,
     ).href,
   };
-
-  const Wllama: typeof WllamaType = (
-    await import(
-      new URL("../../node_modules/@wllama/wllama/esm/index.js", import.meta.url)
-        .href
-    )
-  ).Wllama;
 
   wllama = new Wllama(configPaths);
 
