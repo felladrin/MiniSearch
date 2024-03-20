@@ -2,7 +2,11 @@ import type {
   LoadModelConfig,
   SamplingConfig,
   Wllama as WllamaType,
+  AssetsPathConfig,
 } from "@wllama/wllama/esm";
+import wllamaSingle from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
+import wllamaMulti from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
+import wllamaMultiWorker from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
 
 let wllama: WllamaType | null = null;
 
@@ -10,20 +14,22 @@ export async function initializeWllama(config: {
   modelUrl: string;
   modelConfig?: LoadModelConfig;
 }) {
-  const configPaths = {
-    "single-thread/wllama.wasm": new URL(
-      "../../node_modules/@wllama/wllama/esm/single-thread/wllama.wasm",
-      import.meta.url,
-    ).href,
-    "multi-thread/wllama.wasm": new URL(
-      "../../node_modules/@wllama/wllama/esm/multi-thread/wllama.wasm",
-      import.meta.url,
-    ).href,
-    "multi-thread/wllama.worker.mjs": new URL(
-      "../../node_modules/@wllama/wllama/esm/multi-thread/wllama.worker.mjs",
-      import.meta.url,
-    ).href,
-  };
+  let configPaths: AssetsPathConfig;
+
+  if (process.env.NODE_ENV === "development") {
+    configPaths = {
+      "single-thread/wllama.wasm": wllamaSingle,
+      "multi-thread/wllama.wasm": wllamaMulti,
+      "multi-thread/wllama.worker.mjs": wllamaMultiWorker,
+    };
+  } else {
+    configPaths = {
+      "single-thread/wllama.wasm": "/wllama/esm/single-thread/wllama.wasm",
+      "multi-thread/wllama.wasm": "/wllama/esm/multi-thread/wllama.wasm",
+      "multi-thread/wllama.worker.mjs":
+        "/wllama/esm/multi-thread/wllama.worker.mjs",
+    };
+  }
 
   let Wllama!: typeof WllamaType;
 
