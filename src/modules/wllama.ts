@@ -3,6 +3,10 @@ import type {
   SamplingConfig,
   Wllama as WllamaType,
 } from "@wllama/wllama/esm";
+import wllamaSingleUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
+import wllamaMultiUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
+import wllamaMultiWorkerUrl from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
+import wllamaModuleUrl from "@wllama/wllama/esm/index.js?url";
 
 let wllama: WllamaType | null = null;
 
@@ -11,26 +15,12 @@ export async function initializeWllama(config: {
   modelConfig?: LoadModelConfig;
 }) {
   const configPaths = {
-    "single-thread/wllama.wasm": new URL(
-      "../../node_modules/@wllama/wllama/esm/single-thread/wllama.wasm",
-      import.meta.url,
-    ).href,
-    "multi-thread/wllama.wasm": new URL(
-      "../../node_modules/@wllama/wllama/esm/multi-thread/wllama.wasm",
-      import.meta.url,
-    ).href,
-    "multi-thread/wllama.worker.mjs": new URL(
-      "../../node_modules/@wllama/wllama/esm/multi-thread/wllama.worker.mjs",
-      import.meta.url,
-    ).href,
+    "single-thread/wllama.wasm": wllamaSingleUrl,
+    "multi-thread/wllama.wasm": wllamaMultiUrl,
+    "multi-thread/wllama.worker.mjs": wllamaMultiWorkerUrl,
   };
 
-  const Wllama: typeof WllamaType = (
-    await import(
-      new URL("../../node_modules/@wllama/wllama/esm/index.js", import.meta.url)
-        .href
-    )
-  ).Wllama;
+  const Wllama: typeof WllamaType = (await import(wllamaModuleUrl)).Wllama;
 
   wllama = new Wllama(configPaths);
 
