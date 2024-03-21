@@ -182,35 +182,36 @@ async function generateTextWithWllama() {
   const isRunningOnMobile =
     new MobileDetect(window.navigator.userAgent).mobile() !== null;
 
+  const defaultModel = isRunningOnMobile
+    ? "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q4_K_M.gguf"
+    : "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf";
+
   const largerModel = isRunningOnMobile
-    ? "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q2_k.gguf"
+    ? "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf"
     : "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q8_0.gguf";
 
   await initializeWllama({
-    modelUrl: getUseLargerModelSetting()
-      ? largerModel
-      : "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf",
+    modelUrl: getUseLargerModelSetting() ? largerModel : defaultModel,
+    modelConfig: {
+      n_ctx: 2048,
+    },
   });
 
   if (!getDisableAiResponseSetting()) {
     const prompt = dedent`
       <|im_start|>system
-      You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity. Your interactions are always respectful, helpful, and focused on delivering the most accurate information to the user.<|im_end|>
-      <|im_start|>user
-      Hello!<|im_end|>
-      <|im_start|>assistant
-      Hi! How can I help you today?<|im_end|>
-      <|im_start|>user
-      Context:
+      You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.
+      
+      If the information below is useful, you can use it to complement your response. Otherwise, ignore it.
+
       ${getSearchResults()
         .slice(0, 5)
         .map(([title, snippet]) => `- ${title}: ${snippet}`)
         .join("\n")}<|im_end|>
-      
-      Question:
+      <|im_start|>user
       ${query}<|im_end|>
       <|im_start|>assistant
-
+      
     `;
 
     if (!query) throw Error("Query is empty.");
@@ -219,14 +220,16 @@ async function generateTextWithWllama() {
 
     const completion = await runCompletion({
       prompt,
-      nPredict: 512,
+      nPredict: 768,
       sampling: {
-        temp: 0.15,
+        temp: 0.25,
         top_k: 40,
         top_p: 0.95,
-        min_p: 0.1,
+        min_p: 0.05,
         typical_p: 0.85,
-        penalty_repeat: 1.0,
+        penalty_repeat: 1.1,
+        mirostat: 2,
+        mirostat_tau: 4.0,
       },
       onNewToken: (_token, _piece, currentText) => {
         updateResponse(currentText);
@@ -240,7 +243,7 @@ async function generateTextWithWllama() {
     for (const [title, snippet, url] of getSearchResults()) {
       const prompt = dedent`
         <|im_start|>system
-        You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity. Your interactions are always respectful, helpful, and focused on delivering the most accurate information to the user.<|im_end|>
+        You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
         <|im_start|>user
         Hello!<|im_end|>
         <|im_start|>assistant
@@ -259,12 +262,14 @@ async function generateTextWithWllama() {
         prompt,
         nPredict: 128,
         sampling: {
-          temp: 0.15,
+          temp: 0.25,
           top_k: 40,
           top_p: 0.95,
-          min_p: 0.1,
+          min_p: 0.05,
           typical_p: 0.85,
-          penalty_repeat: 1.0,
+          penalty_repeat: 1.1,
+          mirostat: 2,
+          mirostat_tau: 4.0,
         },
         onNewToken: (_token, _piece, currentText) => {
           updateUrlsDescriptions({
