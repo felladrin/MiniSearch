@@ -45,7 +45,7 @@ async function generateTextWithWebLlm() {
   const commonChatMlConfig: ChatOptions = {
     temperature: 0,
     repetition_penalty: 1.1,
-    max_gen_len: 256,
+    max_gen_len: 512,
   };
 
   const chatConfigPerModel: { [x: string]: ChatOptions } = {
@@ -124,7 +124,7 @@ async function generateTextWithWebLlm() {
           .join("\n")}
         
         [Instructions]
-        Provide an answer for the question below. If you don't know the answer, you can base your answer on the context above.
+        Provide an answer to the question below. If you don't know the answer, you can base your answer on the context above.
         
         [Question]
         ${query}
@@ -146,7 +146,7 @@ async function generateTextWithWebLlm() {
       const request = dedent`
         When searching for "${query}", this link was found: [${title}](${url} "${snippet}")
         Now, tell me: What is this link about and how is it related to the search?
-        Note: Don't cite the link in your response. Just summarize it and let me know if it's worth visiting.
+        Note: Don't cite the link in your response. Just write a few sentences to indicate if it's worth visiting.
       `;
 
       await chat.generate(request, (_, message) => {
