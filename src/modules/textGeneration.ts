@@ -34,12 +34,12 @@ async function generateTextWithWebLlm() {
     : new ChatModule();
 
   const availableModels = {
-    Phi: "Phi2-q4f32_1-1k",
+    Gemma: "gemma-2b-it-q4f32_1",
     TinyLlama: "TinyLlama-1.1B-Chat-v0.4-q4f32_1-1k",
   };
 
   const selectedModel = getUseLargerModelSetting()
-    ? availableModels.Phi
+    ? availableModels.Gemma
     : availableModels.TinyLlama;
 
   const commonChatMlConfig: ChatOptions = {
@@ -49,7 +49,7 @@ async function generateTextWithWebLlm() {
   };
 
   const chatConfigPerModel: { [x: string]: ChatOptions } = {
-    [availableModels.Phi]: {
+    [availableModels.Gemma]: {
       ...commonChatMlConfig,
     },
     [availableModels.TinyLlama]: {
@@ -82,11 +82,11 @@ async function generateTextWithWebLlm() {
   const appConfig = {
     model_list: [
       {
-        local_id: availableModels.Phi,
+        local_id: availableModels.Gemma,
         model_url:
-          "https://huggingface.co/mlc-ai/phi-2-q4f32_1-MLC/resolve/main/",
+          "https://huggingface.co/mlc-ai/gemma-2b-it-q4f32_1-MLC/resolve/main/",
         model_lib_url:
-          "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/phi-2/phi-2-q4f32_1-ctx2k-webgpu.wasm",
+          "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/gemma-2b-it/gemma-2b-it-q4f32_1-ctx4k_cs1k-webgpu.wasm",
       },
       {
         local_id: availableModels.TinyLlama,
@@ -117,15 +117,16 @@ async function generateTextWithWebLlm() {
 
     await chat.generate(
       dedent`
-        Context:
+        [Context]
         ${getSearchResults()
           .slice(0, 5)
           .map(([title, snippet]) => `- ${title}: ${snippet}`)
           .join("\n")}
         
+        [Instructions]
         Provide an answer for the question below. If you don't know the answer, you can base your answer on the context above.
         
-        Question:
+        [Question]
         ${query}
       `,
       (_, message) => {
