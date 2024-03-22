@@ -26,18 +26,34 @@ export function SearchResultsList({
             <br />
             {url}
           </Tooltip>
-          <a
-            href={url}
-            data-tooltip-id={`search-result-${index}`}
-            target="_blank"
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "1rem",
+            }}
           >
-            {title}
-          </a>
+            <a
+              href={url}
+              data-tooltip-id={`search-result-${index}`}
+              target="_blank"
+            >
+              {title}
+            </a>
+            <a href={url} target="_blank">
+              <cite
+                style={{
+                  fontSize: "small",
+                  color: "gray",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {new URL(url).hostname.replace("www.", "")}
+              </cite>
+            </a>
+          </div>
           {urlsDescriptions[url] && (
-            <>
-              <br />
-              <blockquote>{urlsDescriptions[url]}</blockquote>
-            </>
+            <blockquote>{urlsDescriptions[url]}</blockquote>
           )}
         </li>
       ))}
