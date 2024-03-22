@@ -182,12 +182,11 @@ async function generateTextWithWllama() {
   const isRunningOnMobile =
     new MobileDetect(window.navigator.userAgent).mobile() !== null;
 
-  const defaultModel = isRunningOnMobile
-    ? "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q4_K_M.gguf"
-    : "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf";
+  const defaultModel =
+    "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf";
 
   const largerModel = isRunningOnMobile
-    ? "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf"
+    ? defaultModel
     : "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q8_0.gguf";
 
   await initializeWllama({
