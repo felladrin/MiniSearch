@@ -1,45 +1,29 @@
 import type {
   LoadModelConfig,
   SamplingConfig,
-  Wllama as WllamaType,
+  Wllama,
   AssetsPathConfig,
 } from "@wllama/wllama/esm";
-import wllamaSingle from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
-import wllamaMulti from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
-import wllamaMultiWorker from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
+import { importModuleWithoutTranspilation } from "./import";
 
-let wllama: WllamaType | null = null;
+let wllama: Wllama | undefined;
 
 export async function initializeWllama(config: {
   modelUrl: string;
   modelConfig?: LoadModelConfig;
 }) {
-  let configPaths: AssetsPathConfig;
+  const wllamaConfigPaths: AssetsPathConfig = {
+    "single-thread/wllama.wasm": "/wllama/esm/single-thread/wllama.wasm",
+    "multi-thread/wllama.wasm": "/wllama/esm/multi-thread/wllama.wasm",
+    "multi-thread/wllama.worker.mjs":
+      "/wllama/esm/multi-thread/wllama.worker.mjs",
+  };
 
-  if (process.env.NODE_ENV === "development") {
-    configPaths = {
-      "single-thread/wllama.wasm": wllamaSingle,
-      "multi-thread/wllama.wasm": wllamaMulti,
-      "multi-thread/wllama.worker.mjs": wllamaMultiWorker,
-    };
-  } else {
-    configPaths = {
-      "single-thread/wllama.wasm": "/wllama/esm/single-thread/wllama.wasm",
-      "multi-thread/wllama.wasm": "/wllama/esm/multi-thread/wllama.wasm",
-      "multi-thread/wllama.worker.mjs":
-        "/wllama/esm/multi-thread/wllama.worker.mjs",
-    };
-  }
-
-  let Wllama!: typeof WllamaType;
-
-  if (process.env.NODE_ENV === "development") {
-    Wllama = (await import("@wllama/wllama/esm/index.js")).Wllama;
-  } else {
-    Wllama = (await import("/wllama/esm/index.js" as string)).Wllama;
-  }
-
-  wllama = new Wllama(configPaths);
+  wllama = new (
+    await importModuleWithoutTranspilation<{
+      Wllama: typeof Wllama;
+    }>("/wllama/esm/index.js")
+  ).Wllama(wllamaConfigPaths);
 
   return wllama.loadModelFromUrl(config.modelUrl, config.modelConfig ?? {});
 }
@@ -64,5 +48,5 @@ export async function exitWllama() {
 
   await wllama.exit();
 
-  wllama = null;
+  wllama = undefined;
 }

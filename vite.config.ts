@@ -13,9 +13,6 @@ export default defineConfig(({ command }) => ({
   },
   build: {
     target: "esnext",
-    rollupOptions: {
-      external: ["/wllama/esm/index.js"],
-    },
   },
   plugins: [
     react(),
