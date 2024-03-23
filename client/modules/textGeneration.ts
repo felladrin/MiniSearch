@@ -59,7 +59,7 @@ async function generateTextWithWebLlm() {
         system_template: "{system_message}",
         system_message: dedent`
           <|im_start|>system
-          You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity. Your interactions are always respectful, helpful, and focused on delivering the most accurate information to the user.<|im_end|>
+          You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
           <|im_start|>user
           Hello!<|im_end|>
           <|im_start|>assistant
@@ -117,16 +117,15 @@ async function generateTextWithWebLlm() {
 
     await chat.generate(
       dedent`
-        [Context]
+        I have a request/question for you, but before that, I want to provide you with some context.
+        
+        Context:
         ${getSearchResults()
           .slice(0, 5)
           .map(([title, snippet]) => `- ${title}: ${snippet}`)
           .join("\n")}
-        
-        [Instructions]
-        Provide an answer to the question below. If you don't know the answer, you can base your answer on the context above.
-        
-        [Question]
+
+        Now, my request/question is:
         ${query}
       `,
       (_, message) => {
