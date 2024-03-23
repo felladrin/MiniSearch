@@ -569,15 +569,32 @@ async function rankSearchResults(searchResults: SearchResults, query: string) {
     rank = transformersModule.rank;
   }
 
-  const snippets = searchResults.map(
-    ([title, snippet]) => `${title}: ${snippet}`,
-  );
+  const groupSize = 5;
+  const numGroups = Math.ceil(searchResults.length / groupSize);
+  const urlToScoreMap: { [url: string]: number } = {};
 
-  const rankedSearchResults: SearchResults = (
-    await (transformersWorker
-      ? transformersWorker.run("rank", query, snippets)
-      : rank(query, snippets))
-  ).map(({ corpus_id }) => searchResults[corpus_id]);
+  for (let i = 0; i < numGroups; i++) {
+    const start = i * groupSize;
+    const end = start + groupSize;
+    const searchResultsSlice = searchResults.slice(start, end);
+    const documents = searchResultsSlice.map(
+      ([title, snippet]) => `${title}: ${snippet}`,
+    );
+    (
+      await (transformersWorker
+        ? transformersWorker.run("rank", query, documents)
+        : rank(query, documents))
+    ).forEach(({ corpus_id, score }) => {
+      const [, , url] = searchResultsSlice[corpus_id];
+      urlToScoreMap[url] = score;
+    });
+  }
+
+  const rankedSearchResults: SearchResults = searchResults.sort(
+    ([, , url1], [, , url2]) => {
+      return (urlToScoreMap[url2] ?? 0) - (urlToScoreMap[url1] ?? 0);
+    },
+  );
 
   if (transformersWorker) {
     transformersWorker.destroy();
