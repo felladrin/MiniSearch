@@ -6,14 +6,14 @@ Live demo: https://felladrin-minisearch.hf.space
 
 ## Features
 
-- Easy to use: Minimalist yet intuitive interface for all users
-- Integrated: Search from the browser address bar
-- Cross-platform: Models run inside the browser
-- Privacy-focused: No tracking, no ads, no data collection
-- Time-saver: AI responses enhanced with search results
-- Efficient: Models are loaded and cached only when needed
-- Optimized: Aims for the balance between size and performance
-- Open-source: The code is available for inspection and contribution
+- **Privacy-focused**: [No tracking, no ads, no data collection](https://docs.searxng.org/own-instance.html#how-does-searxng-protect-privacy)
+- **Easy to use**: Minimalist yet intuitive interface for all users
+- **Cross-platform**: Models run inside the browser, both on desktop and mobile
+- **Integrated**: Search from the browser address bar by setting it as the default search engine
+- **Time-saver**: AI responses enhanced with search results
+- **Efficient**: Models are loaded and cached only when needed
+- **Optimized**: Aims for the balance between size and performance
+- **Open-source**: [The code is available for inspection and contribution at GitHub](https://github.com/felladrin/MiniSearch)
 
 ## Prerequisites
 
