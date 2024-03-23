@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePluginNode } from "vite-plugin-node";
 import { viteStaticCopy } from "vite-plugin-static-copy";
-import crossOriginIsolation from "vite-plugin-cross-origin-isolation";
+import { crossOriginIsolationHeaders } from "./server/headers";
 
 export default defineConfig(({ command }) => ({
   server: {
@@ -24,7 +24,17 @@ export default defineConfig(({ command }) => ({
         },
       ],
     }),
-    crossOriginIsolation(),
+    {
+      name: "configure-server-cross-origin-isolation",
+      configureServer: (server) => {
+        server.middlewares.use((_, res, next) => {
+          crossOriginIsolationHeaders.forEach(({ key, value }) => {
+            res.setHeader(key, value);
+          });
+          next();
+        });
+      },
+    },
     ...(command === "serve"
       ? VitePluginNode({
           adapter: ({ app, req, res, next }) => {
@@ -34,7 +44,7 @@ export default defineConfig(({ command }) => ({
               next();
             }
           },
-          appPath: "./server.ts",
+          appPath: "./server/index.ts",
           exportName: "app",
         })
       : []),

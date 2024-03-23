@@ -5,7 +5,7 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
-    "start": "tsx server.ts",
+    "start": "tsx server/index.ts",
     "build": "tsc && vite build",
     "dev": "vite",
     "lint": "prettier --check . && eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
@@ -48,7 +48,6 @@
     "eslint-plugin-react-refresh": "^0.4.3",
     "typescript": "^5.0.2",
     "vite": "^5.2.4",
-    "vite-plugin-cross-origin-isolation": "^0.1.6",
     "vite-plugin-node": "^3.0.2",
     "vite-plugin-static-copy": "^1.0.1"
   }
