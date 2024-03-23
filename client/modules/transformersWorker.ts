@@ -1,4 +1,4 @@
-import { handleActions } from "../../node_modules/typed-worker/dist";
+import { handleActions } from "typed-worker";
 import {
   runTextToTextGenerationPipeline,
   applyChatTemplate,
