@@ -290,7 +290,7 @@ async function generateTextWithWllama() {
 }
 
 async function generateTextWithTransformersJs() {
-  const { createWorker } = await import("typed-worker");
+  const { createWorker } = await import("../../node_modules/typed-worker/dist");
 
   const MobileDetect = (await import("mobile-detect")).default;
 
@@ -543,7 +543,7 @@ async function generateTextWithTransformersJs() {
 }
 
 async function rankSearchResults(searchResults: SearchResults, query: string) {
-  const { createWorker } = await import("typed-worker");
+  const { createWorker } = await import("../../node_modules/typed-worker/dist");
 
   type Actions = import("./transformersWorker").Actions;
 
