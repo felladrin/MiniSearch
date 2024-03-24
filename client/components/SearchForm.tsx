@@ -62,7 +62,7 @@ export function SearchForm() {
         onChange={handleInputChange}
         autoFocus
       />
-      <button type="submit" style={{ width: "100%", marginTop: "20px" }}>
+      <button type="submit" style={{ width: "100%" }}>
         Submit
       </button>
     </form>

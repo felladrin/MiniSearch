@@ -6,7 +6,7 @@ import {
 } from "../modules/pubSub";
 import { Tooltip } from "react-tooltip";
 
-export function ConfigForm() {
+export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
     disableAiResponseSettingPubSub,
   );
@@ -18,8 +18,17 @@ export function ConfigForm() {
   );
 
   return (
-    <details>
-      <summary>Settings</summary>
+    <div>
+      <div
+        style={{
+          textAlign: "center",
+          fontSize: "16px",
+          fontWeight: "bolder",
+          margin: "10px",
+        }}
+      >
+        Settings
+      </div>
       <div>
         <Tooltip
           id="disable-ai-setting-tooltip"
@@ -80,6 +89,6 @@ export function ConfigForm() {
           Use a larger AI model
         </label>
       </div>
-    </details>
+    </div>
   );
 }

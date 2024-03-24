@@ -5,9 +5,10 @@ import {
   searchResultsPubSub,
   urlsDescriptionsPubSub,
 } from "../modules/pubSub";
-import { ConfigForm } from "./ConfigForm";
 import { SearchForm } from "./SearchForm";
 import { ResponseView } from "./ResponseView";
+import { Toaster } from "react-hot-toast";
+import { SettingsButton } from "./SettingsButton";
 
 export function App() {
   const [prompt] = usePubSub(promptPubSub);
@@ -25,11 +26,24 @@ export function App() {
           urlsDescriptions={urlsDescriptions}
         />
       ) : (
-        <>
+        <div>
           <SearchForm />
-          <ConfigForm />
-        </>
+          <div
+            style={{
+              position: "fixed",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
+            <SettingsButton />
+          </div>
+        </div>
       )}
+
+      <Toaster />
     </>
   );
 }
