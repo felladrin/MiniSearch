@@ -554,7 +554,12 @@ async function generateTextWithTransformersJs() {
   }
 }
 
-async function rankSearchResults(searchResults: SearchResults, query: string) {
+async function rankSearchResultsWithTransformers(
+  searchResults: SearchResults,
+  query: string,
+) {
+  updateLoadingToast("Analyzing search results...");
+
   const { createWorker } = await import("../../node_modules/typed-worker/dist");
 
   type Actions = import("./transformersWorker").Actions;
@@ -580,8 +585,6 @@ async function rankSearchResults(searchResults: SearchResults, query: string) {
     const transformersModule = await import("./transformers");
     rank = transformersModule.rank;
   }
-
-  updateLoadingToast("Analyzing search results...");
 
   const groupSize = 5;
   const numGroups = Math.ceil(searchResults.length / groupSize);
@@ -615,6 +618,31 @@ async function rankSearchResults(searchResults: SearchResults, query: string) {
   return rankedSearchResults;
 }
 
+async function rankSearchResultsWithLevenshteinDistance(
+  searchResults: SearchResults,
+  query: string,
+) {
+  updateLoadingToast("Analyzing search results...");
+
+  const { default: leven } = await import("leven");
+
+  const urlToScoreMap: { [url: string]: number } = {};
+
+  searchResults.forEach(([title, snippet, url]) => {
+    const document = `${title}: ${snippet}`;
+    const score = leven(query, document);
+    urlToScoreMap[url] = score;
+  });
+
+  const rankedSearchResults: SearchResults = searchResults.sort(
+    ([, , url1], [, , url2]) => {
+      return (urlToScoreMap[url2] ?? 0) - (urlToScoreMap[url1] ?? 0);
+    },
+  );
+
+  return rankedSearchResults;
+}
+
 export async function prepareTextGeneration() {
   if (query === null) return;
 
@@ -634,11 +662,25 @@ export async function prepareTextGeneration() {
   );
 
   try {
-    updateLoadingToast("Loading AI model...");
-    const rankedSearchResults = await rankSearchResults(searchResults, query);
+    const rankedSearchResults = await rankSearchResultsWithTransformers(
+      searchResults,
+      query,
+    );
+
     updateSearchResults(rankedSearchResults);
   } catch (error) {
-    console.info(`Skipping search ranking due to error: ${error}`);
+    console.info(dedent`
+      Could not rank search results due to error: ${error}
+
+      Falling back to ranking with Levenshtein distance.
+    `);
+
+    const rankedSearchResults = await rankSearchResultsWithLevenshteinDistance(
+      searchResults,
+      query,
+    );
+
+    updateSearchResults(rankedSearchResults);
   }
 
   if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
@@ -656,10 +698,10 @@ export async function prepareTextGeneration() {
       error instanceof Error ? error.message : (error as string);
 
     console.info(dedent`
-        Could not load web-llm chat module: ${errorMessage}
+      Could not load web-llm chat module: ${errorMessage}
 
-        Falling back to transformers.js and wllama.
-      `);
+      Falling back to transformers.js and wllama.
+    `);
 
     if ("SharedArrayBuffer" in window) {
       try {
