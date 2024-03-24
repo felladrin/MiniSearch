@@ -34,9 +34,9 @@ export const useLargerModelSettingPubSub = createLocalStoragePubSub(
 );
 export const [, , getUseLargerModelSetting] = useLargerModelSettingPubSub;
 
-export const promptPubSub = createPubSub("Analyzing query...");
+export const promptPubSub = createPubSub("");
 export const [updatePrompt] = promptPubSub;
-export const responsePubSub = createPubSub("Loading AI model...");
+export const responsePubSub = createPubSub("");
 export const [updateResponse] = responsePubSub;
 export const searchResultsPubSub = createPubSub<SearchResults>([]);
 export const [updateSearchResults, , getSearchResults] = searchResultsPubSub;

@@ -36,23 +36,19 @@ export function ResponseView({
         <Markdown>{prompt}</Markdown>
       </blockquote>
       {!getDisableAiResponseSetting() && (
-        <>
-          <div>
-            <Markdown>{response}</Markdown>
-          </div>
-          <hr />
-        </>
+        <div>
+          <Markdown>{response}</Markdown>
+        </div>
       )}
-      <div>
-        {searchResults.length > 0 ? (
+      {response.length > 0 && <hr />}
+      {searchResults.length > 0 && (
+        <div>
           <SearchResultsList
             searchResults={searchResults}
             urlsDescriptions={urlsDescriptions}
           />
-        ) : (
-          "Searching the Web..."
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }

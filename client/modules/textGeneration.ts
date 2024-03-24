@@ -15,8 +15,22 @@ import { loadBar } from "./loadBar";
 import { SearchResults, search } from "./search";
 import { sleep } from "./sleep";
 import { query, debug, disableWorkers } from "./urlParams";
+import toast from "react-hot-toast";
 
 const Worker = disableWorkers ? undefined : window.Worker;
+
+const textGenerationLoadingToastId = "text-generation-loading-toast";
+
+function updateLoadingToast(text: string) {
+  toast.loading(text, {
+    id: textGenerationLoadingToastId,
+    position: "bottom-center",
+  });
+}
+
+function dismissLoadingToast() {
+  toast.dismiss(textGenerationLoadingToastId);
+}
 
 async function generateTextWithWebLlm() {
   const { ChatWorkerClient, ChatModule, hasModelInCache } = await import(
@@ -100,7 +114,7 @@ async function generateTextWithWebLlm() {
 
   if (!(await hasModelInCache(selectedModel, appConfig))) {
     chat.setInitProgressCallback((report) =>
-      updateResponse(
+      updateLoadingToast(
         `Loading: ${report.text.replaceAll("[", "(").replaceAll("]", ")")}`,
       ),
     );
@@ -113,7 +127,7 @@ async function generateTextWithWebLlm() {
   );
 
   if (!getDisableAiResponseSetting()) {
-    updateResponse("Preparing response...");
+    updateLoadingToast("Generating response...");
 
     await chat.generate(
       dedent`
@@ -175,7 +189,7 @@ async function generateTextWithWllama() {
     "./wllama"
   );
 
-  updateResponse("Loading AI model...");
+  updateLoadingToast("Loading AI model...");
 
   const MobileDetect = (await import("mobile-detect")).default;
 
@@ -215,7 +229,7 @@ async function generateTextWithWllama() {
 
     if (!query) throw Error("Query is empty.");
 
-    updateResponse("Preparing response...");
+    updateLoadingToast("Generating response...");
 
     const completion = await runCompletion({
       prompt,
@@ -339,7 +353,7 @@ async function generateTextWithTransformersJs() {
     | undefined = (e: { file: string; progress: number }) => {
     filesProgress[e.file] = e.progress ?? 100;
     const lowestProgress = Math.min(...Object.values(filesProgress));
-    updateResponse(`Loading: ${lowestProgress.toFixed(0)}%`);
+    updateLoadingToast(`Loading: ${lowestProgress.toFixed(0)}%`);
   };
 
   type Actions = import("./transformersWorker").Actions;
@@ -421,7 +435,7 @@ async function generateTextWithTransformersJs() {
 
   handleModelLoadingProgress = undefined;
 
-  await updateResponseWithTypingEffect("Preparing response...");
+  updateLoadingToast("Generating response...");
 
   if (!getDisableAiResponseSetting()) {
     const request = await formatChatMessages([
@@ -568,7 +582,7 @@ async function rankSearchResults(searchResults: SearchResults, query: string) {
     rank = transformersModule.rank;
   }
 
-  updateResponse("Analyzing search results...");
+  updateLoadingToast("Analyzing search results...");
 
   const groupSize = 5;
   const numGroups = Math.ceil(searchResults.length / groupSize);
@@ -621,10 +635,9 @@ export async function prepareTextGeneration() {
   );
 
   try {
-    updateResponse("Loading AI model...");
+    updateLoadingToast("Loading AI model...");
     const rankedSearchResults = await rankSearchResults(searchResults, query);
     updateSearchResults(rankedSearchResults);
-    updateResponse("");
   } catch (error) {
     console.info(`Skipping search ranking due to error: ${error}`);
   }
@@ -633,7 +646,7 @@ export async function prepareTextGeneration() {
 
   if (debug) console.time("Response Generation Time");
 
-  updateResponse("Preparing response...");
+  updateLoadingToast("Generating response...");
 
   loadBar.start();
 
@@ -672,6 +685,8 @@ export async function prepareTextGeneration() {
   }
 
   loadBar.done();
+
+  dismissLoadingToast();
 
   if (debug) {
     console.timeEnd("Response Generation Time");
