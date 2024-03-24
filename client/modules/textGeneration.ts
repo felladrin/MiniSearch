@@ -11,7 +11,6 @@ import {
   updateUrlsDescriptions,
   getUrlsDescriptions,
 } from "./pubSub";
-import { loadBar } from "./loadBar";
 import { SearchResults, search } from "./search";
 import { sleep } from "./sleep";
 import { query, debug, disableWorkers } from "./urlParams";
@@ -648,8 +647,6 @@ export async function prepareTextGeneration() {
 
   updateLoadingToast("Generating response...");
 
-  loadBar.start();
-
   try {
     if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
 
@@ -683,8 +680,6 @@ export async function prepareTextGeneration() {
       }
     }
   }
-
-  loadBar.done();
 
   dismissLoadingToast();
 
