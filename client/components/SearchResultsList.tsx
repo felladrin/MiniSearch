@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { SearchResults } from "../modules/search";
 import { Tooltip } from "react-tooltip";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
+
 export function SearchResultsList({
   searchResults,
   urlsDescriptions,
@@ -9,6 +11,21 @@ export function SearchResultsList({
   urlsDescriptions: Record<string, string>;
 }) {
   const [parent] = useAutoAnimate({ duration: 1000 });
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  const shouldDisplayDomainBelowTitle = windowWidth < 720;
 
   return (
     <ul ref={parent}>
@@ -30,7 +47,8 @@ export function SearchResultsList({
             style={{
               display: "flex",
               justifyContent: "space-between",
-              gap: "1rem",
+              gap: shouldDisplayDomainBelowTitle ? 0 : "1rem",
+              flexDirection: shouldDisplayDomainBelowTitle ? "column" : "row",
             }}
           >
             <a
