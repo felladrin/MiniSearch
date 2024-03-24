@@ -25,6 +25,7 @@ export function SettingsButton() {
             </div>
           </div>,
           {
+            id: "settings-toast",
             duration: Infinity,
             position: "bottom-center",
             style: {
