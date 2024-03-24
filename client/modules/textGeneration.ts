@@ -66,8 +66,6 @@ export async function prepareTextGeneration() {
 
   if (debug) console.time("Response Generation Time");
 
-  updateLoadingToast("Generating response...");
-
   try {
     if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
 
@@ -243,6 +241,8 @@ async function generateTextWithWebLlm() {
   await chat.resetChat();
 
   if (getSummarizeLinksSetting()) {
+    updateLoadingToast("Summarizing links...");
+
     for (const [title, snippet, url] of getSearchResults()) {
       const request = dedent`
         When searching for "${query}", this link was found: [${title}](${url} "${snippet}")
@@ -341,6 +341,8 @@ async function generateTextWithWllama() {
   }
 
   if (getSummarizeLinksSetting()) {
+    updateLoadingToast("Summarizing links...");
+
     for (const [title, snippet, url] of getSearchResults()) {
       const prompt = dedent`
         <|im_start|>system
@@ -568,6 +570,8 @@ async function generateTextWithTransformersJs() {
   }
 
   if (getSummarizeLinksSetting()) {
+    updateLoadingToast("Summarizing links...");
+
     const updateUrlsDescriptionsWithTypingEffect = async (
       url: string,
       description: string,
