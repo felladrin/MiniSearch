@@ -25,6 +25,8 @@ export async function prepareTextGeneration() {
 
   updatePrompt(query);
 
+  updateLoadingToast("Searching the web...");
+
   const searchResults = await search(query, 30);
 
   updateSearchResults(searchResults);
@@ -35,6 +37,8 @@ export async function prepareTextGeneration() {
       {},
     ),
   );
+
+  updateLoadingToast("Ranking search results...");
 
   try {
     const rankedSearchResults = await rankSearchResultsWithTransformers(
@@ -643,8 +647,6 @@ async function rankSearchResultsWithTransformers(
   searchResults: SearchResults,
   query: string,
 ) {
-  updateLoadingToast("Analyzing search results...");
-
   const { createWorker } = await import("../../node_modules/typed-worker/dist");
 
   type Actions = import("./transformersWorker").Actions;
@@ -671,44 +673,30 @@ async function rankSearchResultsWithTransformers(
     rank = transformersModule.rank;
   }
 
-  const groupSize = 5;
-  const numGroups = Math.ceil(searchResults.length / groupSize);
-  const urlToScoreMap: { [url: string]: number } = {};
-
-  for (let i = 0; i < numGroups; i++) {
-    const start = i * groupSize;
-    const end = start + groupSize;
-    const searchResultsSlice = searchResults.slice(start, end);
-    const documents = searchResultsSlice.map(
-      ([title, snippet]) => `${title}: ${snippet}`,
-    );
-    (
-      await (transformersWorker
-        ? transformersWorker.run("rank", query, documents)
-        : rank(query, documents))
-    ).forEach(({ corpus_id, score }) => {
-      const [, , url] = searchResultsSlice[corpus_id];
-      urlToScoreMap[url] = score;
-    });
-  }
-
-  const rankedSearchResults: SearchResults = searchResults.sort(
-    ([, , url1], [, , url2]) => {
-      return (urlToScoreMap[url2] ?? 0) - (urlToScoreMap[url1] ?? 0);
-    },
+  const snippets = searchResults.map(
+    ([title, snippet]) => `${title}: ${snippet}`,
   );
 
-  transformersWorker?.destroy();
+  try {
+    const rankedSearchResults: SearchResults = (
+      await (transformersWorker
+        ? transformersWorker.run("rank", query, snippets)
+        : rank(query, snippets))
+    ).map(({ corpus_id }) => searchResults[corpus_id]);
 
-  return rankedSearchResults;
+    transformersWorker?.destroy();
+
+    return rankedSearchResults;
+  } catch (error) {
+    transformersWorker?.destroy();
+    throw error;
+  }
 }
 
 async function rankSearchResultsWithLevenshteinDistance(
   searchResults: SearchResults,
   query: string,
 ) {
-  updateLoadingToast("Analyzing search results...");
-
   const { default: leven } = await import("leven");
 
   const urlToScoreMap: { [url: string]: number } = {};
@@ -719,11 +707,7 @@ async function rankSearchResultsWithLevenshteinDistance(
     urlToScoreMap[url] = score;
   });
 
-  const rankedSearchResults: SearchResults = searchResults.sort(
-    ([, , url1], [, , url2]) => {
-      return (urlToScoreMap[url2] ?? 0) - (urlToScoreMap[url1] ?? 0);
-    },
-  );
-
-  return rankedSearchResults;
+  return searchResults.slice().sort(([, , url1], [, , url2]) => {
+    return (urlToScoreMap[url2] ?? 0) - (urlToScoreMap[url1] ?? 0);
+  });
 }
