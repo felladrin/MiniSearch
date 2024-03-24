@@ -568,6 +568,8 @@ async function rankSearchResults(searchResults: SearchResults, query: string) {
     rank = transformersModule.rank;
   }
 
+  updateResponse("Analyzing search results...");
+
   const groupSize = 5;
   const numGroups = Math.ceil(searchResults.length / groupSize);
   const urlToScoreMap: { [url: string]: number } = {};
@@ -595,9 +597,7 @@ async function rankSearchResults(searchResults: SearchResults, query: string) {
     },
   );
 
-  if (transformersWorker) {
-    transformersWorker.destroy();
-  }
+  transformersWorker?.destroy();
 
   return rankedSearchResults;
 }
@@ -621,7 +621,7 @@ export async function prepareTextGeneration() {
   );
 
   try {
-    updateResponse("Analyzing search results...");
+    updateResponse("Loading AI model...");
     const rankedSearchResults = await rankSearchResults(searchResults, query);
     updateSearchResults(rankedSearchResults);
     updateResponse("");
