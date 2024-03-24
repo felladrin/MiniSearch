@@ -18,17 +18,102 @@ import toast from "react-hot-toast";
 
 const Worker = disableWorkers ? undefined : window.Worker;
 
-const textGenerationLoadingToastId = "text-generation-loading-toast";
+export async function prepareTextGeneration() {
+  if (query === null) return;
+
+  document.title = query;
+
+  updatePrompt(query);
+
+  const searchResults = await search(query, 30);
+
+  updateSearchResults(searchResults);
+
+  updateUrlsDescriptions(
+    searchResults.reduce(
+      (acc, [, snippet, url]) => ({ ...acc, [url]: snippet }),
+      {},
+    ),
+  );
+
+  try {
+    const rankedSearchResults = await rankSearchResultsWithTransformers(
+      searchResults,
+      query,
+    );
+
+    updateSearchResults(rankedSearchResults);
+  } catch (error) {
+    console.info(dedent`
+      Could not rank search results due to error: ${error}
+
+      Falling back to ranking with Levenshtein distance.
+    `);
+
+    const rankedSearchResults = await rankSearchResultsWithLevenshteinDistance(
+      searchResults,
+      query,
+    );
+
+    updateSearchResults(rankedSearchResults);
+  }
+
+  if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
+
+  if (debug) console.time("Response Generation Time");
+
+  updateLoadingToast("Generating response...");
+
+  try {
+    if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
+
+    await generateTextWithWebLlm();
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : (error as string);
+
+    console.info(dedent`
+      Could not load web-llm chat module: ${errorMessage}
+
+      Falling back to transformers.js and wllama.
+    `);
+
+    if ("SharedArrayBuffer" in window) {
+      try {
+        await generateTextWithWllama();
+      } catch (error) {
+        console.error("Error while generating response with wllama:", error);
+        await generateTextWithTransformersJs();
+      }
+    } else {
+      try {
+        await generateTextWithTransformersJs();
+      } catch (error) {
+        console.error(
+          "Error while generating response with transformers.js:",
+          error,
+        );
+        await generateTextWithWllama();
+      }
+    }
+  }
+
+  dismissLoadingToast();
+
+  if (debug) {
+    console.timeEnd("Response Generation Time");
+  }
+}
 
 function updateLoadingToast(text: string) {
   toast.loading(text, {
-    id: textGenerationLoadingToastId,
+    id: "text-generation-loading-toast",
     position: "bottom-center",
   });
 }
 
 function dismissLoadingToast() {
-  toast.dismiss(textGenerationLoadingToastId);
+  toast.dismiss("text-generation-loading-toast");
 }
 
 async function generateTextWithWebLlm() {
@@ -641,91 +726,4 @@ async function rankSearchResultsWithLevenshteinDistance(
   );
 
   return rankedSearchResults;
-}
-
-export async function prepareTextGeneration() {
-  if (query === null) return;
-
-  document.title = query;
-
-  updatePrompt(query);
-
-  const searchResults = await search(query, 30);
-
-  updateSearchResults(searchResults);
-
-  updateUrlsDescriptions(
-    searchResults.reduce(
-      (acc, [, snippet, url]) => ({ ...acc, [url]: snippet }),
-      {},
-    ),
-  );
-
-  try {
-    const rankedSearchResults = await rankSearchResultsWithTransformers(
-      searchResults,
-      query,
-    );
-
-    updateSearchResults(rankedSearchResults);
-  } catch (error) {
-    console.info(dedent`
-      Could not rank search results due to error: ${error}
-
-      Falling back to ranking with Levenshtein distance.
-    `);
-
-    const rankedSearchResults = await rankSearchResultsWithLevenshteinDistance(
-      searchResults,
-      query,
-    );
-
-    updateSearchResults(rankedSearchResults);
-  }
-
-  if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
-
-  if (debug) console.time("Response Generation Time");
-
-  updateLoadingToast("Generating response...");
-
-  try {
-    if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
-
-    await generateTextWithWebLlm();
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : (error as string);
-
-    console.info(dedent`
-      Could not load web-llm chat module: ${errorMessage}
-
-      Falling back to transformers.js and wllama.
-    `);
-
-    if ("SharedArrayBuffer" in window) {
-      try {
-        await generateTextWithWllama();
-      } catch (error) {
-        console.error("Error while generating response with wllama:", error);
-        await generateTextWithTransformersJs();
-      }
-    } else {
-      try {
-        await generateTextWithTransformersJs();
-      } catch (error) {
-        console.error(
-          "Error while generating response with transformers.js:",
-          error,
-        );
-        await generateTextWithWllama();
-      }
-    }
-  }
-
-  dismissLoadingToast();
-
-  if (debug) {
-    console.timeEnd("Response Generation Time");
-  }
 }
