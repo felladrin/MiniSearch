@@ -13,7 +13,9 @@ export async function initializeWllama(config: {
   modelConfig?: LoadModelConfig;
 }) {
   const wllamaConfigPaths: AssetsPathConfig = {
+    "single-thread/wllama.js": "/wllama/esm/single-thread/wllama.js",
     "single-thread/wllama.wasm": "/wllama/esm/single-thread/wllama.wasm",
+    "multi-thread/wllama.js": "/wllama/esm/multi-thread/wllama.js",
     "multi-thread/wllama.wasm": "/wllama/esm/multi-thread/wllama.wasm",
     "multi-thread/wllama.worker.mjs":
       "/wllama/esm/multi-thread/wllama.worker.mjs",
