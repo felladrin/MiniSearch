@@ -3,7 +3,7 @@ import type {
   SamplingConfig,
   Wllama,
   AssetsPathConfig,
-} from "@wllama/wllama/esm";
+} from "@wllama/wllama";
 import { importModuleWithoutTranspilation } from "./import";
 
 let wllama: Wllama | undefined;
