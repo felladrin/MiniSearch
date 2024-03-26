@@ -38,7 +38,7 @@ export async function prepareTextGeneration() {
     ),
   );
 
-  updateLoadingToast("Ranking search results...");
+  updateLoadingToast("Loading AI model...");
 
   try {
     const rankedSearchResults = await rankSearchResultsWithWllama(
@@ -71,6 +71,8 @@ export async function prepareTextGeneration() {
   }
 
   if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
+
+  updateLoadingToast("Loading AI model...");
 
   if (debug) console.time("Response Generation Time");
 
@@ -284,8 +286,6 @@ async function generateTextWithWllama() {
   const { initializeWllama, runCompletion, exitWllama } = await import(
     "./wllama"
   );
-
-  updateLoadingToast("Loading AI model...");
 
   const MobileDetect = (await import("mobile-detect")).default;
 
@@ -689,6 +689,8 @@ async function rankSearchResultsWithTransformers(
     ([title, snippet]) => `${title}: ${snippet}`,
   );
 
+  updateLoadingToast("Analyzing search results...");
+
   try {
     const rankedSearchResults: SearchResults = (
       await (transformersWorker
@@ -725,6 +727,8 @@ async function rankSearchResultsWithWllama(
   const documents = searchResults.map(
     ([title, snippet]) => `${title}: ${snippet}`,
   );
+
+  updateLoadingToast("Analyzing search results...");
 
   const scores = await rank({ query, documents });
 
