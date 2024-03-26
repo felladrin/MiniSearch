@@ -72,42 +72,53 @@ export async function prepareTextGeneration() {
 
   if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
 
-  updateLoadingToast("Loading AI model...");
-
   if (debug) console.time("Response Generation Time");
 
+  updateLoadingToast("Loading AI model...");
+
   try {
-    if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
+    try {
+      if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
 
-    await generateTextWithWebLlm();
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : (error as string);
+      await generateTextWithWebLlm();
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : (error as string);
 
-    console.info(dedent`
+      console.info(dedent`
       Could not load web-llm chat module: ${errorMessage}
 
       Falling back to transformers.js and wllama.
     `);
 
-    if ("SharedArrayBuffer" in window) {
-      try {
-        await generateTextWithWllama();
-      } catch (error) {
-        console.error("Error while generating response with wllama:", error);
-        await generateTextWithTransformersJs();
-      }
-    } else {
-      try {
-        await generateTextWithTransformersJs();
-      } catch (error) {
-        console.error(
-          "Error while generating response with transformers.js:",
-          error,
-        );
-        await generateTextWithWllama();
+      if ("SharedArrayBuffer" in window) {
+        try {
+          await generateTextWithWllama();
+        } catch (error) {
+          console.error("Error while generating response with wllama:", error);
+          await generateTextWithTransformersJs();
+        }
+      } else {
+        try {
+          await generateTextWithTransformersJs();
+        } catch (error) {
+          console.error(
+            "Error while generating response with transformers.js:",
+            error,
+          );
+          await generateTextWithWllama();
+        }
       }
     }
+  } catch (error) {
+    console.error(
+      "Could not generate response with any of the available models:",
+      error,
+    );
+
+    toast.error(
+      "Could not generate response. Please restart your browser and try again.",
+    );
   }
 
   dismissLoadingToast();
