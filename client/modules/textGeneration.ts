@@ -41,7 +41,7 @@ export async function prepareTextGeneration() {
   updateLoadingToast("Ranking search results...");
 
   try {
-    const rankedSearchResults = await rankSearchResultsWithTransformers(
+    const rankedSearchResults = await rankSearchResultsWithWllama(
       searchResults,
       query,
     );
@@ -51,15 +51,23 @@ export async function prepareTextGeneration() {
     console.info(dedent`
       Could not rank search results due to error: ${error}
 
-      Falling back to ranking with Levenshtein distance.
+      Falling back to ranking with transformers.js.
     `);
 
-    const rankedSearchResults = await rankSearchResultsWithLevenshteinDistance(
-      searchResults,
-      query,
-    );
+    try {
+      const rankedSearchResults = await rankSearchResultsWithTransformers(
+        searchResults,
+        query,
+      );
 
-    updateSearchResults(rankedSearchResults);
+      updateSearchResults(rankedSearchResults);
+    } catch (error) {
+      console.info(dedent`
+        Could not rank search results due to error: ${error}
+
+        Skipping ranking.
+      `);
+    }
   }
 
   if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
@@ -697,21 +705,41 @@ async function rankSearchResultsWithTransformers(
   }
 }
 
-async function rankSearchResultsWithLevenshteinDistance(
+async function rankSearchResultsWithWllama(
   searchResults: SearchResults,
   query: string,
 ) {
-  const { default: leven } = await import("leven");
+  const { initializeWllama, rank, exitWllama } = await import("./wllama");
 
-  const urlToScoreMap: { [url: string]: number } = {};
-
-  searchResults.forEach(([title, snippet, url]) => {
-    const document = `${title}: ${snippet}`;
-    const score = leven(query, document);
-    urlToScoreMap[url] = score;
+  await initializeWllama({
+    modelUrl: getUseLargerModelSetting()
+      ? "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q4_0.gguf"
+      : "https://huggingface.co/ggml-org/models/resolve/main/bert-bge-small/ggml-model-f16.gguf",
+    modelConfig: {
+      n_ctx: 2048,
+      embeddings: true,
+      pooling_type: "LLAMA_POOLING_TYPE_MEAN",
+    },
   });
 
-  return searchResults.slice().sort(([, , url1], [, , url2]) => {
-    return (urlToScoreMap[url2] ?? 0) - (urlToScoreMap[url1] ?? 0);
+  const documents = searchResults.map(
+    ([title, snippet]) => `${title}: ${snippet}`,
+  );
+
+  const scores = await rank({ query, documents });
+
+  const searchResultToScoreMap: Map<SearchResults[0], number> = new Map();
+
+  scores.map((score, index) =>
+    searchResultToScoreMap.set(searchResults[index], score ?? 0),
+  );
+
+  exitWllama();
+
+  return searchResults.slice().sort((a, b) => {
+    return (
+      (searchResultToScoreMap.get(b) ?? 0) -
+      (searchResultToScoreMap.get(a) ?? 0)
+    );
   });
 }
