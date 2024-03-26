@@ -38,38 +38,6 @@ export async function prepareTextGeneration() {
     ),
   );
 
-  updateLoadingToast("Loading AI model...");
-
-  try {
-    const rankedSearchResults = await rankSearchResultsWithWllama(
-      searchResults,
-      query,
-    );
-
-    updateSearchResults(rankedSearchResults);
-  } catch (error) {
-    console.info(dedent`
-      Could not rank search results due to error: ${error}
-
-      Falling back to ranking with transformers.js.
-    `);
-
-    try {
-      const rankedSearchResults = await rankSearchResultsWithTransformers(
-        searchResults,
-        query,
-      );
-
-      updateSearchResults(rankedSearchResults);
-    } catch (error) {
-      console.info(dedent`
-        Could not rank search results due to error: ${error}
-
-        Skipping ranking.
-      `);
-    }
-  }
-
   if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
 
   if (debug) console.time("Response Generation Time");
@@ -119,6 +87,38 @@ export async function prepareTextGeneration() {
     toast.error(
       "Could not generate response. Please restart your browser and try again.",
     );
+  }
+
+  updateLoadingToast("Loading AI model...");
+
+  try {
+    const rankedSearchResults = await rankSearchResultsWithWllama(
+      searchResults,
+      query,
+    );
+
+    updateSearchResults(rankedSearchResults);
+  } catch (error) {
+    console.info(dedent`
+      Could not rank search results due to error: ${error}
+
+      Falling back to ranking with transformers.js.
+    `);
+
+    try {
+      const rankedSearchResults = await rankSearchResultsWithTransformers(
+        searchResults,
+        query,
+      );
+
+      updateSearchResults(rankedSearchResults);
+    } catch (error) {
+      console.info(dedent`
+        Could not rank search results due to error: ${error}
+
+        Skipping ranking.
+      `);
+    }
   }
 
   dismissLoadingToast();
