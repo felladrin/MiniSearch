@@ -5,6 +5,7 @@ import { getRandomQuerySuggestion } from "../modules/querySuggestions";
 
 export function SearchForm() {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const windowInnerHeight = useWindowInnerHeight();
   const [suggestedQuery, setSuggestedQuery] = useState<string>(() => {
     const previousSearchQuery = localStorage.getItem(searchQueryKey) ?? "";
 
@@ -56,18 +57,43 @@ export function SearchForm() {
   }, [startSearching]);
 
   return (
-    <form onSubmit={handleSubmit} style={{ width: "100%" }}>
-      <TextareaAutosize
-        placeholder={suggestedQuery}
-        ref={textAreaRef}
-        onChange={handleInputChange}
-        autoFocus
-        minRows={1}
-        maxRows={6}
-      />
-      <button type="submit" style={{ width: "100%" }}>
-        Submit
-      </button>
-    </form>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        height: windowInnerHeight * 0.8,
+      }}
+    >
+      <form onSubmit={handleSubmit} style={{ width: "100%" }}>
+        <TextareaAutosize
+          placeholder={suggestedQuery}
+          ref={textAreaRef}
+          onChange={handleInputChange}
+          autoFocus
+          minRows={1}
+          maxRows={6}
+        />
+        <button type="submit" style={{ width: "100%" }}>
+          Submit
+        </button>
+      </form>
+    </div>
   );
+}
+
+function useWindowInnerHeight() {
+  const [windowInnerHeight, setWindowInnerHeight] = useState(
+    window.innerHeight,
+  );
+
+  useEffect(() => {
+    const handleResize = () => setWindowInnerHeight(window.innerHeight);
+
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  return windowInnerHeight;
 }
