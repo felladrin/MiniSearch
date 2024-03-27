@@ -1,4 +1,5 @@
 import { useEffect, useRef, FormEvent, useState, useCallback } from "react";
+import TextareaAutosize from "react-textarea-autosize";
 import { searchQueryKey } from "../modules/search";
 import { getRandomQuerySuggestion } from "../modules/querySuggestions";
 
@@ -56,11 +57,13 @@ export function SearchForm() {
 
   return (
     <form onSubmit={handleSubmit} style={{ width: "100%" }}>
-      <textarea
+      <TextareaAutosize
         placeholder={suggestedQuery}
         ref={textAreaRef}
         onChange={handleInputChange}
         autoFocus
+        minRows={1}
+        maxRows={6}
       />
       <button type="submit" style={{ width: "100%" }}>
         Submit
