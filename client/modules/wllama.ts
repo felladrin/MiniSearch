@@ -44,11 +44,21 @@ export async function runCompletion(config: {
   });
 }
 
+export function calculateDotProduct(
+  firstArray: number[],
+  secondArray: number[],
+) {
+  let result = 0;
+
+  for (let index = 0; index < firstArray.length; index++) {
+    result += firstArray[index] * secondArray[index];
+  }
+
+  return result;
+}
+
 export async function rank(config: { query: string; documents: string[] }) {
   if (!wllama) throw new Error("Wllama is not initialized.");
-
-  const calculateDotProduct = (a: number[], b: number[]) =>
-    a.reduce((acc, _, i) => acc + a[i] * b[i], 0);
 
   const queryEmbedding = await wllama.createEmbedding(config.query);
 
