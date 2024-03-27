@@ -1,10 +1,14 @@
-import type {
+import {
   LoadModelConfig,
   SamplingConfig,
   Wllama,
   AssetsPathConfig,
 } from "@wllama/wllama";
-import { importModuleWithoutTranspilation } from "./import";
+import singleThreadWllamaJsUrl from "@wllama/wllama/esm/single-thread/wllama.js?url";
+import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
+import multiThreadWllamaJsUrl from "@wllama/wllama/esm/multi-thread/wllama.js?url";
+import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
+import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
 
 let wllama: Wllama | undefined;
 
@@ -13,19 +17,14 @@ export async function initializeWllama(config: {
   modelConfig?: LoadModelConfig;
 }) {
   const wllamaConfigPaths: AssetsPathConfig = {
-    "single-thread/wllama.js": "/wllama/esm/single-thread/wllama.js",
-    "single-thread/wllama.wasm": "/wllama/esm/single-thread/wllama.wasm",
-    "multi-thread/wllama.js": "/wllama/esm/multi-thread/wllama.js",
-    "multi-thread/wllama.wasm": "/wllama/esm/multi-thread/wllama.wasm",
-    "multi-thread/wllama.worker.mjs":
-      "/wllama/esm/multi-thread/wllama.worker.mjs",
+    "single-thread/wllama.js": singleThreadWllamaJsUrl,
+    "single-thread/wllama.wasm": singleThreadWllamaWasmUrl,
+    "multi-thread/wllama.js": multiThreadWllamaJsUrl,
+    "multi-thread/wllama.wasm": multiThreadWllamaWasmUrl,
+    "multi-thread/wllama.worker.mjs": multiThreadWllamaWorkerMjsUrl,
   };
 
-  wllama = new (
-    await importModuleWithoutTranspilation<{
-      Wllama: typeof Wllama;
-    }>("/wllama/esm/index.js")
-  ).Wllama(wllamaConfigPaths);
+  wllama = new Wllama(wllamaConfigPaths);
 
   return wllama.loadModelFromUrl(config.modelUrl, config.modelConfig ?? {});
 }

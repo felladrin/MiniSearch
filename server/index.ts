@@ -5,6 +5,7 @@ import { fetchSearXNG } from "./fetchSearXNG";
 export const app = express();
 
 app.use((_, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
   crossOriginIsolationHeaders.forEach(({ key, value }) => {
     res.header(key, value);
   });

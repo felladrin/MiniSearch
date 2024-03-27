@@ -49,7 +49,6 @@
     "eslint-plugin-react-refresh": "^0.4.3",
     "typescript": "^5.0.2",
     "vite": "~5.1",
-    "vite-plugin-node": "^3.0.2",
-    "vite-plugin-static-copy": "^1.0.1"
+    "vite-plugin-node": "^3.0.2"
   }
 }
