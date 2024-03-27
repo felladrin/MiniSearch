@@ -155,12 +155,13 @@ async function generateTextWithWebLlm() {
     : new ChatModule();
 
   const availableModels = {
+    Mistral: "Mistral-7B-Instruct-v0.2-q4f16_1",
     Gemma: "gemma-2b-it-q4f32_1",
     TinyLlama: "TinyLlama-1.1B-Chat-v0.4-q4f32_1-1k",
   };
 
   const selectedModel = getUseLargerModelSetting()
-    ? availableModels.Gemma
+    ? availableModels.Mistral
     : availableModels.TinyLlama;
 
   const commonChatMlConfig: ChatOptions = {
@@ -170,6 +171,9 @@ async function generateTextWithWebLlm() {
   };
 
   const chatConfigPerModel: { [x: string]: ChatOptions } = {
+    [availableModels.Mistral]: {
+      ...commonChatMlConfig,
+    },
     [availableModels.Gemma]: {
       ...commonChatMlConfig,
     },
@@ -202,6 +206,13 @@ async function generateTextWithWebLlm() {
 
   const appConfig = {
     model_list: [
+      {
+        local_id: availableModels.Mistral,
+        model_url:
+          "https://huggingface.co/mlc-ai/Mistral-7B-Instruct-v0.2-q4f16_1-MLC/resolve/main/",
+        model_lib_url:
+          "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/Mistral-7B-Instruct-v0.2/Mistral-7B-Instruct-v0.2-q4f16_1-sw4k_cs1k-webgpu.wasm",
+      },
       {
         local_id: availableModels.Gemma,
         model_url:
