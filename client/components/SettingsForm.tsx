@@ -31,6 +31,26 @@ export function SettingsForm() {
       </div>
       <div>
         <Tooltip
+          id="use-large-model-setting-tooltip"
+          place="top-start"
+          variant="info"
+          opacity="1"
+          style={{ width: "75vw", maxWidth: "600px" }}
+        />
+        <label
+          data-tooltip-id="use-large-model-setting-tooltip"
+          data-tooltip-content="Generates better responses, but takes longer to load"
+        >
+          <input
+            type="checkbox"
+            checked={useLargerModel}
+            onChange={(event) => setUseLargerModel(event.target.checked)}
+          />
+          Use a larger AI model
+        </label>
+      </div>
+      <div>
+        <Tooltip
           id="disable-ai-setting-tooltip"
           place="top-start"
           variant="info"
@@ -67,26 +87,6 @@ export function SettingsForm() {
             onChange={(event) => setSummarizeLinks(event.target.checked)}
           />
           Summarize links
-        </label>
-      </div>
-      <div>
-        <Tooltip
-          id="use-large-model-setting-tooltip"
-          place="top-start"
-          variant="info"
-          opacity="1"
-          style={{ width: "75vw", maxWidth: "600px" }}
-        />
-        <label
-          data-tooltip-id="use-large-model-setting-tooltip"
-          data-tooltip-content="Generates better responses, but takes longer to load"
-        >
-          <input
-            type="checkbox"
-            checked={useLargerModel}
-            onChange={(event) => setUseLargerModel(event.target.checked)}
-          />
-          Use a larger AI model
         </label>
       </div>
     </div>
