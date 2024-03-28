@@ -12,6 +12,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@fontsource/inter": "^5.0.17",
     "@formkit/auto-animate": "^0.8.1",
     "@mlc-ai/web-llm": "0.2.29",
     "@wllama/wllama": "^1.4.2",

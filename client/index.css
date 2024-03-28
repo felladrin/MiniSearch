@@ -1,0 +1,13 @@
+@import url('../node_modules/water.css/out/water.css');
+@import url('../node_modules/@fontsource/inter/400.css');
+@import url('../node_modules/@fontsource/inter/600.css');
+@import url('../node_modules/react-tooltip/dist/react-tooltip.css');
+
+:root, body {
+  font-family: Inter, sans-serif;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+}
+
+@supports (font-variation-settings: normal) {
+  :root { font-family: InterVariable, sans-serif; }
+}
