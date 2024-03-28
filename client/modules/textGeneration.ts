@@ -27,7 +27,22 @@ export async function prepareTextGeneration() {
 
   updateLoadingToast("Searching the web...");
 
-  const searchResults = await search(query, 30);
+  let searchResults = await search(query, 30);
+
+  if (searchResults.length === 0) {
+    const queryKeywords = (await import("keyword-extractor")).default.extract(
+      query,
+      {
+        language: "english",
+      },
+    );
+
+    searchResults = await search(queryKeywords.join(" "), 30);
+  }
+
+  if (searchResults.length === 0) {
+    toast.error("No search results found. Please try a different query.");
+  }
 
   updateSearchResults(searchResults);
 

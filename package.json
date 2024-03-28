@@ -20,6 +20,7 @@
     "create-pubsub": "^1.6.3",
     "express": "^4.18.2",
     "html-to-text": "^9.0.5",
+    "keyword-extractor": "^0.0.28",
     "leven": "^4.0.0",
     "markdown-to-jsx": "^7.3.2",
     "mobile-detect": "^1.4.5",
