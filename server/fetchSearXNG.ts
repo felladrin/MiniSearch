@@ -27,6 +27,8 @@ export async function fetchSearXNG(query: string, limit?: number) {
       const uniqueUrls = new Set<string>();
 
       for (const result of results) {
+        if (!result.content || uniqueUrls.has(result.url)) continue;
+
         const stripHtmlTags = (str: string) => str.replace(/<[^>]*>?/gm, "");
 
         const content = stripHtmlTags(result.content).trim();
@@ -35,13 +37,11 @@ export async function fetchSearXNG(query: string, limit?: number) {
 
         const title = stripHtmlTags(result.title);
 
-        const url = result.url as string;
-
-        if (uniqueUrls.has(url)) continue;
-
-        uniqueUrls.add(url);
+        const url = result.url;
 
         searchResults.push([title, content, url]);
+
+        uniqueUrls.add(url);
       }
     }
 
