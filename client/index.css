@@ -1,9 +1,10 @@
 @import url("../node_modules/water.css/out/water.css");
-@import url("../node_modules/@fontsource/inter/400.css");
-@import url("../node_modules/@fontsource/inter/600.css");
+@import url("../node_modules/inter-ui/inter.css");
+@import url("../node_modules/inter-ui/inter-variable.css");
 @import url("../node_modules/react-tooltip/dist/react-tooltip.css");
 
 :root,
+html,
 body {
   font-family: Inter, sans-serif;
   font-feature-settings:
@@ -12,7 +13,9 @@ body {
 }
 
 @supports (font-variation-settings: normal) {
-  :root {
+  :root,
+  html,
+  body {
     font-family: InterVariable, sans-serif;
   }
 }

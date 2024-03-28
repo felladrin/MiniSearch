@@ -12,7 +12,6 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@fontsource/inter": "^5.0.17",
     "@formkit/auto-animate": "^0.8.1",
     "@mlc-ai/web-llm": "0.2.29",
     "@wllama/wllama": "^1.4.2",
@@ -21,6 +20,7 @@
     "create-pubsub": "^1.6.3",
     "express": "^4.18.2",
     "html-to-text": "^9.0.5",
+    "inter-ui": "^4.0.2",
     "keyword-extractor": "^0.0.28",
     "leven": "^4.0.0",
     "markdown-to-jsx": "^7.3.2",
