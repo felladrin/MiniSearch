@@ -15,8 +15,12 @@ import { SearchResults, search } from "./search";
 import { sleep } from "./sleep";
 import { query, debug, disableWorkers } from "./urlParams";
 import toast from "react-hot-toast";
+import MobileDetect from "mobile-detect";
 
 const Worker = disableWorkers ? undefined : window.Worker;
+
+const isRunningOnMobile =
+  new MobileDetect(window.navigator.userAgent).mobile() !== null;
 
 export async function prepareTextGeneration() {
   if (query === null) return;
@@ -56,6 +60,40 @@ export async function prepareTextGeneration() {
   if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
 
   if (debug) console.time("Response Generation Time");
+
+  if (!isRunningOnMobile) {
+    updateLoadingToast("Loading AI model...");
+
+    try {
+      const rankedSearchResults = await rankSearchResultsWithWllama(
+        searchResults,
+        query,
+      );
+
+      updateSearchResults(rankedSearchResults);
+    } catch (error) {
+      console.info(dedent`
+        Could not rank search results due to error: ${error}
+
+        Falling back to ranking with transformers.js.
+      `);
+
+      try {
+        const rankedSearchResults = await rankSearchResultsWithTransformers(
+          searchResults,
+          query,
+        );
+
+        updateSearchResults(rankedSearchResults);
+      } catch (error) {
+        console.info(dedent`
+          Could not rank search results due to error: ${error}
+
+          Skipping ranking.
+        `);
+      }
+    }
+  }
 
   updateLoadingToast("Loading AI model...");
 
@@ -102,38 +140,6 @@ export async function prepareTextGeneration() {
     toast.error(
       "Could not generate response. Please restart your browser and try again.",
     );
-  }
-
-  updateLoadingToast("Loading AI model...");
-
-  try {
-    const rankedSearchResults = await rankSearchResultsWithWllama(
-      searchResults,
-      query,
-    );
-
-    updateSearchResults(rankedSearchResults);
-  } catch (error) {
-    console.info(dedent`
-      Could not rank search results due to error: ${error}
-
-      Falling back to ranking with transformers.js.
-    `);
-
-    try {
-      const rankedSearchResults = await rankSearchResultsWithTransformers(
-        searchResults,
-        query,
-      );
-
-      updateSearchResults(rankedSearchResults);
-    } catch (error) {
-      console.info(dedent`
-        Could not rank search results due to error: ${error}
-
-        Skipping ranking.
-      `);
-    }
   }
 
   dismissLoadingToast();
@@ -324,11 +330,6 @@ async function generateTextWithWllama() {
     "./wllama"
   );
 
-  const MobileDetect = (await import("mobile-detect")).default;
-
-  const isRunningOnMobile =
-    new MobileDetect(window.navigator.userAgent).mobile() !== null;
-
   const defaultModel =
     "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf";
 
@@ -439,11 +440,6 @@ async function generateTextWithWllama() {
 
 async function generateTextWithTransformersJs() {
   const { createWorker } = await import("../../node_modules/typed-worker/dist");
-
-  const MobileDetect = (await import("mobile-detect")).default;
-
-  const isRunningOnMobile =
-    new MobileDetect(window.navigator.userAgent).mobile() !== null;
 
   const models = {
     mobileDefault: "Felladrin/onnx-Minueza-32M-UltraChat",
@@ -751,9 +747,8 @@ async function rankSearchResultsWithWllama(
   const { initializeWllama, rank, exitWllama } = await import("./wllama");
 
   await initializeWllama({
-    modelUrl: getUseLargerModelSetting()
-      ? "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q4_0.gguf"
-      : "https://huggingface.co/ggml-org/models/resolve/main/bert-bge-small/ggml-model-f16.gguf",
+    modelUrl:
+      "https://huggingface.co/ggml-org/models/resolve/main/bert-bge-small/ggml-model-f16.gguf",
     modelConfig: {
       n_ctx: 2048,
       embeddings: true,
