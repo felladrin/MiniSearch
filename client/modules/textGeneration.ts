@@ -61,38 +61,34 @@ export async function prepareTextGeneration() {
 
   if (debug) console.time("Response Generation Time");
 
-  if (!isRunningOnMobile) {
-    updateLoadingToast("Loading AI model...");
+  updateLoadingToast("Loading AI model...");
+
+  try {
+    if (isRunningOnMobile) {
+      throw Error("Mobile device detected. Skipping to TensorFlow.");
+    }
 
     try {
-      const rankedSearchResults = await rankSearchResultsWithWllama(
-        searchResults,
-        query,
+      updateSearchResults(
+        await (
+          "SharedArrayBuffer" in window
+            ? rankSearchResultsWithWllama
+            : rankSearchResultsWithTransformers
+        )(searchResults, query),
       );
-
-      updateSearchResults(rankedSearchResults);
     } catch (error) {
-      console.info(dedent`
-        Could not rank search results due to error: ${error}
-
-        Falling back to ranking with transformers.js.
-      `);
-
-      try {
-        const rankedSearchResults = await rankSearchResultsWithTransformers(
-          searchResults,
-          query,
-        );
-
-        updateSearchResults(rankedSearchResults);
-      } catch (error) {
-        console.info(dedent`
-          Could not rank search results due to error: ${error}
-
-          Skipping ranking.
-        `);
-      }
+      updateSearchResults(
+        await (
+          "SharedArrayBuffer" in window
+            ? rankSearchResultsWithTransformers
+            : rankSearchResultsWithWllama
+        )(searchResults, query),
+      );
     }
+  } catch (error) {
+    updateSearchResults(
+      await rankSearchResultsWithTensorFlow(searchResults, query),
+    );
   }
 
   updateLoadingToast("Loading AI model...");
@@ -685,6 +681,71 @@ async function generateTextWithTransformersJs() {
     if (transformersWorker) {
       transformersWorker.destroy();
     }
+  }
+}
+
+async function rankSearchResultsWithTensorFlow(
+  searchResults: SearchResults,
+  query: string,
+) {
+  const { createWorker } = await import("../../node_modules/typed-worker/dist");
+
+  type Actions = import("./tensorFlowWorker").Actions;
+
+  let tensorFlowWorker: ReturnType<typeof createWorker<Actions>> | undefined;
+
+  if (Worker) {
+    tensorFlowWorker = createWorker<Actions>(() => {
+      const worker = new Worker(
+        new URL("./tensorFlowWorker", import.meta.url),
+        {
+          type: "module",
+        },
+      );
+
+      return worker;
+    });
+  }
+
+  let rank!: typeof import("./tensorFlow").rank;
+
+  if (!tensorFlowWorker) {
+    const transformersModule = await import("./tensorFlow");
+    rank = transformersModule.rank;
+  }
+
+  const lowerCasedQuery = query.toLocaleLowerCase();
+
+  const snippets = searchResults.map(([title, snippet]) =>
+    `${title}: ${snippet}`.toLocaleLowerCase(),
+  );
+
+  updateLoadingToast("Analyzing search results...");
+
+  const searchResultToScoreMap: Map<SearchResults[0], number> = new Map();
+
+  try {
+    (
+      await (tensorFlowWorker
+        ? tensorFlowWorker.run("rank", lowerCasedQuery, snippets)
+        : rank(lowerCasedQuery, snippets))
+    ).map((score, index) =>
+      searchResultToScoreMap.set(searchResults[index], score),
+    );
+
+    tensorFlowWorker?.destroy();
+
+    const rankedSearchResults = searchResults.slice().sort((a, b) => {
+      return (
+        (searchResultToScoreMap.get(b) ?? 0) -
+        (searchResultToScoreMap.get(a) ?? 0)
+      );
+    });
+
+    return rankedSearchResults;
+  } catch (error) {
+    tensorFlowWorker?.destroy();
+    throw error;
   }
 }
 
