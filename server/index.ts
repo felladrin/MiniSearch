@@ -12,7 +12,7 @@ app.use((_, res, next) => {
   next();
 });
 
-app.use(express.static("dist"));
+app.use(express.static(new URL("../client/dist", import.meta.url).pathname));
 
 app.get("/search", async (request, response) => {
   const query = request.query.q as string;
