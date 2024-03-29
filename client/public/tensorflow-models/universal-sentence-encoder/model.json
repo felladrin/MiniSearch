@@ -2473,9 +2473,7 @@
         "op": "GatherNd"
       },
       {
-        "input": [
-          "module_apply_default/Encoder_en/KonaTransformer/Maximum"
-        ],
+        "input": ["module_apply_default/Encoder_en/KonaTransformer/Maximum"],
         "attr": {
           "SrcT": {
             "type": 3
@@ -2779,12 +2777,7 @@
             "type": 1
           },
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           }
         },
         "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_0/TransformerLayer/AdjustResidualInput/dense/BiasAdd",
@@ -2983,12 +2976,7 @@
           "dilations": {
             "list": {
               "s": [],
-              "i": [
-                "1",
-                "1",
-                "1",
-                "1"
-              ],
+              "i": ["1", "1", "1", "1"],
               "f": [],
               "b": [],
               "type": [],
@@ -3003,12 +2991,7 @@
           "strides": {
             "list": {
               "s": [],
-              "i": [
-                "1",
-                "1",
-                "1",
-                "1"
-              ],
+              "i": ["1", "1", "1", "1"],
               "f": [],
               "b": [],
               "type": [],
@@ -3018,24 +3001,13 @@
             }
           },
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           },
           "use_cudnn_on_gpu": {
             "b": true
           },
           "padding": {
-            "s": [
-              86,
-              65,
-              76,
-              73,
-              68
-            ]
+            "s": [86, 65, 76, 73, 68]
           }
         },
         "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_0/TransformerLayer/MultiheadAttention/qkv_transform_single/Conv2D",
@@ -3051,12 +3023,7 @@
             "type": 1
           },
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           }
         },
         "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_0/TransformerLayer/MultiheadAttention/qkv_transform_single/BiasAdd",
@@ -3070,9 +3037,7 @@
           "squeeze_dims": {
             "list": {
               "s": [],
-              "i": [
-                "2"
-              ],
+              "i": ["2"],
               "f": [],
               "b": [],
               "type": [],
@@ -3826,23 +3791,12 @@
         ],
         "attr": {
           "padding": {
-            "s": [
-              86,
-              65,
-              76,
-              73,
-              68
-            ]
+            "s": [86, 65, 76, 73, 68]
           },
           "dilations": {
             "list": {
               "s": [],
-              "i": [
-                "1",
-                "1",
-                "1",
-                "1"
-              ],
+              "i": ["1", "1", "1", "1"],
               "f": [],
               "b": [],
               "type": [],
@@ -3857,12 +3811,7 @@
           "strides": {
             "list": {
               "s": [],
-              "i": [
-                "1",
-                "1",
-                "1",
-                "1"
-              ],
+              "i": ["1", "1", "1", "1"],
               "f": [],
               "b": [],
               "type": [],
@@ -3872,12 +3821,7 @@
             }
           },
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           },
           "use_cudnn_on_gpu": {
             "b": true
@@ -3896,12 +3840,7 @@
             "type": 1
           },
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           }
         },
         "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_0/TransformerLayer/MultiheadAttention/output_transform_single/BiasAdd",
@@ -3915,9 +3854,7 @@
           "squeeze_dims": {
             "list": {
               "s": [],
-              "i": [
-                "2"
-              ],
+              "i": ["2"],
               "f": [],
               "b": [],
               "type": [],
@@ -4295,12 +4232,7 @@
         ],
         "attr": {
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           },
           "T": {
             "type": 1
@@ -4514,12 +4446,7 @@
             "type": 1
           },
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           }
         },
         "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_0/TransformerLayer/FFN/conv2/BiasAdd",
@@ -4536,9 +4463,7 @@
           "squeeze_dims": {
             "list": {
               "s": [],
-              "i": [
-                "0"
-              ],
+              "i": ["0"],
               "f": [],
               "b": [],
               "type": [],
@@ -4801,12 +4726,7 @@
           "dilations": {
             "list": {
               "s": [],
-              "i": [
-                "1",
-                "1",
-                "1",
-                "1"
-              ],
+              "i": ["1", "1", "1", "1"],
               "f": [],
               "b": [],
               "type": [],
@@ -4819,22 +4739,12 @@
             "type": 1
           },
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           },
           "strides": {
             "list": {
               "s": [],
-              "i": [
-                "1",
-                "1",
-                "1",
-                "1"
-              ],
+              "i": ["1", "1", "1", "1"],
               "f": [],
               "b": [],
               "type": [],
@@ -4847,13 +4757,7 @@
             "b": true
           },
           "padding": {
-            "s": [
-              86,
-              65,
-              76,
-              73,
-              68
-            ]
+            "s": [86, 65, 76, 73, 68]
           }
         },
         "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/MultiheadAttention/qkv_transform_single/Conv2D",
@@ -4869,12 +4773,7 @@
             "type": 1
           },
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           }
         },
         "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/MultiheadAttention/qkv_transform_single/BiasAdd",
@@ -4888,9 +4787,7 @@
           "squeeze_dims": {
             "list": {
               "s": [],
-              "i": [
-                "2"
-              ],
+              "i": ["2"],
               "f": [],
               "b": [],
               "type": [],
@@ -5646,12 +5543,7 @@
           "dilations": {
             "list": {
               "s": [],
-              "i": [
-                "1",
-                "1",
-                "1",
-                "1"
-              ],
+              "i": ["1", "1", "1", "1"],
               "f": [],
               "b": [],
               "type": [],
@@ -5664,22 +5556,12 @@
             "type": 1
           },
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           },
           "strides": {
             "list": {
               "s": [],
-              "i": [
-                "1",
-                "1",
-                "1",
-                "1"
-              ],
+              "i": ["1", "1", "1", "1"],
               "f": [],
               "b": [],
               "type": [],
@@ -5692,13 +5574,7 @@
             "b": true
           },
           "padding": {
-            "s": [
-              86,
-              65,
-              76,
-              73,
-              68
-            ]
+            "s": [86, 65, 76, 73, 68]
           }
         },
         "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/MultiheadAttention/output_transform_single/Conv2D",
@@ -5711,12 +5587,7 @@
         ],
         "attr": {
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           },
           "T": {
             "type": 1
@@ -5733,9 +5604,7 @@
           "squeeze_dims": {
             "list": {
               "s": [],
-              "i": [
-                "2"
-              ],
+              "i": ["2"],
               "f": [],
               "b": [],
               "type": [],
@@ -6113,12 +5982,7 @@
         ],
         "attr": {
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           },
           "T": {
             "type": 1
@@ -6329,12 +6193,7 @@
         ],
         "attr": {
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           },
           "T": {
             "type": 1
@@ -6354,9 +6213,7 @@
           "squeeze_dims": {
             "list": {
               "s": [],
-              "i": [
-                "0"
-              ],
+              "i": ["0"],
               "f": [],
               "b": [],
               "type": [],
@@ -6647,12 +6504,7 @@
         ],
         "attr": {
           "data_format": {
-            "s": [
-              78,
-              72,
-              87,
-              67
-            ]
+            "s": [78, 72, 87, 67]
           },
           "T": {
             "type": 1
@@ -6765,46 +6617,32 @@
       "weights": [
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/FFN/conv2/Tensordot/Reshape_1",
-          "shape": [
-            1536,
-            512
-          ],
+          "shape": [1536, 512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/FFN/conv1/Tensordot/Reshape_1",
-          "shape": [
-            512,
-            1536
-          ],
+          "shape": [512, 1536],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_1/TransformerLayer/FFN/layer_prepostprocess/layer_norm/layer_norm_scale/ConcatPartitions/concat",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_1/TransformerLayer/FFN/layer_prepostprocess/layer_norm/layer_norm_bias/ConcatPartitions/concat",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_1/TransformerLayer/FFN/conv1/bias/ConcatPartitions/concat",
-          "shape": [
-            1536
-          ],
+          "shape": [1536],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_1/TransformerLayer/FFN/conv2/bias/ConcatPartitions/concat",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
@@ -6814,40 +6652,27 @@
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_1/TransformerLayer/layer_prepostprocess/layer_norm/layer_norm_scale/ConcatPartitions/concat",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_1/TransformerLayer/layer_prepostprocess/layer_norm/layer_norm_bias/ConcatPartitions/concat",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
           "name": "module/Encoder_en/KonaTransformer/Encode/Layer_1/TransformerLayer/MultiheadAttention/qkv_transform_single/kernel/part_0",
-          "shape": [
-            1,
-            1,
-            512,
-            1536
-          ],
+          "shape": [1, 1, 512, 1536],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_1/TransformerLayer/MultiheadAttention/qkv_transform_single/bias/ConcatPartitions/concat",
-          "shape": [
-            1536
-          ],
+          "shape": [1536],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/MultiheadAttention/Const",
-          "shape": [
-            3
-          ],
+          "shape": [3],
           "dtype": "int32"
         },
         {
@@ -6862,84 +6687,57 @@
         },
         {
           "name": "module/Encoder_en/KonaTransformer/Encode/Layer_1/TransformerLayer/MultiheadAttention/output_transform_single/kernel/part_0",
-          "shape": [
-            1,
-            1,
-            512,
-            512
-          ],
+          "shape": [1, 1, 512, 512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_1/TransformerLayer/MultiheadAttention/output_transform_single/bias/ConcatPartitions/concat",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_0/TransformerLayer/FFN/conv2/Tensordot/Reshape_1",
-          "shape": [
-            1536,
-            512
-          ],
+          "shape": [1536, 512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_0/TransformerLayer/FFN/conv1/Tensordot/Reshape_1",
-          "shape": [
-            512,
-            1536
-          ],
+          "shape": [512, 1536],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/FFN/layer_prepostprocess/layer_norm/layer_norm_scale/ConcatPartitions/concat",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/FFN/layer_prepostprocess/layer_norm/layer_norm_bias/ConcatPartitions/concat",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/FFN/conv1/Tensordot/Const_2",
-          "shape": [
-            1
-          ],
+          "shape": [1],
           "dtype": "int32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/FFN/conv1/bias/ConcatPartitions/concat",
-          "shape": [
-            1536
-          ],
+          "shape": [1536],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/FFN/conv2/Tensordot/Const_2",
-          "shape": [
-            1
-          ],
+          "shape": [1],
           "dtype": "int32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/FFN/conv2/bias/ConcatPartitions/concat",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/MultiheadAttention/DotProductAttention/BaseDotProductAttention/Slice/begin",
-          "shape": [
-            1
-          ],
+          "shape": [1],
           "dtype": "int32"
         },
         {
@@ -6954,9 +6752,7 @@
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/layer_prepostprocess/layer_norm/layer_norm_scale/ConcatPartitions/concat",
-          "shape": [
-            256
-          ],
+          "shape": [256],
           "dtype": "float32"
         },
         {
@@ -6966,33 +6762,22 @@
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/layer_prepostprocess/layer_norm/layer_norm_bias/ConcatPartitions/concat",
-          "shape": [
-            256
-          ],
+          "shape": [256],
           "dtype": "float32"
         },
         {
           "name": "module/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/MultiheadAttention/qkv_transform_single/kernel/part_0",
-          "shape": [
-            1,
-            1,
-            256,
-            768
-          ],
+          "shape": [1, 1, 256, 768],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/MultiheadAttention/qkv_transform_single/bias/ConcatPartitions/concat",
-          "shape": [
-            768
-          ],
+          "shape": [768],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_0/TransformerLayer/MultiheadAttention/Const",
-          "shape": [
-            3
-          ],
+          "shape": [3],
           "dtype": "int32"
         },
         {
@@ -7007,9 +6792,7 @@
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/MultiheadAttention/split_heads/transpose/perm",
-          "shape": [
-            4
-          ],
+          "shape": [4],
           "dtype": "int32"
         },
         {
@@ -7019,71 +6802,47 @@
         },
         {
           "name": "module/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/MultiheadAttention/output_transform_single/kernel/part_0",
-          "shape": [
-            1,
-            1,
-            256,
-            512
-          ],
+          "shape": [1, 1, 256, 512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/MultiheadAttention/output_transform_single/bias/ConcatPartitions/concat",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
           "name": "module/Embeddings_en",
-          "shape": [
-            8002,
-            256
-          ],
+          "shape": [8002, 256],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_0/AddTimingSignal/TimingSignal/ExpandDims_1",
-          "shape": [
-            1,
-            128
-          ],
+          "shape": [1, 128],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/dense/kernel/ConcatPartitions/concat",
-          "shape": [
-            256,
-            512
-          ],
+          "shape": [256, 512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/Layer_0/TransformerLayer/dense/bias/ConcatPartitions/concat",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/FFN/conv2/Tensordot/Const",
-          "shape": [
-            1
-          ],
+          "shape": [1],
           "dtype": "int32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/FFN/conv1/Tensordot/add_1",
-          "shape": [
-            1
-          ],
+          "shape": [1],
           "dtype": "int32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/FFN/Scatter/strided_slice/stack",
-          "shape": [
-            1
-          ],
+          "shape": [1],
           "dtype": "int32"
         },
         {
@@ -7103,30 +6862,22 @@
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/ClipToMaxLength/ones_like",
-          "shape": [
-            2
-          ],
+          "shape": [2],
           "dtype": "int32"
         },
         {
           "name": "ConstantFolding/module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/FFN/conv1/Tensordot/ListDiff-folded-0",
-          "shape": [
-            2
-          ],
+          "shape": [2],
           "dtype": "int32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_0/AddTimingSignal/strided_slice_2/stack_1",
-          "shape": [
-            2
-          ],
+          "shape": [2],
           "dtype": "int32"
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_0/AddTimingSignal/strided_slice_2/stack_2",
-          "shape": [
-            2
-          ],
+          "shape": [2],
           "dtype": "int32"
         },
         {
@@ -7136,9 +6887,7 @@
         },
         {
           "name": "module_apply_default/Encoder_en/KonaTransformer/Encode/TransformerStack/Layer_1/TransformerLayer/FFN/layer_prepostprocess/layer_norm/Mean/reduction_indices",
-          "shape": [
-            1
-          ],
+          "shape": [1],
           "dtype": "int32"
         },
         {
@@ -7153,17 +6902,12 @@
         },
         {
           "name": "module/Encoder_en/hidden_layers/tanh_layer_0/weights",
-          "shape": [
-            512,
-            512
-          ],
+          "shape": [512, 512],
           "dtype": "float32"
         },
         {
           "name": "module/Encoder_en/hidden_layers/tanh_layer_0/bias",
-          "shape": [
-            512
-          ],
+          "shape": [512],
           "dtype": "float32"
         },
         {
