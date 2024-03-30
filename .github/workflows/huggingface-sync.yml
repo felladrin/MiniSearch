@@ -10,6 +10,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          lfs: true
       - name: Sync to Hugging Face Spaces
         uses: JacobLinCool/huggingface-sync@v1
         with:
