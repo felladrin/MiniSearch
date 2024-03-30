@@ -127,18 +127,29 @@ export async function prepareTextGeneration() {
         }
       }
     }
+
+    dismissLoadingToast();
   } catch (error) {
     console.error(
       "Could not generate response with any of the available models:",
       error,
     );
 
-    toast.error(
-      "Could not generate response. Please restart your browser and try again.",
-    );
-  }
+    dismissLoadingToast();
 
-  dismissLoadingToast();
+    const restartTimeout = 3000;
+
+    toast.error(
+      "Could not generate response. This browser may be out of memory. Let's try refreshing the page.",
+      { duration: restartTimeout },
+    );
+
+    setTimeout(() => {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set("t", Date.now().toString());
+      window.location.replace(newUrl.toString());
+    }, restartTimeout);
+  }
 
   if (debug) {
     console.timeEnd("Response Generation Time");
