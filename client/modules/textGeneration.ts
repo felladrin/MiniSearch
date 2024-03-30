@@ -688,31 +688,7 @@ async function rankSearchResultsWithTensorFlow(
   searchResults: SearchResults,
   query: string,
 ) {
-  const { createWorker } = await import("../../node_modules/typed-worker/dist");
-
-  type Actions = import("./tensorFlowWorker").Actions;
-
-  let tensorFlowWorker: ReturnType<typeof createWorker<Actions>> | undefined;
-
-  if (Worker) {
-    tensorFlowWorker = createWorker<Actions>(() => {
-      const worker = new Worker(
-        new URL("./tensorFlowWorker", import.meta.url),
-        {
-          type: "module",
-        },
-      );
-
-      return worker;
-    });
-  }
-
-  let rank!: typeof import("./tensorFlow").rank;
-
-  if (!tensorFlowWorker) {
-    const transformersModule = await import("./tensorFlow");
-    rank = transformersModule.rank;
-  }
+  const { rank } = await import("./tensorFlow");
 
   const lowerCasedQuery = query.toLocaleLowerCase();
 
@@ -724,29 +700,18 @@ async function rankSearchResultsWithTensorFlow(
 
   const searchResultToScoreMap: Map<SearchResults[0], number> = new Map();
 
-  try {
-    (
-      await (tensorFlowWorker
-        ? tensorFlowWorker.run("rank", lowerCasedQuery, snippets)
-        : rank(lowerCasedQuery, snippets))
-    ).map((score, index) =>
-      searchResultToScoreMap.set(searchResults[index], score),
+  (await rank(lowerCasedQuery, snippets)).map((score, index) =>
+    searchResultToScoreMap.set(searchResults[index], score),
+  );
+
+  const rankedSearchResults = searchResults.slice().sort((a, b) => {
+    return (
+      (searchResultToScoreMap.get(b) ?? 0) -
+      (searchResultToScoreMap.get(a) ?? 0)
     );
+  });
 
-    tensorFlowWorker?.destroy();
-
-    const rankedSearchResults = searchResults.slice().sort((a, b) => {
-      return (
-        (searchResultToScoreMap.get(b) ?? 0) -
-        (searchResultToScoreMap.get(a) ?? 0)
-      );
-    });
-
-    return rankedSearchResults;
-  } catch (error) {
-    tensorFlowWorker?.destroy();
-    throw error;
-  }
+  return rankedSearchResults;
 }
 
 async function rankSearchResultsWithTransformers(
