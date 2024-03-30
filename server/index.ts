@@ -1,8 +1,11 @@
 import express from "express";
 import { crossOriginIsolationHeaders } from "./headers";
 import { fetchSearXNG } from "./fetchSearXNG";
+import compression from "compression";
 
 export const app = express();
+
+app.use(compression());
 
 app.use((_, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -12,7 +15,16 @@ app.use((_, res, next) => {
   next();
 });
 
-app.use(express.static(new URL("../client/dist", import.meta.url).pathname));
+app.use(
+  express.static(new URL("../client/dist", import.meta.url).pathname, {
+    maxAge: "1d",
+    setHeaders: (res, path) => {
+      if (express.static.mime.lookup(path) === "text/html") {
+        res.setHeader("Cache-Control", "no-cache");
+      }
+    },
+  }),
+);
 
 app.get("/search", async (request, response) => {
   const query = request.query.q as string;
