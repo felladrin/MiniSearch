@@ -2,8 +2,6 @@ import { convert as convertHtmlToPlainText } from "html-to-text";
 
 export type SearchResults = [title: string, snippet: string, url: string][];
 
-export const searchQueryKey = "searchQuery";
-
 export async function search(query: string, limit?: number) {
   const searchUrl = new URL("/search", window.location.origin);
 

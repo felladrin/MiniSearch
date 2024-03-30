@@ -1,20 +1,19 @@
 import { useEffect, useRef, FormEvent, useState, useCallback } from "react";
 import TextareaAutosize from "react-textarea-autosize";
-import { searchQueryKey } from "../modules/search";
 import { getRandomQuerySuggestion } from "../modules/querySuggestions";
 
-export function SearchForm() {
+export function SearchForm({
+  query,
+  updateQuery,
+}: {
+  query: string;
+  updateQuery: (query: string) => void;
+}) {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const windowInnerHeight = useWindowInnerHeight();
-  const [suggestedQuery, setSuggestedQuery] = useState<string>(() => {
-    const previousSearchQuery = localStorage.getItem(searchQueryKey) ?? "";
-
-    localStorage.removeItem(searchQueryKey);
-
-    return previousSearchQuery === ""
-      ? getRandomQuerySuggestion()
-      : previousSearchQuery;
-  });
+  const [suggestedQuery, setSuggestedQuery] = useState<string>(
+    getRandomQuerySuggestion(),
+  );
 
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const userQueryIsBlank = event.target.value.trim().length === 0;
@@ -34,8 +33,16 @@ export function SearchForm() {
       queryToEncode = textAreaRef.current.value;
     }
 
-    window.location.href = `./?q=${encodeURIComponent(queryToEncode)}`;
-  }, [suggestedQuery]);
+    window.history.pushState(
+      null,
+      "",
+      `/?q=${encodeURIComponent(queryToEncode)}`,
+    );
+
+    updateQuery(queryToEncode);
+
+    location.reload();
+  }, [suggestedQuery, updateQuery]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -58,15 +65,20 @@ export function SearchForm() {
 
   return (
     <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: windowInnerHeight * 0.8,
-      }}
+      style={
+        query.length === 0
+          ? {
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              height: windowInnerHeight * 0.8,
+            }
+          : undefined
+      }
     >
       <form onSubmit={handleSubmit} style={{ width: "100%" }}>
         <TextareaAutosize
+          defaultValue={query}
           placeholder={suggestedQuery}
           ref={textAreaRef}
           onChange={handleInputChange}
@@ -75,7 +87,7 @@ export function SearchForm() {
           maxRows={6}
         />
         <button type="submit" style={{ width: "100%" }}>
-          Submit
+          Search
         </button>
       </form>
     </div>
