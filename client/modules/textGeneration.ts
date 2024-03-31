@@ -137,7 +137,7 @@ export async function prepareTextGeneration() {
 
     dismissLoadingToast();
 
-    const restartTimeout = 3000;
+    const restartTimeout = 5000;
 
     toast.error(
       "Could not generate response. This browser may be out of memory. Let's try refreshing the page.",
@@ -145,9 +145,13 @@ export async function prepareTextGeneration() {
     );
 
     setTimeout(() => {
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.set("t", Date.now().toString());
-      window.location.replace(newUrl.toString());
+      caches.keys().then(function (cacheNames) {
+        cacheNames.forEach(function (cacheName) {
+          caches.delete(cacheName);
+        });
+        localStorage.clear();
+        location.reload();
+      });
     }, restartTimeout);
   }
 
