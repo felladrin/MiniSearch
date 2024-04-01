@@ -11,17 +11,17 @@ export function SearchResultsList({
   urlsDescriptions: Record<string, string>;
 }) {
   const [parent] = useAutoAnimate({ duration: 1000 });
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [windowWidth, setWindowWidth] = useState(self.innerWidth);
 
   useEffect(() => {
     const handleResize = () => {
-      setWindowWidth(window.innerWidth);
+      setWindowWidth(self.innerWidth);
     };
 
-    window.addEventListener("resize", handleResize);
+    self.addEventListener("resize", handleResize);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
+      self.removeEventListener("resize", handleResize);
     };
   }, []);
 

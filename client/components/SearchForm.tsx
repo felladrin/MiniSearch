@@ -33,7 +33,7 @@ export function SearchForm({
       queryToEncode = textAreaRef.current.value;
     }
 
-    window.history.pushState(
+    self.history.pushState(
       null,
       "",
       `/?q=${encodeURIComponent(queryToEncode)}`,
@@ -95,16 +95,14 @@ export function SearchForm({
 }
 
 function useWindowInnerHeight() {
-  const [windowInnerHeight, setWindowInnerHeight] = useState(
-    window.innerHeight,
-  );
+  const [windowInnerHeight, setWindowInnerHeight] = useState(self.innerHeight);
 
   useEffect(() => {
-    const handleResize = () => setWindowInnerHeight(window.innerHeight);
+    const handleResize = () => setWindowInnerHeight(self.innerHeight);
 
-    window.addEventListener("resize", handleResize);
+    self.addEventListener("resize", handleResize);
 
-    return () => window.removeEventListener("resize", handleResize);
+    return () => self.removeEventListener("resize", handleResize);
   }, []);
 
   return windowInnerHeight;

@@ -17,10 +17,10 @@ import { query, debug, disableWorkers } from "./urlParams";
 import toast from "react-hot-toast";
 import MobileDetect from "mobile-detect";
 
-const Worker = disableWorkers ? undefined : window.Worker;
+const Worker = disableWorkers ? undefined : self.Worker;
 
 const isRunningOnMobile =
-  new MobileDetect(window.navigator.userAgent).mobile() !== null;
+  new MobileDetect(self.navigator.userAgent).mobile() !== null;
 
 export async function prepareTextGeneration() {
   if (query === null) return;
