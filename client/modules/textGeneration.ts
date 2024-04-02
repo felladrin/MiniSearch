@@ -811,7 +811,7 @@ async function rankSearchResultsWithWllama(
     searchResultToScoreMap.set(searchResults[index], score ?? 0),
   );
 
-  exitWllama();
+  await exitWllama();
 
   return searchResults.slice().sort((a, b) => {
     return (
