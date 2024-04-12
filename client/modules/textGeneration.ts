@@ -172,109 +172,51 @@ function dismissLoadingToast() {
 }
 
 async function generateTextWithWebLlm() {
-  const { ChatWorkerClient, ChatModule, hasModelInCache } = await import(
+  const { CreateWebWorkerEngine, CreateEngine, hasModelInCache } = await import(
     "@mlc-ai/web-llm"
   );
 
-  type ChatOptions = import("@mlc-ai/web-llm").ChatOptions;
-
-  const chat = Worker
-    ? new ChatWorkerClient(
-        new Worker(new URL("./webLlmWorker.ts", import.meta.url), {
-          type: "module",
-        }),
-      )
-    : new ChatModule();
-
   const availableModels = {
     Mistral: "Mistral-7B-Instruct-v0.2-q4f16_1",
-    Gemma: "gemma-2b-it-q4f32_1",
-    TinyLlama: "TinyLlama-1.1B-Chat-v0.4-q4f32_1-1k",
+    TinyLlama: "TinyLlama-1.1B-Chat-v0.4-q0f16",
   };
 
   const selectedModel = getUseLargerModelSetting()
     ? availableModels.Mistral
     : availableModels.TinyLlama;
 
-  const commonChatMlConfig: ChatOptions = {
-    temperature: 0,
-    repetition_penalty: 1.1,
-    max_gen_len: 512,
-  };
+  const isModelCached = await hasModelInCache(selectedModel);
 
-  const chatConfigPerModel: { [x: string]: ChatOptions } = {
-    [availableModels.Mistral]: {
-      ...commonChatMlConfig,
-    },
-    [availableModels.Gemma]: {
-      ...commonChatMlConfig,
-    },
-    [availableModels.TinyLlama]: {
-      ...commonChatMlConfig,
-      conv_template: "custom",
-      conv_config: {
-        system_template: "{system_message}",
-        system_message: dedent`
-          <|im_start|>system
-          You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
-          <|im_start|>user
-          Hello!<|im_end|>
-          <|im_start|>assistant
-          Hi! How can I help you today?
-        `,
-        roles: {
-          user: "<|im_start|>user",
-          assistant: "<|im_start|>assistant",
-        },
-        offset: 0,
-        seps: ["<|im_end|>\n"],
-        role_content_sep: "\n",
-        role_empty_sep: "\n",
-        stop_str: ["<|im_end|>"],
-        stop_token_ids: [2, 32002],
-      },
-    },
-  };
+  let initProgressCallback:
+    | import("@mlc-ai/web-llm").InitProgressCallback
+    | undefined;
 
-  const appConfig = {
-    model_list: [
-      {
-        local_id: availableModels.Mistral,
-        model_url:
-          "https://huggingface.co/mlc-ai/Mistral-7B-Instruct-v0.2-q4f16_1-MLC/resolve/main/",
-        model_lib_url:
-          "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/Mistral-7B-Instruct-v0.2/Mistral-7B-Instruct-v0.2-q4f16_1-sw4k_cs1k-webgpu.wasm",
-      },
-      {
-        local_id: availableModels.Gemma,
-        model_url:
-          "https://huggingface.co/mlc-ai/gemma-2b-it-q4f32_1-MLC/resolve/main/",
-        model_lib_url:
-          "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/gemma-2b-it/gemma-2b-it-q4f32_1-ctx4k_cs1k-webgpu.wasm",
-      },
-      {
-        local_id: availableModels.TinyLlama,
-        model_url:
-          "https://huggingface.co/mlc-ai/TinyLlama-1.1B-Chat-v0.4-q0f32-MLC/resolve/main/",
-        model_lib_url:
-          "https://raw.githubusercontent.com/mlc-ai/binary-mlc-llm-libs/main/TinyLlama-1.1B-Chat-v0.4/TinyLlama-1.1B-Chat-v0.4-q0f32-ctx2k-webgpu.wasm",
-      },
-    ],
-  };
-
-  if (!(await hasModelInCache(selectedModel, appConfig))) {
-    chat.setInitProgressCallback((report) =>
+  if (isModelCached) {
+    updateLoadingToast("Generating response...");
+  } else {
+    initProgressCallback = (report) => {
       updateLoadingToast(
         `Loading: ${report.text.replaceAll("[", "(").replaceAll("]", ")")}`,
-      ),
-    );
+      );
+    };
   }
 
-  await chat.reload(
-    selectedModel,
-    chatConfigPerModel[selectedModel],
-    appConfig,
-  );
+  const chatOpts: import("@mlc-ai/web-llm").ChatOptions = {
+    temperature: 0.5,
+    top_p: 0.5,
+    repetition_penalty: 1.15,
+    max_gen_len: 2048,
+  };
+
+  const chat = Worker
+    ? await CreateWebWorkerEngine(
+        new Worker(new URL("./webLlmWorker.ts", import.meta.url), {
+          type: "module",
+        }),
+        selectedModel,
+        { initProgressCallback, chatOpts },
+      )
+    : await CreateEngine(selectedModel, { initProgressCallback, chatOpts });
 
   if (!getDisableAiResponseSetting()) {
     updateLoadingToast("Generating response...");
@@ -285,7 +227,7 @@ async function generateTextWithWebLlm() {
         
         Context:
         ${getSearchResults()
-          .slice(0, 5)
+          .slice(0, 10)
           .map(([title, snippet]) => `- ${title}: ${snippet}`)
           .join("\n")}
 
