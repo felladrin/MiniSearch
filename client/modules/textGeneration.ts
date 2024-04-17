@@ -305,7 +305,7 @@ async function generateTextWithWllama() {
       If the information below is useful, you can use it to complement your response. Otherwise, ignore it.
 
       ${getSearchResults()
-        .slice(0, 5)
+        .slice(0, 10)
         .map(([title, snippet]) => `- ${title}: ${snippet}`)
         .join("\n")}<|im_end|>
       <|im_start|>user
@@ -322,14 +322,15 @@ async function generateTextWithWllama() {
       prompt,
       nPredict: 768,
       sampling: {
-        temp: 0.25,
-        top_k: 40,
-        top_p: 0.95,
+        temp: 0.65,
+        top_k: 35,
+        top_p: 1,
         min_p: 0.05,
         typical_p: 0.85,
         penalty_repeat: 1.1,
+        penalty_last_n: -1,
         mirostat: 2,
-        mirostat_tau: 4.0,
+        mirostat_tau: 3.5,
       },
       onNewToken: (_token, _piece, currentText) => {
         updateResponse(currentText);
@@ -364,14 +365,15 @@ async function generateTextWithWllama() {
         prompt,
         nPredict: 128,
         sampling: {
-          temp: 0.25,
-          top_k: 40,
-          top_p: 0.95,
+          temp: 0.65,
+          top_k: 35,
+          top_p: 1,
           min_p: 0.05,
           typical_p: 0.85,
           penalty_repeat: 1.1,
+          penalty_last_n: -1,
           mirostat: 2,
-          mirostat_tau: 4.0,
+          mirostat_tau: 3.5,
         },
         onNewToken: (_token, _piece, currentText) => {
           updateUrlsDescriptions({
