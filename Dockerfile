@@ -19,4 +19,4 @@ COPY --chown=${USERNAME}:${USERNAME} . .
 RUN npm ci \
   && npm run build
 ENTRYPOINT [ "/bin/sh", "-c" ]
-CMD [ "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & npm start" ]
+CMD [ "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & npm start -- --host" ]
