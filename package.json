@@ -5,10 +5,10 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
-    "start": "tsx server/index.ts",
+    "start": "vite preview",
     "build": "tsc && vite build",
     "dev": "vite",
-    "lint": "prettier --check . && eslint --fix client server",
+    "lint": "prettier --check . && eslint --fix client",
     "format": "prettier --write ."
   },
   "dependencies": {
@@ -16,12 +16,11 @@
     "@mlc-ai/web-llm": "0.2.32",
     "@tensorflow-models/universal-sentence-encoder": "^1.3.3",
     "@tensorflow/tfjs": "^4.17.0",
+    "@vitejs/plugin-basic-ssl": "^1.1.0",
     "@wllama/wllama": "^1.4.2",
     "@xenova/transformers": "^2.8.0",
-    "compression": "^1.7.4",
     "console-panel": "^1.0.4",
     "create-pubsub": "^1.6.3",
-    "express": "^4.18.2",
     "html-to-text": "^9.0.5",
     "inter-ui": "^4.0.2",
     "keyword-extractor": "^0.0.28",
@@ -36,7 +35,6 @@
     "react-textarea-autosize": "^8.5.3",
     "react-tooltip": "^5.21.6",
     "ts-dedent": "^2.2.0",
-    "tsx": "^4.0.0",
     "typed-worker": "^1.0.4",
     "vconsole": "^3.15.1",
     "water.css": "^2.1.1"
@@ -54,7 +52,6 @@
     "globals": "^15.0.0",
     "typescript": "^5.0.2",
     "typescript-eslint": "^7.6.0",
-    "vite": "~5.1",
-    "vite-plugin-node": "^3.0.2"
+    "vite": "^5.2.9"
   }
 }

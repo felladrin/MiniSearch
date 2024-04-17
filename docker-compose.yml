@@ -1,9 +1,10 @@
 version: "3"
-
 services:
   development-server:
     environment:
+      - HOST=${HOST:-0.0.0.0}
       - PORT=${PORT:-7860}
+      - BASIC_SSL=${BASIC_SSL:-false}
       - HMR_PORT=${HMR_PORT:-7861}
     ports:
       - "${PORT:-7860}:7860"
@@ -15,5 +16,5 @@ services:
       - .:/home/user/app/
     command:
       [
-        "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & npm install && npm run dev -- --host",
+        "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & npm install && npm run dev",
       ]

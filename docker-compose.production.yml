@@ -1,9 +1,10 @@
 version: "3"
-
 services:
   production-server:
     environment:
+      - HOST=${HOST:-0.0.0.0}
       - PORT=${PORT:-7860}
+      - BASIC_SSL=${BASIC_SSL:-false}
     ports:
       - "${PORT:-7860}:7860"
     build:
