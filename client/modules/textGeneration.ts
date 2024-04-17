@@ -400,7 +400,7 @@ async function generateTextWithTransformersJs() {
   const models = {
     mobileDefault: "Felladrin/onnx-Minueza-32M-UltraChat",
     mobileLarger: "Felladrin/onnx-Minueza-32M-UltraChat",
-    desktopDefault: "Felladrin/onnx-TinyMistral-248M-Chat-v1",
+    desktopDefault: "Felladrin/onnx-TinyMistral-248M-Chat-v2",
     desktopLarger: "Xenova/Qwen1.5-0.5B-Chat",
   } as const;
 
@@ -552,7 +552,7 @@ async function generateTextWithTransformersJs() {
         textGenerationModel === models.mobileDefault
           ? 1.02
           : textGenerationModel === models.desktopDefault
-            ? 1.01
+            ? 1.06
             : 1.0,
       num_beams: 3,
       early_stopping: true,
@@ -620,7 +620,7 @@ async function generateTextWithTransformersJs() {
                 max_new_tokens: 128,
                 repetition_penalty: 1.035,
                 penalty_alpha: 0.5,
-                top_k: 4,
+                top_k: 5,
               }
             : {
                 max_new_tokens: 128,
