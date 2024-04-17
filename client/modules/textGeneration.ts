@@ -283,12 +283,13 @@ async function generateTextWithWllama() {
     "./wllama"
   );
 
-  const defaultModel =
-    "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf";
+  const defaultModel = isRunningOnMobile
+    ? "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf"
+    : "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q8_0.gguf";
 
   const largerModel = isRunningOnMobile
-    ? defaultModel
-    : "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q8_0.gguf";
+    ? "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q3_k_m.gguf"
+    : "https://huggingface.co/TheBloke/TinyLlama-1.1B-1T-OpenOrca-GGUF/resolve/main/tinyllama-1.1b-1t-openorca.Q5_K_M.gguf";
 
   await initializeWllama({
     modelUrl: getUseLargerModelSetting() ? largerModel : defaultModel,
