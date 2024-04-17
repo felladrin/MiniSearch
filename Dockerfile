@@ -1,9 +1,10 @@
-FROM searxng/searxng:2024.3.15-e2af3e497
+FROM searxng/searxng:2024.4.13-1746eecf2
 ENV PORT ${PORT:-7860}
 EXPOSE ${PORT}
 RUN apk add --update \
   nodejs \
-  npm
+  npm \
+  git
 RUN sed -i 's/- html/- json/' /usr/local/searxng/searx/settings.yml \
   && sed -i 's/su-exec searxng:searxng //' /usr/local/searxng/dockerfiles/docker-entrypoint.sh \
   && mkdir -p /etc/searxng \
