@@ -22,6 +22,8 @@ const Worker = disableWorkers ? undefined : self.Worker;
 const isRunningOnMobile =
   new MobileDetect(self.navigator.userAgent).mobile() !== null;
 
+const amountOfSearchResultsToUseOnPrompt = isRunningOnMobile ? 5 : 10;
+
 export async function prepareTextGeneration() {
   if (query === null) return;
 
@@ -227,7 +229,7 @@ async function generateTextWithWebLlm() {
         
         Context:
         ${getSearchResults()
-          .slice(0, 10)
+          .slice(0, amountOfSearchResultsToUseOnPrompt)
           .map(([title, snippet]) => `- ${title}: ${snippet}`)
           .join("\n")}
 
@@ -306,7 +308,7 @@ async function generateTextWithWllama() {
       If the information below is useful, you can use it to complement your response. Otherwise, ignore it.
 
       ${getSearchResults()
-        .slice(0, 10)
+        .slice(0, amountOfSearchResultsToUseOnPrompt)
         .map(([title, snippet]) => `- ${title}: ${snippet}`)
         .join("\n")}<|im_end|>
       <|im_start|>user
@@ -536,7 +538,7 @@ async function generateTextWithTransformersJs() {
         content: dedent`
           Context:
           ${getSearchResults()
-            .slice(0, 5)
+            .slice(0, amountOfSearchResultsToUseOnPrompt)
             .map(([title, snippet]) => `- ${title}: ${snippet}`)
             .join("\n")}
           
