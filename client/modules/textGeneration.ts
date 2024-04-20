@@ -325,10 +325,13 @@ async function generateTextWithWllama() {
       prompt,
       nPredict: 768,
       sampling: {
-        temp: 0.65,
-        top_k: 35,
+        temp: 1.3,
+        // @ts-expect-error Not typed yet.
+        dynatemp_range: 1.2,
+        top_k: 0,
         top_p: 1,
         min_p: 0.05,
+        tfs_z: 0.95,
         typical_p: 0.85,
         penalty_repeat: 1.1,
         penalty_last_n: -1,
@@ -368,10 +371,13 @@ async function generateTextWithWllama() {
         prompt,
         nPredict: 128,
         sampling: {
-          temp: 0.65,
-          top_k: 35,
+          temp: 1.3,
+          // @ts-expect-error Not typed yet.
+          dynatemp_range: 1.2,
+          top_k: 0,
           top_p: 1,
           min_p: 0.05,
+          tfs_z: 0.95,
           typical_p: 0.85,
           penalty_repeat: 1.1,
           penalty_last_n: -1,
