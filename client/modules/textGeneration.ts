@@ -22,7 +22,7 @@ const Worker = disableWorkers ? undefined : self.Worker;
 const isRunningOnMobile =
   new MobileDetect(self.navigator.userAgent).mobile() !== null;
 
-const amountOfSearchResultsToUseOnPrompt = isRunningOnMobile ? 5 : 10;
+const amountOfSearchResultsToUseOnPrompt = isRunningOnMobile ? 3 : 6;
 
 export async function prepareTextGeneration() {
   if (query === null) return;
