@@ -327,7 +327,6 @@ async function generateTextWithWllama() {
       nPredict: 768,
       sampling: {
         temp: 1.3,
-        // @ts-expect-error Not typed yet.
         dynatemp_range: 1.2,
         top_k: 0,
         top_p: 1,
@@ -373,7 +372,6 @@ async function generateTextWithWllama() {
         nPredict: 128,
         sampling: {
           temp: 1.3,
-          // @ts-expect-error Not typed yet.
           dynatemp_range: 1.2,
           top_k: 0,
           top_p: 1,
