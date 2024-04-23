@@ -66,20 +66,20 @@ export async function prepareTextGeneration() {
   updateLoadingToast("Loading AI model...");
 
   try {
-    updateSearchResults(
-      await (
-        "SharedArrayBuffer" in window
-          ? rankSearchResultsWithWllama
-          : rankSearchResultsWithTransformers
-      )(searchResults, query),
-    );
+    if (isRunningOnMobile) {
+      throw Error("Mobile device detected. Skipping to TensorFlow.");
+    }
+
+    try {
+      updateSearchResults(
+        await rankSearchResultsWithWllama(searchResults, query),
+      );
+    } catch (error) {
+      updateSearchResults(
+        await rankSearchResultsWithTransformers(searchResults, query),
+      );
+    }
   } catch (error) {
-    console.info(dedent`
-      Could not rerank search results using transformers.js or wllama.
-
-      Falling back to TensorFlow.js.
-    `);
-
     updateSearchResults(
       await rankSearchResultsWithTensorFlow(searchResults, query),
     );
