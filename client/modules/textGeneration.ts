@@ -47,7 +47,13 @@ export async function prepareTextGeneration() {
   }
 
   if (searchResults.length === 0) {
-    toast.error("No search results found. Please try a different query.");
+    toast.error(
+      "It looks like your current search did not return any results. Try refining your search by adding more keywords or rephrasing your query.",
+      {
+        position: "bottom-center",
+        duration: 5000,
+      },
+    );
   }
 
   updateSearchResults(searchResults);
