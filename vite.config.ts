@@ -32,6 +32,10 @@ export default defineConfig(() => ({
       configureServer: searchEndpointServerHook,
       configurePreviewServer: searchEndpointServerHook,
     },
+    {
+      name: "configure-server-cache",
+      configurePreviewServer: cacheServerHook,
+    },
   ],
 }));
 
@@ -76,6 +80,21 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
     const searchResults = await fetchSearXNG(query, limit);
 
     response.end(JSON.stringify(searchResults));
+  });
+}
+
+function cacheServerHook<T extends ViteDevServer | PreviewServer>(server: T) {
+  server.middlewares.use(async (request, response, next) => {
+    if (
+      request.url === "/" ||
+      request.url.startsWith("/?") ||
+      request.url.endsWith(".html")
+    ) {
+      response.setHeader("Cache-Control", "no-cache");
+    } else {
+      response.setHeader("Cache-Control", "public, max-age=86400");
+    }
+    next();
   });
 }
 
