@@ -114,6 +114,52 @@ export const crossOriginIsolationHeaders: { key: string; value: string }[] = [
   },
 ];
 
+async function fetchDuckDuckGo(query: string, limit?: number) {
+  try {
+    query = encodeURIComponent(query.replace(/"/g, '\\"'));
+    const html = await fetch(`https://duckduckgo.com/?q=${query}`).then((res) =>
+      res.text(),
+    );
+    const matches = html.match(/vqd=['"](\d+-\d+(?:-\d+)?)['"]/);
+    const vqd = matches ? matches[1] : null;
+    if (!vqd) {
+      return [];
+    }
+    const url = `https://links.duckduckgo.com/d.js?q=${query}&o=json&vqd=${vqd}`;
+    const res = await fetch(url).then((res) => res.text());
+    const result = JSON.parse(res);
+    const searchResults: [title: string, content: string, url: string][] = [];
+    if (result.results) {
+      let results = result.results;
+
+      if (limit && limit > 0) {
+        results = results.slice(0, limit);
+      }
+
+      for (const result of results) {
+        if (result.n) continue;
+
+        let content = result.a as string;
+
+        if (!content || content === "") continue;
+
+        const stripHtmlTags = (str: string) => str.replace(/<[^>]*>?/gm, "");
+
+        const title = stripHtmlTags(result.t);
+        content = stripHtmlTags(content);
+        const url = result.u as string;
+
+        searchResults.push([title, content, url]);
+      }
+    }
+
+    return searchResults;
+  } catch (e) {
+    console.error(e);
+    return [];
+  }
+}
+
 export async function fetchSearXNG(query: string, limit?: number) {
   try {
     const url = new URL("http://127.0.0.1:8080/search");
@@ -158,6 +204,8 @@ export async function fetchSearXNG(query: string, limit?: number) {
         uniqueUrls.add(url);
       }
     }
+
+    if (searchResults.length === 0) return fetchDuckDuckGo(query, limit);
 
     return searchResults;
   } catch (e) {
