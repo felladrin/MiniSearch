@@ -69,12 +69,8 @@ export async function prepareTextGeneration() {
 
   if (debug) console.time("Response Generation Time");
 
-  updateLoadingToast("Loading AI model...");
-
-  try {
-    if (isRunningOnMobile) {
-      throw Error("Mobile device detected. Skipping to TensorFlow.");
-    }
+  if (!isRunningOnMobile) {
+    updateLoadingToast("Loading AI model...");
 
     try {
       updateSearchResults(
@@ -85,10 +81,6 @@ export async function prepareTextGeneration() {
         await rankSearchResultsWithTransformers(searchResults, query),
       );
     }
-  } catch (error) {
-    updateSearchResults(
-      await rankSearchResultsWithTensorFlow(searchResults, query),
-    );
   }
 
   updateLoadingToast("Loading AI model...");
@@ -647,36 +639,6 @@ async function generateTextWithTransformersJs() {
       transformersWorker.destroy();
     }
   }
-}
-
-async function rankSearchResultsWithTensorFlow(
-  searchResults: SearchResults,
-  query: string,
-) {
-  const { rank } = await import("./tensorFlow");
-
-  const lowerCasedQuery = query.toLocaleLowerCase();
-
-  const snippets = searchResults.map(([title, snippet]) =>
-    `${title}: ${snippet}`.toLocaleLowerCase(),
-  );
-
-  updateLoadingToast("Analyzing search results...");
-
-  const searchResultToScoreMap: Map<SearchResults[0], number> = new Map();
-
-  (await rank(lowerCasedQuery, snippets)).map((score, index) =>
-    searchResultToScoreMap.set(searchResults[index], score),
-  );
-
-  const rankedSearchResults = searchResults.slice().sort((a, b) => {
-    return (
-      (searchResultToScoreMap.get(b) ?? 0) -
-      (searchResultToScoreMap.get(a) ?? 0)
-    );
-  });
-
-  return rankedSearchResults;
 }
 
 async function rankSearchResultsWithTransformers(
