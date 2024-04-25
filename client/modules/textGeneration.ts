@@ -277,7 +277,7 @@ async function generateTextWithWllama() {
   );
 
   const defaultModel = isRunningOnMobile
-    ? "https://huggingface.co/afrideva/Llama-68M-Chat-v1-GGUF/resolve/main/llama-68m-chat-v1.q8_0.gguf"
+    ? "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf"
     : "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q8_0.gguf";
 
   const largerModel = isRunningOnMobile
