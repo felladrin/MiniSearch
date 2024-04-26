@@ -277,12 +277,12 @@ async function generateTextWithWllama() {
   );
 
   const defaultModel = isRunningOnMobile
-    ? "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf"
-    : "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q8_0.gguf";
+    ? "https://huggingface.co/Felladrin/Tinyllama-616M-Cinder-Q4_K_M-GGUF/resolve/main/tinyllama-616m-cinder.Q4_K_M.gguf"
+    : "https://huggingface.co/Felladrin/Tinyllama-616M-Cinder-Q8_0-GGUF/resolve/main/tinyllama-616m-cinder.Q8_0.gguf";
 
   const largerModel = isRunningOnMobile
-    ? "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf"
-    : "https://huggingface.co/TheBloke/TinyLlama-1.1B-1T-OpenOrca-GGUF/resolve/main/tinyllama-1.1b-1t-openorca.Q5_K_M.gguf";
+    ? "https://huggingface.co/duyntnet/TinyLlama-1.1B-Chat-v1.0-imatrix-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0-IQ3_XXS.gguf"
+    : "https://huggingface.co/duyntnet/TinyLlama-1.1B-Chat-v1.0-imatrix-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0-Q5_K_S.gguf?download=true";
 
   await initializeWllama({
     modelUrl: getUseLargerModelSetting() ? largerModel : defaultModel,
@@ -293,7 +293,7 @@ async function generateTextWithWllama() {
 
   if (!getDisableAiResponseSetting()) {
     const prompt = dedent`
-      <|im_start|>system
+      <|system|>
       You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.
       
       If the information below is useful, you can use it to complement your response. Otherwise, ignore it.
@@ -301,10 +301,14 @@ async function generateTextWithWllama() {
       ${getSearchResults()
         .slice(0, amountOfSearchResultsToUseOnPrompt)
         .map(([title, snippet]) => `- ${title}: ${snippet}`)
-        .join("\n")}<|im_end|>
-      <|im_start|>user
-      ${query}<|im_end|>
-      <|im_start|>assistant
+        .join("\n")}</s>
+      <|user|>
+      Hello!</s>
+      <|assistant|>
+      Hi! How can I help you today?</s>
+      <|user|>
+      ${query}</s>
+      <|assistant|>
       
     `;
 
@@ -341,19 +345,19 @@ async function generateTextWithWllama() {
 
     for (const [title, snippet, url] of getSearchResults()) {
       const prompt = dedent`
-        <|im_start|>system
-        You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
-        <|im_start|>user
-        Hello!<|im_end|>
-        <|im_start|>assistant
-        Hi! How can I help you today?<|im_end|>
-        <|im_start|>user
+        <|system|>
+        You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.</s>
+        <|user|>
+        Hello!</s>
+        <|assistant|>
+        Hi! How can I help you today?</s>
+        <|user|>
         Context:
         ${title}: ${snippet}
 
         Question:
-        What is this text about?<|im_end|>
-        <|im_start|>assistant
+        What is this text about?</s>
+        <|assistant|>
         This text is about
       `;
 
