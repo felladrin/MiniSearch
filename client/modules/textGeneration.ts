@@ -282,7 +282,7 @@ async function generateTextWithWllama() {
 
   const largerModel = isRunningOnMobile
     ? "https://huggingface.co/duyntnet/TinyLlama-1.1B-Chat-v1.0-imatrix-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0-IQ3_XXS.gguf"
-    : "https://huggingface.co/duyntnet/TinyLlama-1.1B-Chat-v1.0-imatrix-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0-Q5_K_S.gguf?download=true";
+    : "https://huggingface.co/duyntnet/TinyLlama-1.1B-Chat-v1.0-imatrix-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0-IQ3_XXS.gguf";
 
   await initializeWllama({
     modelUrl: getUseLargerModelSetting() ? largerModel : defaultModel,
