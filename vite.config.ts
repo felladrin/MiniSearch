@@ -142,7 +142,7 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
 
       response.end(JSON.stringify(searchResults));
     } catch (error) {
-      response.statusCode = 400;
+      response.statusCode = 429;
       response.end("Too many requests.");
     }
   });
