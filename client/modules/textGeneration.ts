@@ -277,11 +277,11 @@ async function generateTextWithWllama() {
   );
 
   const defaultModel = isRunningOnMobile
-    ? "https://huggingface.co/Felladrin/Tinyllama-616M-Cinder-Q4_K_M-GGUF/resolve/main/tinyllama-616m-cinder.Q4_K_M.gguf"
+    ? "https://huggingface.co/afrideva/zephyr-220m-dpo-full-GGUF/resolve/main/zephyr-220m-dpo-full.q8_0.gguf"
     : "https://huggingface.co/Felladrin/Tinyllama-616M-Cinder-Q8_0-GGUF/resolve/main/tinyllama-616m-cinder.Q8_0.gguf";
 
   const largerModel = isRunningOnMobile
-    ? "https://huggingface.co/duyntnet/TinyLlama-1.1B-Chat-v1.0-imatrix-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0-IQ3_XXS.gguf"
+    ? "https://huggingface.co/Felladrin/Tinyllama-616M-Cinder-Q4_K_M-GGUF/resolve/main/tinyllama-616m-cinder.Q4_K_M.gguf"
     : "https://huggingface.co/duyntnet/TinyLlama-1.1B-Chat-v1.0-imatrix-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0-IQ3_XXS.gguf";
 
   await initializeWllama({
