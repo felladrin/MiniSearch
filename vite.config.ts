@@ -4,6 +4,9 @@ import basicSSL from "@vitejs/plugin-basic-ssl";
 import fetch from "node-fetch";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 
+const serverStartTime = new Date().getTime();
+let searchesSinceLastRestart = 0;
+
 export default defineConfig(() => ({
   root: "./client",
   server: {
@@ -32,6 +35,11 @@ export default defineConfig(() => ({
       name: "configure-server-search-endpoint",
       configureServer: searchEndpointServerHook,
       configurePreviewServer: searchEndpointServerHook,
+    },
+    {
+      name: "configure-server-status-endpoint",
+      configureServer: statusEndpointServerHook,
+      configurePreviewServer: statusEndpointServerHook,
     },
     {
       name: "configure-server-cache",
@@ -64,6 +72,26 @@ function crossOriginServerHook<T extends ViteDevServer | PreviewServer>(
       response.setHeader(key, value);
     });
     next();
+  });
+}
+
+function statusEndpointServerHook<T extends ViteDevServer | PreviewServer>(
+  server: T,
+) {
+  server.middlewares.use(async (request, response, next) => {
+    if (!request.url.startsWith("/status")) return next();
+
+    const secondsSinceLastRestart = Math.floor(
+      (new Date().getTime() - serverStartTime) / 1000,
+    );
+
+    response.end(
+      JSON.stringify({
+        secondsSinceLastRestart,
+        searchesSinceLastRestart,
+        searchesPerSecond: searchesSinceLastRestart / secondsSinceLastRestart,
+      }),
+    );
   });
 }
 
@@ -111,6 +139,8 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
         limitParam && Number(limitParam) > 0 ? Number(limitParam) : undefined;
 
       const searchResults = await fetchSearXNG(query, limit);
+
+      searchesSinceLastRestart++;
 
       response.end(JSON.stringify(searchResults));
     } catch (error) {
