@@ -4,11 +4,15 @@ import basicSSL from "@vitejs/plugin-basic-ssl";
 import fetch from "node-fetch";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 
+const searchToken = Math.random().toString(36).substring(2);
 const serverStartTime = new Date().getTime();
 let searchesSinceLastRestart = 0;
 
 export default defineConfig(() => ({
   root: "./client",
+  define: {
+    __SEARCH_TOKEN__: JSON.stringify(searchToken),
+  },
   server: {
     host: process.env.HOST,
     port: process.env.PORT ? Number(process.env.PORT) : undefined,
@@ -107,44 +111,52 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
   server.middlewares.use(async (request, response, next) => {
     if (!request.url.startsWith("/search")) return next();
 
-    const remoteAddress = (
-      (request.headers["x-forwarded-for"] as string) ||
-      request.socket.remoteAddress ||
-      ""
-    )
-      .split(",")[0]
-      .trim();
-
     try {
+      const remoteAddress = (
+        (request.headers["x-forwarded-for"] as string) ||
+        request.socket.remoteAddress ||
+        ""
+      )
+        .split(",")[0]
+        .trim();
+
       await rateLimiter.consume(remoteAddress);
-
-      const { searchParams } = new URL(
-        request.url,
-        `http://${request.headers.host}`,
-      );
-
-      const query = searchParams.get("q");
-
-      if (!query) {
-        response.statusCode = 400;
-        response.end("Missing the query parameter.");
-        return;
-      }
-
-      const limitParam = searchParams.get("limit");
-
-      const limit =
-        limitParam && Number(limitParam) > 0 ? Number(limitParam) : undefined;
-
-      const searchResults = await fetchSearXNG(query, limit);
-
-      searchesSinceLastRestart++;
-
-      response.end(JSON.stringify(searchResults));
     } catch (error) {
       response.statusCode = 429;
       response.end("Too many requests.");
     }
+
+    const { searchParams } = new URL(
+      request.url,
+      `http://${request.headers.host}`,
+    );
+
+    const token = searchParams.get("token");
+
+    if (!token || token !== searchToken) {
+      response.statusCode = 401;
+      response.end("Unauthorized.");
+      return;
+    }
+
+    const query = searchParams.get("q");
+
+    if (!query) {
+      response.statusCode = 400;
+      response.end("Missing the query parameter.");
+      return;
+    }
+
+    const limitParam = searchParams.get("limit");
+
+    const limit =
+      limitParam && Number(limitParam) > 0 ? Number(limitParam) : undefined;
+
+    const searchResults = await fetchSearXNG(query, limit);
+
+    searchesSinceLastRestart++;
+
+    response.end(JSON.stringify(searchResults));
   });
 }
 
