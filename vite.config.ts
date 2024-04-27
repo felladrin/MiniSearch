@@ -3,55 +3,60 @@ import react from "@vitejs/plugin-react";
 import basicSSL from "@vitejs/plugin-basic-ssl";
 import fetch from "node-fetch";
 import { RateLimiterMemory } from "rate-limiter-flexible";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import temporaryDirectory from "temp-dir";
+import path from "node:path";
 
-const searchToken = "minisearch"; // TODO: Make it dynamic.
 const serverStartTime = new Date().getTime();
 let searchesSinceLastRestart = 0;
-// TODO: Add status for SearchWithResults and SearchWithoutResults.
 
-export default defineConfig(() => ({
-  root: "./client",
-  define: {
-    __SEARCH_TOKEN__: JSON.stringify(searchToken),
-  },
-  server: {
-    host: process.env.HOST,
-    port: process.env.PORT ? Number(process.env.PORT) : undefined,
-    hmr: {
-      port: process.env.HMR_PORT ? Number(process.env.HMR_PORT) : undefined,
+export default defineConfig(({ command }) => {
+  if (command === "build") regenerateSearchToken();
+
+  return {
+    root: "./client",
+    define: {
+      __SEARCH_TOKEN__: JSON.stringify(getSearchToken()),
     },
-  },
-  preview: {
-    host: process.env.HOST,
-    port: process.env.PORT ? Number(process.env.PORT) : undefined,
-  },
-  build: {
-    target: "esnext",
-  },
-  plugins: [
-    process.env.BASIC_SSL === "true" ? basicSSL() : undefined,
-    react(),
-    {
-      name: "configure-server-cross-origin-isolation",
-      configureServer: crossOriginServerHook,
-      configurePreviewServer: crossOriginServerHook,
+    server: {
+      host: process.env.HOST,
+      port: process.env.PORT ? Number(process.env.PORT) : undefined,
+      hmr: {
+        port: process.env.HMR_PORT ? Number(process.env.HMR_PORT) : undefined,
+      },
     },
-    {
-      name: "configure-server-search-endpoint",
-      configureServer: searchEndpointServerHook,
-      configurePreviewServer: searchEndpointServerHook,
+    preview: {
+      host: process.env.HOST,
+      port: process.env.PORT ? Number(process.env.PORT) : undefined,
     },
-    {
-      name: "configure-server-status-endpoint",
-      configureServer: statusEndpointServerHook,
-      configurePreviewServer: statusEndpointServerHook,
+    build: {
+      target: "esnext",
     },
-    {
-      name: "configure-server-cache",
-      configurePreviewServer: cacheServerHook,
-    },
-  ],
-}));
+    plugins: [
+      process.env.BASIC_SSL === "true" ? basicSSL() : undefined,
+      react(),
+      {
+        name: "configure-server-cross-origin-isolation",
+        configureServer: crossOriginServerHook,
+        configurePreviewServer: crossOriginServerHook,
+      },
+      {
+        name: "configure-server-search-endpoint",
+        configureServer: searchEndpointServerHook,
+        configurePreviewServer: searchEndpointServerHook,
+      },
+      {
+        name: "configure-server-status-endpoint",
+        configureServer: statusEndpointServerHook,
+        configurePreviewServer: statusEndpointServerHook,
+      },
+      {
+        name: "configure-server-cache",
+        configurePreviewServer: cacheServerHook,
+      },
+    ],
+  };
+});
 
 function crossOriginServerHook<T extends ViteDevServer | PreviewServer>(
   server: T,
@@ -119,7 +124,7 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
 
     const token = searchParams.get("token");
 
-    if (!token || token !== searchToken) {
+    if (!token || token !== getSearchToken()) {
       response.statusCode = 401;
       response.end("Unauthorized.");
       return;
@@ -228,4 +233,18 @@ async function fetchSearXNG(query: string, limit?: number) {
     console.error(e);
     return [];
   }
+}
+
+function getSearchTokenFilePath() {
+  return path.resolve(temporaryDirectory, "minisearch-token");
+}
+
+function regenerateSearchToken() {
+  const newToken = Math.random().toString(36).substring(2);
+  writeFileSync(getSearchTokenFilePath(), newToken);
+}
+
+function getSearchToken() {
+  if (!existsSync(getSearchTokenFilePath())) regenerateSearchToken();
+  return readFileSync(getSearchTokenFilePath(), "utf8");
 }
