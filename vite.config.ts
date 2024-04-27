@@ -4,7 +4,7 @@ import basicSSL from "@vitejs/plugin-basic-ssl";
 import fetch from "node-fetch";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 
-const searchToken = Math.random().toString(36).substring(2);
+const searchToken = "minisearch"; // TODO: Make it dynamic.
 const serverStartTime = new Date().getTime();
 let searchesSinceLastRestart = 0;
 // TODO: Add status for SearchWithResults and SearchWithoutResults.
