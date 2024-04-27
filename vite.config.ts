@@ -7,6 +7,7 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 const searchToken = Math.random().toString(36).substring(2);
 const serverStartTime = new Date().getTime();
 let searchesSinceLastRestart = 0;
+// TODO: Add status for SearchWithResults and SearchWithoutResults.
 
 export default defineConfig(() => ({
   root: "./client",
@@ -111,21 +112,6 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
   server.middlewares.use(async (request, response, next) => {
     if (!request.url.startsWith("/search")) return next();
 
-    try {
-      const remoteAddress = (
-        (request.headers["x-forwarded-for"] as string) ||
-        request.socket.remoteAddress ||
-        ""
-      )
-        .split(",")[0]
-        .trim();
-
-      await rateLimiter.consume(remoteAddress);
-    } catch (error) {
-      response.statusCode = 429;
-      response.end("Too many requests.");
-    }
-
     const { searchParams } = new URL(
       request.url,
       `http://${request.headers.host}`,
@@ -151,6 +137,22 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
 
     const limit =
       limitParam && Number(limitParam) > 0 ? Number(limitParam) : undefined;
+
+    try {
+      const remoteAddress = (
+        (request.headers["x-forwarded-for"] as string) ||
+        request.socket.remoteAddress ||
+        "unknown"
+      )
+        .split(",")[0]
+        .trim();
+
+      await rateLimiter.consume(remoteAddress);
+    } catch (error) {
+      response.statusCode = 429;
+      response.end("Too many requests.");
+      return;
+    }
 
     const searchResults = await fetchSearXNG(query, limit);
 
