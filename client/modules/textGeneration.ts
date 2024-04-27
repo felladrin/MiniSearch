@@ -43,8 +43,6 @@ export async function prepareTextGeneration() {
       },
     );
 
-    await sleep(1000);
-
     searchResults = await search(queryKeywords.join(" "), 30);
   }
 
