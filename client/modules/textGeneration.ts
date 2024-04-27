@@ -337,7 +337,7 @@ async function generateTextWithWllama() {
       },
     });
 
-    updateResponse(completion.replaceAll("<|im_end|>", ""));
+    updateResponse(completion);
   }
 
   if (getSummarizeLinksSetting()) {
@@ -387,7 +387,7 @@ async function generateTextWithWllama() {
 
       updateUrlsDescriptions({
         ...getUrlsDescriptions(),
-        [url]: `This link is about ${completion.replaceAll("<|im_end|>", "")}`,
+        [url]: `This link is about ${completion}`,
       });
     }
   }
