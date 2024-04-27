@@ -13,6 +13,8 @@ export async function search(query: string, limit?: number) {
 
   const response = await fetch(searchUrl.toString());
 
+  if (!response.ok) return [];
+
   const searchResults = (await response.json()) as SearchResults;
 
   const cleanedSearchResults = searchResults.map(([title, snippet, url]) => [

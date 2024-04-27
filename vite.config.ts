@@ -2,6 +2,7 @@ import { PreviewServer, ViteDevServer, defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import basicSSL from "@vitejs/plugin-basic-ssl";
 import fetch from "node-fetch";
+import { RateLimiterMemory } from "rate-limiter-flexible";
 
 export default defineConfig(() => ({
   root: "./client",
@@ -53,33 +54,53 @@ function crossOriginServerHook<T extends ViteDevServer | PreviewServer>(
 function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
   server: T,
 ) {
+  const rateLimiter = new RateLimiterMemory({
+    points: 2,
+    duration: 10,
+  });
+
   server.middlewares.use(async (request, response, next) => {
     if (!request.url.startsWith("/search")) {
       next();
       return;
     }
 
-    const { searchParams } = new URL(
-      request.url,
-      `http://${request.headers.host}`,
-    );
+    const remoteAddress = (
+      (request.headers["x-forwarded-for"] as string) ||
+      request.socket.remoteAddress ||
+      ""
+    )
+      .split(",")[0]
+      .trim();
 
-    const query = searchParams.get("q");
+    try {
+      await rateLimiter.consume(remoteAddress);
 
-    if (!query) {
+      const { searchParams } = new URL(
+        request.url,
+        `http://${request.headers.host}`,
+      );
+
+      const query = searchParams.get("q");
+
+      if (!query) {
+        response.statusCode = 400;
+        response.end("Missing the query parameter.");
+        return;
+      }
+
+      const limitParam = searchParams.get("limit");
+
+      const limit =
+        limitParam && Number(limitParam) > 0 ? Number(limitParam) : undefined;
+
+      const searchResults = await fetchSearXNG(query, limit);
+
+      response.end(JSON.stringify(searchResults));
+    } catch (error) {
       response.statusCode = 400;
-      response.end("Missing the query parameter.");
-      return;
+      response.end("Too many requests.");
     }
-
-    const limitParam = searchParams.get("limit");
-
-    const limit =
-      limitParam && Number(limitParam) > 0 ? Number(limitParam) : undefined;
-
-    const searchResults = await fetchSearXNG(query, limit);
-
-    response.end(JSON.stringify(searchResults));
   });
 }
 

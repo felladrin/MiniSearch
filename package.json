@@ -27,6 +27,7 @@
     "mobile-detect": "^1.4.5",
     "node-fetch": "^3.3.2",
     "prettier": "^3.0.3",
+    "rate-limiter-flexible": "^5.0.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
