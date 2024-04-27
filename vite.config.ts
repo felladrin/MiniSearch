@@ -44,6 +44,22 @@ function crossOriginServerHook<T extends ViteDevServer | PreviewServer>(
   server: T,
 ) {
   server.middlewares.use((_, response, next) => {
+    /** Server headers for cross origin isolation, which enable clients to use `SharedArrayBuffer` on the Browser. */
+    const crossOriginIsolationHeaders: { key: string; value: string }[] = [
+      {
+        key: "Cross-Origin-Embedder-Policy",
+        value: "require-corp",
+      },
+      {
+        key: "Cross-Origin-Opener-Policy",
+        value: "same-origin",
+      },
+      {
+        key: "Cross-Origin-Resource-Policy",
+        value: "cross-origin",
+      },
+    ];
+
     crossOriginIsolationHeaders.forEach(({ key, value }) => {
       response.setHeader(key, value);
     });
@@ -119,22 +135,6 @@ function cacheServerHook<T extends ViteDevServer | PreviewServer>(server: T) {
   });
 }
 
-/** Server headers for cross origin isolation, which enable clients to use `SharedArrayBuffer` on the Browser. */
-export const crossOriginIsolationHeaders: { key: string; value: string }[] = [
-  {
-    key: "Cross-Origin-Embedder-Policy",
-    value: "require-corp",
-  },
-  {
-    key: "Cross-Origin-Opener-Policy",
-    value: "same-origin",
-  },
-  {
-    key: "Cross-Origin-Resource-Policy",
-    value: "cross-origin",
-  },
-];
-
 async function fetchDuckDuckGo(query: string, limit?: number) {
   try {
     query = encodeURIComponent(query.replace(/"/g, '\\"'));
@@ -181,7 +181,7 @@ async function fetchDuckDuckGo(query: string, limit?: number) {
   }
 }
 
-export async function fetchSearXNG(query: string, limit?: number) {
+async function fetchSearXNG(query: string, limit?: number) {
   try {
     const url = new URL("http://127.0.0.1:8080/search");
 
