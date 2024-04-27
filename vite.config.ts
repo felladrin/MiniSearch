@@ -71,6 +71,7 @@ function crossOriginServerHook<T extends ViteDevServer | PreviewServer>(
     crossOriginIsolationHeaders.forEach(({ key, value }) => {
       response.setHeader(key, value);
     });
+
     next();
   });
 }
@@ -104,10 +105,7 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
   });
 
   server.middlewares.use(async (request, response, next) => {
-    if (!request.url.startsWith("/search")) {
-      next();
-      return;
-    }
+    if (!request.url.startsWith("/search")) return next();
 
     const remoteAddress = (
       (request.headers["x-forwarded-for"] as string) ||
@@ -161,6 +159,7 @@ function cacheServerHook<T extends ViteDevServer | PreviewServer>(server: T) {
     } else {
       response.setHeader("Cache-Control", "public, max-age=86400");
     }
+
     next();
   });
 }
