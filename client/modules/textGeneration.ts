@@ -1,5 +1,5 @@
 import { dedent } from "ts-dedent";
-import { isWebGPUAvailable } from "./gpu";
+import { isWebGPUAvailable } from "./webGpu";
 import {
   updatePrompt,
   updateSearchResults,
