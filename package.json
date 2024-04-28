@@ -16,7 +16,6 @@
     "@mlc-ai/web-llm": "0.2.35",
     "@vitejs/plugin-basic-ssl": "^1.1.0",
     "@wllama/wllama": "^1.4.2",
-    "@xenova/transformers": "^2.8.0",
     "console-panel": "^1.0.4",
     "create-pubsub": "^1.6.3",
     "html-to-text": "^9.0.5",
@@ -35,7 +34,6 @@
     "react-tooltip": "^5.21.6",
     "temp-dir": "^3.0.0",
     "ts-dedent": "^2.2.0",
-    "typed-worker": "^1.0.4",
     "vconsole": "^3.15.1",
     "water.css": "^2.1.1"
   },

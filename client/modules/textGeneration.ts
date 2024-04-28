@@ -77,9 +77,10 @@ export async function prepareTextGeneration() {
         await rankSearchResultsWithWllama(searchResults, query),
       );
     } catch (error) {
-      updateSearchResults(
-        await rankSearchResultsWithTransformers(searchResults, query),
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : (error as string);
+
+      console.info(`Could not rank search results: ${errorMessage}`);
     }
   }
 
@@ -380,58 +381,6 @@ async function generateTextWithWllama() {
   }
 
   await exitWllama();
-}
-
-async function rankSearchResultsWithTransformers(
-  searchResults: SearchResults,
-  query: string,
-) {
-  const { createWorker } = await import("../../node_modules/typed-worker/dist");
-
-  type Actions = import("./transformersWorker").Actions;
-
-  let transformersWorker: ReturnType<typeof createWorker<Actions>> | undefined;
-
-  if (Worker) {
-    transformersWorker = createWorker<Actions>(() => {
-      const worker = new Worker(
-        new URL("./transformersWorker", import.meta.url),
-        {
-          type: "module",
-        },
-      );
-
-      return worker;
-    });
-  }
-
-  let rank!: typeof import("./transformers").rank;
-
-  if (!transformersWorker) {
-    const transformersModule = await import("./transformers");
-    rank = transformersModule.rank;
-  }
-
-  const snippets = searchResults.map(
-    ([title, snippet]) => `${title}: ${snippet}`,
-  );
-
-  updateLoadingToast("Analyzing search results...");
-
-  try {
-    const rankedSearchResults: SearchResults = (
-      await (transformersWorker
-        ? transformersWorker.run("rank", query, snippets)
-        : rank(query, snippets))
-    ).map(({ corpus_id }) => searchResults[corpus_id]);
-
-    transformersWorker?.destroy();
-
-    return rankedSearchResults;
-  } catch (error) {
-    transformersWorker?.destroy();
-    throw error;
-  }
 }
 
 async function rankSearchResultsWithWllama(
