@@ -176,22 +176,15 @@ async function generateTextWithWebLlm() {
     };
   }
 
-  const chatOpts: import("@mlc-ai/web-llm").ChatOptions = {
-    temperature: 0.5,
-    top_p: 0.5,
-    repetition_penalty: 1.15,
-    max_gen_len: 2048,
-  };
-
-  const chat = Worker
+  const engine = Worker
     ? await CreateWebWorkerEngine(
         new Worker(new URL("./webLlmWorker.ts", import.meta.url), {
           type: "module",
         }),
         selectedModel,
-        { initProgressCallback, chatOpts },
+        { initProgressCallback },
       )
-    : await CreateEngine(selectedModel, { initProgressCallback, chatOpts });
+    : await CreateEngine(selectedModel, { initProgressCallback });
 
   if (!getDisableAiResponseSetting()) {
     updateLoadingToast("Generating response...");
@@ -209,10 +202,37 @@ async function generateTextWithWebLlm() {
       query,
     ].join("\n");
 
-    await chat.generate(prompt, (_, message) => updateResponse(message));
+    const messages: import("@mlc-ai/web-llm").ChatCompletionMessageParam[] = [
+      {
+        role: "system",
+        content:
+          "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.",
+      },
+      { role: "user", content: prompt },
+    ];
+
+    const completion = await engine.chat.completions.create({
+      stream: true,
+      messages: messages,
+      temperature: 0.5,
+      top_p: 0.5,
+      frequency_penalty: 1.15,
+      presence_penalty: 0.5,
+      max_gen_len: 768,
+    });
+
+    let streamedMessage = "";
+
+    for await (const chunk of completion) {
+      const deltaContent = chunk.choices[0].delta.content;
+
+      if (deltaContent) streamedMessage += deltaContent;
+
+      updateResponse(streamedMessage);
+    }
   }
 
-  await chat.resetChat();
+  await engine.resetChat();
 
   if (getSummarizeLinksSetting()) {
     updateLoadingToast("Summarizing links...");
@@ -224,22 +244,47 @@ async function generateTextWithWebLlm() {
         "Note: Don't cite the link in your response. Just write a few sentences to indicate if it's worth visiting.",
       ].join("\n");
 
-      await chat.generate(prompt, (_, message) => {
-        updateUrlsDescriptions({
-          ...getUrlsDescriptions(),
-          [url]: message,
-        });
+      const messages: import("@mlc-ai/web-llm").ChatCompletionMessageParam[] = [
+        {
+          role: "system",
+          content:
+            "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.",
+        },
+        { role: "user", content: prompt },
+      ];
+
+      const completion = await engine.chat.completions.create({
+        stream: true,
+        messages: messages,
+        temperature: 0.5,
+        top_p: 0.5,
+        frequency_penalty: 1.15,
+        presence_penalty: 0.5,
+        max_gen_len: 128,
       });
 
-      await chat.resetChat();
+      let streamedMessage = "";
+
+      for await (const chunk of completion) {
+        const deltaContent = chunk.choices[0].delta.content;
+
+        if (deltaContent) streamedMessage += deltaContent;
+
+        updateUrlsDescriptions({
+          ...getUrlsDescriptions(),
+          [url]: streamedMessage,
+        });
+      }
+
+      await engine.resetChat();
     }
   }
 
   if (debug) {
-    console.info(await chat.runtimeStatsText());
+    console.info(await engine.runtimeStatsText());
   }
 
-  chat.unload();
+  engine.unload();
 }
 
 async function generateTextWithWllama() {
