@@ -1,4 +1,3 @@
-import { dedent } from "ts-dedent";
 import { isWebGPUAvailable } from "./webGpu";
 import {
   updatePrompt,
@@ -92,11 +91,9 @@ export async function prepareTextGeneration() {
       const errorMessage =
         error instanceof Error ? error.message : (error as string);
 
-      console.info(dedent`
-        Could not load web-llm chat module: ${errorMessage}
-
-        Falling back to Wllama.
-      `);
+      console.info(
+        `Could not load web-llm chat module: ${errorMessage}\n\nFalling back to Wllama.`,
+      );
 
       try {
         await generateTextWithWllama();
@@ -199,27 +196,22 @@ async function generateTextWithWebLlm() {
   if (!getDisableAiResponseSetting()) {
     updateLoadingToast("Generating response...");
 
-    await chat.generate(
-      dedent`
-        I have a request/question for you, but before that, I want to provide you with some context.
-        
-        Context:
-        ${getSearchResults()
-          .slice(0, amountOfSearchResultsToUseOnPrompt)
-          .map(([title, snippet]) => `- ${title}: ${snippet}`)
-          .join("\n")}
+    const prompt = [
+      "I have a request/question for you, but before that, I want to provide you with some context.",
+      "\n",
+      "Context:",
+      getSearchResults()
+        .slice(0, amountOfSearchResultsToUseOnPrompt)
+        .map(([title, snippet]) => `- ${title}: ${snippet}`)
+        .join("\n"),
+      "\n",
+      "Now, my request/question is:",
+      query,
+    ].join("\n");
 
-        Now, my request/question is:
-        ${query}
-      `,
-      (_, message) => {
-        if (message.length === 0) {
-          chat.interruptGenerate();
-        } else {
-          updateResponse(message);
-        }
-      },
-    );
+    console.log(prompt);
+
+    await chat.generate(prompt, (_, message) => updateResponse(message));
   }
 
   await chat.resetChat();
@@ -228,21 +220,19 @@ async function generateTextWithWebLlm() {
     updateLoadingToast("Summarizing links...");
 
     for (const [title, snippet, url] of getSearchResults()) {
-      const request = dedent`
-        When searching for "${query}", this link was found: [${title}](${url} "${snippet}")
-        Now, tell me: What is this link about and how is it related to the search?
-        Note: Don't cite the link in your response. Just write a few sentences to indicate if it's worth visiting.
-      `;
+      const prompt = [
+        `When searching for "${query}", this link was found: [${title}](${url} "${snippet}")`,
+        "Now, tell me: What is this link about and how is it related to the search?",
+        "Note: Don't cite the link in your response. Just write a few sentences to indicate if it's worth visiting.",
+      ].join("\n");
 
-      await chat.generate(request, (_, message) => {
-        if (message.length === 0) {
-          chat.interruptGenerate();
-        } else {
-          updateUrlsDescriptions({
-            ...getUrlsDescriptions(),
-            [url]: message,
-          });
-        }
+      console.log(prompt);
+
+      await chat.generate(prompt, (_, message) => {
+        updateUrlsDescriptions({
+          ...getUrlsDescriptions(),
+          [url]: message,
+        });
       });
 
       await chat.resetChat();
