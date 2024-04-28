@@ -16,7 +16,6 @@
     "@mlc-ai/web-llm": "0.2.35",
     "@vitejs/plugin-basic-ssl": "^1.1.0",
     "@wllama/wllama": "^1.4.2",
-    "console-panel": "^1.0.4",
     "create-pubsub": "^1.6.3",
     "html-to-text": "^9.0.5",
     "inter-ui": "^4.0.2",
