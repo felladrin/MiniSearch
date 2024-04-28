@@ -20,7 +20,6 @@
     "html-to-text": "^9.0.5",
     "inter-ui": "^4.0.2",
     "keyword-extractor": "^0.0.28",
-    "leven": "^4.0.0",
     "markdown-to-jsx": "^7.3.2",
     "mobile-detect": "^1.4.5",
     "node-fetch": "^3.3.2",
