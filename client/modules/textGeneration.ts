@@ -314,11 +314,11 @@ async function generateTextWithWllama() {
       messageSuffix: "</s>\n",
     },
     mobileLarger: {
-      url: "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q3_k_m.gguf",
-      systemPrefix: "<|im_start|>system\n",
-      userPrefix: "<|im_start|>user\n",
-      assistantPrefix: "<|im_start|>assistant\n",
-      messageSuffix: "<|im_end|>\n",
+      url: "https://huggingface.co/Felladrin/gguf-Q4_K_M-Tinyllama-616M-Cinder/resolve/main/tinyllama-616m-cinder.Q4_K_M.gguf",
+      systemPrefix: "<|system|>\n",
+      userPrefix: "<|user|>\n",
+      assistantPrefix: "<|assistant|>\n",
+      messageSuffix: "</s>\n",
     },
     desktopDefault: {
       url: "https://huggingface.co/afrideva/zephyr-220m-dpo-full-GGUF/resolve/main/zephyr-220m-dpo-full.q8_0.gguf",
