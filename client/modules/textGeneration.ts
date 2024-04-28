@@ -209,8 +209,6 @@ async function generateTextWithWebLlm() {
       query,
     ].join("\n");
 
-    console.log(prompt);
-
     await chat.generate(prompt, (_, message) => updateResponse(message));
   }
 
@@ -225,8 +223,6 @@ async function generateTextWithWebLlm() {
         "Now, tell me: What is this link about and how is it related to the search?",
         "Note: Don't cite the link in your response. Just write a few sentences to indicate if it's worth visiting.",
       ].join("\n");
-
-      console.log(prompt);
 
       await chat.generate(prompt, (_, message) => {
         updateUrlsDescriptions({
@@ -266,25 +262,25 @@ async function generateTextWithWllama() {
     };
   } = {
     mobileDefault: {
-      url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf",
+      url: "https://huggingface.co/afrideva/zephyr-220m-dpo-full-GGUF/resolve/main/zephyr-220m-dpo-full.q8_0.gguf",
+      systemPrefix: "<|system|>\n",
+      userPrefix: "<|user|>\n",
+      assistantPrefix: "<|assistant|>\n",
+      messageSuffix: "</s>\n",
+    },
+    mobileLarger: {
+      url: "https://huggingface.co/Felladrin/gguf-TinyMistral-248M-Chat-v2/resolve/main/TinyMistral-248M-Chat-v2.Q8_0.gguf",
       systemPrefix: "<|im_start|>system\n",
       userPrefix: "<|im_start|>user\n",
       assistantPrefix: "<|im_start|>assistant\n",
       messageSuffix: "<|im_end|>\n",
     },
-    mobileLarger: {
-      url: "https://huggingface.co/afrideva/zephyr-220m-dpo-full-GGUF/resolve/main/zephyr-220m-dpo-full.q8_0.gguf",
-      systemPrefix: "<|system|>\n",
-      userPrefix: "<|user|>\n",
-      assistantPrefix: "<|assistant|>\n",
-      messageSuffix: "</s>\n",
-    },
     desktopDefault: {
-      url: "https://huggingface.co/afrideva/zephyr-220m-dpo-full-GGUF/resolve/main/zephyr-220m-dpo-full.q8_0.gguf",
-      systemPrefix: "<|system|>\n",
-      userPrefix: "<|user|>\n",
-      assistantPrefix: "<|assistant|>\n",
-      messageSuffix: "</s>\n",
+      url: "https://huggingface.co/Felladrin/gguf-TinyMistral-248M-Chat-v2/resolve/main/TinyMistral-248M-Chat-v2.Q8_0.gguf",
+      systemPrefix: "<|im_start|>system\n",
+      userPrefix: "<|im_start|>user\n",
+      assistantPrefix: "<|im_start|>assistant\n",
+      messageSuffix: "<|im_end|>\n",
     },
     desktopLarger: {
       url: "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q8_0.gguf",
@@ -292,10 +288,6 @@ async function generateTextWithWllama() {
       userPrefix: "<|im_start|>user\n",
       assistantPrefix: "<|im_start|>assistant\n",
       messageSuffix: "<|im_end|>\n",
-      sampling: {
-        temp: 0.4,
-        dynatemp_range: 0,
-      },
     },
   };
 
@@ -348,8 +340,8 @@ async function generateTextWithWllama() {
       prompt,
       nPredict: 768,
       sampling: {
-        temp: 1.3,
-        dynatemp_range: 1.2,
+        temp: 0.4,
+        dynatemp_range: 0,
         top_k: 0,
         top_p: 1,
         min_p: 0.05,
