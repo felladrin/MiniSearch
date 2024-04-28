@@ -261,41 +261,94 @@ async function generateTextWithWllama() {
     "./wllama"
   );
 
+  const availableModels: {
+    [key in
+      | "mobileDefault"
+      | "mobileLarger"
+      | "desktopDefault"
+      | "desktopLarger"]: {
+      url: string;
+      systemPrefix: string;
+      userPrefix: string;
+      assistantPrefix: string;
+      messageSuffix: string;
+      sampling?: import("@wllama/wllama").SamplingConfig;
+    };
+  } = {
+    mobileDefault: {
+      url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.gguf",
+      systemPrefix: "<|im_start|>system\n",
+      userPrefix: "<|im_start|>user\n",
+      assistantPrefix: "<|im_start|>assistant\n",
+      messageSuffix: "<|im_end|>\n",
+    },
+    mobileLarger: {
+      url: "https://huggingface.co/afrideva/zephyr-220m-dpo-full-GGUF/resolve/main/zephyr-220m-dpo-full.q8_0.gguf",
+      systemPrefix: "<|system|>\n",
+      userPrefix: "<|user|>\n",
+      assistantPrefix: "<|assistant|>\n",
+      messageSuffix: "</s>\n",
+    },
+    desktopDefault: {
+      url: "https://huggingface.co/afrideva/zephyr-220m-dpo-full-GGUF/resolve/main/zephyr-220m-dpo-full.q8_0.gguf",
+      systemPrefix: "<|system|>\n",
+      userPrefix: "<|user|>\n",
+      assistantPrefix: "<|assistant|>\n",
+      messageSuffix: "</s>\n",
+    },
+    desktopLarger: {
+      url: "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q8_0.gguf",
+      systemPrefix: "<|im_start|>system\n",
+      userPrefix: "<|im_start|>user\n",
+      assistantPrefix: "<|im_start|>assistant\n",
+      messageSuffix: "<|im_end|>\n",
+      sampling: {
+        temp: 0.4,
+        dynatemp_range: 0,
+      },
+    },
+  };
+
   const defaultModel = isRunningOnMobile
-    ? "https://huggingface.co/afrideva/zephyr-220m-dpo-full-GGUF/resolve/main/zephyr-220m-dpo-full.q8_0.gguf"
-    : "https://huggingface.co/Felladrin/Tinyllama-616M-Cinder-Q8_0-GGUF/resolve/main/tinyllama-616m-cinder.Q8_0.gguf";
+    ? availableModels.mobileDefault
+    : availableModels.desktopDefault;
 
   const largerModel = isRunningOnMobile
-    ? "https://huggingface.co/Felladrin/Tinyllama-616M-Cinder-Q4_K_M-GGUF/resolve/main/tinyllama-616m-cinder.Q4_K_M.gguf"
-    : "https://huggingface.co/duyntnet/TinyLlama-1.1B-Chat-v1.0-imatrix-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0-IQ3_XXS.gguf";
+    ? availableModels.mobileLarger
+    : availableModels.desktopLarger;
+
+  const selectedModel = getUseLargerModelSetting() ? largerModel : defaultModel;
 
   await initializeWllama({
-    modelUrl: getUseLargerModelSetting() ? largerModel : defaultModel,
+    modelUrl: selectedModel.url,
     modelConfig: {
       n_ctx: 2048,
     },
   });
 
   if (!getDisableAiResponseSetting()) {
-    const prompt = dedent`
-      <|system|>
-      You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.
-      
-      If the information below is useful, you can use it to complement your response. Otherwise, ignore it.
-
-      ${getSearchResults()
-        .slice(0, amountOfSearchResultsToUseOnPrompt)
-        .map(([title, snippet]) => `- ${title}: ${snippet}`)
-        .join("\n")}</s>
-      <|user|>
-      Hello!</s>
-      <|assistant|>
-      Hi! How can I help you today?</s>
-      <|user|>
-      ${query}</s>
-      <|assistant|>
-      
-    `;
+    const prompt = [
+      selectedModel.systemPrefix,
+      [
+        "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.",
+        "If the information below is useful, you can use it to complement your response. Otherwise, ignore it.",
+        getSearchResults()
+          .slice(0, amountOfSearchResultsToUseOnPrompt)
+          .map(([title, snippet]) => `- ${title}: ${snippet}`)
+          .join("\n"),
+      ].join("\n\n"),
+      selectedModel.messageSuffix,
+      selectedModel.userPrefix,
+      "Hello!",
+      selectedModel.messageSuffix,
+      selectedModel.assistantPrefix,
+      "Hi! How can I help you today?",
+      selectedModel.messageSuffix,
+      selectedModel.userPrefix,
+      query,
+      selectedModel.messageSuffix,
+      selectedModel.assistantPrefix,
+    ].join("");
 
     if (!query) throw Error("Query is empty.");
 
@@ -316,6 +369,7 @@ async function generateTextWithWllama() {
         penalty_last_n: -1,
         mirostat: 2,
         mirostat_tau: 3.5,
+        ...selectedModel.sampling,
       },
       onNewToken: (_token, _piece, currentText) => {
         updateResponse(currentText);
@@ -329,22 +383,24 @@ async function generateTextWithWllama() {
     updateLoadingToast("Summarizing links...");
 
     for (const [title, snippet, url] of getSearchResults()) {
-      const prompt = dedent`
-        <|system|>
-        You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.</s>
-        <|user|>
-        Hello!</s>
-        <|assistant|>
-        Hi! How can I help you today?</s>
-        <|user|>
-        Context:
-        ${title}: ${snippet}
-
-        Question:
-        What is this text about?</s>
-        <|assistant|>
-        This text is about
-      `;
+      const prompt = [
+        selectedModel.systemPrefix,
+        "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.",
+        selectedModel.messageSuffix,
+        selectedModel.userPrefix,
+        "Hello!",
+        selectedModel.messageSuffix,
+        selectedModel.assistantPrefix,
+        "Hi! How can I help you today?",
+        selectedModel.messageSuffix,
+        selectedModel.userPrefix,
+        ["Context:", `${title}: ${snippet}`].join("\n"),
+        "\n",
+        ["Question:", "What is this text about?"].join("\n"),
+        selectedModel.messageSuffix,
+        selectedModel.assistantPrefix,
+        "This text is about",
+      ].join("");
 
       const completion = await runCompletion({
         prompt,
@@ -361,6 +417,7 @@ async function generateTextWithWllama() {
           penalty_last_n: -1,
           mirostat: 2,
           mirostat_tau: 3.5,
+          ...selectedModel.sampling,
         },
         onNewToken: (_token, _piece, currentText) => {
           updateUrlsDescriptions({
