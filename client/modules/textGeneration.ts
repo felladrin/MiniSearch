@@ -14,12 +14,9 @@ import {
 import { SearchResults, search } from "./search";
 import { query, debug, disableWorkers } from "./urlParams";
 import toast from "react-hot-toast";
-import MobileDetect from "mobile-detect";
+import { isRunningOnMobile } from "./mobileDetection";
 
 const Worker = disableWorkers ? undefined : self.Worker;
-
-const isRunningOnMobile =
-  new MobileDetect(self.navigator.userAgent).mobile() !== null;
 
 const amountOfSearchResultsToUseOnPrompt = isRunningOnMobile ? 3 : 6;
 
