@@ -153,12 +153,12 @@ async function generateTextWithWebLlm() {
   const availableModels = {
     Llama: "Llama-3-8B-Instruct-q4f16_1",
     Mistral: "Mistral-7B-Instruct-v0.2-q4f16_1",
-    TinyLlama: "TinyLlama-1.1B-Chat-v0.4-q0f16",
+    Gemma: "gemma-2b-it-q4f16_1",
   };
 
   const selectedModel = getUseLargerModelSetting()
     ? availableModels.Llama
-    : availableModels.TinyLlama;
+    : availableModels.Gemma;
 
   const isModelCached = await hasModelInCache(selectedModel);
 
