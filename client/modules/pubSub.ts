@@ -49,6 +49,11 @@ export const searchResultsPubSub = createPubSub<SearchResults>([]);
 
 export const [updateSearchResults, , getSearchResults] = searchResultsPubSub;
 
+export const reRankedSearchResultsPubSub = createPubSub<SearchResults>([]);
+
+export const [updateReRankedSearchResults, , getReRankedSearchResults] =
+  reRankedSearchResultsPubSub;
+
 export const urlsDescriptionsPubSub = createPubSub<Record<string, string>>({});
 
 export const [updateUrlsDescriptions, , getUrlsDescriptions] =

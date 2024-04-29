@@ -9,6 +9,8 @@ import {
   getSearchResults,
   updateUrlsDescriptions,
   getUrlsDescriptions,
+  updateReRankedSearchResults,
+  getReRankedSearchResults,
 } from "./pubSub";
 import { SearchResults, search } from "./search";
 import { query, debug, disableWorkers } from "./urlParams";
@@ -69,7 +71,7 @@ export async function prepareTextGeneration() {
     updateLoadingToast("Loading AI model...");
 
     try {
-      updateSearchResults(
+      updateReRankedSearchResults(
         await rankSearchResultsWithWllama(searchResults, query),
       );
     } catch (error) {
@@ -77,6 +79,8 @@ export async function prepareTextGeneration() {
         error instanceof Error ? error.message : (error as string);
 
       console.info(`Could not rank search results: ${errorMessage}`);
+
+      updateReRankedSearchResults(searchResults);
     }
   }
 
@@ -193,7 +197,7 @@ async function generateTextWithWebLlm() {
       "I have a request/question for you, but before that, I want to provide you with some context.",
       "\n",
       "Context:",
-      getSearchResults()
+      getReRankedSearchResults()
         .slice(0, amountOfSearchResultsToUseOnPrompt)
         .map(([title, snippet]) => `- ${title}: ${snippet}`)
         .join("\n"),
@@ -378,7 +382,7 @@ async function generateTextWithWllama() {
       [
         "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.",
         "If the information below is useful, you can use it to complement your response. Otherwise, ignore it.",
-        getSearchResults()
+        getReRankedSearchResults()
           .slice(0, amountOfSearchResultsToUseOnPrompt)
           .map(([title, snippet]) => `- ${title}: ${snippet}`)
           .join("\n"),
