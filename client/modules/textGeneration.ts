@@ -11,6 +11,7 @@ import {
   getUrlsDescriptions,
   updateReRankedSearchResults,
   getReRankedSearchResults,
+  getDisableWebGpuUsageSetting,
 } from "./pubSub";
 import { SearchResults, search } from "./search";
 import { query, debug } from "./urlParams";
@@ -84,6 +85,8 @@ export async function prepareTextGeneration() {
   try {
     try {
       if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
+
+      if (getDisableWebGpuUsageSetting()) throw Error("WebGPU is disabled.");
 
       await generateTextWithWebLlm();
     } catch (error) {

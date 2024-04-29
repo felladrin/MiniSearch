@@ -3,8 +3,10 @@ import {
   disableAiResponseSettingPubSub,
   summarizeLinksSettingPubSub,
   useLargerModelSettingPubSub,
+  disableWebGpuUsageSettingPubSub,
 } from "../modules/pubSub";
 import { Tooltip } from "react-tooltip";
+import { isWebGPUAvailable } from "../modules/webGpu";
 
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -15,6 +17,9 @@ export function SettingsForm() {
   );
   const [useLargerModel, setUseLargerModel] = usePubSub(
     useLargerModelSettingPubSub,
+  );
+  const [disableWebGpuUsage, setDisableWebGpuUsage] = usePubSub(
+    disableWebGpuUsageSettingPubSub,
   );
 
   return (
@@ -69,6 +74,28 @@ export function SettingsForm() {
           Disable AI response
         </label>
       </div>
+      {isWebGPUAvailable && (
+        <div>
+          <Tooltip
+            id="use-large-model-setting-tooltip"
+            place="top-start"
+            variant="info"
+            opacity="1"
+            style={{ width: "75vw", maxWidth: "600px" }}
+          />
+          <label
+            data-tooltip-id="use-large-model-setting-tooltip"
+            data-tooltip-content="Disables the WebGPU and run smaller AI models only using the CPU"
+          >
+            <input
+              type="checkbox"
+              checked={disableWebGpuUsage}
+              onChange={(event) => setDisableWebGpuUsage(event.target.checked)}
+            />
+            Disable WebGPU usage
+          </label>
+        </div>
+      )}
       <div>
         <Tooltip
           id="summarize-links-setting-tooltip"

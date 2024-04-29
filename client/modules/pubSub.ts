@@ -37,6 +37,14 @@ export const useLargerModelSettingPubSub = createLocalStoragePubSub(
 
 export const [, , getUseLargerModelSetting] = useLargerModelSettingPubSub;
 
+export const disableWebGpuUsageSettingPubSub = createLocalStoragePubSub(
+  "disableWebGpuUsage",
+  false,
+);
+
+export const [, , getDisableWebGpuUsageSetting] =
+  disableWebGpuUsageSettingPubSub;
+
 export const promptPubSub = createPubSub("");
 
 export const [updatePrompt] = promptPubSub;
