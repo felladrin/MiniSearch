@@ -13,11 +13,9 @@ import {
   getReRankedSearchResults,
 } from "./pubSub";
 import { SearchResults, search } from "./search";
-import { query, debug, disableWorkers } from "./urlParams";
+import { query, debug } from "./urlParams";
 import toast from "react-hot-toast";
 import { isRunningOnMobile } from "./mobileDetection";
-
-const Worker = disableWorkers ? undefined : self.Worker;
 
 const amountOfSearchResultsToUseOnPrompt = isRunningOnMobile ? 3 : 6;
 
