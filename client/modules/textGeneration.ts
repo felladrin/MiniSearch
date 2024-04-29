@@ -218,10 +218,6 @@ async function generateTextWithWebLlm() {
     const completion = await engine.chat.completions.create({
       stream: true,
       messages: messages,
-      temperature: 0.5,
-      top_p: 0.5,
-      frequency_penalty: 1.15,
-      presence_penalty: 0.5,
       max_gen_len: 768,
     });
 
@@ -260,10 +256,6 @@ async function generateTextWithWebLlm() {
       const completion = await engine.chat.completions.create({
         stream: true,
         messages: messages,
-        temperature: 0.5,
-        top_p: 0.5,
-        frequency_penalty: 1.15,
-        presence_penalty: 0.5,
         max_gen_len: 128,
       });
 
