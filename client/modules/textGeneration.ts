@@ -194,7 +194,7 @@ async function generateTextWithWebLlm() {
       "\n",
       "Context:",
       getReRankedSearchResults()
-        .slice(0, 10)
+        .slice(0, isRunningOnMobile ? 3 : 6)
         .map(([title, snippet]) => `- ${title}: ${snippet}`)
         .join("\n"),
       "\n",
@@ -371,7 +371,7 @@ async function generateTextWithWllama() {
         "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.",
         "If the information below is useful, you can use it to complement your response. Otherwise, ignore it.",
         getReRankedSearchResults()
-          .slice(0, 10)
+          .slice(0, isRunningOnMobile ? 5 : 10)
           .map(([title, snippet]) => `- ${title}: ${snippet}`)
           .join("\n"),
       ].join("\n\n"),
