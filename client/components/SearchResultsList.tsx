@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { SearchResults } from "../modules/search";
 import { Tooltip } from "react-tooltip";
-import { useAutoAnimate } from "@formkit/auto-animate/react";
 
 export function SearchResultsList({
   searchResults,
@@ -10,7 +9,6 @@ export function SearchResultsList({
   searchResults: SearchResults;
   urlsDescriptions: Record<string, string>;
 }) {
-  const [parent] = useAutoAnimate({ duration: 1000 });
   const [windowWidth, setWindowWidth] = useState(self.innerWidth);
 
   useEffect(() => {
@@ -28,7 +26,7 @@ export function SearchResultsList({
   const shouldDisplayDomainBelowTitle = windowWidth < 720;
 
   return (
-    <ul ref={parent}>
+    <ul>
       {searchResults.map(([title, snippet, url], index) => (
         <li key={url}>
           <Tooltip
