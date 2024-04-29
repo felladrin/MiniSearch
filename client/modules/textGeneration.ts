@@ -17,7 +17,7 @@ import { query, debug } from "./urlParams";
 import toast from "react-hot-toast";
 import { isRunningOnMobile } from "./mobileDetection";
 
-const amountOfSearchResultsToUseOnPrompt = isRunningOnMobile ? 3 : 6;
+const amountOfSearchResultsToUseOnPrompt = isRunningOnMobile ? 5 : 10;
 
 export async function prepareTextGeneration() {
   if (query === null) return;
