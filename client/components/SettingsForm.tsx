@@ -56,22 +56,22 @@ export function SettingsForm() {
       </div>
       <div>
         <Tooltip
-          id="disable-ai-setting-tooltip"
+          id="summarize-links-setting-tooltip"
           place="top-start"
           variant="info"
           opacity="1"
           style={{ width: "75vw", maxWidth: "600px" }}
         />
         <label
-          data-tooltip-id="disable-ai-setting-tooltip"
-          data-tooltip-content="Disables the AI response, in case you only want to see the links from the web search results"
+          data-tooltip-id="summarize-links-setting-tooltip"
+          data-tooltip-content="Provides a short overview for each of the links from the web search results"
         >
           <input
             type="checkbox"
-            checked={disableAiResponse}
-            onChange={(event) => setDisableAiResponse(event.target.checked)}
+            checked={summarizeLinks}
+            onChange={(event) => setSummarizeLinks(event.target.checked)}
           />
-          Disable AI response
+          Summarize links
         </label>
       </div>
       {isWebGPUAvailable && (
@@ -98,22 +98,22 @@ export function SettingsForm() {
       )}
       <div>
         <Tooltip
-          id="summarize-links-setting-tooltip"
+          id="disable-ai-setting-tooltip"
           place="top-start"
           variant="info"
           opacity="1"
           style={{ width: "75vw", maxWidth: "600px" }}
         />
         <label
-          data-tooltip-id="summarize-links-setting-tooltip"
-          data-tooltip-content="Provides a short overview for each of the links from the web search results"
+          data-tooltip-id="disable-ai-setting-tooltip"
+          data-tooltip-content="Disables the AI response, in case you only want to see the links from the web search results"
         >
           <input
             type="checkbox"
-            checked={summarizeLinks}
-            onChange={(event) => setSummarizeLinks(event.target.checked)}
+            checked={disableAiResponse}
+            onChange={(event) => setDisableAiResponse(event.target.checked)}
           />
-          Summarize links
+          Disable AI response
         </label>
       </div>
     </div>
