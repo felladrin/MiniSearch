@@ -314,7 +314,7 @@ async function generateTextWithWllama() {
       messageSuffix: "</s>\n",
     },
     mobileLarger: {
-      url: "https://huggingface.co/Felladrin/gguf-Q4_K_M-Tinyllama-616M-Cinder/resolve/main/tinyllama-616m-cinder.Q4_K_M.gguf",
+      url: "https://huggingface.co/Felladrin/gguf-Tinyllama-616M-Cinder/resolve/main/Tinyllama-616M-Cinder.Q3_K_S.gguf",
       systemPrefix: "<|system|>\n",
       userPrefix: "<|user|>\n",
       assistantPrefix: "<|assistant|>\n",
