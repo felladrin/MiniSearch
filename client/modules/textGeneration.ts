@@ -29,12 +29,11 @@ export async function prepareTextGeneration() {
   let searchResults = await search(query, 30);
 
   if (searchResults.length === 0) {
-    const queryKeywords = (await import("keyword-extractor")).default.extract(
-      query,
-      {
+    const queryKeywords = (await import("keyword-extractor")).default
+      .extract(query, {
         language: "english",
-      },
-    );
+      })
+      .slice(0, 10);
 
     searchResults = await search(queryKeywords.join(" "), 30);
   }
