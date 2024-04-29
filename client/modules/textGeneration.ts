@@ -52,6 +52,8 @@ export async function prepareTextGeneration() {
 
   updateSearchResults(searchResults);
 
+  updateReRankedSearchResults(searchResults);
+
   updateUrlsDescriptions(
     searchResults.reduce(
       (acc, [, snippet, url]) => ({ ...acc, [url]: snippet }),
@@ -75,8 +77,6 @@ export async function prepareTextGeneration() {
         error instanceof Error ? error.message : (error as string);
 
       console.info(`Could not rank search results: ${errorMessage}`);
-
-      updateReRankedSearchResults(searchResults);
     }
   }
 
