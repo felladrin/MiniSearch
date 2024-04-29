@@ -17,8 +17,6 @@ import { query, debug } from "./urlParams";
 import toast from "react-hot-toast";
 import { isRunningOnMobile } from "./mobileDetection";
 
-const amountOfSearchResultsToUseOnPrompt = isRunningOnMobile ? 5 : 10;
-
 export async function prepareTextGeneration() {
   if (query === null) return;
 
@@ -196,7 +194,7 @@ async function generateTextWithWebLlm() {
       "\n",
       "Context:",
       getReRankedSearchResults()
-        .slice(0, amountOfSearchResultsToUseOnPrompt)
+        .slice(0, 10)
         .map(([title, snippet]) => `- ${title}: ${snippet}`)
         .join("\n"),
       "\n",
@@ -373,7 +371,7 @@ async function generateTextWithWllama() {
         "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.",
         "If the information below is useful, you can use it to complement your response. Otherwise, ignore it.",
         getReRankedSearchResults()
-          .slice(0, amountOfSearchResultsToUseOnPrompt)
+          .slice(0, 10)
           .map(([title, snippet]) => `- ${title}: ${snippet}`)
           .join("\n"),
       ].join("\n\n"),
