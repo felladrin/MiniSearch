@@ -292,6 +292,21 @@ async function generateTextWithWllama() {
     "./wllama"
   );
 
+  const commonSamplingConfig: import("@wllama/wllama").SamplingConfig = {
+    temp: 0.35,
+    dynatemp_range: 0.25,
+    top_k: 0,
+    top_p: 1,
+    min_p: 0.05,
+    tfs_z: 0.95,
+    typical_p: 0.85,
+    penalty_freq: 0.5,
+    penalty_repeat: 1.176,
+    penalty_last_n: -1,
+    mirostat: 2,
+    mirostat_tau: 3.5,
+  };
+
   const availableModels: {
     [key in
       | "mobileDefault"
@@ -303,36 +318,40 @@ async function generateTextWithWllama() {
       userPrefix: string;
       assistantPrefix: string;
       messageSuffix: string;
-      sampling?: import("@wllama/wllama").SamplingConfig;
+      sampling: import("@wllama/wllama").SamplingConfig;
     };
   } = {
     mobileDefault: {
-      url: "https://huggingface.co/afrideva/zephyr-220m-dpo-full-GGUF/resolve/main/zephyr-220m-dpo-full.q8_0.gguf",
-      systemPrefix: "<|system|>\n",
-      userPrefix: "<|user|>\n",
-      assistantPrefix: "<|assistant|>\n",
-      messageSuffix: "</s>\n",
+      url: "https://huggingface.co/Felladrin/gguf-vicuna-160m/resolve/main/vicuna-160m.Q8_0.gguf",
+      systemPrefix: "",
+      userPrefix: "USER:",
+      assistantPrefix: "ASSISTANT:",
+      messageSuffix: "</s> ",
+      sampling: commonSamplingConfig,
     },
     mobileLarger: {
-      url: "https://huggingface.co/Felladrin/gguf-Tinyllama-616M-Cinder/resolve/main/Tinyllama-616M-Cinder.Q3_K_S.gguf",
+      url: "https://huggingface.co/Felladrin/gguf-zephyr-220m-dpo-full/resolve/main/zephyr-220m-dpo-full.Q8_0.gguf",
       systemPrefix: "<|system|>\n",
       userPrefix: "<|user|>\n",
       assistantPrefix: "<|assistant|>\n",
       messageSuffix: "</s>\n",
+      sampling: commonSamplingConfig,
     },
     desktopDefault: {
-      url: "https://huggingface.co/afrideva/zephyr-220m-dpo-full-GGUF/resolve/main/zephyr-220m-dpo-full.q8_0.gguf",
-      systemPrefix: "<|system|>\n",
-      userPrefix: "<|user|>\n",
-      assistantPrefix: "<|assistant|>\n",
-      messageSuffix: "</s>\n",
+      url: "https://huggingface.co/Felladrin/gguf-vicuna-160m/resolve/main/vicuna-160m.Q8_0.gguf",
+      systemPrefix: "",
+      userPrefix: "USER:",
+      assistantPrefix: "ASSISTANT:",
+      messageSuffix: "</s> ",
+      sampling: commonSamplingConfig,
     },
     desktopLarger: {
-      url: "https://huggingface.co/Qwen/Qwen1.5-0.5B-Chat-GGUF/resolve/main/qwen1_5-0_5b-chat-q8_0.gguf",
+      url: "https://huggingface.co/Felladrin/gguf-Qwen1.5-0.5B-Chat/resolve/main/Qwen1.5-0.5B-Chat.Q8_0.gguf",
       systemPrefix: "<|im_start|>system\n",
       userPrefix: "<|im_start|>user\n",
       assistantPrefix: "<|im_start|>assistant\n",
       messageSuffix: "<|im_end|>\n",
+      sampling: commonSamplingConfig,
     },
   };
 
@@ -384,20 +403,7 @@ async function generateTextWithWllama() {
     const completion = await runCompletion({
       prompt,
       nPredict: 768,
-      sampling: {
-        temp: 0.3,
-        dynatemp_range: 0.2,
-        top_k: 0,
-        top_p: 1,
-        min_p: 0.05,
-        tfs_z: 0.95,
-        typical_p: 0.85,
-        penalty_repeat: 1.1,
-        penalty_last_n: -1,
-        mirostat: 2,
-        mirostat_tau: 3.5,
-        ...selectedModel.sampling,
-      },
+      sampling: selectedModel.sampling,
       onNewToken: (_token, _piece, currentText) => {
         updateResponse(currentText);
       },
@@ -432,20 +438,7 @@ async function generateTextWithWllama() {
       const completion = await runCompletion({
         prompt,
         nPredict: 128,
-        sampling: {
-          temp: 1.3,
-          dynatemp_range: 1.2,
-          top_k: 0,
-          top_p: 1,
-          min_p: 0.05,
-          tfs_z: 0.95,
-          typical_p: 0.85,
-          penalty_repeat: 1.1,
-          penalty_last_n: -1,
-          mirostat: 2,
-          mirostat_tau: 3.5,
-          ...selectedModel.sampling,
-        },
+        sampling: selectedModel.sampling,
         onNewToken: (_token, _piece, currentText) => {
           updateUrlsDescriptions({
             ...getUrlsDescriptions(),
