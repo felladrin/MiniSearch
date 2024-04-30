@@ -466,21 +466,22 @@ async function rankSearchResultsWithWllama(
     },
   });
 
-  const documents = searchResults.map(
-    ([title, snippet]) => `${title}: ${snippet}`,
-  );
-
   updateLoadingToast("Analyzing search results...");
 
-  const scores = await rank({ query, documents });
+  const scores = await rank({
+    query: query.toLocaleLowerCase(),
+    documents: searchResults.map(([title, snippet]) =>
+      `${title}: ${snippet}`.toLocaleLowerCase(),
+    ),
+  });
+
+  await exitWllama();
 
   const searchResultToScoreMap: Map<SearchResults[0], number> = new Map();
 
   scores.map((score, index) =>
     searchResultToScoreMap.set(searchResults[index], score ?? 0),
   );
-
-  await exitWllama();
 
   return searchResults.slice().sort((a, b) => {
     return (
