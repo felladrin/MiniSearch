@@ -65,19 +65,17 @@ export async function prepareTextGeneration() {
 
   if (debug) console.time("Response Generation Time");
 
-  if (!isRunningOnMobile) {
-    updateLoadingToast("Loading AI model...");
+  updateLoadingToast("Loading AI model...");
 
-    try {
-      updateReRankedSearchResults(
-        await rankSearchResultsWithWllama(searchResults, query),
-      );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : (error as string);
+  try {
+    updateReRankedSearchResults(
+      await rankSearchResultsWithWllama(searchResults, query),
+    );
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : (error as string);
 
-      console.info(`Could not rank search results: ${errorMessage}`);
-    }
+    console.info(`Could not rank search results: ${errorMessage}`);
   }
 
   updateLoadingToast("Loading AI model...");
