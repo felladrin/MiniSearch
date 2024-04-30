@@ -62,9 +62,11 @@ export async function rank(config: { query: string; documents: string[] }) {
 
   const queryEmbedding = await wllama.createEmbedding(config.query);
 
-  const documentsEmbeddings = (await Promise.all(
-    config.documents.map((document) => wllama?.createEmbedding(document)),
-  )) as number[][];
+  const documentsEmbeddings: number[][] = [];
+
+  for (const document of config.documents) {
+    documentsEmbeddings.push(await wllama?.createEmbedding(document));
+  }
 
   return documentsEmbeddings.map((documentEmbedding) =>
     calculateDotProduct(queryEmbedding, documentEmbedding),

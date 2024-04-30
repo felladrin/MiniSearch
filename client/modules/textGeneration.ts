@@ -459,9 +459,10 @@ async function rankSearchResultsWithWllama(
 
   await initializeWllama({
     modelUrl:
-      "https://huggingface.co/ggml-org/models/resolve/main/bert-bge-small/ggml-model-f16.gguf",
+      "https://huggingface.co/Felladrin/gguf-multi-qa-MiniLM-L6-cos-v1/resolve/main/multi-qa-MiniLM-L6-cos-v1.Q8_0.gguf",
     modelConfig: {
-      n_ctx: 2048,
+      n_ctx: 512,
+      n_batch: 512,
       embeddings: true,
       pooling_type: "LLAMA_POOLING_TYPE_MEAN",
     },
