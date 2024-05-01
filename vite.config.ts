@@ -6,6 +6,7 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import temporaryDirectory from "temp-dir";
 import path from "node:path";
+import fs from "node:fs";
 
 const serverStartTime = new Date().getTime();
 let searchesSinceLastRestart = 0;
@@ -17,6 +18,7 @@ export default defineConfig(({ command }) => {
     root: "./client",
     define: {
       __SEARCH_TOKEN__: JSON.stringify(getSearchToken()),
+      __QUERY_SUGGESTIONS__: getQuerySuggestions(25),
     },
     server: {
       host: process.env.HOST,
@@ -247,4 +249,12 @@ function regenerateSearchToken() {
 function getSearchToken() {
   if (!existsSync(getSearchTokenFilePath())) regenerateSearchToken();
   return readFileSync(getSearchTokenFilePath(), "utf8");
+}
+
+function getQuerySuggestions(limit?: number) {
+  return (
+    JSON.parse(fs.readFileSync("query-suggestions.json").toString()) as string[]
+  )
+    .sort(() => Math.random() - 0.5)
+    .slice(0, limit);
 }
