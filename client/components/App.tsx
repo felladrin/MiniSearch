@@ -11,12 +11,18 @@ import { SettingsButton } from "./SettingsButton";
 import Markdown from "markdown-to-jsx";
 import { getDisableAiResponseSetting } from "../modules/pubSub";
 import { SearchResultsList } from "./SearchResultsList";
+import { useEffect } from "react";
+import { prepareTextGeneration } from "../modules/textGeneration";
 
 export function App() {
   const [query, updateQuery] = usePubSub(promptPubSub);
   const [response] = usePubSub(responsePubSub);
   const [searchResults] = usePubSub(searchResultsPubSub);
   const [urlsDescriptions] = usePubSub(urlsDescriptionsPubSub);
+
+  useEffect(() => {
+    prepareTextGeneration();
+  }, []);
 
   return (
     <>
