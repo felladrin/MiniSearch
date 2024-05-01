@@ -7,6 +7,12 @@ import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import temporaryDirectory from "temp-dir";
 import path from "node:path";
 import fs from "node:fs";
+import {
+  initModel,
+  distance as calculateSimilarity,
+  EmbeddingsModel,
+} from "@energetic-ai/embeddings";
+import { modelSource as embeddingModel } from "@energetic-ai/model-embeddings-en";
 
 const serverStartTime = new Date().getTime();
 let searchesSinceLastRestart = 0;
@@ -165,7 +171,19 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
 
     searchesSinceLastRestart++;
 
-    response.end(JSON.stringify(searchResults));
+    if (searchResults.length === 0) {
+      response.end(JSON.stringify([]));
+      return;
+    }
+
+    try {
+      response.end(
+        JSON.stringify(await rankSearchResults(query, searchResults)),
+      );
+    } catch (error) {
+      console.error("Error ranking search results:", error);
+      response.end(JSON.stringify(searchResults));
+    }
   });
 }
 
@@ -257,4 +275,46 @@ function getQuerySuggestions(limit?: number) {
   )
     .sort(() => Math.random() - 0.5)
     .slice(0, limit);
+}
+
+let cachedEmbeddingModel: EmbeddingsModel | undefined;
+
+async function getSimilarityScores(query: string, documents: string[]) {
+  if (!cachedEmbeddingModel)
+    cachedEmbeddingModel = await initModel(embeddingModel);
+
+  const [queryEmbedding] = await cachedEmbeddingModel.embed([query]);
+
+  const documentsEmbeddings = await cachedEmbeddingModel.embed(documents);
+
+  return documentsEmbeddings.map((documentEmbedding) =>
+    calculateSimilarity(queryEmbedding, documentEmbedding),
+  );
+}
+
+async function rankSearchResults(
+  query: string,
+  searchResults: [title: string, content: string, url: string][],
+) {
+  const scores = await getSimilarityScores(
+    query.toLocaleLowerCase(),
+    searchResults.map(([title, snippet]) =>
+      `${title}: ${snippet}`.toLocaleLowerCase(),
+    ),
+  );
+
+  const searchResultToScoreMap: Map<(typeof searchResults)[0], number> =
+    new Map();
+
+  scores.map((score, index) =>
+    searchResultToScoreMap.set(searchResults[index], score ?? 0),
+  );
+
+  return searchResults
+    .slice()
+    .sort(
+      (a, b) =>
+        (searchResultToScoreMap.get(b) ?? 0) -
+        (searchResultToScoreMap.get(a) ?? 0),
+    );
 }

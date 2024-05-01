@@ -57,22 +57,6 @@ export function calculateDotProduct(
   return result;
 }
 
-export async function rank(config: { query: string; documents: string[] }) {
-  if (!wllama) throw new Error("Wllama is not initialized.");
-
-  const queryEmbedding = await wllama.createEmbedding(config.query);
-
-  const documentsEmbeddings: number[][] = [];
-
-  for (const document of config.documents) {
-    documentsEmbeddings.push(await wllama?.createEmbedding(document));
-  }
-
-  return documentsEmbeddings.map((documentEmbedding) =>
-    calculateDotProduct(queryEmbedding, documentEmbedding),
-  );
-}
-
 export async function exitWllama() {
   if (!wllama) throw new Error("Wllama is not initialized.");
 

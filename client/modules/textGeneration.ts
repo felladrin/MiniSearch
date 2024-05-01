@@ -13,7 +13,7 @@ import {
   getReRankedSearchResults,
   getDisableWebGpuUsageSetting,
 } from "./pubSub";
-import { SearchResults, search } from "./search";
+import { search } from "./search";
 import { query, debug } from "./urlParams";
 import toast from "react-hot-toast";
 import { isRunningOnMobile } from "./mobileDetection";
@@ -64,21 +64,6 @@ export async function prepareTextGeneration() {
   if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
 
   if (debug) console.time("Response Generation Time");
-
-  if (!isRunningOnMobile) {
-    updateLoadingToast("Loading AI model...");
-
-    try {
-      updateReRankedSearchResults(
-        await rankSearchResultsWithWllama(searchResults, query),
-      );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : (error as string);
-
-      console.info(`Could not rank search results: ${errorMessage}`);
-    }
-  }
 
   updateLoadingToast("Loading AI model...");
 
@@ -451,46 +436,4 @@ async function generateTextWithWllama() {
   }
 
   await exitWllama();
-}
-
-async function rankSearchResultsWithWllama(
-  searchResults: SearchResults,
-  query: string,
-) {
-  const { initializeWllama, rank, exitWllama } = await import("./wllama");
-
-  await initializeWllama({
-    modelUrl:
-      "https://huggingface.co/Felladrin/gguf-multi-qa-MiniLM-L6-cos-v1/resolve/main/multi-qa-MiniLM-L6-cos-v1.Q8_0.gguf",
-    modelConfig: {
-      n_ctx: 512,
-      n_batch: 512,
-      embeddings: true,
-      pooling_type: "LLAMA_POOLING_TYPE_MEAN",
-    },
-  });
-
-  updateLoadingToast("Analyzing search results...");
-
-  const scores = await rank({
-    query: query.toLocaleLowerCase(),
-    documents: searchResults.map(([title, snippet]) =>
-      `${title}: ${snippet}`.toLocaleLowerCase(),
-    ),
-  });
-
-  await exitWllama();
-
-  const searchResultToScoreMap: Map<SearchResults[0], number> = new Map();
-
-  scores.map((score, index) =>
-    searchResultToScoreMap.set(searchResults[index], score ?? 0),
-  );
-
-  return searchResults.slice().sort((a, b) => {
-    return (
-      (searchResultToScoreMap.get(b) ?? 0) -
-      (searchResultToScoreMap.get(a) ?? 0)
-    );
-  });
 }
