@@ -24,7 +24,7 @@ export default defineConfig(({ command }) => {
     root: "./client",
     define: {
       VITE_SEARCH_TOKEN: JSON.stringify(getSearchToken()),
-      VITE_QUERY_SUGGESTIONS: getQuerySuggestions(25),
+      VITE_QUERY_SUGGESTIONS: getQuerySuggestions(50),
     },
     server: {
       host: process.env.HOST,
