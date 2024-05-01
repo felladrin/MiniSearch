@@ -44,19 +44,6 @@ export async function runCompletion(config: {
   });
 }
 
-export function calculateDotProduct(
-  firstArray: number[],
-  secondArray: number[],
-) {
-  let result = 0;
-
-  for (let index = 0; index < firstArray.length; index++) {
-    result += firstArray[index] * secondArray[index];
-  }
-
-  return result;
-}
-
 export async function exitWllama() {
   if (!wllama) throw new Error("Wllama is not initialized.");
 
