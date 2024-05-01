@@ -23,8 +23,8 @@ export default defineConfig(({ command }) => {
   return {
     root: "./client",
     define: {
-      __SEARCH_TOKEN__: JSON.stringify(getSearchToken()),
-      __QUERY_SUGGESTIONS__: getQuerySuggestions(25),
+      VITE_SEARCH_TOKEN: JSON.stringify(getSearchToken()),
+      VITE_QUERY_SUGGESTIONS: getQuerySuggestions(25),
     },
     server: {
       host: process.env.HOST,

@@ -1,4 +1,4 @@
 /// <reference types="vite/client" />
 
-declare const __SEARCH_TOKEN__: string;
-declare const __QUERY_SUGGESTIONS__: string[];
+declare const VITE_SEARCH_TOKEN: string;
+declare const VITE_QUERY_SUGGESTIONS: string[];

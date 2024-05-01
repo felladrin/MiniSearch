@@ -6,7 +6,7 @@ export async function search(query: string, limit?: number) {
   const searchUrl = new URL("/search", self.location.origin);
 
   searchUrl.searchParams.set("q", query);
-  searchUrl.searchParams.set("token", __SEARCH_TOKEN__);
+  searchUrl.searchParams.set("token", VITE_SEARCH_TOKEN);
 
   if (limit && limit > 0) {
     searchUrl.searchParams.set("limit", limit.toString());

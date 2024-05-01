@@ -8,6 +8,6 @@ export function getRandomQuerySuggestion() {
 
 function refillQuerySuggestions() {
   querySuggestions.push(
-    ...__QUERY_SUGGESTIONS__.slice().sort(() => Math.random() - 0.5),
+    ...VITE_QUERY_SUGGESTIONS.slice().sort(() => Math.random() - 0.5),
   );
 }
