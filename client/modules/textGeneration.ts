@@ -79,41 +79,20 @@ export async function prepareTextGeneration() {
         error instanceof Error ? error.message : (error as string);
 
       console.info(
-        `Could not load web-llm chat module: ${errorMessage}\n\nFalling back to Wllama.`,
+        `Could not generate response with Web-LLM: ${errorMessage}\n\nFalling back to Wllama.`,
       );
 
-      try {
-        await generateTextWithWllama();
-      } catch (error) {
-        console.error("Error while generating response with wllama:", error);
-      }
+      await generateTextWithWllama();
     }
-
-    dismissLoadingToast();
   } catch (error) {
-    console.error(
-      "Could not generate response with any of the available models:",
-      error,
-    );
-
-    dismissLoadingToast();
-
-    const restartTimeout = 5000;
+    console.error("Error while generating response with wllama:", error);
 
     toast.error(
-      "Could not generate response. This browser may be out of memory. Let's try refreshing the page.",
-      { duration: restartTimeout },
+      "Could not generate response. The browser may be out of memory. Please close this tab and run this search again in a new one.",
+      { duration: 10000 },
     );
-
-    setTimeout(() => {
-      caches.keys().then(function (cacheNames) {
-        cacheNames.forEach(function (cacheName) {
-          caches.delete(cacheName);
-        });
-        localStorage.clear();
-        location.reload();
-      });
-    }, restartTimeout);
+  } finally {
+    dismissLoadingToast();
   }
 
   if (debug) {
