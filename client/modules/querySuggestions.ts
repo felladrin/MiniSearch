@@ -1,5 +1,13 @@
-export const querySuggestions = __QUERY_SUGGESTIONS__;
+export const querySuggestions: string[] = [];
 
 export function getRandomQuerySuggestion() {
-  return querySuggestions[Math.floor(Math.random() * querySuggestions.length)];
+  if (querySuggestions.length === 0) refillQuerySuggestions();
+
+  return querySuggestions.pop();
+}
+
+function refillQuerySuggestions() {
+  querySuggestions.push(
+    ...__QUERY_SUGGESTIONS__.slice().sort(() => Math.random() - 0.5),
+  );
 }
