@@ -157,6 +157,7 @@ async function generateTextWithWebLlm() {
     Mistral: "Mistral-7B-Instruct-v0.2-q4f16_1",
     Gemma: "gemma-2b-it-q4f16_1",
     Phi: "Phi2-q4f16_1",
+    TinyLlama: "TinyLlama-1.1B-Chat-v0.4-q0f16",
   };
 
   const selectedModel = getUseLargerModelSetting()
