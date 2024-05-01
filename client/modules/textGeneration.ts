@@ -147,7 +147,7 @@ async function generateTextWithWebLlm() {
 
   const selectedModel = getUseLargerModelSetting()
     ? availableModels.Llama
-    : availableModels.Phi;
+    : availableModels.Gemma;
 
   const isModelCached = await hasModelInCache(selectedModel);
 
@@ -192,11 +192,6 @@ async function generateTextWithWebLlm() {
     ].join("\n");
 
     const messages: import("@mlc-ai/web-llm").ChatCompletionMessageParam[] = [
-      {
-        role: "system",
-        content:
-          "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.",
-      },
       { role: "user", content: prompt },
     ];
 
