@@ -73,15 +73,20 @@ export async function prepareTextGeneration() {
 
       if (getDisableWebGpuUsageSetting()) throw Error("WebGPU is disabled.");
 
-      await generateTextWithWebLlm();
+      if (getUseLargerModelSetting()) {
+        try {
+          await generateTextWithWebLlm();
+        } catch (error) {
+          await generateTextWithRatchet();
+        }
+      } else {
+        try {
+          await generateTextWithRatchet();
+        } catch (error) {
+          await generateTextWithWebLlm();
+        }
+      }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : (error as string);
-
-      console.info(
-        `Could not generate response with Web-LLM: ${errorMessage}\n\nFalling back to Wllama.`,
-      );
-
       await generateTextWithWllama();
     }
   } catch (error) {
@@ -410,4 +415,75 @@ async function generateTextWithWllama() {
   }
 
   await exitWllama();
+}
+
+async function generateTextWithRatchet() {
+  const { initializeRatchet, runCompletion, exitRatchet } = await import(
+    "./ratchet"
+  );
+
+  await initializeRatchet((loadingProgressPercentage) =>
+    updateLoadingToast(`Loading: ${Math.floor(loadingProgressPercentage)}%`),
+  );
+
+  if (!getDisableAiResponseSetting()) {
+    if (!query) throw Error("Query is empty.");
+
+    updateLoadingToast("Generating response...");
+
+    const prompt = [
+      "Provide a concise response to the request below.",
+      "If the information from the Web Search Results below is useful, you can use it to complement your response. Otherwise, ignore it.",
+      "",
+      "Web Search Results:",
+      "",
+      getReRankedSearchResults()
+        .slice(0, isRunningOnMobile ? 5 : 10)
+        .map(([title, snippet]) => `- ${title}: ${snippet}`)
+        .join("\n"),
+      "",
+      "Request:",
+      "",
+      query,
+    ].join("\n");
+
+    let response = "";
+
+    await runCompletion(prompt, (completionChunk) => {
+      response += completionChunk;
+      updateResponse(response);
+    });
+
+    if (!response.endsWith(".")) {
+      response += ".";
+      updateResponse(response);
+    }
+  }
+
+  if (getSummarizeLinksSetting()) {
+    updateLoadingToast("Summarizing links...");
+
+    for (const [title, snippet, url] of getSearchResults()) {
+      const prompt = [
+        "Context:",
+        `Link title: ${title}`,
+        `Link snippet: ${snippet}`,
+        "",
+        "Question:",
+        "What is this link about?",
+      ].join("\n");
+
+      let response = "";
+
+      await runCompletion(prompt, (completionChunk) => {
+        response += completionChunk;
+        updateUrlsDescriptions({
+          ...getUrlsDescriptions(),
+          [url]: response,
+        });
+      });
+    }
+  }
+
+  await exitRatchet();
 }
