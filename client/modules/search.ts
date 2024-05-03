@@ -19,8 +19,8 @@ export async function search(query: string, limit?: number) {
   const searchResults = (await response.json()) as SearchResults;
 
   const cleanedSearchResults = searchResults.map(([title, snippet, url]) => [
-    convertHtmlToPlainText(title),
-    convertHtmlToPlainText(snippet),
+    convertHtmlToPlainText(title, { wordwrap: false }),
+    convertHtmlToPlainText(snippet, { wordwrap: false }),
     url,
   ]) as SearchResults;
 
