@@ -9,8 +9,6 @@ import {
   getSearchResults,
   updateUrlsDescriptions,
   getUrlsDescriptions,
-  updateReRankedSearchResults,
-  getReRankedSearchResults,
   getDisableWebGpuUsageSetting,
 } from "./pubSub";
 import { search } from "./search";
@@ -51,8 +49,6 @@ export async function prepareTextGeneration() {
   }
 
   updateSearchResults(searchResults);
-
-  updateReRankedSearchResults(searchResults);
 
   updateUrlsDescriptions(
     searchResults.reduce(
@@ -166,7 +162,7 @@ async function generateTextWithWebLlm() {
       "I have a request/question for you, but before that, I want to provide you with some context.",
       "\n",
       "Context:",
-      getReRankedSearchResults()
+      getSearchResults()
         .slice(0, isRunningOnMobile ? 3 : 6)
         .map(([title, snippet]) => `- ${title}: ${snippet}`)
         .join("\n"),
@@ -338,7 +334,7 @@ async function generateTextWithWllama() {
       [
         "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.",
         "If the information below is useful, you can use it to complement your response. Otherwise, ignore it.",
-        getReRankedSearchResults()
+        getSearchResults()
           .slice(0, isRunningOnMobile ? 5 : 10)
           .map(([title, snippet]) => `- ${title}: ${snippet}`)
           .join("\n"),
@@ -437,7 +433,7 @@ async function generateTextWithRatchet() {
       "",
       "Web Search Results:",
       "",
-      getReRankedSearchResults()
+      getSearchResults()
         .slice(0, isRunningOnMobile ? 5 : 10)
         .map(([title, snippet]) => `- ${title}: ${snippet}`)
         .join("\n"),
