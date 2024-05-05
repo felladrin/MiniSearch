@@ -5,7 +5,8 @@ export function SettingsButton() {
   return (
     <button
       style={{ fontSize: "small" }}
-      onClick={() =>
+      onClick={(event) => {
+        event.preventDefault();
         toast(
           <div>
             <SettingsForm />
@@ -34,8 +35,8 @@ export function SettingsButton() {
               color: "var(--text-main)",
             },
           },
-        )
-      }
+        );
+      }}
     >
       Settings
     </button>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, FormEvent, useState, useCallback } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { getRandomQuerySuggestion } from "../modules/querySuggestions";
+import { SettingsButton } from "./SettingsButton";
 
 export function SearchForm({
   query,
@@ -86,9 +87,12 @@ export function SearchForm({
           minRows={1}
           maxRows={6}
         />
-        <button type="submit" style={{ width: "100%" }}>
-          Search
-        </button>
+        <div style={{ display: "flex", width: "100%" }}>
+          <button type="submit" style={{ width: "100%", fontSize: "small" }}>
+            Search
+          </button>
+          <SettingsButton />
+        </div>
       </form>
     </div>
   );
