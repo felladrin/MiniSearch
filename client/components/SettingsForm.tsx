@@ -7,6 +7,7 @@ import {
 } from "../modules/pubSub";
 import { Tooltip } from "react-tooltip";
 import { isWebGPUAvailable } from "../modules/webGpu";
+import type { ChangeEventHandler } from "react";
 
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -35,87 +36,74 @@ export function SettingsForm() {
         Settings
       </div>
       <div>
-        <Tooltip
-          id="use-large-model-setting-tooltip"
-          place="top-start"
-          variant="info"
-          opacity="1"
-          style={{ width: "75vw", maxWidth: "600px" }}
+        <SettingCheckbox
+          label="Use a larger AI model"
+          checked={useLargerModel}
+          onChange={(event) => setUseLargerModel(event.target.checked)}
+          tooltipId="use-large-model-setting-tooltip"
+          tooltipContent="Generates better responses, but takes longer to load"
         />
-        <label
-          data-tooltip-id="use-large-model-setting-tooltip"
-          data-tooltip-content="Generates better responses, but takes longer to load"
-        >
-          <input
-            type="checkbox"
-            checked={useLargerModel}
-            onChange={(event) => setUseLargerModel(event.target.checked)}
-          />
-          Use a larger AI model
-        </label>
       </div>
       <div>
-        <Tooltip
-          id="summarize-links-setting-tooltip"
-          place="top-start"
-          variant="info"
-          opacity="1"
-          style={{ width: "75vw", maxWidth: "600px" }}
+        <SettingCheckbox
+          label="Summarize links"
+          checked={summarizeLinks}
+          onChange={(event) => setSummarizeLinks(event.target.checked)}
+          tooltipId="summarize-links-setting-tooltip"
+          tooltipContent="Provides a short overview for each of the links from the web search results"
         />
-        <label
-          data-tooltip-id="summarize-links-setting-tooltip"
-          data-tooltip-content="Provides a short overview for each of the links from the web search results"
-        >
-          <input
-            type="checkbox"
-            checked={summarizeLinks}
-            onChange={(event) => setSummarizeLinks(event.target.checked)}
-          />
-          Summarize links
-        </label>
       </div>
       {isWebGPUAvailable && (
         <div>
-          <Tooltip
-            id="use-large-model-setting-tooltip"
-            place="top-start"
-            variant="info"
-            opacity="1"
-            style={{ width: "75vw", maxWidth: "600px" }}
+          <SettingCheckbox
+            label="Disable WebGPU usage"
+            checked={disableWebGpuUsage}
+            onChange={(event) => setDisableWebGpuUsage(event.target.checked)}
+            tooltipId="use-large-model-setting-tooltip"
+            tooltipContent="Disables the WebGPU and run smaller AI models only using the CPU"
           />
-          <label
-            data-tooltip-id="use-large-model-setting-tooltip"
-            data-tooltip-content="Disables the WebGPU and run smaller AI models only using the CPU"
-          >
-            <input
-              type="checkbox"
-              checked={disableWebGpuUsage}
-              onChange={(event) => setDisableWebGpuUsage(event.target.checked)}
-            />
-            Disable WebGPU usage
-          </label>
         </div>
       )}
       <div>
-        <Tooltip
-          id="disable-ai-setting-tooltip"
-          place="top-start"
-          variant="info"
-          opacity="1"
-          style={{ width: "75vw", maxWidth: "600px" }}
+        <SettingCheckbox
+          label="Disable AI response"
+          checked={disableAiResponse}
+          onChange={(event) => setDisableAiResponse(event.target.checked)}
+          tooltipId="disable-ai-setting-tooltip"
+          tooltipContent="Disables the AI response, in case you only want to see the links from the web search results"
         />
-        <label
-          data-tooltip-id="disable-ai-setting-tooltip"
-          data-tooltip-content="Disables the AI response, in case you only want to see the links from the web search results"
-        >
-          <input
-            type="checkbox"
-            checked={disableAiResponse}
-            onChange={(event) => setDisableAiResponse(event.target.checked)}
-          />
-          Disable AI response
-        </label>
       </div>
     </div>
+  );
+}
+
+function SettingCheckbox(props: {
+  label: string;
+  checked?: boolean;
+  onChange?: ChangeEventHandler<HTMLInputElement>;
+  tooltipId?: string;
+  tooltipContent?: string;
+}) {
+  return (
+    <>
+      <Tooltip
+        id={props.tooltipId}
+        place="top-start"
+        variant="info"
+        opacity="1"
+        style={{ maxWidth: "90vw" }}
+      />
+      <label
+        data-tooltip-id={props.tooltipId}
+        data-tooltip-content={props.tooltipContent}
+      >
+        <input
+          type="checkbox"
+          checked={props.checked}
+          onChange={props.onChange}
+        />
+        {props.label}
+      </label>
+    </>
   );
 }
