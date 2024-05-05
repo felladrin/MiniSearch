@@ -277,15 +277,16 @@ function getQuerySuggestions(limit?: number) {
     .slice(0, limit);
 }
 
-let cachedEmbeddingModel: EmbeddingsModel | undefined;
+let embeddingModelInstance: EmbeddingsModel | undefined;
 
 async function getSimilarityScores(query: string, documents: string[]) {
-  if (!cachedEmbeddingModel)
-    cachedEmbeddingModel = await initModel(embeddingModel);
+  if (!embeddingModelInstance) {
+    embeddingModelInstance = await initModel(embeddingModel);
+  }
 
-  const [queryEmbedding] = await cachedEmbeddingModel.embed([query]);
+  const [queryEmbedding] = await embeddingModelInstance.embed([query]);
 
-  const documentsEmbeddings = await cachedEmbeddingModel.embed(documents);
+  const documentsEmbeddings = await embeddingModelInstance.embed(documents);
 
   return documentsEmbeddings.map((documentEmbedding) =>
     calculateSimilarity(queryEmbedding, documentEmbedding),
