@@ -57,6 +57,8 @@ export async function prepareTextGeneration() {
     ),
   );
 
+  dismissLoadingToast();
+
   if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
 
   if (debug) console.time("Response Generation Time");
