@@ -2,6 +2,8 @@ import { SettingsForm } from "./SettingsForm";
 import { toast } from "react-hot-toast";
 
 export function SettingsButton() {
+  const toastId = "settings-toast";
+
   return (
     <button
       style={{ fontSize: "small", marginRight: 0 }}
@@ -19,14 +21,14 @@ export function SettingsButton() {
             >
               <button
                 style={{ fontSize: "small" }}
-                onClick={() => toast.dismiss()}
+                onClick={() => toast.dismiss(toastId)}
               >
                 Done
               </button>
             </div>
           </div>,
           {
-            id: "settings-toast",
+            id: toastId,
             duration: Infinity,
             position: "bottom-center",
             style: {
