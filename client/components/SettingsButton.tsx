@@ -4,7 +4,7 @@ import { toast } from "react-hot-toast";
 export function SettingsButton() {
   return (
     <button
-      style={{ fontSize: "small" }}
+      style={{ fontSize: "small", marginRight: 0 }}
       onClick={(event) => {
         event.preventDefault();
         toast(
