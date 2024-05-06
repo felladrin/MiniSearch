@@ -453,7 +453,7 @@ async function fetchPageContent(
 ) {
   const response = await fetch(`https://r.jina.ai/${url}`);
 
-  if (!response || !response.ok) {
+  if (!response) {
     throw new Error("No response from server");
   } else if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
