@@ -11,7 +11,7 @@ import {
   getUrlsDescriptions,
   getDisableWebGpuUsageSetting,
 } from "./pubSub";
-import { search } from "./search";
+import { SearchResults, search } from "./search";
 import { query, debug } from "./urlParams";
 import toast from "react-hot-toast";
 import { isRunningOnMobile } from "./mobileDetection";
@@ -160,26 +160,9 @@ async function generateTextWithWebLlm() {
   if (!getDisableAiResponseSetting()) {
     updateLoadingToast("Generating response...");
 
-    const prompt = [
-      "I have a request/question for you, but before that, I want to provide you with some context.",
-      "\n",
-      "Context:",
-      getSearchResults()
-        .slice(0, isRunningOnMobile ? 3 : 6)
-        .map(([title, snippet]) => `- ${title}: ${snippet}`)
-        .join("\n"),
-      "\n",
-      "Now, my request/question is:",
-      query,
-    ].join("\n");
-
-    const messages: import("@mlc-ai/web-llm").ChatCompletionMessageParam[] = [
-      { role: "user", content: prompt },
-    ];
-
     const completion = await engine.chat.completions.create({
       stream: true,
-      messages: messages,
+      messages: [{ role: "user", content: getMainPrompt() }],
       max_gen_len: 768,
     });
 
@@ -200,20 +183,15 @@ async function generateTextWithWebLlm() {
     updateLoadingToast("Summarizing links...");
 
     for (const [title, snippet, url] of getSearchResults()) {
-      const prompt = [
-        `When searching for "${query}", this link was found: [${title}](${url} "${snippet}")`,
-        "Now, tell me: What is this link about and how is it related to the search?",
-        "Note: Don't cite the link in your response. Just write a few sentences to indicate if it's worth visiting.",
-      ].join("\n");
-
-      const messages: import("@mlc-ai/web-llm").ChatCompletionMessageParam[] = [
-        { role: "user", content: prompt },
-      ];
-
       const completion = await engine.chat.completions.create({
         stream: true,
-        messages: messages,
-        max_gen_len: 128,
+        messages: [
+          {
+            role: "user",
+            content: await getLinkSummarizationPrompt([title, snippet, url]),
+          },
+        ],
+        max_gen_len: 768,
       });
 
       let streamedMessage = "";
@@ -424,30 +402,14 @@ async function generateTextWithRatchet() {
 
     updateLoadingToast("Generating response...");
 
-    const prompt = [
-      "Provide a concise response to the request below.",
-      "If the information from the Web Search Results below is useful, you can use it to complement your response. Otherwise, ignore it.",
-      "",
-      "Web Search Results:",
-      "",
-      getSearchResults()
-        .slice(0, isRunningOnMobile ? 5 : 10)
-        .map(([title, snippet]) => `- ${title}: ${snippet}`)
-        .join("\n"),
-      "",
-      "Request:",
-      "",
-      query,
-    ].join("\n");
-
     let response = "";
 
-    await runCompletion(prompt, (completionChunk) => {
+    await runCompletion(getMainPrompt(), (completionChunk) => {
       response += completionChunk;
       updateResponse(response);
     });
 
-    if (!response.endsWith(".")) {
+    if (!endsWithASign(response)) {
       response += ".";
       updateResponse(response);
     }
@@ -457,26 +419,107 @@ async function generateTextWithRatchet() {
     updateLoadingToast("Summarizing links...");
 
     for (const [title, snippet, url] of getSearchResults()) {
-      const prompt = [
-        "Context:",
-        `Link title: ${title}`,
-        `Link snippet: ${snippet}`,
-        "",
-        "Question:",
-        "What is this link about?",
-      ].join("\n");
-
       let response = "";
 
-      await runCompletion(prompt, (completionChunk) => {
-        response += completionChunk;
+      await runCompletion(
+        await getLinkSummarizationPrompt([title, snippet, url]),
+        (completionChunk) => {
+          response += completionChunk;
+          updateUrlsDescriptions({
+            ...getUrlsDescriptions(),
+            [url]: response,
+          });
+        },
+      );
+
+      if (!endsWithASign(response)) {
+        response += ".";
         updateUrlsDescriptions({
           ...getUrlsDescriptions(),
           [url]: response,
         });
-      });
+      }
     }
   }
 
   await exitRatchet();
+}
+
+async function fetchPageContent(
+  url: string,
+  options?: {
+    maxLength?: number;
+  },
+) {
+  const response = await fetch(`https://r.jina.ai/${url}`);
+
+  if (!response || !response.ok) {
+    throw new Error("No response from server");
+  } else if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const text = await response.text();
+
+  return text.trim().substring(0, options?.maxLength);
+}
+
+function endsWithASign(text: string) {
+  return text.endsWith(".") || text.endsWith("!") || text.endsWith("?");
+}
+
+function getMainPrompt() {
+  return [
+    "Provide a concise response to the request below.",
+    "If the information from the Web Search Results below is useful, you can use it to complement your response. Otherwise, ignore it.",
+    "",
+    "Web Search Results:",
+    "",
+    getSearchResults()
+      .slice(0, isRunningOnMobile ? 5 : 10)
+      .map(([title, snippet]) => `- ${title}: ${snippet}`)
+      .join("\n"),
+    "",
+    "Request:",
+    "",
+    query,
+  ].join("\n");
+}
+
+async function getLinkSummarizationPrompt([
+  title,
+  snippet,
+  url,
+]: SearchResults[0]) {
+  let prompt = "";
+
+  try {
+    const pageContent = await fetchPageContent(url, {
+      maxLength: isRunningOnMobile ? 1750 : 3500,
+    });
+
+    prompt = [
+      `The context below is related to a link found when searching for "${query}":`,
+      "",
+      "[BEGIN OF CONTEXT]",
+      `Snippet: ${snippet}`,
+      "",
+      pageContent,
+      "[END OF CONTEXT]",
+      "",
+      "Now, tell me: What is this link about and how is it related to the search?",
+      "",
+      "Note: Don't cite the link in your response. Just write a few sentences to indicate if it's worth visiting.",
+    ].join("\n");
+  } catch (error) {
+    prompt = [
+      `When searching for "${query}", this link was found: [${title}](${url} "${snippet}")`,
+      "",
+      "Now, tell me: What is this link about and how is it related to the search?",
+      "",
+      "Note: Don't cite the link in your response. Just write a few sentences to indicate if it's worth visiting.",
+    ].join("\n");
+  }
+
+  return prompt;
 }
