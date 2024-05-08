@@ -12,16 +12,22 @@ export function SearchForm({
 }) {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const windowInnerHeight = useWindowInnerHeight();
-  const [suggestedQuery, setSuggestedQuery] = useState<string>(
-    getRandomQuerySuggestion(),
-  );
+  const [suggestedQuery, setSuggestedQuery] = useState("");
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const userQueryIsBlank = event.target.value.trim().length === 0;
-    const suggestedQueryIsBlank = suggestedQuery.trim().length === 0;
+  useEffect(() => {
+    getRandomQuerySuggestion().then((querySuggestion) => {
+      setSuggestedQuery(querySuggestion);
+    });
+  }, []);
+
+  const handleInputChange = async (
+    event: React.ChangeEvent<HTMLTextAreaElement>,
+  ) => {
+    const userQueryIsBlank = event.target.value.length === 0;
+    const suggestedQueryIsBlank = suggestedQuery.length === 0;
 
     if (userQueryIsBlank && suggestedQueryIsBlank) {
-      setSuggestedQuery(getRandomQuerySuggestion());
+      setSuggestedQuery(await getRandomQuerySuggestion());
     } else if (!userQueryIsBlank && !suggestedQueryIsBlank) {
       setSuggestedQuery("");
     }

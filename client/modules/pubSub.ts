@@ -45,6 +45,14 @@ export const disableWebGpuUsageSettingPubSub = createLocalStoragePubSub(
 export const [, , getDisableWebGpuUsageSetting] =
   disableWebGpuUsageSettingPubSub;
 
+export const querySuggestionsPubSub = createLocalStoragePubSub<string[]>(
+  "querySuggestions",
+  [],
+);
+
+export const [updateQuerySuggestions, , getQuerySuggestions] =
+  querySuggestionsPubSub;
+
 export const promptPubSub = createPubSub("");
 
 export const [updatePrompt] = promptPubSub;
