@@ -253,9 +253,9 @@ async function generateTextWithWllama() {
   } = {
     mobileDefault: {
       url: "https://huggingface.co/Felladrin/gguf-vicuna-160m/resolve/main/vicuna-160m.Q8_0.gguf",
-      userPrefix: "USER:",
-      assistantPrefix: "ASSISTANT:",
-      messageSuffix: "</s> ",
+      userPrefix: "USER:\n",
+      assistantPrefix: "ASSISTANT:\n",
+      messageSuffix: "</s>\n",
       sampling: commonSamplingConfig,
     },
     mobileLarger: {
