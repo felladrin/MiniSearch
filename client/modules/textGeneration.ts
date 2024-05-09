@@ -266,14 +266,14 @@ async function generateTextWithWllama() {
       sampling: commonSamplingConfig,
     },
     desktopDefault: {
-      url: "https://huggingface.co/Felladrin/gguf-Qwen1.5-0.5B-Chat/resolve/main/Qwen1.5-0.5B-Chat.Q8_0.gguf",
+      url: "https://huggingface.co/Felladrin/gguf-TinyLlama-1.1B-1T-OpenOrca/resolve/main/tinyllama-1.1b-1t-openorca.Q8_0.gguf",
       userPrefix: "<|im_start|>user\n",
       assistantPrefix: "<|im_start|>assistant\n",
       messageSuffix: "<|im_end|>\n",
       sampling: commonSamplingConfig,
     },
     desktopLarger: {
-      url: "https://huggingface.co/Felladrin/gguf-TinyLlama-1.1B-1T-OpenOrca/resolve/main/tinyllama-1.1b-1t-openorca.Q8_0.gguf",
+      url: "https://huggingface.co/Felladrin/gguf-stablelm-2-1_6b-chat/resolve/main/stablelm-2-1_6b-chat.Q8_0.gguf",
       userPrefix: "<|im_start|>user\n",
       assistantPrefix: "<|im_start|>assistant\n",
       messageSuffix: "<|im_end|>\n",
