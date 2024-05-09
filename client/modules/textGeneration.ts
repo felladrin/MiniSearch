@@ -485,9 +485,7 @@ async function getLinkSummarizationPrompt([
   let prompt = "";
 
   try {
-    const pageContent = await fetchPageContent(url, {
-      maxLength: isRunningOnMobile ? 1750 : 3500,
-    });
+    const pageContent = await fetchPageContent(url, { maxLength: 2500 });
 
     prompt = [
       `The context below is related to a link found when searching for "${query}":`,
