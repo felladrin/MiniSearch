@@ -307,13 +307,7 @@ async function generateTextWithWllama() {
       "Hi! How can I help you?",
       selectedModel.messageSuffix,
       selectedModel.userPrefix,
-      [
-        "Take a look at this info:",
-        getSearchResults()
-          .slice(0, 6)
-          .map(([title, snippet]) => `- ${title}: ${snippet}`)
-          .join("\n"),
-      ].join("\n\n"),
+      ["Take a look at this info:", getFormattedSearchResults(5)].join("\n\n"),
       selectedModel.messageSuffix,
       selectedModel.assistantPrefix,
       "Alright!",
@@ -475,10 +469,7 @@ function getMainPrompt() {
     "",
     "Web Search Results:",
     "",
-    getSearchResults()
-      .slice(0, isRunningOnMobile ? 5 : 10)
-      .map(([title, snippet]) => `- ${title}: ${snippet}`)
-      .join("\n"),
+    getFormattedSearchResults(5),
     "",
     "Request:",
     "",
@@ -522,4 +513,11 @@ async function getLinkSummarizationPrompt([
   }
 
   return prompt;
+}
+
+function getFormattedSearchResults(limit?: number) {
+  return getSearchResults()
+    .slice(0, limit)
+    .map(([title, snippet, url]) => `${title}\n${url}\n${snippet}`)
+    .join("\n\n");
 }
