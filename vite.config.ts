@@ -289,8 +289,8 @@ async function rankSearchResults(
 ) {
   const scores = await getSimilarityScores(
     query.toLocaleLowerCase(),
-    searchResults.map(([title, snippet]) =>
-      `${title}: ${snippet}`.toLocaleLowerCase(),
+    searchResults.map(([title, snippet, url]) =>
+      `${title}\n${url}\n${snippet}`.toLocaleLowerCase(),
     ),
   );
 
