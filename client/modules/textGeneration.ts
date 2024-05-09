@@ -25,14 +25,13 @@ export async function prepareTextGeneration() {
 
   updateLoadingToast("Searching the web...");
 
-  let searchResults = await search(query, 30);
+  let searchResults = await search(
+    query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query,
+    30,
+  );
 
   if (searchResults.length === 0) {
-    const queryKeywords = (await import("keyword-extractor")).default
-      .extract(query, {
-        language: "english",
-      })
-      .slice(0, 10);
+    const queryKeywords = await getKeywords(query, 10);
 
     searchResults = await search(queryKeywords.join(" "), 30);
   }
@@ -518,4 +517,10 @@ function getFormattedSearchResults(limit?: number) {
     .slice(0, limit)
     .map(([title, snippet, url]) => `${title}\n${url}\n${snippet}`)
     .join("\n\n");
+}
+
+async function getKeywords(text: string, limit?: number) {
+  return (await import("keyword-extractor")).default
+    .extract(text, { language: "english" })
+    .slice(0, limit);
 }
