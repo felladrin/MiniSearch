@@ -1,5 +1,5 @@
 import {
-  LoadModelConfig,
+  DownloadModelConfig,
   SamplingConfig,
   Wllama,
   AssetsPathConfig,
@@ -14,7 +14,7 @@ let wllama: Wllama | undefined;
 
 export async function initializeWllama(config: {
   modelUrl: string;
-  modelConfig?: LoadModelConfig;
+  modelConfig?: DownloadModelConfig;
 }) {
   const wllamaConfigPaths: AssetsPathConfig = {
     "single-thread/wllama.js": singleThreadWllamaJsUrl,
