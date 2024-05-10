@@ -13,7 +13,7 @@ import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllam
 let wllama: Wllama | undefined;
 
 export async function initializeWllama(config: {
-  modelUrl: string;
+  modelUrl: string | string[];
   modelConfig?: DownloadModelConfig;
 }) {
   const wllamaConfigPaths: AssetsPathConfig = {
