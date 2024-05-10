@@ -320,6 +320,10 @@ async function generateTextWithWllama() {
     modelUrl: selectedModel.url,
     modelConfig: {
       n_ctx: 2048,
+      n_threads:
+        (navigator.hardwareConcurrency ?? 1) > 1
+          ? Math.max(navigator.hardwareConcurrency - 2, 2)
+          : 1,
       progressCallback: ({ loaded, total }) => {
         const progressPercentage = Math.round((loaded / total) * 100);
 
