@@ -84,7 +84,11 @@ export async function prepareTextGeneration() {
         }
       }
     } catch (error) {
-      await generateTextWithWllama();
+      try {
+        await generateTextWithWllama();
+      } catch (error) {
+        await generateTextWithWllama({ forceSingleThread: true });
+      }
     }
   } catch (error) {
     console.error("Error while generating response with wllama:", error);
@@ -217,7 +221,9 @@ async function generateTextWithWebLlm() {
   engine.unload();
 }
 
-async function generateTextWithWllama() {
+async function generateTextWithWllama(options?: {
+  forceSingleThread?: boolean;
+}) {
   const { initializeWllama, runCompletion, exitWllama } = await import(
     "./wllama"
   );
@@ -308,15 +314,12 @@ async function generateTextWithWllama() {
 
   let loadingPercentage = 0;
 
-  const wllamaConfig: {
-    modelUrl: string | string[];
-    modelConfig: import("@wllama/wllama").DownloadModelConfig;
-  } = {
+  await initializeWllama({
     modelUrl: selectedModel.url,
     modelConfig: {
       n_ctx: 2048,
       n_threads:
-        (navigator.hardwareConcurrency ?? 1) > 1
+        !options?.forceSingleThread && (navigator.hardwareConcurrency ?? 1) > 1
           ? Math.max(navigator.hardwareConcurrency - 2, 2)
           : 1,
       progressCallback: ({ loaded, total }) => {
@@ -333,17 +336,7 @@ async function generateTextWithWllama() {
         }
       },
     },
-  };
-
-  try {
-    await initializeWllama(wllamaConfig);
-  } catch (error) {
-    await exitWllama();
-
-    wllamaConfig.modelConfig.n_threads = 1;
-
-    await initializeWllama(wllamaConfig);
-  }
+  });
 
   if (!getDisableAiResponseSetting()) {
     const prompt = [
