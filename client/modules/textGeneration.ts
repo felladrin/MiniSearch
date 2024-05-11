@@ -257,16 +257,32 @@ async function generateTextWithWllama(options?: {
     };
   } = {
     mobileDefault: {
-      url: "https://huggingface.co/Felladrin/gguf-vicuna-160m/resolve/main/vicuna-160m.Q8_0.gguf",
+      url: Array.from(
+        { length: 7 },
+        (_, i) =>
+          `https://huggingface.co/Felladrin/gguf-sharded-vicuna-160m/resolve/main/vicuna-160m.Q8_0.shard-${(
+            i + 1
+          )
+            .toString()
+            .padStart(5, "0")}-of-00007.gguf`,
+      ),
       userPrefix: "USER:\n",
       assistantPrefix: "ASSISTANT:\n",
       messageSuffix: "</s>\n",
       sampling: commonSamplingConfig,
     },
     mobileLarger: {
-      url: "https://huggingface.co/Felladrin/gguf-zephyr-220m-dpo-full/resolve/main/zephyr-220m-dpo-full.Q8_0.gguf",
-      userPrefix: "<|user|>\n",
-      assistantPrefix: "<|assistant|>\n",
+      url: Array.from(
+        { length: 7 },
+        (_, i) =>
+          `https://huggingface.co/Felladrin/gguf-sharded-vicuna-160m/resolve/main/vicuna-160m.F16.shard-${(
+            i + 1
+          )
+            .toString()
+            .padStart(5, "0")}-of-00007.gguf`,
+      ),
+      userPrefix: "USER:\n",
+      assistantPrefix: "ASSISTANT:\n",
       messageSuffix: "</s>\n",
       sampling: commonSamplingConfig,
     },
