@@ -260,30 +260,30 @@ async function generateTextWithWllama(options?: {
       url: Array.from(
         { length: 7 },
         (_, i) =>
-          `https://huggingface.co/Felladrin/gguf-sharded-vicuna-160m/resolve/main/vicuna-160m.Q8_0.shard-${(
-            i + 1
-          )
-            .toString()
-            .padStart(5, "0")}-of-00007.gguf`,
-      ),
-      userPrefix: "USER:\n",
-      assistantPrefix: "ASSISTANT:\n",
-      messageSuffix: "</s>\n",
-      sampling: commonSamplingConfig,
-    },
-    mobileLarger: {
-      url: Array.from(
-        { length: 7 },
-        (_, i) =>
           `https://huggingface.co/Felladrin/gguf-sharded-vicuna-160m/resolve/main/vicuna-160m.F16.shard-${(
             i + 1
           )
             .toString()
             .padStart(5, "0")}-of-00007.gguf`,
       ),
-      userPrefix: "USER:\n",
-      assistantPrefix: "ASSISTANT:\n",
-      messageSuffix: "</s>\n",
+      userPrefix: "USER:",
+      assistantPrefix: "ASSISTANT:",
+      messageSuffix: "</s>",
+      sampling: commonSamplingConfig,
+    },
+    mobileLarger: {
+      url: Array.from(
+        { length: 10 },
+        (_, i) =>
+          `https://huggingface.co/Felladrin/gguf-sharded-TinyLlama-1.1B-1T-OpenOrca/resolve/main/tinyllama-1.1b-1t-openorca.Q3_K_S.shard-${(
+            i + 1
+          )
+            .toString()
+            .padStart(5, "0")}-of-00010.gguf`,
+      ),
+      userPrefix: "<|im_start|>user\n",
+      assistantPrefix: "<|im_start|>assistant\n",
+      messageSuffix: "<|im_end|>\n",
       sampling: commonSamplingConfig,
     },
     desktopDefault: {
