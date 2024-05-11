@@ -259,13 +259,13 @@ async function generateTextWithWllama() {
     },
     mobileLarger: {
       url: Array.from(
-        { length: 4 },
+        { length: 3 },
         (_, i) =>
-          `https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat/resolve/main/Qwen1.5-0.5B-Chat.Q8_0.shard-${(
+          `https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat/resolve/main/Qwen1.5-0.5B-Chat.Q4_k_m.shard-${(
             i + 1
           )
             .toString()
-            .padStart(5, "0")}-of-00004.gguf`,
+            .padStart(5, "0")}-of-00003.gguf`,
       ),
       userPrefix: "<|im_start|>user\n",
       assistantPrefix: "<|im_start|>assistant\n",
