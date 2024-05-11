@@ -308,12 +308,15 @@ async function generateTextWithWllama() {
 
   let loadingPercentage = 0;
 
-  await initializeWllama({
+  const wllamaConfig: {
+    modelUrl: string | string[];
+    modelConfig: import("@wllama/wllama").DownloadModelConfig;
+  } = {
     modelUrl: selectedModel.url,
     modelConfig: {
       n_ctx: 2048,
       n_threads:
-        !isRunningOnMobile && (navigator.hardwareConcurrency ?? 1) > 1
+        (navigator.hardwareConcurrency ?? 1) > 1
           ? Math.max(navigator.hardwareConcurrency - 2, 2)
           : 1,
       progressCallback: ({ loaded, total }) => {
@@ -330,7 +333,17 @@ async function generateTextWithWllama() {
         }
       },
     },
-  });
+  };
+
+  try {
+    await initializeWllama(wllamaConfig);
+  } catch (error) {
+    await exitWllama();
+
+    wllamaConfig.modelConfig.n_threads = 1;
+
+    await initializeWllama(wllamaConfig);
+  }
 
   if (!getDisableAiResponseSetting()) {
     const prompt = [

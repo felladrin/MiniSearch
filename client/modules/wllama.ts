@@ -45,9 +45,7 @@ export async function runCompletion(config: {
 }
 
 export async function exitWllama() {
-  if (!wllama) throw new Error("Wllama is not initialized.");
-
-  await wllama.exit();
+  if (wllama) await wllama.exit();
 
   wllama = undefined;
 }
