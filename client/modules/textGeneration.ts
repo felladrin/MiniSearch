@@ -141,7 +141,7 @@ async function generateTextWithWebLlm() {
     | undefined;
 
   if (isModelCached) {
-    updateLoadingToast("Generating response...");
+    updateLoadingToast("Thinking...");
   } else {
     initProgressCallback = (report) => {
       updateLoadingToast(
@@ -161,7 +161,9 @@ async function generateTextWithWebLlm() {
     : await CreateEngine(selectedModel, { initProgressCallback });
 
   if (!getDisableAiResponseSetting()) {
-    updateLoadingToast("Generating response...");
+    updateLoadingToast("Thinking...");
+
+    let isAnswering = false;
 
     const completion = await engine.chat.completions.create({
       stream: true,
@@ -175,6 +177,11 @@ async function generateTextWithWebLlm() {
       const deltaContent = chunk.choices[0].delta.content;
 
       if (deltaContent) streamedMessage += deltaContent;
+
+      if (!isAnswering) {
+        isAnswering = true;
+        updateLoadingToast("Answering...");
+      }
 
       updateResponse(streamedMessage);
     }
@@ -411,13 +418,19 @@ async function generateTextWithWllama(options?: {
 
     if (!query) throw Error("Query is empty.");
 
-    updateLoadingToast("Generating response...");
+    updateLoadingToast("Thinking...");
+
+    let isAnswering = false;
 
     const completion = await runCompletion({
       prompt,
       nPredict: 768,
       sampling: selectedModel.sampling,
       onNewToken: (_token, _piece, currentText) => {
+        if (!isAnswering) {
+          isAnswering = true;
+          updateLoadingToast("Answering...");
+        }
         updateResponse(currentText);
       },
     });
@@ -479,11 +492,18 @@ async function generateTextWithRatchet() {
   if (!getDisableAiResponseSetting()) {
     if (!query) throw Error("Query is empty.");
 
-    updateLoadingToast("Generating response...");
+    updateLoadingToast("Thinking...");
+
+    let isAnswering = false;
 
     let response = "";
 
     await runCompletion(getMainPrompt(), (completionChunk) => {
+      if (!isAnswering) {
+        isAnswering = true;
+        updateLoadingToast("Answering...");
+      }
+
       response += completionChunk;
       updateResponse(response);
     });
