@@ -318,6 +318,38 @@ async function generateTextWithWllama(options?: {
     },
   };
 
+  const threadsToUse =
+    !options?.forceSingleThread && (navigator.hardwareConcurrency ?? 1) > 1
+      ? Math.max(navigator.hardwareConcurrency - 2, 2)
+      : 1;
+
+  if (threadsToUse === 1) {
+    availableModels.desktopDefault = availableModels.mobileDefault;
+    availableModels.desktopLarger = availableModels.mobileLarger;
+    availableModels.mobileDefault = {
+      url: "https://huggingface.co/Felladrin/gguf-zephyr-220m-dpo-full/resolve/main/zephyr-220m-dpo-full.Q8_0.gguf",
+      userPrefix: "<|user|>\n",
+      assistantPrefix: "<|assistant|>\n",
+      messageSuffix: "</s>\n",
+      sampling: commonSamplingConfig,
+    };
+    availableModels.mobileLarger = {
+      url: Array.from(
+        { length: 7 },
+        (_, i) =>
+          `https://huggingface.co/Felladrin/gguf-sharded-vicuna-160m/resolve/main/vicuna-160m.F16.shard-${(
+            i + 1
+          )
+            .toString()
+            .padStart(5, "0")}-of-00007.gguf`,
+      ),
+      userPrefix: "USER:",
+      assistantPrefix: "ASSISTANT:",
+      messageSuffix: "</s>",
+      sampling: commonSamplingConfig,
+    };
+  }
+
   const defaultModel = isRunningOnMobile
     ? availableModels.mobileDefault
     : availableModels.desktopDefault;
@@ -334,10 +366,7 @@ async function generateTextWithWllama(options?: {
     modelUrl: selectedModel.url,
     modelConfig: {
       n_ctx: 2048,
-      n_threads:
-        !options?.forceSingleThread && (navigator.hardwareConcurrency ?? 1) > 1
-          ? Math.max(navigator.hardwareConcurrency - 2, 2)
-          : 1,
+      n_threads: threadsToUse,
       progressCallback: ({ loaded, total }) => {
         const progressPercentage = Math.round((loaded / total) * 100);
 
