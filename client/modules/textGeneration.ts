@@ -267,15 +267,15 @@ async function generateTextWithWllama(options?: {
       url: Array.from(
         { length: 7 },
         (_, i) =>
-          `https://huggingface.co/Felladrin/gguf-sharded-vicuna-160m/resolve/main/vicuna-160m.F16.shard-${(
+          `https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.F16.shard-${(
             i + 1
           )
             .toString()
             .padStart(5, "0")}-of-00007.gguf`,
       ),
-      userPrefix: "USER:",
-      assistantPrefix: "ASSISTANT:",
-      messageSuffix: "</s>",
+      userPrefix: "<|im_start|>user\n",
+      assistantPrefix: "<|im_start|>assistant\n",
+      messageSuffix: "<|im_end|>\n",
       sampling: commonSamplingConfig,
     },
     mobileLarger: {
@@ -334,25 +334,33 @@ async function generateTextWithWllama(options?: {
     availableModels.desktopDefault = availableModels.mobileDefault;
     availableModels.desktopLarger = availableModels.mobileLarger;
     availableModels.mobileDefault = {
-      url: "https://huggingface.co/Felladrin/gguf-zephyr-220m-dpo-full/resolve/main/zephyr-220m-dpo-full.Q8_0.gguf",
-      userPrefix: "<|user|>\n",
-      assistantPrefix: "<|assistant|>\n",
-      messageSuffix: "</s>\n",
+      url: Array.from(
+        { length: 7 },
+        (_, i) =>
+          `https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-${(
+            i + 1
+          )
+            .toString()
+            .padStart(5, "0")}-of-00007.gguf`,
+      ),
+      userPrefix: "<|im_start|>user\n",
+      assistantPrefix: "<|im_start|>assistant\n",
+      messageSuffix: "<|im_end|>\n",
       sampling: commonSamplingConfig,
     };
     availableModels.mobileLarger = {
       url: Array.from(
         { length: 7 },
         (_, i) =>
-          `https://huggingface.co/Felladrin/gguf-sharded-vicuna-160m/resolve/main/vicuna-160m.F16.shard-${(
+          `https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.F16.shard-${(
             i + 1
           )
             .toString()
             .padStart(5, "0")}-of-00007.gguf`,
       ),
-      userPrefix: "USER:",
-      assistantPrefix: "ASSISTANT:",
-      messageSuffix: "</s>",
+      userPrefix: "<|im_start|>user\n",
+      assistantPrefix: "<|im_start|>assistant\n",
+      messageSuffix: "<|im_end|>\n",
       sampling: commonSamplingConfig,
     };
   }
