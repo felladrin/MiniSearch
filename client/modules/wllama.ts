@@ -38,7 +38,7 @@ export async function runCompletion(config: {
     piece: Uint8Array,
     currentText: string,
     optionals: {
-      abortSignal: () => any;
+      abortSignal: () => void;
     },
   ) => void;
 }) {
