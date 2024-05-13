@@ -84,11 +84,7 @@ export async function prepareTextGeneration() {
         }
       }
     } catch (error) {
-      try {
-        await generateTextWithWllama();
-      } catch (error) {
-        await generateTextWithWllama({ forceSingleThread: true });
-      }
+      await generateTextWithWllama();
     }
   } catch (error) {
     console.error("Error while generating response with wllama:", error);
@@ -228,9 +224,7 @@ async function generateTextWithWebLlm() {
   engine.unload();
 }
 
-async function generateTextWithWllama(options?: {
-  forceSingleThread?: boolean;
-}) {
+async function generateTextWithWllama() {
   const { initializeWllama, runCompletion, exitWllama } = await import(
     "./wllama"
   );
@@ -267,7 +261,7 @@ async function generateTextWithWllama(options?: {
       url: Array.from(
         { length: 7 },
         (_, i) =>
-          `https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.F16.shard-${(
+          `https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-${(
             i + 1
           )
             .toString()
@@ -280,13 +274,13 @@ async function generateTextWithWllama(options?: {
     },
     mobileLarger: {
       url: Array.from(
-        { length: 10 },
+        { length: 7 },
         (_, i) =>
-          `https://huggingface.co/Felladrin/gguf-sharded-TinyLlama-1.1B-1T-OpenOrca/resolve/main/tinyllama-1.1b-1t-openorca.Q3_K_S.shard-${(
+          `https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-${(
             i + 1
           )
             .toString()
-            .padStart(5, "0")}-of-00010.gguf`,
+            .padStart(5, "0")}-of-00007.gguf`,
       ),
       userPrefix: "<|im_start|>user\n",
       assistantPrefix: "<|im_start|>assistant\n",
@@ -325,46 +319,6 @@ async function generateTextWithWllama(options?: {
     },
   };
 
-  const threadsToUse =
-    !options?.forceSingleThread && (navigator.hardwareConcurrency ?? 1) > 1
-      ? Math.max(navigator.hardwareConcurrency - 2, 2)
-      : 1;
-
-  if (threadsToUse === 1) {
-    availableModels.desktopDefault = availableModels.mobileDefault;
-    availableModels.desktopLarger = availableModels.mobileLarger;
-    availableModels.mobileDefault = {
-      url: Array.from(
-        { length: 7 },
-        (_, i) =>
-          `https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-${(
-            i + 1
-          )
-            .toString()
-            .padStart(5, "0")}-of-00007.gguf`,
-      ),
-      userPrefix: "<|im_start|>user\n",
-      assistantPrefix: "<|im_start|>assistant\n",
-      messageSuffix: "<|im_end|>\n",
-      sampling: commonSamplingConfig,
-    };
-    availableModels.mobileLarger = {
-      url: Array.from(
-        { length: 7 },
-        (_, i) =>
-          `https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.F16.shard-${(
-            i + 1
-          )
-            .toString()
-            .padStart(5, "0")}-of-00007.gguf`,
-      ),
-      userPrefix: "<|im_start|>user\n",
-      assistantPrefix: "<|im_start|>assistant\n",
-      messageSuffix: "<|im_end|>\n",
-      sampling: commonSamplingConfig,
-    };
-  }
-
   const defaultModel = isRunningOnMobile
     ? availableModels.mobileDefault
     : availableModels.desktopDefault;
@@ -381,7 +335,6 @@ async function generateTextWithWllama(options?: {
     modelUrl: selectedModel.url,
     modelConfig: {
       n_ctx: 2048,
-      n_threads: threadsToUse,
       progressCallback: ({ loaded, total }) => {
         const progressPercentage = Math.round((loaded / total) * 100);
 
