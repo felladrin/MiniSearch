@@ -33,7 +33,14 @@ export async function runCompletion(config: {
   prompt: string;
   nPredict?: number;
   sampling?: SamplingConfig;
-  onNewToken: (token: number, piece: Uint8Array, currentText: string) => void;
+  onNewToken: (
+    token: number,
+    piece: Uint8Array,
+    currentText: string,
+    optionals: {
+      abortSignal: () => any;
+    },
+  ) => void;
 }) {
   if (!wllama) throw new Error("Wllama is not initialized.");
 

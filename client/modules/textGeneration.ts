@@ -387,12 +387,17 @@ async function generateTextWithWllama() {
       prompt,
       nPredict: 768,
       sampling: selectedModel.sampling,
-      onNewToken: (_token, _piece, currentText) => {
+      onNewToken: (_token, _piece, currentText, { abortSignal }) => {
         if (!isAnswering) {
           isAnswering = true;
           updateLoadingToast("Answering...");
         }
+
         updateResponse(currentText);
+
+        if (currentText.includes(selectedModel.messageSuffix.trim())) {
+          abortSignal();
+        }
       },
     });
 
@@ -423,11 +428,15 @@ async function generateTextWithWllama() {
         prompt,
         nPredict: 128,
         sampling: selectedModel.sampling,
-        onNewToken: (_token, _piece, currentText) => {
+        onNewToken: (_token, _piece, currentText, { abortSignal }) => {
           updateUrlsDescriptions({
             ...getUrlsDescriptions(),
             [url]: `This link is about ${currentText}`,
           });
+
+          if (currentText.includes(selectedModel.messageSuffix.trim())) {
+            abortSignal();
+          }
         },
       });
 
