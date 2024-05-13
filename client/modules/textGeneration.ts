@@ -137,7 +137,7 @@ async function generateTextWithWebLlm() {
     | undefined;
 
   if (isModelCached) {
-    updateLoadingToast("Thinking...");
+    updateLoadingToast("Preparing response...");
   } else {
     initProgressCallback = (report) => {
       updateLoadingToast(
@@ -157,7 +157,7 @@ async function generateTextWithWebLlm() {
     : await CreateEngine(selectedModel, { initProgressCallback });
 
   if (!getDisableAiResponseSetting()) {
-    updateLoadingToast("Thinking...");
+    updateLoadingToast("Preparing response...");
 
     let isAnswering = false;
 
@@ -176,7 +176,7 @@ async function generateTextWithWebLlm() {
 
       if (!isAnswering) {
         isAnswering = true;
-        updateLoadingToast("Answering...");
+        updateLoadingToast("Generating response...");
       }
 
       updateResponse(streamedMessage);
@@ -379,7 +379,7 @@ async function generateTextWithWllama() {
 
     if (!query) throw Error("Query is empty.");
 
-    updateLoadingToast("Thinking...");
+    updateLoadingToast("Preparing response...");
 
     let isAnswering = false;
 
@@ -390,7 +390,7 @@ async function generateTextWithWllama() {
       onNewToken: (_token, _piece, currentText, { abortSignal }) => {
         if (!isAnswering) {
           isAnswering = true;
-          updateLoadingToast("Answering...");
+          updateLoadingToast("Generating response...");
         }
 
         updateResponse(currentText);
@@ -462,7 +462,7 @@ async function generateTextWithRatchet() {
   if (!getDisableAiResponseSetting()) {
     if (!query) throw Error("Query is empty.");
 
-    updateLoadingToast("Thinking...");
+    updateLoadingToast("Preparing response...");
 
     let isAnswering = false;
 
@@ -471,7 +471,7 @@ async function generateTextWithRatchet() {
     await runCompletion(getMainPrompt(), (completionChunk) => {
       if (!isAnswering) {
         isAnswering = true;
-        updateLoadingToast("Answering...");
+        updateLoadingToast("Generating response...");
       }
 
       response += completionChunk;
