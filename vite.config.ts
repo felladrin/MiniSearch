@@ -309,4 +309,3 @@ async function rankSearchResults(
         (searchResultToScoreMap.get(a) ?? 0),
     );
 }
-
