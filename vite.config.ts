@@ -6,7 +6,6 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import temporaryDirectory from "temp-dir";
 import path from "node:path";
-import fs from "node:fs";
 import {
   initModel,
   distance as calculateSimilarity,
@@ -19,8 +18,6 @@ let searchesSinceLastRestart = 0;
 
 export default defineConfig(({ command }) => {
   if (command === "build") regenerateSearchToken();
-
-  updateWllamaPThreadPoolSize();
 
   return {
     root: "./client",
@@ -313,19 +310,3 @@ async function rankSearchResults(
     );
 }
 
-function updateWllamaPThreadPoolSize() {
-  const multiThreadWllamaJsPath = path.resolve(
-    __dirname,
-    "node_modules/@wllama/wllama/esm/multi-thread/wllama.js",
-  );
-
-  fs.writeFileSync(
-    multiThreadWllamaJsPath,
-    fs
-      .readFileSync(multiThreadWllamaJsPath, "utf8")
-      .replace(
-        /pthreadPoolSize=[0-9]+;/g,
-        "pthreadPoolSize=Math.max(navigator.hardwareConcurrency - 2, 2);",
-      ),
-  );
-}
