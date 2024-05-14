@@ -334,7 +334,14 @@ async function generateTextWithWllama() {
   await initializeWllama({
     modelUrl: selectedModel.url,
     modelConfig: {
-      n_ctx: 2048,
+      n_ctx:  2 * 1024,
+      n_threads:
+        isRunningOnMobile && navigator.hardwareConcurrency
+          ? navigator.hardwareConcurrency
+          : (navigator.hardwareConcurrency ?? 1) > 1
+            ? Math.max(navigator.hardwareConcurrency - 2, 2)
+            : 1,
+      cache_type_k: "q4_0",
       progressCallback: ({ loaded, total }) => {
         const progressPercentage = Math.round((loaded / total) * 100);
 
