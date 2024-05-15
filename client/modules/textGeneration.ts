@@ -274,13 +274,13 @@ async function generateTextWithWllama() {
     },
     mobileLarger: {
       url: Array.from(
-        { length: 7 },
+        { length: 10 },
         (_, i) =>
-          `https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-${(
+          `https://huggingface.co/Felladrin/gguf-sharded-TinyLlama-1.1B-1T-OpenOrca/resolve/main/tinyllama-1.1b-1t-openorca.Q3_K_S.shard-${(
             i + 1
           )
             .toString()
-            .padStart(5, "0")}-of-00007.gguf`,
+            .padStart(5, "0")}-of-00010.gguf`,
       ),
       userPrefix: "<|im_start|>user\n",
       assistantPrefix: "<|im_start|>assistant\n",
@@ -334,7 +334,7 @@ async function generateTextWithWllama() {
   await initializeWllama({
     modelUrl: selectedModel.url,
     modelConfig: {
-      n_ctx:  2 * 1024,
+      n_ctx: 2 * 1024,
       n_threads:
         isRunningOnMobile && navigator.hardwareConcurrency
           ? navigator.hardwareConcurrency
