@@ -274,17 +274,17 @@ async function generateTextWithWllama() {
     },
     mobileLarger: {
       url: Array.from(
-        { length: 10 },
+        { length: 7 },
         (_, i) =>
-          `https://huggingface.co/Felladrin/gguf-sharded-TinyLlama-1.1B-1T-OpenOrca/resolve/main/tinyllama-1.1b-1t-openorca.Q3_K_S.shard-${(
+          `https://huggingface.co/Felladrin/gguf-sharded-zephyr-220m-dpo-full/resolve/main/zephyr-220m-dpo-full.Q8_0.shard-${(
             i + 1
           )
             .toString()
-            .padStart(5, "0")}-of-00010.gguf`,
+            .padStart(5, "0")}-of-00007.gguf`,
       ),
-      userPrefix: "<|im_start|>user\n",
-      assistantPrefix: "<|im_start|>assistant\n",
-      messageSuffix: "<|im_end|>\n",
+      userPrefix: "<|user|>\n",
+      assistantPrefix: "<|assistant|>\n",
+      messageSuffix: "</s>\n",
       sampling: commonSamplingConfig,
     },
     desktopDefault: {
