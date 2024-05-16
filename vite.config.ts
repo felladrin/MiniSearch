@@ -106,7 +106,6 @@ function statusEndpointServerHook<T extends ViteDevServer | PreviewServer>(
       JSON.stringify({
         secondsSinceLastRestart,
         searchesSinceLastRestart,
-        searchesPerSecond: searchesSinceLastRestart / secondsSinceLastRestart,
       }),
     );
   });
