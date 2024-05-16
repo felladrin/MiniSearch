@@ -1,4 +1,4 @@
-import { PreviewServer, ViteDevServer, defineConfig } from "vite";
+import { Connect, PreviewServer, ViteDevServer, defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import basicSSL from "@vitejs/plugin-basic-ssl";
 import fetch from "node-fetch";
@@ -15,6 +15,7 @@ import { modelSource as embeddingModel } from "@energetic-ai/model-embeddings-en
 
 const serverStartTime = new Date().getTime();
 let searchesSinceLastRestart = 0;
+const connectionsReceived = new Set();
 
 export default defineConfig(({ command }) => {
   if (command === "build") regenerateSearchToken();
@@ -106,6 +107,7 @@ function statusEndpointServerHook<T extends ViteDevServer | PreviewServer>(
       JSON.stringify({
         secondsSinceLastRestart,
         searchesSinceLastRestart,
+        uniqueVisitorsSinceLastRestart: connectionsReceived.size,
       }),
     );
   });
@@ -121,6 +123,8 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
 
   server.middlewares.use(async (request, response, next) => {
     if (!request.url.startsWith("/search")) return next();
+
+    connectionsReceived.add(getConnectionIdFromRequest(request));
 
     const { searchParams } = new URL(
       request.url,
@@ -149,15 +153,7 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
       limitParam && Number(limitParam) > 0 ? Number(limitParam) : undefined;
 
     try {
-      const remoteAddress = (
-        (request.headers["x-forwarded-for"] as string) ||
-        request.socket.remoteAddress ||
-        "unknown"
-      )
-        .split(",")[0]
-        .trim();
-
-      await rateLimiter.consume(remoteAddress);
+      await rateLimiter.consume(getConnectionIdFromRequest(request));
     } catch (error) {
       response.statusCode = 429;
       response.end("Too many requests.");
@@ -307,4 +303,14 @@ async function rankSearchResults(
         (searchResultToScoreMap.get(b) ?? 0) -
         (searchResultToScoreMap.get(a) ?? 0),
     );
+}
+
+function getConnectionIdFromRequest(request: Connect.IncomingMessage) {
+  return (
+    (request.headers["x-forwarded-for"] as string) ||
+    request.socket.remoteAddress ||
+    "unknown"
+  )
+    .split(",")[0]
+    .trim();
 }
