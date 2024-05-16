@@ -306,11 +306,5 @@ async function rankSearchResults(
 }
 
 function getConnectionIdFromRequest(request: Connect.IncomingMessage) {
-  return (
-    (request.headers["x-forwarded-for"] as string) ||
-    request.socket.remoteAddress ||
-    "unknown"
-  )
-    .split(",")[0]
-    .trim();
+  return (request.socket.remoteAddress || "unknown").split(",")[0].trim();
 }
