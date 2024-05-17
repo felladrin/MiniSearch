@@ -10,6 +10,7 @@ import {
   updateUrlsDescriptions,
   getUrlsDescriptions,
   getDisableWebGpuUsageSetting,
+  getNumberOfThreadsSetting,
 } from "./pubSub";
 import { SearchResults, search } from "./search";
 import { query, debug } from "./urlParams";
@@ -335,12 +336,7 @@ async function generateTextWithWllama() {
     modelUrl: selectedModel.url,
     modelConfig: {
       n_ctx: 2 * 1024,
-      n_threads:
-        isRunningOnMobile && navigator.hardwareConcurrency
-          ? navigator.hardwareConcurrency
-          : (navigator.hardwareConcurrency ?? 1) > 1
-            ? Math.max(navigator.hardwareConcurrency - 2, 2)
-            : 1,
+      n_threads: getNumberOfThreadsSetting(),
       cache_type_k: "q4_0",
       progressCallback: ({ loaded, total }) => {
         const progressPercentage = Math.round((loaded / total) * 100);

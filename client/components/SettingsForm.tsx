@@ -4,10 +4,11 @@ import {
   summarizeLinksSettingPubSub,
   useLargerModelSettingPubSub,
   disableWebGpuUsageSettingPubSub,
+  numberOfThreadsSettingPubSub,
 } from "../modules/pubSub";
 import { Tooltip } from "react-tooltip";
 import { isWebGPUAvailable } from "../modules/webGpu";
-import type { ChangeEventHandler } from "react";
+import type { ChangeEventHandler, HTMLInputTypeAttribute } from "react";
 
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -21,6 +22,9 @@ export function SettingsForm() {
   );
   const [disableWebGpuUsage, setDisableWebGpuUsage] = usePubSub(
     disableWebGpuUsageSettingPubSub,
+  );
+  const [numberOfThreads, setNumberOfThreads] = usePubSub(
+    numberOfThreadsSettingPubSub,
   );
 
   return (
@@ -36,8 +40,9 @@ export function SettingsForm() {
         Settings
       </div>
       <div>
-        <SettingCheckbox
+        <SettingInput
           label="Use a larger AI model"
+          type="checkbox"
           checked={useLargerModel}
           onChange={(event) => setUseLargerModel(event.target.checked)}
           tooltipId="use-large-model-setting-tooltip"
@@ -45,18 +50,30 @@ export function SettingsForm() {
         />
       </div>
       <div>
-        <SettingCheckbox
+        <SettingInput
           label="Summarize links"
+          type="checkbox"
           checked={summarizeLinks}
           onChange={(event) => setSummarizeLinks(event.target.checked)}
           tooltipId="summarize-links-setting-tooltip"
           tooltipContent="Provides a short overview for each of the links from the web search results"
         />
       </div>
+      <div>
+        <SettingInput
+          label="Disable AI response"
+          type="checkbox"
+          checked={disableAiResponse}
+          onChange={(event) => setDisableAiResponse(event.target.checked)}
+          tooltipId="disable-ai-setting-tooltip"
+          tooltipContent="Disables the AI response, in case you only want to see the links from the web search results"
+        />
+      </div>
       {isWebGPUAvailable && (
         <div>
-          <SettingCheckbox
+          <SettingInput
             label="Disable WebGPU usage"
+            type="checkbox"
             checked={disableWebGpuUsage}
             onChange={(event) => setDisableWebGpuUsage(event.target.checked)}
             tooltipId="use-large-model-setting-tooltip"
@@ -64,22 +81,27 @@ export function SettingsForm() {
           />
         </div>
       )}
-      <div>
-        <SettingCheckbox
-          label="Disable AI response"
-          checked={disableAiResponse}
-          onChange={(event) => setDisableAiResponse(event.target.checked)}
-          tooltipId="disable-ai-setting-tooltip"
-          tooltipContent="Disables the AI response, in case you only want to see the links from the web search results"
-        />
-      </div>
+      {(!isWebGPUAvailable || disableWebGpuUsage) && (
+        <div>
+          <SettingInput
+            label="CPU threads to use"
+            type="number"
+            value={numberOfThreads}
+            onChange={(event) => setNumberOfThreads(Number(event.target.value))}
+            tooltipId="number-of-threads-setting-tooltip"
+            tooltipContent="Number of threads to use for the AI model. Lower values will use less CPU, but may take longer to respond. A too-high value may cause the app to hang. Note that this value is ignored when using WebGPU."
+          />
+        </div>
+      )}
     </div>
   );
 }
 
-function SettingCheckbox(props: {
+function SettingInput(props: {
   label: string;
+  type: HTMLInputTypeAttribute;
   checked?: boolean;
+  value?: string | number | readonly string[];
   onChange?: ChangeEventHandler<HTMLInputElement>;
   tooltipId?: string;
   tooltipContent?: string;
@@ -96,11 +118,14 @@ function SettingCheckbox(props: {
       <label
         data-tooltip-id={props.tooltipId}
         data-tooltip-content={props.tooltipContent}
+        style={{ textAlign: "center" }}
       >
         <input
-          type="checkbox"
+          type={props.type}
+          value={props.value}
           checked={props.checked}
           onChange={props.onChange}
+          style={{ textAlign: "center" }}
         />
         {props.label}
       </label>
