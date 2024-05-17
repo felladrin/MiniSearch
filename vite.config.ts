@@ -104,7 +104,7 @@ function statusEndpointServerHook<T extends ViteDevServer | PreviewServer>(
       (new Date().getTime() - serverStartTime) / 1000,
     );
 
-    response.end(
+    response.setHeader("Content-Type", "application/json").end(
       JSON.stringify({
         secondsSinceLastRestart,
         searchesSinceLastRestart,
@@ -181,17 +181,21 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
     searchesSinceLastRestart++;
 
     if (searchResults.length === 0) {
-      response.end(JSON.stringify([]));
+      response
+        .setHeader("Content-Type", "application/json")
+        .end(JSON.stringify([]));
       return;
     }
 
     try {
-      response.end(
-        JSON.stringify(await rankSearchResults(query, searchResults)),
-      );
+      response
+        .setHeader("Content-Type", "application/json")
+        .end(JSON.stringify(await rankSearchResults(query, searchResults)));
     } catch (error) {
       console.error("Error ranking search results:", error);
-      response.end(JSON.stringify(searchResults));
+      response
+        .setHeader("Content-Type", "application/json")
+        .end(JSON.stringify(searchResults));
     }
   });
 }
