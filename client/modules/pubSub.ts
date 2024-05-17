@@ -50,6 +50,14 @@ export const querySuggestionsPubSub = createLocalStoragePubSub<string[]>(
   [],
 );
 
+export const lastSearchTokenHashPubSub = createLocalStoragePubSub(
+  "lastSearchTokenHash",
+  "",
+);
+
+export const [updateLastSearchTokenHash, , getLastSearchTokenHash] =
+  lastSearchTokenHashPubSub;
+
 export const [updateQuerySuggestions, , getQuerySuggestions] =
   querySuggestionsPubSub;
 

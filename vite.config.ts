@@ -1,4 +1,4 @@
-import { Connect, PreviewServer, ViteDevServer, defineConfig } from "vite";
+import { PreviewServer, ViteDevServer, defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import basicSSL from "@vitejs/plugin-basic-ssl";
 import fetch from "node-fetch";
@@ -12,10 +12,11 @@ import {
   EmbeddingsModel,
 } from "@energetic-ai/embeddings";
 import { modelSource as embeddingModel } from "@energetic-ai/model-embeddings-en";
+import { argon2Verify } from "hash-wasm";
 
 const serverStartTime = new Date().getTime();
 let searchesSinceLastRestart = 0;
-const connectionsReceived = new Set();
+const verifiedTokens = new Set();
 
 export default defineConfig(({ command }) => {
   if (command === "build") regenerateSearchToken();
@@ -107,7 +108,7 @@ function statusEndpointServerHook<T extends ViteDevServer | PreviewServer>(
       JSON.stringify({
         secondsSinceLastRestart,
         searchesSinceLastRestart,
-        uniqueVisitorsSinceLastRestart: connectionsReceived.size,
+        tokensVerifiedSinceLastRestart: verifiedTokens.size,
       }),
     );
   });
@@ -124,20 +125,15 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
   server.middlewares.use(async (request, response, next) => {
     if (!request.url.startsWith("/search")) return next();
 
-    connectionsReceived.add(getConnectionIdFromRequest(request));
-
     const { searchParams } = new URL(
       request.url,
       `http://${request.headers.host}`,
     );
 
-    const token = searchParams.get("token");
+    const limitParam = searchParams.get("limit");
 
-    if (!token || token !== getSearchToken()) {
-      response.statusCode = 401;
-      response.end("Unauthorized.");
-      return;
-    }
+    const limit =
+      limitParam && Number(limitParam) > 0 ? Number(limitParam) : undefined;
 
     const query = searchParams.get("q");
 
@@ -147,13 +143,33 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
       return;
     }
 
-    const limitParam = searchParams.get("limit");
+    const token = searchParams.get("token");
 
-    const limit =
-      limitParam && Number(limitParam) > 0 ? Number(limitParam) : undefined;
+    const isVerifiedToken = verifiedTokens.has(token);
+
+    if (!isVerifiedToken) {
+      let isValidToken = false;
+
+      try {
+        isValidToken = await argon2Verify({
+          password: getSearchToken(),
+          hash: token,
+        });
+      } catch (error) {
+        void error;
+      }
+
+      if (isValidToken) {
+        verifiedTokens.add(token);
+      } else {
+        response.statusCode = 401;
+        response.end("Unauthorized.");
+        return;
+      }
+    }
 
     try {
-      await rateLimiter.consume(getConnectionIdFromRequest(request));
+      await rateLimiter.consume(token);
     } catch (error) {
       response.statusCode = 429;
       response.end("Too many requests.");
@@ -303,8 +319,4 @@ async function rankSearchResults(
         (searchResultToScoreMap.get(b) ?? 0) -
         (searchResultToScoreMap.get(a) ?? 0),
     );
-}
-
-function getConnectionIdFromRequest(request: Connect.IncomingMessage) {
-  return (request.socket.remoteAddress || "unknown").split(",")[0].trim();
 }

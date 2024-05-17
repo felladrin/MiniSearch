@@ -19,6 +19,7 @@
     "@ratchet-ml/ratchet-web": "^0.4.0",
     "@wllama/wllama": "^1.4.2",
     "create-pubsub": "^1.6.3",
+    "hash-wasm": "^4.11.0",
     "html-to-text": "^9.0.5",
     "inter-ui": "^4.0.2",
     "keyword-extractor": "^0.0.28",
