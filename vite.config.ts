@@ -214,7 +214,12 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
 
 function cacheServerHook<T extends ViteDevServer | PreviewServer>(server: T) {
   server.middlewares.use(async (request, response, next) => {
-    if (
+    if (request.url.endsWith(".woff2")) {
+      response.setHeader(
+        "Cache-Control",
+        "public, max-age=31536000, immutable",
+      );
+    } else if (
       request.url === "/" ||
       request.url.startsWith("/?") ||
       request.url.endsWith(".html")
