@@ -4,6 +4,8 @@ A minimalist search engine with integrated browser-based AI.
 
 Live demo: https://felladrin-minisearch.hf.space
 
+https://github.com/felladrin/MiniSearch/assets/418083/79990898-d92e-46d1-9ea2-1d9243c72155
+
 ## Features
 
 - **Privacy-focused**: [No tracking, no ads, no data collection](https://docs.searxng.org/own-instance.html#how-does-searxng-protect-privacy)
