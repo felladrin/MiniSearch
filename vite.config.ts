@@ -319,25 +319,23 @@ async function rankSearchResults(
   query: string,
   searchResults: [title: string, content: string, url: string][],
 ) {
-  const scores = await getSimilarityScores(
-    query.toLocaleLowerCase(),
-    searchResults.map(([title, snippet, url]) =>
-      `${title}\n${url}\n${snippet}`.toLocaleLowerCase(),
-    ),
-  );
-
   const searchResultToScoreMap: Map<(typeof searchResults)[0], number> =
     new Map();
 
-  scores.map((score, index) =>
-    searchResultToScoreMap.set(searchResults[index], score ?? 0),
-  );
+  (
+    await getSimilarityScores(
+      query.toLocaleLowerCase(),
+      searchResults.map(([title, snippet, url]) =>
+        `${title}\n${url}\n${snippet}`.toLocaleLowerCase(),
+      ),
+    )
+  ).forEach((score, index) => {
+    searchResultToScoreMap.set(searchResults[index], score);
+  });
 
   return searchResults
     .slice()
     .sort(
-      (a, b) =>
-        (searchResultToScoreMap.get(b) ?? 0) -
-        (searchResultToScoreMap.get(a) ?? 0),
+      (a, b) => searchResultToScoreMap.get(b) - searchResultToScoreMap.get(a),
     );
 }
