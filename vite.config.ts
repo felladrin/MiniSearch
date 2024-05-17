@@ -13,6 +13,7 @@ import {
 } from "@energetic-ai/embeddings";
 import { modelSource as embeddingModel } from "@energetic-ai/model-embeddings-en";
 import { argon2Verify } from "hash-wasm";
+import compression from "compression";
 
 const serverStartTime = new Date().getTime();
 let searchesSinceLastRestart = 0;
@@ -44,6 +45,11 @@ export default defineConfig(({ command }) => {
       process.env.BASIC_SSL === "true" ? basicSSL() : undefined,
       react(),
       {
+        name: "configure-server-compression",
+        configureServer: compressionServerHook,
+        configurePreviewServer: compressionServerHook,
+      },
+      {
         name: "configure-server-cross-origin-isolation",
         configureServer: crossOriginServerHook,
         configurePreviewServer: crossOriginServerHook,
@@ -65,6 +71,12 @@ export default defineConfig(({ command }) => {
     ],
   };
 });
+
+function compressionServerHook<T extends ViteDevServer | PreviewServer>(
+  server: T,
+) {
+  server.middlewares.use(compression());
+}
 
 function crossOriginServerHook<T extends ViteDevServer | PreviewServer>(
   server: T,
