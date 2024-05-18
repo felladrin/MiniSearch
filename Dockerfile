@@ -16,8 +16,11 @@ RUN adduser -D -u 1000 ${USERNAME} \
   && chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
 USER user
 WORKDIR /home/${USERNAME}/app 
+COPY --chown=${USERNAME}:${USERNAME} ./package.json ./package.json
+COPY --chown=${USERNAME}:${USERNAME} ./package-lock.json ./package-lock.json
+COPY --chown=${USERNAME}:${USERNAME} ./.npmrc ./.npmrc
+RUN npm ci
 COPY --chown=${USERNAME}:${USERNAME} . .
-RUN npm ci \
-  && npm run build
+RUN npm run build
 ENTRYPOINT [ "/bin/sh", "-c" ]
 CMD [ "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & touch /etc/searxng/limiter.toml & npm start -- --host" ]
