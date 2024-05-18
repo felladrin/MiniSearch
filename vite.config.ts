@@ -13,7 +13,7 @@ import {
 } from "@energetic-ai/embeddings";
 import { modelSource as embeddingModel } from "@energetic-ai/model-embeddings-en";
 import { argon2Verify } from "hash-wasm";
-import compression from "compression";
+import compression from "http-compression";
 
 const serverStartTime = new Date().getTime();
 let searchesSinceLastRestart = 0;
@@ -116,7 +116,8 @@ function statusEndpointServerHook<T extends ViteDevServer | PreviewServer>(
       (new Date().getTime() - serverStartTime) / 1000,
     );
 
-    response.setHeader("Content-Type", "application/json").end(
+    response.setHeader("Content-Type", "application/json");
+    response.end(
       JSON.stringify({
         secondsSinceLastRestart,
         searchesSinceLastRestart,
@@ -193,21 +194,20 @@ function searchEndpointServerHook<T extends ViteDevServer | PreviewServer>(
     searchesSinceLastRestart++;
 
     if (searchResults.length === 0) {
-      response
-        .setHeader("Content-Type", "application/json")
-        .end(JSON.stringify([]));
+      response.setHeader("Content-Type", "application/json");
+      response.end(JSON.stringify([]));
       return;
     }
 
     try {
-      response
-        .setHeader("Content-Type", "application/json")
-        .end(JSON.stringify(await rankSearchResults(query, searchResults)));
+      response.setHeader("Content-Type", "application/json");
+      response.end(
+        JSON.stringify(await rankSearchResults(query, searchResults)),
+      );
     } catch (error) {
       console.error("Error ranking search results:", error);
-      response
-        .setHeader("Content-Type", "application/json")
-        .end(JSON.stringify(searchResults));
+      response.setHeader("Content-Type", "application/json");
+      response.end(JSON.stringify(searchResults));
     }
   });
 }
