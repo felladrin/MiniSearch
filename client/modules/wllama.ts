@@ -78,17 +78,17 @@ export const availableModels: {
   },
   mobileLarger: {
     url: Array.from(
-      { length: 7 },
+      { length: 10 },
       (_, i) =>
-        `https://huggingface.co/Felladrin/gguf-sharded-zephyr-1b-olmo-sft-qlora/resolve/main/zephyr-1b-olmo-sft-qlora.Q3_K_S.shard-${(
+        `https://huggingface.co/Felladrin/gguf-sharded-TinyLlama-1.1B-1T-OpenOrca/resolve/main/tinyllama-1.1b-1t-openorca.Q3_K_S.shard-${(
           i + 1
         )
           .toString()
-          .padStart(5, "0")}-of-00007.gguf`,
+          .padStart(5, "0")}-of-00010.gguf`,
     ),
-    userPrefix: "<|user|>\n",
-    assistantPrefix: "<|assistant|>\n",
-    messageSuffix: "<|endoftext|>\n",
+    userPrefix: "<|im_start|>user\n",
+    assistantPrefix: "<|im_start|>assistant\n",
+    messageSuffix: "<|im_end|>\n",
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
