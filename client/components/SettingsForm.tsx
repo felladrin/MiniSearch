@@ -1,7 +1,6 @@
 import { usePubSub } from "create-pubsub/react";
 import {
   disableAiResponseSettingPubSub,
-  summarizeLinksSettingPubSub,
   useLargerModelSettingPubSub,
   disableWebGpuUsageSettingPubSub,
   numberOfThreadsSettingPubSub,
@@ -13,9 +12,6 @@ import type { ChangeEventHandler, HTMLInputTypeAttribute } from "react";
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
     disableAiResponseSettingPubSub,
-  );
-  const [summarizeLinks, setSummarizeLinks] = usePubSub(
-    summarizeLinksSettingPubSub,
   );
   const [useLargerModel, setUseLargerModel] = usePubSub(
     useLargerModelSettingPubSub,
@@ -47,16 +43,6 @@ export function SettingsForm() {
           onChange={(event) => setUseLargerModel(event.target.checked)}
           tooltipId="use-large-model-setting-tooltip"
           tooltipContent="Generates better responses, but takes longer to load"
-        />
-      </div>
-      <div>
-        <SettingInput
-          label="Summarize links"
-          type="checkbox"
-          checked={summarizeLinks}
-          onChange={(event) => setSummarizeLinks(event.target.checked)}
-          tooltipId="summarize-links-setting-tooltip"
-          tooltipContent="Provides a short overview for each of the links from the web search results"
         />
       </div>
       <div>

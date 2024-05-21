@@ -3,16 +3,14 @@ import {
   updatePrompt,
   updateSearchResults,
   getDisableAiResponseSetting,
-  getSummarizeLinksSetting,
   getUseLargerModelSetting,
   updateResponse,
   getSearchResults,
   updateUrlsDescriptions,
-  getUrlsDescriptions,
   getDisableWebGpuUsageSetting,
   getNumberOfThreadsSetting,
 } from "./pubSub";
-import { SearchResults, search } from "./search";
+import { search } from "./search";
 import { query, debug } from "./urlParams";
 import toast from "react-hot-toast";
 import { isRunningOnMobile } from "./mobileDetection";
@@ -59,7 +57,7 @@ export async function prepareTextGeneration() {
 
   dismissLoadingToast();
 
-  if (getDisableAiResponseSetting() && !getSummarizeLinksSetting()) return;
+  if (getDisableAiResponseSetting()) return;
 
   if (debug) console.time("Response Generation Time");
 
@@ -184,40 +182,6 @@ async function generateTextWithWebLlm() {
     }
   }
 
-  await engine.resetChat();
-
-  if (getSummarizeLinksSetting()) {
-    updateLoadingToast("Summarizing links...");
-
-    for (const [title, snippet, url] of getSearchResults()) {
-      const completion = await engine.chat.completions.create({
-        stream: true,
-        messages: [
-          {
-            role: "user",
-            content: await getLinkSummarizationPrompt([title, snippet, url]),
-          },
-        ],
-        max_gen_len: 768,
-      });
-
-      let streamedMessage = "";
-
-      for await (const chunk of completion) {
-        const deltaContent = chunk.choices[0].delta.content;
-
-        if (deltaContent) streamedMessage += deltaContent;
-
-        updateUrlsDescriptions({
-          ...getUrlsDescriptions(),
-          [url]: streamedMessage,
-        });
-      }
-
-      await engine.resetChat();
-    }
-  }
-
   if (debug) {
     console.info(await engine.runtimeStatsText());
   }
@@ -316,48 +280,6 @@ async function generateTextWithWllama() {
     updateResponse(completion.replace(selectedModel.messageSuffix.trim(), ""));
   }
 
-  if (getSummarizeLinksSetting()) {
-    updateLoadingToast("Summarizing links...");
-
-    for (const [title, snippet, url] of getSearchResults()) {
-      const prompt = [
-        selectedModel.userPrefix,
-        "Hello!",
-        selectedModel.messageSuffix,
-        selectedModel.assistantPrefix,
-        "Hi! How can I help you?",
-        selectedModel.messageSuffix,
-        selectedModel.userPrefix,
-        ["Context:", `${title}: ${snippet}`].join("\n"),
-        "\n",
-        ["Question:", "What is this text about?"].join("\n"),
-        selectedModel.messageSuffix,
-        selectedModel.assistantPrefix,
-        ["Answer:", "This text is about"].join("\n"),
-      ].join("");
-
-      const completion = await wllama.createCompletion(prompt, {
-        nPredict: 128,
-        sampling: selectedModel.sampling,
-        onNewToken: (_token, _piece, currentText, { abortSignal }) => {
-          updateUrlsDescriptions({
-            ...getUrlsDescriptions(),
-            [url]: `This link is about ${currentText}`,
-          });
-
-          if (currentText.includes(selectedModel.messageSuffix.trim())) {
-            abortSignal();
-          }
-        },
-      });
-
-      updateUrlsDescriptions({
-        ...getUrlsDescriptions(),
-        [url]: `This link is about ${completion.replace(selectedModel.messageSuffix.trim(), "")}`,
-      });
-    }
-  }
-
   await wllama.exit();
 }
 
@@ -395,53 +317,7 @@ async function generateTextWithRatchet() {
     }
   }
 
-  if (getSummarizeLinksSetting()) {
-    updateLoadingToast("Summarizing links...");
-
-    for (const [title, snippet, url] of getSearchResults()) {
-      let response = "";
-
-      await runCompletion(
-        await getLinkSummarizationPrompt([title, snippet, url]),
-        (completionChunk) => {
-          response += completionChunk;
-          updateUrlsDescriptions({
-            ...getUrlsDescriptions(),
-            [url]: response,
-          });
-        },
-      );
-
-      if (!endsWithASign(response)) {
-        response += ".";
-        updateUrlsDescriptions({
-          ...getUrlsDescriptions(),
-          [url]: response,
-        });
-      }
-    }
-  }
-
   await exitRatchet();
-}
-
-async function fetchPageContent(
-  url: string,
-  options?: {
-    maxLength?: number;
-  },
-) {
-  const response = await fetch(`https://r.jina.ai/${url}`);
-
-  if (!response) {
-    throw new Error("No response from server");
-  } else if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-
-  const text = await response.text();
-
-  return text.trim().substring(0, options?.maxLength);
 }
 
 function endsWithASign(text: string) {
@@ -461,42 +337,6 @@ function getMainPrompt() {
     "",
     query,
   ].join("\n");
-}
-
-async function getLinkSummarizationPrompt([
-  title,
-  snippet,
-  url,
-]: SearchResults[0]) {
-  let prompt = "";
-
-  try {
-    const pageContent = await fetchPageContent(url, { maxLength: 2500 });
-
-    prompt = [
-      `The context below is related to a link found when searching for "${query}":`,
-      "",
-      "[BEGIN OF CONTEXT]",
-      `Snippet: ${snippet}`,
-      "",
-      pageContent,
-      "[END OF CONTEXT]",
-      "",
-      "Now, tell me: What is this link about and how is it related to the search?",
-      "",
-      "Note: Don't cite the link in your response. Just write a few sentences to indicate if it's worth visiting.",
-    ].join("\n");
-  } catch (error) {
-    prompt = [
-      `When searching for "${query}", this link was found: [${title}](${url} "${snippet}")`,
-      "",
-      "Now, tell me: What is this link about and how is it related to the search?",
-      "",
-      "Note: Don't cite the link in your response. Just write a few sentences to indicate if it's worth visiting.",
-    ].join("\n");
-  }
-
-  return prompt;
 }
 
 function getFormattedSearchResults(limit?: number) {

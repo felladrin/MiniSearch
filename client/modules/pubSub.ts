@@ -24,13 +24,6 @@ export const disableAiResponseSettingPubSub = createLocalStoragePubSub(
 
 export const [, , getDisableAiResponseSetting] = disableAiResponseSettingPubSub;
 
-export const summarizeLinksSettingPubSub = createLocalStoragePubSub(
-  "summarizeLinks",
-  false,
-);
-
-export const [, , getSummarizeLinksSetting] = summarizeLinksSettingPubSub;
-
 export const useLargerModelSettingPubSub = createLocalStoragePubSub(
   "useLargerModel",
   false,
@@ -87,5 +80,4 @@ export const [updateSearchResults, , getSearchResults] = searchResultsPubSub;
 
 export const urlsDescriptionsPubSub = createPubSub<Record<string, string>>({});
 
-export const [updateUrlsDescriptions, , getUrlsDescriptions] =
-  urlsDescriptionsPubSub;
+export const [updateUrlsDescriptions] = urlsDescriptionsPubSub;
