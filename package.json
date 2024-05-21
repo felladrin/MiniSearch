@@ -6,9 +6,9 @@
   "license": "Apache-2.0",
   "scripts": {
     "start": "vite preview",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "dev": "vite",
-    "lint": "prettier --check . && eslint --fix client",
+    "lint": "prettier --check . && tsc && eslint --fix client",
     "format": "prettier --write ."
   },
   "dependencies": {
