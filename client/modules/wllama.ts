@@ -93,17 +93,17 @@ export const availableModels: {
   },
   desktopDefault: {
     url: Array.from(
-      { length: 7 },
+      { length: 26 },
       (_, i) =>
-        `https://huggingface.co/Felladrin/gguf-sharded-stablelm-2-1_6b-chat/resolve/main/stablelm-2-1_6b-chat.Q8_0.shard-${(
+        `https://huggingface.co/Felladrin/gguf-sharded-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1.8b-chat.Q8_0.shard-${(
           i + 1
         )
           .toString()
-          .padStart(5, "0")}-of-00007.gguf`,
+          .padStart(5, "0")}-of-00026.gguf`,
     ),
-    userPrefix: "<|im_start|>user\n",
-    assistantPrefix: "<|im_start|>assistant\n",
-    messageSuffix: "<|im_end|>\n",
+    userPrefix: "<|prompt|>\n",
+    assistantPrefix: "<|answer|>\n",
+    messageSuffix: "</s>\n",
     sampling: commonSamplingConfig,
   },
   desktopLarger: {

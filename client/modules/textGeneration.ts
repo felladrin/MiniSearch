@@ -178,7 +178,7 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
     model: {
       n_ctx: 2 * 1024,
       n_threads: getNumberOfThreadsSetting(),
-      cache_type_k: "q4_0",
+      cache_type_k: "f16",
       progressCallback: ({ loaded, total }) => {
         const progressPercentage = Math.round((loaded / total) * 100);
 
