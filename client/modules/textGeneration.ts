@@ -22,40 +22,7 @@ export async function prepareTextGeneration() {
 
   updatePrompt(query);
 
-  updateLoadingToast("Searching the web...");
-
-  let searchResults = await search(
-    query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query,
-    30,
-  );
-
-  if (searchResults.length === 0) {
-    const queryKeywords = await getKeywords(query, 10);
-
-    searchResults = await search(queryKeywords.join(" "), 30);
-  }
-
-  if (searchResults.length === 0) {
-    toast(
-      "It looks like your current search did not return any results. Try refining your search by adding more keywords or rephrasing your query.",
-      {
-        position: "bottom-center",
-        duration: 10000,
-        icon: "💡",
-      },
-    );
-  }
-
-  updateSearchResults(searchResults);
-
-  updateUrlsDescriptions(
-    searchResults.reduce(
-      (acc, [, snippet, url]) => ({ ...acc, [url]: snippet }),
-      {},
-    ),
-  );
-
-  dismissLoadingToast();
+  const searchPromise = getSearchPromise(query);
 
   if (getDisableAiResponseSetting()) return;
 
@@ -71,23 +38,21 @@ export async function prepareTextGeneration() {
 
       if (getUseLargerModelSetting()) {
         try {
-          await generateTextWithWebLlm();
+          await generateTextWithWebLlm(searchPromise);
         } catch (error) {
-          await generateTextWithRatchet();
+          await generateTextWithRatchet(searchPromise);
         }
       } else {
         try {
-          await generateTextWithRatchet();
+          await generateTextWithRatchet(searchPromise);
         } catch (error) {
-          await generateTextWithWebLlm();
+          await generateTextWithWebLlm(searchPromise);
         }
       }
     } catch (error) {
-      await generateTextWithWllama();
+      await generateTextWithWllama(searchPromise);
     }
   } catch (error) {
-    console.error("Error while generating response with wllama:", error);
-
     toast.error(
       "Could not generate response. The browser may be out of memory. Please close this tab and run this search again in a new one.",
       { duration: 10000 },
@@ -112,7 +77,7 @@ function dismissLoadingToast() {
   toast.dismiss("text-generation-loading-toast");
 }
 
-async function generateTextWithWebLlm() {
+async function generateTextWithWebLlm(searchPromise: Promise<void>) {
   const { CreateWebWorkerEngine, CreateEngine, hasModelInCache } = await import(
     "@mlc-ai/web-llm"
   );
@@ -156,6 +121,8 @@ async function generateTextWithWebLlm() {
     : await CreateEngine(selectedModel, { initProgressCallback });
 
   if (!getDisableAiResponseSetting()) {
+    await searchPromise;
+
     updateLoadingToast("Preparing response...");
 
     let isAnswering = false;
@@ -189,7 +156,7 @@ async function generateTextWithWebLlm() {
   engine.unload();
 }
 
-async function generateTextWithWllama() {
+async function generateTextWithWllama(searchPromise: Promise<void>) {
   const { initializeWllama, availableModels } = await import("./wllama");
 
   const defaultModel = isRunningOnMobile
@@ -229,6 +196,10 @@ async function generateTextWithWllama() {
   });
 
   if (!getDisableAiResponseSetting()) {
+    await searchPromise;
+
+    updateLoadingToast("Preparing response...");
+
     const prompt = [
       selectedModel.userPrefix,
       "Hello!",
@@ -253,10 +224,6 @@ async function generateTextWithWllama() {
       selectedModel.messageSuffix,
       selectedModel.assistantPrefix,
     ].join("");
-
-    if (!query) throw Error("Query is empty.");
-
-    updateLoadingToast("Preparing response...");
 
     let isAnswering = false;
 
@@ -283,7 +250,7 @@ async function generateTextWithWllama() {
   await wllama.exit();
 }
 
-async function generateTextWithRatchet() {
+async function generateTextWithRatchet(searchPromise: Promise<void>) {
   const { initializeRatchet, runCompletion, exitRatchet } = await import(
     "./ratchet"
   );
@@ -293,7 +260,7 @@ async function generateTextWithRatchet() {
   );
 
   if (!getDisableAiResponseSetting()) {
-    if (!query) throw Error("Query is empty.");
+    await searchPromise;
 
     updateLoadingToast("Preparing response...");
 
@@ -350,4 +317,44 @@ async function getKeywords(text: string, limit?: number) {
   return (await import("keyword-extractor")).default
     .extract(text, { language: "english" })
     .slice(0, limit);
+}
+
+async function getSearchPromise(query: string) {
+  toast.loading("Searching the web...", {
+    id: "search-progress-toast",
+    position: "bottom-center",
+  });
+
+  let searchResults = await search(
+    query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query,
+    30,
+  );
+
+  if (searchResults.length === 0) {
+    const queryKeywords = await getKeywords(query, 10);
+
+    searchResults = await search(queryKeywords.join(" "), 30);
+  }
+
+  if (searchResults.length === 0) {
+    toast(
+      "It looks like your current search did not return any results. Try refining your search by adding more keywords or rephrasing your query.",
+      {
+        position: "bottom-center",
+        duration: 10000,
+        icon: "💡",
+      },
+    );
+  }
+
+  toast.dismiss("search-progress-toast");
+
+  updateSearchResults(searchResults);
+
+  updateUrlsDescriptions(
+    searchResults.reduce(
+      (acc, [, snippet, url]) => ({ ...acc, [url]: snippet }),
+      {},
+    ),
+  );
 }
