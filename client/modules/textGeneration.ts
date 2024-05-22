@@ -78,9 +78,8 @@ function dismissLoadingToast() {
 }
 
 async function generateTextWithWebLlm(searchPromise: Promise<void>) {
-  const { CreateWebWorkerEngine, CreateEngine, hasModelInCache } = await import(
-    "@mlc-ai/web-llm"
-  );
+  const { CreateWebWorkerMLCEngine, CreateMLCEngine, hasModelInCache } =
+    await import("@mlc-ai/web-llm");
 
   const availableModels = {
     Llama: "Llama-3-8B-Instruct-q4f16_1",
@@ -111,14 +110,14 @@ async function generateTextWithWebLlm(searchPromise: Promise<void>) {
   }
 
   const engine = Worker
-    ? await CreateWebWorkerEngine(
+    ? await CreateWebWorkerMLCEngine(
         new Worker(new URL("./webLlmWorker.ts", import.meta.url), {
           type: "module",
         }),
         selectedModel,
         { initProgressCallback },
       )
-    : await CreateEngine(selectedModel, { initProgressCallback });
+    : await CreateMLCEngine(selectedModel, { initProgressCallback });
 
   if (!getDisableAiResponseSetting()) {
     await searchPromise;
