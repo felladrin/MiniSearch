@@ -14,6 +14,7 @@ import {
 import { modelSource as embeddingModel } from "@energetic-ai/model-embeddings-en";
 import { argon2Verify } from "hash-wasm";
 import compression from "http-compression";
+import replaceInFile from "replace-in-file";
 
 const serverStartTime = new Date().getTime();
 let searchesSinceLastRestart = 0;
@@ -21,6 +22,13 @@ const verifiedTokens = new Set();
 
 export default defineConfig(({ command }) => {
   if (command === "build") regenerateSearchToken();
+
+  // This replacement is a temporary solution for https://github.com/mlc-ai/web-llm/issues/414:
+  replaceInFile.sync({
+    files: path.resolve(__dirname, "node_modules/@mlc-ai/web-llm/lib/index.js"),
+    from: "//# sourceMappingURL=index.js.map",
+    to: "",
+  });
 
   return {
     root: "./client",
