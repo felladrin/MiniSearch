@@ -58,6 +58,7 @@ export const availableModels: {
     userPrefix: string;
     assistantPrefix: string;
     messageSuffix: string;
+    cacheType?: "f16" | "q8_0" | "q4_0";
     sampling: SamplingConfig;
   };
 } = {
@@ -74,6 +75,7 @@ export const availableModels: {
     userPrefix: "<|im_start|>user\n",
     assistantPrefix: "<|im_start|>assistant\n",
     messageSuffix: "<|im_end|>\n",
+    cacheType: "q8_0",
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
@@ -89,6 +91,7 @@ export const availableModels: {
     userPrefix: "<|user|>\n",
     assistantPrefix: "<|assistant|>\n",
     messageSuffix: "</s>\n",
+    cacheType: "q8_0",
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
@@ -104,6 +107,7 @@ export const availableModels: {
     userPrefix: "<|prompt|>\n",
     assistantPrefix: "<|answer|>\n",
     messageSuffix: "</s>\n",
+    cacheType: "f16",
     sampling: commonSamplingConfig,
   },
   desktopLarger: {
@@ -119,6 +123,7 @@ export const availableModels: {
     userPrefix: "<|user|>\n",
     assistantPrefix: "<|assistant|>\n",
     messageSuffix: "<|end|>\n",
+    cacheType: "q4_0",
     sampling: commonSamplingConfig,
   },
 };
