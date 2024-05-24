@@ -9,7 +9,8 @@
     "build": "vite build",
     "dev": "vite",
     "lint": "prettier --check . && tsc && eslint --fix client",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "glob -c 'tsx --test' '**/*.test.ts'"
   },
   "dependencies": {
     "@energetic-ai/core": "^0.2.0",
@@ -47,7 +48,9 @@
     "@vitejs/plugin-basic-ssl": "^1.1.0",
     "@vitejs/plugin-react": "^4.0.3",
     "eslint": "^9.0.0",
+    "glob": "^10.4.1",
     "globals": "^15.0.0",
+    "tsx": "^4.11.0",
     "typescript": "^5.0.2",
     "typescript-eslint": "^7.6.0",
     "vite": "^5.2.9"
