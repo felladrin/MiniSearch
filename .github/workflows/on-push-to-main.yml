@@ -3,28 +3,10 @@ on:
   push:
     branches: ["main"]
 jobs:
-  check-code-quality:
-    name: Check Code Quality
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-      - run: npm ci
-      - run: npm test
-      - run: npm run lint
-  check-docker-container:
-    name: Check Docker Container
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker-compose -f docker-compose.production.yml up -d
-      - name: Check if main page is available
-        run: until curl -s -o /dev/null -w "%{http_code}" localhost:7860 | grep 200; do sleep 1; done
-      - run: docker-compose -f docker-compose.production.yml down
+  test-lint-ping:
+    uses: ./.github/workflows/reusable-test-lint-ping.yml
   build-and-push-image:
+    needs: [test-lint-ping]
     name: Publish Docker image to GitHub Packages
     runs-on: ubuntu-latest
     env:
@@ -55,6 +37,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
   sync-to-hf:
+    needs: [test-lint-ping]
     name: Sync to HuggingFace Spaces
     runs-on: ubuntu-latest
     steps:
