@@ -9,6 +9,7 @@ import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.w
 import multiThreadWllamaJsUrl from "@wllama/wllama/esm/multi-thread/wllama.js?url";
 import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
 import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
+import { parseModelUrl } from "./parseModelUrl";
 
 export async function initializeWllama(
   modelUrl: string | string[],
@@ -47,28 +48,6 @@ const commonSamplingConfig: SamplingConfig = {
   mirostat: 2,
   mirostat_tau: 3.5,
 };
-
-function parseModelUrl(url: string) {
-  const urlPartsRegex = /(.*)-(\d{5})-of-(\d{5})\.gguf$/;
-
-  const matches = url.match(urlPartsRegex);
-
-  if (!matches || matches.length !== 4) return url;
-
-  const baseURL = matches[1];
-
-  const paddedShardsAmount = matches[3];
-
-  const paddedShardNumbers = Array.from(
-    { length: Number(paddedShardsAmount) },
-    (_, i) => (i + 1).toString().padStart(5, "0"),
-  );
-
-  return paddedShardNumbers.map(
-    (paddedShardNumber) =>
-      `${baseURL}-${paddedShardNumber}-of-${paddedShardsAmount}.gguf`,
-  );
-}
 
 export const availableModels: {
   [key in
