@@ -28,18 +28,14 @@ export function SearchResultsList({
 
   return (
     <ul>
-      {searchResults.map(([title, snippet, url], index) => (
+      {searchResults.map(([title, , url], index) => (
         <li key={url}>
           <Tooltip
             id={`search-result-${index}`}
             place="top-start"
             variant="info"
             opacity="1"
-            style={{ width: "75vw", maxWidth: "600px" }}
           >
-            {snippet}
-            <br />
-            <br />
             {url}
           </Tooltip>
           <div
@@ -52,12 +48,16 @@ export function SearchResultsList({
           >
             <a
               href={url}
-              data-tooltip-id={`search-result-${index}`}
               target="_blank"
+              data-tooltip-id={`search-result-${index}`}
             >
               {title}
             </a>
-            <a href={url} target="_blank">
+            <a
+              href={url}
+              target="_blank"
+              data-tooltip-id={`search-result-${index}`}
+            >
               <cite
                 style={{
                   fontSize: "small",
