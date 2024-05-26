@@ -95,12 +95,12 @@ export const availableModels: {
   },
   desktopLarger: {
     url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-Phi-3-mini-4k-instruct-iMat/resolve/main/phi-3-mini-4k-instruct-imat-Q5_K_M.shard-00001-of-00051.gguf",
+      "https://huggingface.co/Felladrin/gguf-sharded-phi-2-orange-v2/resolve/main/phi-2-orange-v2.Q5_K_M.shard-00001-of-00025.gguf",
     ),
-    userPrefix: "<|user|>\n",
-    assistantPrefix: "<|assistant|>\n",
-    messageSuffix: "<|end|>\n",
-    cacheType: "q4_0",
+    userPrefix: "<|im_start|>user\n",
+    assistantPrefix: "<|im_start|>assistant\n",
+    messageSuffix: "<|im_end|>\n",
+    cacheType: "f16",
     sampling: commonSamplingConfig,
   },
 };
