@@ -91,7 +91,7 @@ async function generateTextWithWebLlm(searchPromise: Promise<void>) {
 
   const selectedModel = getUseLargerModelSetting()
     ? availableModels.Llama
-    : availableModels.Gemma;
+    : availableModels.Phi;
 
   const isModelCached = await hasModelInCache(selectedModel);
 
