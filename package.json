@@ -35,7 +35,6 @@
     "react-hot-toast": "^2.4.1",
     "react-textarea-autosize": "^8.5.3",
     "react-tooltip": "^5.21.6",
-    "replace-in-file": "^7.1.0",
     "temp-dir": "^3.0.0",
     "water.css": "^2.1.1"
   },

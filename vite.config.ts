@@ -1,8 +1,6 @@
 import { defineConfig } from "vite";
 import viteReactPlugin from "@vitejs/plugin-react";
 import viteBasicSSLPlugin from "@vitejs/plugin-basic-ssl";
-import replaceInFile from "replace-in-file";
-import { resolve as resolvePath } from "node:path";
 import { statusEndpointServerHook } from "./server/statusEndpointServerHook";
 import { searchEndpointServerHook } from "./server/searchEndpointServerHook";
 import { compressionServerHook } from "./server/compressionServerHook";
@@ -12,13 +10,6 @@ import { getSearchToken, regenerateSearchToken } from "./server/searchToken";
 
 export default defineConfig(({ command }) => {
   if (command === "build") regenerateSearchToken();
-
-  // This replacement is a temporary solution for https://github.com/mlc-ai/web-llm/issues/414:
-  replaceInFile.sync({
-    files: resolvePath(__dirname, "node_modules/@mlc-ai/web-llm/lib/index.js"),
-    from: "//# sourceMappingURL=index.js.map",
-    to: "",
-  });
 
   return {
     root: "./client",
