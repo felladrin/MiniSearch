@@ -16,7 +16,7 @@
     "@energetic-ai/core": "^0.2.0",
     "@energetic-ai/embeddings": "^0.2.0",
     "@energetic-ai/model-embeddings-en": "^0.2.0",
-    "@mlc-ai/web-llm": "0.2.39",
+    "@mlc-ai/web-llm": "0.2.40",
     "@ratchet-ml/ratchet-web": "^0.4.0",
     "@wllama/wllama": "^1.4.2",
     "create-pubsub": "^1.6.3",
