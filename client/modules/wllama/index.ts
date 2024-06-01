@@ -3,7 +3,7 @@ import {
   Wllama,
   WllamaConfig,
   SamplingConfig,
-} from "@wllama/wllama";
+} from "@wllama/wllama/esm";
 import singleThreadWllamaJsUrl from "@wllama/wllama/esm/single-thread/wllama.js?url";
 import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
 import multiThreadWllamaJsUrl from "@wllama/wllama/esm/multi-thread/wllama.js?url";
