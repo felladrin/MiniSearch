@@ -69,9 +69,7 @@ export function SearchResultsList({
             </a>
           </div>
           {urlsDescriptions[url] && (
-            <blockquote>
-              {urlsDescriptions[url]}
-            </blockquote>
+            <blockquote>{urlsDescriptions[url]}</blockquote>
           )}
         </li>
       ))}
