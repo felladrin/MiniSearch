@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { SearchResults } from "../modules/search";
 import { Tooltip } from "react-tooltip";
-import Markdown from "markdown-to-jsx";
 
 export function SearchResultsList({
   searchResults,
@@ -71,7 +70,7 @@ export function SearchResultsList({
           </div>
           {urlsDescriptions[url] && (
             <blockquote>
-              <Markdown>{urlsDescriptions[url]}</Markdown>
+              {urlsDescriptions[url]}
             </blockquote>
           )}
         </li>
