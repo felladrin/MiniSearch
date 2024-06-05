@@ -57,7 +57,7 @@ function calculateDotProduct(firstArray: number[], secondArray: number[]) {
 async function loadModel() {
   const hfRepo = "Felladrin/gguf-multi-qa-MiniLM-L6-cos-v1";
 
-  const hfRepoFile = "multi-qa-MiniLM-L6-cos-v1.F16.gguf";
+  const hfRepoFile = "multi-qa-MiniLM-L6-cos-v1.Q8_0.gguf";
 
   const localFilePath = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
