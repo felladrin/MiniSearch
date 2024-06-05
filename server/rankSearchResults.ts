@@ -1,47 +1,78 @@
-import {
-  initModel,
-  distance as calculateSimilarity,
-  EmbeddingsModel,
-} from "@energetic-ai/embeddings";
-import { modelSource as embeddingModel } from "@energetic-ai/model-embeddings-en";
+import { fileURLToPath } from "url";
+import path from "node:path";
+import { getLlama } from "node-llama-cpp";
+import { downloadFileFromHuggingFaceRepository } from "./downloadFileFromHuggingFaceRepository";
 
-let embeddingModelInstance: EmbeddingsModel | undefined;
-
-async function getSimilarityScores(query: string, documents: string[]) {
-  if (!embeddingModelInstance) {
-    embeddingModelInstance = await initModel(embeddingModel);
-  }
-
-  const [queryEmbedding] = await embeddingModelInstance.embed([query]);
-
-  const documentsEmbeddings = await embeddingModelInstance.embed(documents);
-
-  return documentsEmbeddings.map((documentEmbedding) =>
-    calculateSimilarity(queryEmbedding, documentEmbedding),
-  );
-}
+const loadModelPromise = loadModel();
 
 export async function rankSearchResults(
   query: string,
   searchResults: [title: string, content: string, url: string][],
 ) {
+  const model = await loadModelPromise;
+
+  const embeddingContext = await model.createEmbeddingContext();
+
+  const queryEmbedding = (
+    await embeddingContext.getEmbeddingFor(query.toLocaleLowerCase())
+  ).vector;
+
+  const documentsEmbeddings: number[][] = [];
+
+  const documents = searchResults.map(([title, snippet, url]) =>
+    `${title}\n${url}\n${snippet}`.toLocaleLowerCase(),
+  );
+
+  for (const document of documents) {
+    const embedding = await embeddingContext.getEmbeddingFor(document);
+    documentsEmbeddings.push(embedding.vector);
+  }
+
+  const scores = documentsEmbeddings.map((documentEmbedding) =>
+    calculateDotProduct(queryEmbedding, documentEmbedding),
+  );
+
   const searchResultToScoreMap: Map<(typeof searchResults)[0], number> =
     new Map();
 
-  (
-    await getSimilarityScores(
-      query.toLocaleLowerCase(),
-      searchResults.map(([title, snippet, url]) =>
-        `${title}\n${url}\n${snippet}`.toLocaleLowerCase(),
-      ),
-    )
-  ).forEach((score, index) => {
-    searchResultToScoreMap.set(searchResults[index], score);
-  });
+  scores.map((score, index) =>
+    searchResultToScoreMap.set(searchResults[index], score),
+  );
 
-  return searchResults
-    .slice()
-    .sort(
-      (a, b) => searchResultToScoreMap.get(b) - searchResultToScoreMap.get(a),
-    );
+  return searchResults.slice().sort((a, b) => {
+    return searchResultToScoreMap.get(b) - searchResultToScoreMap.get(a);
+  });
+}
+
+function calculateDotProduct(firstArray: number[], secondArray: number[]) {
+  let result = 0;
+
+  for (let index = 0; index < firstArray.length; index++) {
+    result += firstArray[index] * secondArray[index];
+  }
+
+  return result;
+}
+
+async function loadModel() {
+  const hfRepo = "Felladrin/gguf-multi-qa-MiniLM-L6-cos-v1";
+
+  const hfRepoFile = "multi-qa-MiniLM-L6-cos-v1.F16.gguf";
+
+  const localFilePath = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "models",
+    hfRepo,
+    hfRepoFile,
+  );
+
+  const llama = await getLlama();
+
+  await downloadFileFromHuggingFaceRepository(
+    hfRepo,
+    hfRepoFile,
+    localFilePath,
+  );
+
+  return llama.loadModel({ modelPath: localFilePath });
 }

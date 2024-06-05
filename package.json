@@ -13,9 +13,7 @@
     "test": "glob -c 'tsx --test' '**/*.test.ts'"
   },
   "dependencies": {
-    "@energetic-ai/core": "^0.2.0",
-    "@energetic-ai/embeddings": "^0.2.0",
-    "@energetic-ai/model-embeddings-en": "^0.2.0",
+    "@huggingface/hub": "^0.15.1",
     "@mlc-ai/web-llm": "0.2.41",
     "@ratchet-ml/ratchet-web": "^0.4.0",
     "@wllama/wllama": "^1.10.0",
@@ -28,6 +26,7 @@
     "markdown-to-jsx": "^7.3.2",
     "mobile-detect": "^1.4.5",
     "node-fetch": "^3.3.2",
+    "node-llama-cpp": "^3.0.0-beta.22",
     "prettier": "^3.0.3",
     "rate-limiter-flexible": "^5.0.2",
     "react": "^18.2.0",
