@@ -132,7 +132,6 @@ async function generateTextWithWebLlm(searchPromise: Promise<void>) {
     const completion = await engine.chat.completions.create({
       stream: true,
       messages: [{ role: "user", content: getMainPrompt() }],
-      max_gen_len: 768,
     });
 
     let streamedMessage = "";
