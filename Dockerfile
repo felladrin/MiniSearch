@@ -4,7 +4,10 @@ EXPOSE ${PORT}
 RUN apk add --update \
   nodejs \
   npm \
-  git
+  git \
+  build-base \
+  cmake \
+  ccache
 ARG SEARXNG_SETTINGS_FOLDER=/etc/searxng
 RUN sed -i 's/- html/- json/' /usr/local/searxng/searx/settings.yml \
   && sed -i 's/su-exec searxng:searxng //' /usr/local/searxng/dockerfiles/docker-entrypoint.sh \
