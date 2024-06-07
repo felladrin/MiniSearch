@@ -1,4 +1,5 @@
 import fetch from "node-fetch";
+import { convert as convertHtmlToPlainText } from "html-to-text";
 
 export async function fetchSearXNG(query: string, limit?: number) {
   try {
@@ -27,15 +28,17 @@ export async function fetchSearXNG(query: string, limit?: number) {
       const uniqueUrls = new Set<string>();
 
       for (const result of results) {
-        if (!result.content || uniqueUrls.has(result.url)) continue;
+        if (uniqueUrls.has(result.url) || !result.content) continue;
 
-        const stripHtmlTags = (str: string) => str.replace(/<[^>]*>?/gm, "");
+        const title = convertHtmlToPlainText(result.title, {
+          wordwrap: false,
+        }).trim();
 
-        const content = stripHtmlTags(result.content).trim();
+        const content = convertHtmlToPlainText(result.content, {
+          wordwrap: false,
+        }).trim();
 
-        if (content === "") continue;
-
-        const title = stripHtmlTags(result.title);
+        if (title === "" || content === "") continue;
 
         const url = result.url;
 
