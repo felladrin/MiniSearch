@@ -80,7 +80,7 @@ export const availableModels: {
     userPrefix: "<|im_start|>user\n",
     assistantPrefix: "<|im_start|>assistant\n",
     messageSuffix: "<|im_end|>\n",
-    cacheType: "f16",
+    cacheType: "q4_0",
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
