@@ -70,17 +70,17 @@ export const availableModels: {
     userPrefix: "<|im_start|>user\n",
     assistantPrefix: "<|im_start|>assistant\n",
     messageSuffix: "<|im_end|>\n",
-    cacheType: "q8_0",
+    cacheType: "f16",
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
     url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-zephyr-220m-dpo-full/resolve/main/zephyr-220m-dpo-full.Q8_0.shard-00001-of-00007.gguf",
+      "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-0.5B-Instruct/resolve/main/Qwen2-0.5B-Instruct.Q4_0.shard-00001-of-00003.gguf",
     ),
-    userPrefix: "<|user|>\n",
-    assistantPrefix: "<|assistant|>\n",
-    messageSuffix: "</s>\n",
-    cacheType: "q8_0",
+    userPrefix: "<|im_start|>user\n",
+    assistantPrefix: "<|im_start|>assistant\n",
+    messageSuffix: "<|im_end|>\n",
+    cacheType: "f16",
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
