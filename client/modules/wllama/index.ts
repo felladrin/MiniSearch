@@ -79,7 +79,7 @@ export const availableModels: {
   },
   mobileLarger: {
     url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-WizardVicuna-pythia-410m-deduped/resolve/main/WizardVicuna-pythia-410m-deduped.Q4_0.shard-00001-of-00005.gguf",
+      "https://huggingface.co/Felladrin/gguf-sharded-WizardVicuna-pythia-410m-deduped/resolve/main/WizardVicuna-pythia-410m-deduped.Q3_K_S.shard-00001-of-00004.gguf",
     ),
     userPrefix: "<|Human|>\n",
     userSuffix: "<|endoftext|>\n",
