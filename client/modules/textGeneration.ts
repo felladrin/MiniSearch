@@ -229,7 +229,7 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
 
     let isAnswering = false;
 
-    const completion = await wllama.createCompletion(prompt, {
+    await wllama.createCompletion(prompt, {
       nPredict: 768,
       sampling: selectedModel.sampling,
       onNewToken: (_token, _piece, currentText, { abortSignal }) => {
@@ -240,15 +240,14 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
 
         updateResponse(currentText);
 
-        if (currentText.includes(selectedModel.assistantSuffix.trim())) {
-          abortSignal();
+        for (const stopString of selectedModel.stopStrings) {
+          if (currentText.includes(stopString)) {
+            updateResponse(currentText.replaceAll(stopString, ""));
+            abortSignal();
+          }
         }
       },
     });
-
-    updateResponse(
-      completion.replace(selectedModel.assistantSuffix.trim(), ""),
-    );
   }
 
   await wllama.exit();

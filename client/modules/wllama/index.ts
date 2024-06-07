@@ -60,6 +60,7 @@ export const availableModels: {
     userSuffix: string;
     assistantPrefix: string;
     assistantSuffix: string;
+    stopStrings: string[];
     cacheType?: "f16" | "q8_0" | "q4_0";
     sampling: SamplingConfig;
   };
@@ -72,6 +73,7 @@ export const availableModels: {
     userSuffix: "<|im_end|>\n",
     assistantPrefix: "<|im_start|>assistant\n",
     assistantSuffix: "<|im_end|>\n",
+    stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
     sampling: commonSamplingConfig,
   },
@@ -83,6 +85,12 @@ export const availableModels: {
     userSuffix: "<|endofinstruction|>",
     assistantPrefix: "",
     assistantSuffix: "<|endofcompletion|>",
+    stopStrings: [
+      "<|startofinstruction|>",
+      "<|endofinstruction|>",
+      "<|endofcompletion|>",
+      "<|pad|>",
+    ],
     cacheType: "f16",
     sampling: commonSamplingConfig,
   },
@@ -94,6 +102,7 @@ export const availableModels: {
     userSuffix: "</s>\n",
     assistantPrefix: "<|answer|>\n",
     assistantSuffix: "</s>\n",
+    stopStrings: ["<|prompt|>", "<|answer|>", "</s>"],
     cacheType: "f16",
     sampling: commonSamplingConfig,
   },
@@ -105,6 +114,7 @@ export const availableModels: {
     userSuffix: "<|im_end|>\n",
     assistantPrefix: "<|im_start|>assistant\n",
     assistantSuffix: "<|im_end|>\n",
+    stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
     sampling: commonSamplingConfig,
   },
