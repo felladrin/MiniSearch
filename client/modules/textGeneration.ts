@@ -205,25 +205,25 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
     const prompt = [
       selectedModel.userPrefix,
       "Hello!",
-      selectedModel.messageSuffix,
+      selectedModel.userSuffix,
       selectedModel.assistantPrefix,
       "Hi! How can I help you?",
-      selectedModel.messageSuffix,
+      selectedModel.assistantSuffix,
       selectedModel.userPrefix,
       ["Take a look at this info:", getFormattedSearchResults(5)].join("\n\n"),
-      selectedModel.messageSuffix,
+      selectedModel.userSuffix,
       selectedModel.assistantPrefix,
       "Alright!",
-      selectedModel.messageSuffix,
+      selectedModel.assistantSuffix,
       selectedModel.userPrefix,
       "Now I'm going to write my question, and if this info is useful you can use them in your answer. Ready?",
-      selectedModel.messageSuffix,
+      selectedModel.userSuffix,
       selectedModel.assistantPrefix,
       "I'm ready to answer!",
-      selectedModel.messageSuffix,
+      selectedModel.assistantSuffix,
       selectedModel.userPrefix,
       query,
-      selectedModel.messageSuffix,
+      selectedModel.userSuffix,
       selectedModel.assistantPrefix,
     ].join("");
 
@@ -240,13 +240,15 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
 
         updateResponse(currentText);
 
-        if (currentText.includes(selectedModel.messageSuffix.trim())) {
+        if (currentText.includes(selectedModel.assistantSuffix.trim())) {
           abortSignal();
         }
       },
     });
 
-    updateResponse(completion.replace(selectedModel.messageSuffix.trim(), ""));
+    updateResponse(
+      completion.replace(selectedModel.assistantSuffix.trim(), ""),
+    );
   }
 
   await wllama.exit();

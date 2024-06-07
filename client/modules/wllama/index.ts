@@ -57,8 +57,9 @@ export const availableModels: {
     | "desktopLarger"]: {
     url: string | string[];
     userPrefix: string;
+    userSuffix: string;
     assistantPrefix: string;
-    messageSuffix: string;
+    assistantSuffix: string;
     cacheType?: "f16" | "q8_0" | "q4_0";
     sampling: SamplingConfig;
   };
@@ -68,19 +69,21 @@ export const availableModels: {
       "https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-00001-of-00007.gguf",
     ),
     userPrefix: "<|im_start|>user\n",
+    userSuffix: "<|im_end|>\n",
     assistantPrefix: "<|im_start|>assistant\n",
-    messageSuffix: "<|im_end|>\n",
+    assistantSuffix: "<|im_end|>\n",
     cacheType: "f16",
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
     url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-0.5B-Instruct/resolve/main/Qwen2-0.5B-Instruct.Q4_0.shard-00001-of-00003.gguf",
+      "https://huggingface.co/Felladrin/gguf-sharded-Aira-2-355M/resolve/main/Aira-2-355M.Q4_K_M.shard-00001-of-00006.gguf",
     ),
-    userPrefix: "<|im_start|>user\n",
-    assistantPrefix: "<|im_start|>assistant\n",
-    messageSuffix: "<|im_end|>\n",
-    cacheType: "q4_0",
+    userPrefix: "<|startofinstruction|>",
+    userSuffix: "<|endofinstruction|>",
+    assistantPrefix: "",
+    assistantSuffix: "<|endofcompletion|>",
+    cacheType: "f16",
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
@@ -88,8 +91,9 @@ export const availableModels: {
       "https://huggingface.co/Felladrin/gguf-sharded-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1.8b-chat.Q8_0.shard-00001-of-00026.gguf",
     ),
     userPrefix: "<|prompt|>\n",
+    userSuffix: "</s>\n",
     assistantPrefix: "<|answer|>\n",
-    messageSuffix: "</s>\n",
+    assistantSuffix: "</s>\n",
     cacheType: "f16",
     sampling: commonSamplingConfig,
   },
@@ -98,8 +102,9 @@ export const availableModels: {
       "https://huggingface.co/Felladrin/gguf-sharded-phi-2-orange-v2/resolve/main/phi-2-orange-v2.Q5_K_M.shard-00001-of-00025.gguf",
     ),
     userPrefix: "<|im_start|>user\n",
+    userSuffix: "<|im_end|>\n",
     assistantPrefix: "<|im_start|>assistant\n",
-    messageSuffix: "<|im_end|>\n",
+    assistantSuffix: "<|im_end|>\n",
     cacheType: "f16",
     sampling: commonSamplingConfig,
   },
