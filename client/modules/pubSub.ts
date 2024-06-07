@@ -41,11 +41,9 @@ export const [, , getDisableWebGpuUsageSetting] =
 
 export const numberOfThreadsSettingPubSub = createLocalStoragePubSub(
   "numberOfThreads",
-  isRunningOnMobile && navigator.hardwareConcurrency
-    ? navigator.hardwareConcurrency
-    : (navigator.hardwareConcurrency ?? 1) > 1
-      ? Math.max(navigator.hardwareConcurrency - 2, 2)
-      : 1,
+  !isRunningOnMobile && (navigator.hardwareConcurrency ?? 1) > 1
+    ? Math.max(navigator.hardwareConcurrency - 2, 2)
+    : 1,
 );
 
 export const [, , getNumberOfThreadsSetting] = numberOfThreadsSettingPubSub;
