@@ -297,9 +297,9 @@ function endsWithASign(text: string) {
 function getMainPrompt() {
   return [
     "Provide a concise response to the request below.",
-    "If the information from the Web Search Results below is useful, you can use it to complement your response. Otherwise, ignore it.",
+    "If the information from the web search results below is useful, you can use it to complement your response. Otherwise, ignore it.",
     "",
-    "Web Search Results:",
+    "Web search results:",
     "",
     getFormattedSearchResults(5),
     "",
@@ -312,8 +312,11 @@ function getMainPrompt() {
 function getFormattedSearchResults(limit?: number) {
   return getSearchResults()
     .slice(0, limit)
-    .map(([title, snippet, url]) => `${title}\n${url}\n${snippet}`)
-    .join("\n\n");
+    .map(
+      ([title, snippet, url], index) =>
+        `${index + 1}. [${title}](${url} "${snippet}")`,
+    )
+    .join("\n");
 }
 
 async function getKeywords(text: string, limit?: number) {
