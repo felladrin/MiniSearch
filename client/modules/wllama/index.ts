@@ -77,7 +77,7 @@ export const availableModels: {
   },
   mobileLarger: {
     url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-Aira-2-355M/resolve/main/Aira-2-355M.Q4_K_M.shard-00001-of-00006.gguf",
+      "https://huggingface.co/Felladrin/gguf-sharded-Aira-2-355M/resolve/main/Aira-2-355M.Q3_K_M.shard-00001-of-00005.gguf",
     ),
     userPrefix: "<|startofinstruction|>",
     userSuffix: "<|endofinstruction|>",
