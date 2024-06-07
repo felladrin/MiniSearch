@@ -55,7 +55,7 @@ export async function prepareTextGeneration() {
   } catch (error) {
     toast.error(
       "Could not generate response. The browser may be out of memory. Please close this tab and run this search again in a new one.",
-      { duration: 10000 },
+      { duration: 10000, position: "bottom-center" },
     );
   } finally {
     dismissLoadingToast();
