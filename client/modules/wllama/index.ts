@@ -74,7 +74,7 @@ export const availableModels: {
     assistantPrefix: "<|im_start|>assistant\n",
     assistantSuffix: "<|im_end|>\n",
     stopStrings: ["<|im_start|>", "<|im_end|>"],
-    cacheType: "f16",
+    cacheType: "q8_0",
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
@@ -86,7 +86,7 @@ export const availableModels: {
     assistantPrefix: "<|Assistant|>\n",
     assistantSuffix: "<|endoftext|>\n",
     stopStrings: ["<|Human|>", "<|Assistant|>", "<|endoftext|>"],
-    cacheType: "f16",
+    cacheType: "q8_0",
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
