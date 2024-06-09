@@ -84,16 +84,16 @@ export const availableModels: {
   },
   mobileLarger: {
     url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-0.5B-Instruct/resolve/main/Qwen2-0.5B-Instruct.Q3_K_S.shard-00001-of-00003.gguf",
+      "https://huggingface.co/Felladrin/gguf-sharded-zephyr-220m-dpo-full/resolve/main/zephyr-220m-dpo-full.Q8_0.shard-00001-of-00007.gguf",
     ),
     introduction:
       "A chat between a curious user and an artificial intelligence assistant.\n\n",
-    userPrefix: "<|im_start|>user\n",
-    userSuffix: "<|im_end|>\n",
-    assistantPrefix: "<|im_start|>assistant\n",
-    assistantSuffix: "<|im_end|>\n",
-    stopStrings: ["<|im_start|>", "<|im_end|>"],
-    cacheType: "q8_0",
+    userPrefix: "<|user|>\n",
+    userSuffix: "</s>\n",
+    assistantPrefix: "<|assistant|>\n",
+    assistantSuffix: "</s>\n",
+    stopStrings: ["<|user|>", "<|assistant|>", "</s>"],
+    cacheType: "f16",
     contextSize: 1024,
     sampling: commonSamplingConfig,
   },
