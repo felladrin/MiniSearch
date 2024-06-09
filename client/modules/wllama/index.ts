@@ -61,7 +61,8 @@ export const availableModels: {
     assistantPrefix: string;
     assistantSuffix: string;
     stopStrings: string[];
-    cacheType?: "f16" | "q8_0" | "q4_0";
+    cacheType: "f16" | "q8_0" | "q4_0";
+    contextSize: number;
     sampling: SamplingConfig;
   };
 } = {
@@ -74,7 +75,8 @@ export const availableModels: {
     assistantPrefix: "<|im_start|>assistant\n",
     assistantSuffix: "<|im_end|>\n",
     stopStrings: ["<|im_start|>", "<|im_end|>"],
-    cacheType: "q8_0",
+    cacheType: "f16",
+    contextSize: 1024,
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
@@ -86,7 +88,8 @@ export const availableModels: {
     assistantPrefix: "<|Assistant|>\n",
     assistantSuffix: "<|endoftext|>\n",
     stopStrings: ["<|Human|>", "<|Assistant|>", "<|endoftext|>"],
-    cacheType: "q8_0",
+    cacheType: "f16",
+    contextSize: 1024,
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
@@ -99,6 +102,7 @@ export const availableModels: {
     assistantSuffix: "</s>\n",
     stopStrings: ["<|prompt|>", "<|answer|>", "</s>"],
     cacheType: "f16",
+    contextSize: 2048,
     sampling: commonSamplingConfig,
   },
   desktopLarger: {
@@ -111,6 +115,7 @@ export const availableModels: {
     assistantSuffix: "<|im_end|>\n",
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
+    contextSize: 2048,
     sampling: commonSamplingConfig,
   },
 };

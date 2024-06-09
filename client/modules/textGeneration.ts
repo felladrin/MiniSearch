@@ -177,8 +177,8 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
       suppressNativeLog: !debug,
     },
     model: {
-      n_ctx: 2 * 1024,
       n_threads: getNumberOfThreadsSetting(),
+      n_ctx: selectedModel.contextSize,
       cache_type_k: selectedModel.cacheType,
       parallelDownloads: isRunningOnMobile ? 1 : 3,
       progressCallback: ({ loaded, total }) => {
