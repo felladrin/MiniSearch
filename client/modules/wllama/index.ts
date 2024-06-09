@@ -79,7 +79,7 @@ export const availableModels: {
     assistantSuffix: "<|im_end|>\n",
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
-    contextSize: 1024,
+    contextSize: 2048,
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
@@ -94,7 +94,7 @@ export const availableModels: {
     assistantSuffix: "<|im_end|>\n",
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
-    contextSize: 1024,
+    contextSize: 2048,
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
