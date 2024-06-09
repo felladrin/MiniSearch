@@ -72,7 +72,7 @@ export const availableModels: {
       "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q4_K_M.gguf",
     ),
     introduction:
-      "A chat between a curious user and an artificial intelligence assistant.\n\n",
+      "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
     userSuffix: "<|im_end|>\n",
     assistantPrefix: "<|im_start|>assistant\n",
@@ -87,7 +87,7 @@ export const availableModels: {
       "https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-00001-of-00007.gguf",
     ),
     introduction:
-      "A chat between a curious user and an artificial intelligence assistant.\n\n",
+      "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
     userSuffix: "<|im_end|>\n",
     assistantPrefix: "<|im_start|>assistant\n",
@@ -102,7 +102,7 @@ export const availableModels: {
       "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-0.5B-Instruct/resolve/main/Qwen2-0.5B-Instruct.Q8_0.shard-00001-of-00004.gguf",
     ),
     introduction:
-      "A chat between a curious user and an artificial intelligence assistant.\n\n",
+      "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
     userSuffix: "<|im_end|>\n",
     assistantPrefix: "<|im_start|>assistant\n",
@@ -116,11 +116,12 @@ export const availableModels: {
     url: parseModelUrl(
       "https://huggingface.co/Felladrin/gguf-sharded-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1.8b-chat.Q8_0.shard-00001-of-00026.gguf",
     ),
-    introduction: "A chat log.\n\n",
-    userPrefix: "<|prompt|>\n",
-    userSuffix: "</s>\n",
-    assistantPrefix: "<|answer|>\n",
-    assistantSuffix: "</s>\n",
+    introduction:
+      "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.</s>",
+    userPrefix: "<|prompt|>",
+    userSuffix: "</s>",
+    assistantPrefix: "<|answer|>",
+    assistantSuffix: "</s>",
     stopStrings: ["<|prompt|>", "<|answer|>", "</s>"],
     cacheType: "f16",
     contextSize: 2048,
