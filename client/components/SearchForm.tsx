@@ -2,6 +2,9 @@ import { useEffect, useRef, FormEvent, useState, useCallback } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { getRandomQuerySuggestion } from "../modules/querySuggestions";
 import { SettingsButton } from "./SettingsButton";
+import { useNavigate } from "react-router-dom";
+import { prepareTextGeneration } from "../modules/textGeneration";
+import { updateResponse, updateSearchResults } from "../modules/pubSub";
 
 export function SearchForm({
   query,
@@ -14,6 +17,11 @@ export function SearchForm({
   const windowInnerHeight = useWindowInnerHeight();
   const defaultSuggestedQuery = "Anything you need!";
   const [suggestedQuery, setSuggestedQuery] = useState(defaultSuggestedQuery);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    prepareTextGeneration();
+  }, []);
 
   useEffect(() => {
     getRandomQuerySuggestion().then((querySuggestion) => {
@@ -25,12 +33,9 @@ export function SearchForm({
     event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
     const userQueryIsBlank = event.target.value.length === 0;
-    const suggestedQueryIsTheDefault = suggestedQuery === defaultSuggestedQuery;
 
-    if (userQueryIsBlank && suggestedQueryIsTheDefault) {
+    if (userQueryIsBlank) {
       setSuggestedQuery(await getRandomQuerySuggestion());
-    } else if (!userQueryIsBlank && !suggestedQueryIsTheDefault) {
-      setSuggestedQuery(defaultSuggestedQuery);
     }
   };
 
@@ -41,15 +46,19 @@ export function SearchForm({
       queryToEncode = textAreaRef.current.value;
     }
 
-    self.history.pushState(
-      null,
-      "",
-      `/?q=${encodeURIComponent(queryToEncode)}`,
-    );
+    navigate(`/?q=${encodeURIComponent(queryToEncode)}`);
+
+    if (textAreaRef.current) {
+      textAreaRef.current.value = queryToEncode;
+    }
 
     updateQuery(queryToEncode);
 
-    location.reload();
+    updateResponse("");
+
+    updateSearchResults([]);
+
+    prepareTextGeneration();
   }, [suggestedQuery, updateQuery]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {

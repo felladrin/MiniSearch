@@ -1,6 +1,6 @@
 import { isWebGPUAvailable } from "./webGpu";
 import {
-  updatePrompt,
+  updateQuery,
   updateSearchResults,
   getDisableAiResponseSetting,
   getUseLargerModelSetting,
@@ -9,24 +9,25 @@ import {
   updateUrlsDescriptions,
   getDisableWebGpuUsageSetting,
   getNumberOfThreadsSetting,
+  isDebugModeEnabled,
+  getQuery,
 } from "./pubSub";
 import { search } from "./search";
-import { query, debug } from "./urlParams";
 import toast from "react-hot-toast";
 import { isRunningOnMobile } from "./mobileDetection";
 
 export async function prepareTextGeneration() {
-  if (query === null) return;
+  if (getQuery() === "") return;
 
-  document.title = query;
+  document.title = getQuery();
 
-  updatePrompt(query);
+  updateQuery(getQuery());
 
-  const searchPromise = getSearchPromise(query);
+  const searchPromise = getSearchPromise(getQuery());
 
   if (getDisableAiResponseSetting()) return;
 
-  if (debug) console.time("Response Generation Time");
+  if (isDebugModeEnabled()) console.time("Response Generation Time");
 
   updateLoadingToast("Loading AI model...");
 
@@ -61,7 +62,7 @@ export async function prepareTextGeneration() {
     dismissLoadingToast();
   }
 
-  if (debug) {
+  if (isDebugModeEnabled()) {
     console.timeEnd("Response Generation Time");
   }
 }
@@ -115,11 +116,14 @@ async function generateTextWithWebLlm(searchPromise: Promise<void>) {
           type: "module",
         }),
         selectedModel,
-        { initProgressCallback, logLevel: debug ? "DEBUG" : "SILENT" },
+        {
+          initProgressCallback,
+          logLevel: isDebugModeEnabled() ? "DEBUG" : "SILENT",
+        },
       )
     : await CreateMLCEngine(selectedModel, {
         initProgressCallback,
-        logLevel: debug ? "DEBUG" : "SILENT",
+        logLevel: isDebugModeEnabled() ? "DEBUG" : "SILENT",
       });
 
   if (!getDisableAiResponseSetting()) {
@@ -150,7 +154,7 @@ async function generateTextWithWebLlm(searchPromise: Promise<void>) {
     }
   }
 
-  if (debug) {
+  if (isDebugModeEnabled()) {
     console.info(await engine.runtimeStatsText());
   }
 
@@ -174,7 +178,7 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
 
   const wllama = await initializeWllama(selectedModel.url, {
     wllama: {
-      suppressNativeLog: !debug,
+      suppressNativeLog: !isDebugModeEnabled(),
     },
     model: {
       n_threads: getNumberOfThreadsSetting(),
@@ -293,7 +297,7 @@ function getMainPrompt() {
     "",
     "Request:",
     "",
-    query,
+    getQuery(),
   ].join("\n");
 }
 
