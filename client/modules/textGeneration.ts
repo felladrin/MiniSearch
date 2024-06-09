@@ -27,6 +27,8 @@ export async function prepareTextGeneration() {
 
   updateQuery(getQuery());
 
+  updateResponse("");
+
   updateSearchResults([]);
 
   const searchPromise = getSearchPromise(getQuery());
