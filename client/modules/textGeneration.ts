@@ -11,6 +11,8 @@ import {
   getNumberOfThreadsSetting,
   isDebugModeEnabled,
   getQuery,
+  interruptTextGeneration,
+  onTextGenerationInterrupted,
 } from "./pubSub";
 import { search } from "./search";
 import toast from "react-hot-toast";
@@ -21,7 +23,11 @@ export async function prepareTextGeneration() {
 
   document.title = getQuery();
 
+  interruptTextGeneration();
+
   updateQuery(getQuery());
+
+  updateSearchResults([]);
 
   const searchPromise = getSearchPromise(getQuery());
 
@@ -140,6 +146,14 @@ async function generateTextWithWebLlm(searchPromise: Promise<void>) {
 
     let streamedMessage = "";
 
+    let wasInterrupted = false;
+
+    const unsubscribeFromTextGenerationInterruption =
+      onTextGenerationInterrupted(async () => {
+        await engine.interruptGenerate();
+        wasInterrupted = true;
+      });
+
     for await (const chunk of completion) {
       const deltaContent = chunk.choices[0].delta.content;
 
@@ -152,6 +166,10 @@ async function generateTextWithWebLlm(searchPromise: Promise<void>) {
 
       updateResponse(streamedMessage);
     }
+
+    unsubscribeFromTextGenerationInterruption();
+
+    if (wasInterrupted) updateResponse("");
   }
 
   if (isDebugModeEnabled()) {
@@ -222,9 +240,21 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
 
     let isAnswering = false;
 
+    let abortTextGeneration: (() => void) | undefined;
+
+    let wasInterrupted = false;
+
+    const unsubscribeFromTextGenerationInterruption =
+      onTextGenerationInterrupted(() => {
+        abortTextGeneration?.();
+        wasInterrupted = true;
+      });
+
     await wllama.createCompletion(prompt, {
       sampling: selectedModel.sampling,
       onNewToken: (_token, _piece, currentText, { abortSignal }) => {
+        abortTextGeneration = abortSignal;
+
         if (!isAnswering) {
           isAnswering = true;
           updateLoadingToast("Generating response...");
@@ -240,6 +270,10 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
         }
       },
     });
+
+    unsubscribeFromTextGenerationInterruption();
+
+    if (wasInterrupted) updateResponse("");
   }
 
   await wllama.exit();
@@ -263,6 +297,9 @@ async function generateTextWithRatchet(searchPromise: Promise<void>) {
 
     let response = "";
 
+    const unsubscribeFromTextGenerationInterruption =
+      onTextGenerationInterrupted(() => self.location.reload());
+
     await runCompletion(getMainPrompt(), (completionChunk) => {
       if (!isAnswering) {
         isAnswering = true;
@@ -272,6 +309,8 @@ async function generateTextWithRatchet(searchPromise: Promise<void>) {
       response += completionChunk;
       updateResponse(response);
     });
+
+    unsubscribeFromTextGenerationInterruption();
 
     if (!endsWithASign(response)) {
       response += ".";

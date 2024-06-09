@@ -4,7 +4,6 @@ import { getRandomQuerySuggestion } from "../modules/querySuggestions";
 import { SettingsButton } from "./SettingsButton";
 import { useNavigate } from "react-router-dom";
 import { prepareTextGeneration } from "../modules/textGeneration";
-import { updateResponse, updateSearchResults } from "../modules/pubSub";
 
 export function SearchForm({
   query,
@@ -42,21 +41,17 @@ export function SearchForm({
   const startSearching = useCallback(() => {
     let queryToEncode = suggestedQuery;
 
-    if (textAreaRef.current && textAreaRef.current.value.trim().length > 0) {
-      queryToEncode = textAreaRef.current.value;
+    if (textAreaRef.current) {
+      if (textAreaRef.current.value.trim().length > 0) {
+        queryToEncode = textAreaRef.current.value;
+      } else {
+        textAreaRef.current.value = queryToEncode;
+      }
     }
 
     navigate(`/?q=${encodeURIComponent(queryToEncode)}`);
 
-    if (textAreaRef.current) {
-      textAreaRef.current.value = queryToEncode;
-    }
-
     updateQuery(queryToEncode);
-
-    updateResponse("");
-
-    updateSearchResults([]);
 
     prepareTextGeneration();
   }, [suggestedQuery, updateQuery]);

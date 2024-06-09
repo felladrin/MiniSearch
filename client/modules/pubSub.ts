@@ -87,3 +87,8 @@ export const debugModeEnabledPubSub = createPubSub(
 );
 
 export const [, , isDebugModeEnabled] = debugModeEnabledPubSub;
+
+export const interruptTextGenerationPubSub = createPubSub();
+
+export const [interruptTextGeneration, onTextGenerationInterrupted] =
+  interruptTextGenerationPubSub;
