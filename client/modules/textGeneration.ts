@@ -219,7 +219,6 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
     let isAnswering = false;
 
     await wllama.createCompletion(prompt, {
-      nPredict: 768,
       sampling: selectedModel.sampling,
       onNewToken: (_token, _piece, currentText, { abortSignal }) => {
         if (!isAnswering) {
