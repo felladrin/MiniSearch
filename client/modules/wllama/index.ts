@@ -56,6 +56,7 @@ export const availableModels: {
     | "desktopDefault"
     | "desktopLarger"]: {
     url: string | string[];
+    introduction: string;
     userPrefix: string;
     userSuffix: string;
     assistantPrefix: string;
@@ -70,6 +71,8 @@ export const availableModels: {
     url: parseModelUrl(
       "https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-00001-of-00007.gguf",
     ),
+    introduction:
+      "A chat between a curious user and an artificial intelligence assistant.\n\n",
     userPrefix: "<|im_start|>user\n",
     userSuffix: "<|im_end|>\n",
     assistantPrefix: "<|im_start|>assistant\n",
@@ -81,8 +84,10 @@ export const availableModels: {
   },
   mobileLarger: {
     url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-WizardVicuna-pythia-410m-deduped/resolve/main/WizardVicuna-pythia-410m-deduped.Q3_K_S.shard-00001-of-00004.gguf",
+      "https://huggingface.co/Felladrin/gguf-sharded-WizardVicuna-pythia-410m-deduped/resolve/main/WizardVicuna-pythia-410m-deduped.Q4_K_S.shard-00001-of-00005.gguf",
     ),
+    introduction:
+      "A chat between a curious Human and an Artificial Intelligence Assistant.\n\n",
     userPrefix: "<|Human|>\n",
     userSuffix: "<|endoftext|>\n",
     assistantPrefix: "<|Assistant|>\n",
@@ -94,26 +99,29 @@ export const availableModels: {
   },
   desktopDefault: {
     url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1.8b-chat.Q8_0.shard-00001-of-00026.gguf",
+      "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-0.5B-Instruct/resolve/main/Qwen2-0.5B-Instruct.Q8_0.shard-00001-of-00004.gguf",
     ),
-    userPrefix: "<|prompt|>\n",
-    userSuffix: "</s>\n",
-    assistantPrefix: "<|answer|>\n",
-    assistantSuffix: "</s>\n",
-    stopStrings: ["<|prompt|>", "<|answer|>", "</s>"],
+    introduction:
+      "A chat between a curious user and an artificial intelligence assistant.\n\n",
+    userPrefix: "<|im_start|>user\n",
+    userSuffix: "<|im_end|>\n",
+    assistantPrefix: "<|im_start|>assistant\n",
+    assistantSuffix: "<|im_end|>\n",
+    stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
     sampling: commonSamplingConfig,
   },
   desktopLarger: {
     url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-phi-2-orange-v2/resolve/main/phi-2-orange-v2.Q5_K_M.shard-00001-of-00025.gguf",
+      "https://huggingface.co/Felladrin/gguf-sharded-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1.8b-chat.Q8_0.shard-00001-of-00026.gguf",
     ),
-    userPrefix: "<|im_start|>user\n",
-    userSuffix: "<|im_end|>\n",
-    assistantPrefix: "<|im_start|>assistant\n",
-    assistantSuffix: "<|im_end|>\n",
-    stopStrings: ["<|im_start|>", "<|im_end|>"],
+    introduction: "A chat log.\n\n",
+    userPrefix: "<|prompt|>\n",
+    userSuffix: "</s>\n",
+    assistantPrefix: "<|answer|>\n",
+    assistantSuffix: "</s>\n",
+    stopStrings: ["<|prompt|>", "<|answer|>", "</s>"],
     cacheType: "f16",
     contextSize: 2048,
     sampling: commonSamplingConfig,

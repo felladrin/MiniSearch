@@ -203,6 +203,7 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
     updateLoadingToast("Preparing response...");
 
     const prompt = [
+      selectedModel.introduction,
       selectedModel.userPrefix,
       "Hello!",
       selectedModel.userSuffix,
@@ -210,19 +211,7 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
       "Hi! How can I help you?",
       selectedModel.assistantSuffix,
       selectedModel.userPrefix,
-      ["Take a look at this info:", getFormattedSearchResults(5)].join("\n\n"),
-      selectedModel.userSuffix,
-      selectedModel.assistantPrefix,
-      "Alright!",
-      selectedModel.assistantSuffix,
-      selectedModel.userPrefix,
-      "Now I'm going to write my question, and if this info is useful you can use them in your answer. Ready?",
-      selectedModel.userSuffix,
-      selectedModel.assistantPrefix,
-      "I'm ready to answer!",
-      selectedModel.assistantSuffix,
-      selectedModel.userPrefix,
-      query,
+      getMainPrompt(),
       selectedModel.userSuffix,
       selectedModel.assistantPrefix,
     ].join("");
