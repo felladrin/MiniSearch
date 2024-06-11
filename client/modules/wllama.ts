@@ -9,7 +9,6 @@ import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.w
 import multiThreadWllamaJsUrl from "@wllama/wllama/esm/multi-thread/wllama.js?url";
 import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
 import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
-import { parseModelUrl } from "./parseModelUrl";
 
 export async function initializeWllama(
   modelUrl: string | string[],
@@ -68,9 +67,7 @@ export const availableModels: {
   };
 } = {
   mobileDefault: {
-    url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q4_K_M.gguf",
-    ),
+    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q4_K_M.gguf",
     introduction:
       "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
@@ -83,9 +80,7 @@ export const availableModels: {
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
-    url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-00001-of-00007.gguf",
-    ),
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-00001-of-00007.gguf",
     introduction:
       "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
@@ -98,9 +93,7 @@ export const availableModels: {
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
-    url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-0.5B-Instruct/resolve/main/Qwen2-0.5B-Instruct.Q8_0.shard-00001-of-00004.gguf",
-    ),
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-0.5B-Instruct/resolve/main/Qwen2-0.5B-Instruct.Q8_0.shard-00001-of-00004.gguf",
     introduction:
       "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
@@ -113,9 +106,7 @@ export const availableModels: {
     sampling: commonSamplingConfig,
   },
   desktopLarger: {
-    url: parseModelUrl(
-      "https://huggingface.co/Felladrin/gguf-sharded-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1.8b-chat.Q8_0.shard-00001-of-00026.gguf",
-    ),
+    url: "https://huggingface.co/Felladrin/gguf-sharded-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1.8b-chat.Q8_0.shard-00001-of-00026.gguf",
     introduction:
       "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.</s>",
     userPrefix: "<|prompt|>",
