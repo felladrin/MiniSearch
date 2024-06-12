@@ -34,9 +34,13 @@ export async function fetchSearXNG(query: string, limit?: number) {
           wordwrap: false,
         }).trim();
 
-        const content = convertHtmlToPlainText(result.content, {
+        let content = convertHtmlToPlainText(result.content, {
           wordwrap: false,
         }).trim();
+
+        if (content.includes("...Missing:")) {
+          content = `${content.split("...Missing:")[0].trim()}...`;
+        }
 
         if (title === "" || content === "") continue;
 
