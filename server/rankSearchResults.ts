@@ -32,14 +32,20 @@ export async function rankSearchResults(
     calculateDotProduct(queryEmbedding, documentEmbedding),
   );
 
+  const highestScore = Math.max(...scores);
+
+  const scoreThreshold = highestScore / 3;
+
   const searchResultToScoreMap: Map<(typeof searchResults)[0], number> =
     new Map();
 
-  scores.map((score, index) =>
-    searchResultToScoreMap.set(searchResults[index], score),
-  );
+  scores.forEach((score, index) => {
+    if (score > scoreThreshold) {
+      searchResultToScoreMap.set(searchResults[index], score);
+    }
+  });
 
-  return searchResults.slice().sort((a, b) => {
+  return Array.from(searchResultToScoreMap.keys()).sort((a, b) => {
     return searchResultToScoreMap.get(b) - searchResultToScoreMap.get(a);
   });
 }
