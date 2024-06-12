@@ -1,5 +1,6 @@
 import fetch from "node-fetch";
 import { convert as convertHtmlToPlainText } from "html-to-text";
+import { strip as stripEmojis } from "node-emoji";
 
 export async function fetchSearXNG(query: string, limit?: number) {
   try {
@@ -37,6 +38,8 @@ export async function fetchSearXNG(query: string, limit?: number) {
         let content = convertHtmlToPlainText(result.content, {
           wordwrap: false,
         }).trim();
+
+        content = stripEmojis(content, { preserveSpaces: true });
 
         if (content.includes("...Missing:")) {
           content = `${content.split("...Missing:")[0].trim()}...`;
