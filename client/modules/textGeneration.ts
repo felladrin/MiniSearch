@@ -332,7 +332,7 @@ function getMainPrompt() {
     "Provide a concise response to the request below.",
     "If the information from the web search results below is useful, you can use it to complement your response. Otherwise, ignore it.",
     "",
-    "Web search results:",
+    "Top web search results:",
     "",
     getFormattedSearchResults(5),
     "",
@@ -347,7 +347,7 @@ function getFormattedSearchResults(limit?: number) {
     .slice(0, limit)
     .map(
       ([title, snippet, url], index) =>
-        `${index + 1}. [${title}](${url} "${snippet}")`,
+        `${index + 1}. [${title}](${url} "${snippet.replaceAll('"', "'")}")`,
     )
     .join("\n");
 }

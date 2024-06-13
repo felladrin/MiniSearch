@@ -20,7 +20,7 @@ export async function rankSearchResults(
   const documentsEmbeddings: number[][] = [];
 
   const documents = searchResults.map(([title, snippet, url]) =>
-    `${title}\n${url}\n${snippet}`.toLocaleLowerCase(),
+    `[${title}](${url} "${snippet.replaceAll('"', "'")}")`.toLocaleLowerCase(),
   );
 
   for (const document of documents) {
@@ -34,7 +34,7 @@ export async function rankSearchResults(
 
   const highestScore = Math.max(...scores);
 
-  const scoreThreshold = highestScore / 3;
+  const scoreThreshold = highestScore / 2;
 
   const searchResultToScoreMap: Map<(typeof searchResults)[0], number> =
     new Map();
