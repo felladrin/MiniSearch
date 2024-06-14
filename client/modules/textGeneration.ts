@@ -17,6 +17,7 @@ import {
 import { search } from "./search";
 import toast from "react-hot-toast";
 import { isRunningOnMobile } from "./mobileDetection";
+import { isRunningOnSafari } from "./browserDetection";
 import { match } from "ts-pattern";
 
 export async function prepareTextGeneration() {
@@ -46,18 +47,17 @@ export async function prepareTextGeneration() {
 
       if (getDisableWebGpuUsageSetting()) throw Error("WebGPU is disabled.");
 
-      if (getUseLargerModelSetting()) {
-        try {
-          await generateTextWithWebLlm(searchPromise);
-        } catch (error) {
-          await generateTextWithRatchet(searchPromise);
-        }
-      } else {
-        try {
-          await generateTextWithRatchet(searchPromise);
-        } catch (error) {
-          await generateTextWithWebLlm(searchPromise);
-        }
+      const generateTextWithWebGpu = [
+        generateTextWithWebLlm,
+        generateTextWithRatchet,
+      ];
+
+      if (isRunningOnSafari) generateTextWithWebGpu.reverse();
+
+      try {
+        await generateTextWithWebGpu[0](searchPromise);
+      } catch (error) {
+        await generateTextWithWebGpu[1](searchPromise);
       }
     } catch (error) {
       await generateTextWithWllama(searchPromise);
