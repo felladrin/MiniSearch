@@ -10,6 +10,7 @@ import { Toaster } from "react-hot-toast";
 import Markdown from "markdown-to-jsx";
 import { getDisableAiResponseSetting } from "../modules/pubSub";
 import { SearchResultsList } from "./SearchResultsList";
+import { match, P } from "ts-pattern";
 
 export function Main() {
   const [query, updateQuery] = usePubSub(queryPubSub);
@@ -20,25 +21,29 @@ export function Main() {
   return (
     <>
       <SearchForm query={query} updateQuery={updateQuery} />
-      {!getDisableAiResponseSetting() && response.length > 0 && (
-        <div
-          style={{
-            backgroundColor: "var(--background)",
-            borderRadius: "6px",
-            padding: "10px 25px",
-          }}
-        >
-          <Markdown>{response}</Markdown>
-        </div>
-      )}
-      {searchResults.length > 0 && (
-        <div>
-          <SearchResultsList
-            searchResults={searchResults}
-            urlsDescriptions={urlsDescriptions}
-          />
-        </div>
-      )}
+      {match([getDisableAiResponseSetting(), response.length])
+        .with([false, P.number.positive()], () => (
+          <div
+            style={{
+              backgroundColor: "var(--background)",
+              borderRadius: "6px",
+              padding: "10px 25px",
+            }}
+          >
+            <Markdown>{response}</Markdown>
+          </div>
+        ))
+        .otherwise(() => null)}
+      {match(searchResults.length)
+        .with(P.number.positive(), () => (
+          <div>
+            <SearchResultsList
+              searchResults={searchResults}
+              urlsDescriptions={urlsDescriptions}
+            />
+          </div>
+        ))
+        .otherwise(() => null)}
       <Toaster />
     </>
   );

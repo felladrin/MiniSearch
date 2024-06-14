@@ -8,6 +8,7 @@ import {
 import { Tooltip } from "react-tooltip";
 import { isWebGPUAvailable } from "../modules/webGpu";
 import type { ChangeEventHandler, HTMLInputTypeAttribute } from "react";
+import { match, P } from "ts-pattern";
 
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -67,18 +68,22 @@ export function SettingsForm() {
           />
         </div>
       )}
-      {(!isWebGPUAvailable || disableWebGpuUsage) && (
-        <div>
-          <SettingInput
-            label="CPU threads to use"
-            type="number"
-            value={numberOfThreads}
-            onChange={(event) => setNumberOfThreads(Number(event.target.value))}
-            tooltipId="number-of-threads-setting-tooltip"
-            tooltipContent="Number of threads to use for the AI model. Lower values will use less CPU, but may take longer to respond. A too-high value may cause the app to hang. Note that this value is ignored when using WebGPU."
-          />
-        </div>
-      )}
+      {match([isWebGPUAvailable, disableWebGpuUsage])
+        .with([false, P.any], [P.any, true], () => (
+          <div>
+            <SettingInput
+              label="CPU threads to use"
+              type="number"
+              value={numberOfThreads}
+              onChange={({ target }) =>
+                setNumberOfThreads(Number(target.value))
+              }
+              tooltipId="number-of-threads-setting-tooltip"
+              tooltipContent="Number of threads to use for the AI model. Lower values will use less CPU, but may take longer to respond. A too-high value may cause the app to hang. Note that this value is ignored when using WebGPU."
+            />
+          </div>
+        ))
+        .otherwise(() => null)}
     </div>
   );
 }

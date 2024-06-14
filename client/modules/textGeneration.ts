@@ -17,6 +17,7 @@ import {
 import { search } from "./search";
 import toast from "react-hot-toast";
 import { isRunningOnMobile } from "./mobileDetection";
+import { match } from "ts-pattern";
 
 export async function prepareTextGeneration() {
   if (getQuery() === "") return;
@@ -184,15 +185,12 @@ async function generateTextWithWebLlm(searchPromise: Promise<void>) {
 async function generateTextWithWllama(searchPromise: Promise<void>) {
   const { initializeWllama, availableModels } = await import("./wllama");
 
-  const defaultModel = isRunningOnMobile
-    ? availableModels.mobileDefault
-    : availableModels.desktopDefault;
-
-  const largerModel = isRunningOnMobile
-    ? availableModels.mobileLarger
-    : availableModels.desktopLarger;
-
-  const selectedModel = getUseLargerModelSetting() ? largerModel : defaultModel;
+  const selectedModel = match([isRunningOnMobile, getUseLargerModelSetting()])
+    .with([true, false], () => availableModels.mobileDefault)
+    .with([true, true], () => availableModels.mobileLarger)
+    .with([false, false], () => availableModels.desktopDefault)
+    .with([false, true], () => availableModels.desktopLarger)
+    .exhaustive();
 
   let loadingPercentage = 0;
 
@@ -210,12 +208,11 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
 
         if (loadingPercentage !== progressPercentage) {
           loadingPercentage = progressPercentage;
-
-          if (loadingPercentage === 100) {
-            updateLoadingToast(`AI model loaded.`);
-          } else {
-            updateLoadingToast(`Loading: ${loadingPercentage}%`);
-          }
+          updateLoadingToast(
+            loadingPercentage === 100
+              ? `AI model loaded.`
+              : `Loading: ${loadingPercentage}%`,
+          );
         }
       },
     },
