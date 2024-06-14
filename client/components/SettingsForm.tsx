@@ -8,7 +8,7 @@ import {
 import { Tooltip } from "react-tooltip";
 import { isWebGPUAvailable } from "../modules/webGpu";
 import type { ChangeEventHandler, HTMLInputTypeAttribute } from "react";
-import { match, P } from "ts-pattern";
+import { match, Pattern } from "ts-pattern";
 
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -69,7 +69,7 @@ export function SettingsForm() {
         </div>
       )}
       {match([isWebGPUAvailable, disableWebGpuUsage])
-        .with([false, P.any], [P.any, true], () => (
+        .with([false, Pattern.any], [Pattern.any, true], () => (
           <div>
             <SettingInput
               label="CPU threads to use"

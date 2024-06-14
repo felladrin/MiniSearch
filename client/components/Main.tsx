@@ -10,7 +10,7 @@ import { Toaster } from "react-hot-toast";
 import Markdown from "markdown-to-jsx";
 import { getDisableAiResponseSetting } from "../modules/pubSub";
 import { SearchResultsList } from "./SearchResultsList";
-import { match, P } from "ts-pattern";
+import { match, Pattern } from "ts-pattern";
 
 export function Main() {
   const [query, updateQuery] = usePubSub(queryPubSub);
@@ -22,7 +22,7 @@ export function Main() {
     <>
       <SearchForm query={query} updateQuery={updateQuery} />
       {match([getDisableAiResponseSetting(), response.length])
-        .with([false, P.number.positive()], () => (
+        .with([false, Pattern.number.positive()], () => (
           <div
             style={{
               backgroundColor: "var(--background)",
@@ -35,7 +35,7 @@ export function Main() {
         ))
         .otherwise(() => null)}
       {match(searchResults.length)
-        .with(P.number.positive(), () => (
+        .with(Pattern.number.positive(), () => (
           <div>
             <SearchResultsList
               searchResults={searchResults}
