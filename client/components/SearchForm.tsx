@@ -4,6 +4,7 @@ import { getRandomQuerySuggestion } from "../modules/querySuggestions";
 import { SettingsButton } from "./SettingsButton";
 import { useNavigate } from "react-router-dom";
 import { prepareTextGeneration } from "../modules/textGeneration";
+import { isMatching, match, Pattern } from "ts-pattern";
 
 export function SearchForm({
   query,
@@ -13,6 +14,7 @@ export function SearchForm({
   updateQuery: (query: string) => void;
 }) {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const [textAreaValue, setTextAreaValue] = useState(query);
   const windowInnerHeight = useWindowInnerHeight();
   const defaultSuggestedQuery = "Anything you need!";
   const [suggestedQuery, setSuggestedQuery] = useState(defaultSuggestedQuery);
@@ -31,74 +33,89 @@ export function SearchForm({
   const handleInputChange = async (
     event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
-    const userQueryIsBlank = event.target.value.length === 0;
+    const text = event.target.value;
 
-    if (userQueryIsBlank) {
+    setTextAreaValue(text);
+
+    if (text.length === 0) {
       setSuggestedQuery(await getRandomQuerySuggestion());
     }
   };
 
-  const startSearching = useCallback(() => {
-    let queryToEncode = suggestedQuery;
+  const handleClearButtonClick = async () => {
+    setSuggestedQuery(await getRandomQuerySuggestion());
+    setTextAreaValue("");
+    textAreaRef.current?.focus();
+  };
 
-    if (textAreaRef.current) {
-      if (textAreaRef.current.value.trim().length > 0) {
-        queryToEncode = textAreaRef.current.value;
-      } else {
-        textAreaRef.current.value = queryToEncode;
-      }
-    }
+  const startSearching = useCallback(() => {
+    const queryToEncode = match(textAreaValue.trim())
+      .with(Pattern.string.minLength(1), () => textAreaValue)
+      .otherwise(() => suggestedQuery);
+
+    setTextAreaValue(queryToEncode);
 
     navigate(`/?q=${encodeURIComponent(queryToEncode)}`);
 
     updateQuery(queryToEncode);
 
     prepareTextGeneration();
-  }, [suggestedQuery, updateQuery]);
+  }, [textAreaValue, suggestedQuery, updateQuery]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     startSearching();
   };
 
-  useEffect(() => {
-    const keyboardEventHandler = (event: KeyboardEvent) => {
-      if (event.code === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        startSearching();
-      }
-    };
-    const textArea = textAreaRef.current;
-    textArea?.addEventListener("keypress", keyboardEventHandler);
-    return () => {
-      textArea?.removeEventListener("keypress", keyboardEventHandler);
-    };
-  }, [startSearching]);
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const isPressingEnterWithoutShift = isMatching<Partial<typeof event>>(
+      {
+        code: "Enter",
+        shiftKey: false,
+      },
+      event,
+    );
+
+    if (isPressingEnterWithoutShift) {
+      event.preventDefault();
+      startSearching();
+    }
+  };
+
+  const style = match(query)
+    .with(Pattern.string.length(0), () => ({
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      height: windowInnerHeight * 0.8,
+    }))
+    .otherwise(() => undefined);
 
   return (
-    <div
-      style={
-        query.length === 0
-          ? {
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              height: windowInnerHeight * 0.8,
-            }
-          : undefined
-      }
-    >
+    <div style={style}>
       <form onSubmit={handleSubmit} style={{ width: "100%" }}>
         <TextareaAutosize
-          defaultValue={query}
+          value={textAreaValue}
           placeholder={suggestedQuery}
           ref={textAreaRef}
+          onKeyDown={handleKeyDown}
           onChange={handleInputChange}
           autoFocus
           minRows={1}
           maxRows={6}
         />
         <div style={{ display: "flex", width: "100%" }}>
+          {match(textAreaValue)
+            .with(Pattern.string.minLength(1), () => (
+              <button
+                type="button"
+                style={{ fontSize: "small" }}
+                onClick={handleClearButtonClick}
+              >
+                Clear
+              </button>
+            ))
+            .otherwise(() => null)}
           <button type="submit" style={{ width: "100%", fontSize: "small" }}>
             Search
           </button>
