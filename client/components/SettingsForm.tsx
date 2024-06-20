@@ -4,6 +4,7 @@ import {
   useLargerModelSettingPubSub,
   disableWebGpuUsageSettingPubSub,
   numberOfThreadsSettingPubSub,
+  searchResultsToConsiderSettingPubSub,
 } from "../modules/pubSub";
 import { Tooltip } from "react-tooltip";
 import { isWebGPUAvailable } from "../modules/webGpu";
@@ -22,6 +23,9 @@ export function SettingsForm() {
   );
   const [numberOfThreads, setNumberOfThreads] = usePubSub(
     numberOfThreadsSettingPubSub,
+  );
+  const [searchResultsToConsider, setSearchResultsToConsider] = usePubSub(
+    searchResultsToConsiderSettingPubSub,
   );
 
   return (
@@ -84,6 +88,20 @@ export function SettingsForm() {
           </div>
         ))
         .otherwise(() => null)}
+      <div>
+        <SettingInput
+          label="Search results to consider"
+          type="number"
+          value={searchResultsToConsider}
+          onChange={({ target }) =>
+            setSearchResultsToConsider(
+              Math.min(Math.max(Number(target.value), 0), 10),
+            )
+          }
+          tooltipId="search-results-to-reference-setting-tooltip"
+          tooltipContent="Determines the number of search results to consider when generating AI responses. A higher value may enhance accuracy, but it will also increase response time."
+        />
+      </div>
     </div>
   );
 }

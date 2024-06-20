@@ -13,6 +13,7 @@ import {
   getQuery,
   interruptTextGeneration,
   onTextGenerationInterrupted,
+  getNumberOfSearchResultsToConsiderSetting,
 } from "./pubSub";
 import { search } from "./search";
 import toast from "react-hot-toast";
@@ -325,13 +326,20 @@ function endsWithASign(text: string) {
 }
 
 function getMainPrompt() {
+  const numberOfSearchResultsToConsider = Math.min(
+    Math.max(getNumberOfSearchResultsToConsiderSetting(), 0),
+    10,
+  );
+
+  if (numberOfSearchResultsToConsider === 0) return getQuery();
+
   return [
     "Provide a concise response to the request below.",
     "If the information from the web search results below is useful, you can use it to complement your response. Otherwise, ignore it.",
     "",
     "Top web search results:",
     "",
-    getFormattedSearchResults(5),
+    getFormattedSearchResults(numberOfSearchResultsToConsider),
     "",
     "Request:",
     "",

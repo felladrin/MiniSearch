@@ -48,6 +48,14 @@ export const numberOfThreadsSettingPubSub = createLocalStoragePubSub(
 
 export const [, , getNumberOfThreadsSetting] = numberOfThreadsSettingPubSub;
 
+export const searchResultsToConsiderSettingPubSub = createLocalStoragePubSub(
+  "searchResultsToConsider",
+  5,
+);
+
+export const [, , getNumberOfSearchResultsToConsiderSetting] =
+  searchResultsToConsiderSettingPubSub;
+
 export const querySuggestionsPubSub = createLocalStoragePubSub<string[]>(
   "querySuggestions",
   [],
