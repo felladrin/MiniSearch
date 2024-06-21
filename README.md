@@ -39,6 +39,10 @@ You can build and run it from the source if you don't want to use MiniSearch's D
 docker-compose -f docker-compose.production.yml up --build
 ```
 
+## Searching via browser's address bar
+
+You can set MiniSearch as your browser's address-bar search engine using the pattern `http://localhost:7860/?q=%s`, in which your search term replaces `%s`.
+
 ## Contributing
 
 MiniSearch is open-source and contributions are welcome!
