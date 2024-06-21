@@ -145,7 +145,7 @@ async function generateTextWithWebLlm(searchPromise: Promise<void>) {
 
     const completion = await engine.chat.completions.create({
       stream: true,
-      messages: [{ role: "user", content: getMainPrompt() }],
+      messages: [{ role: "user", content: getMainPrompt(true) }],
     });
 
     let streamedMessage = "";
@@ -233,7 +233,7 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
       "Hi! How can I help you?",
       selectedModel.assistantSuffix,
       selectedModel.userPrefix,
-      getMainPrompt(),
+      getMainPrompt(!isRunningOnMobile),
       selectedModel.userSuffix,
       selectedModel.assistantPrefix,
     ].join("");
@@ -300,7 +300,7 @@ async function generateTextWithRatchet(searchPromise: Promise<void>) {
     const unsubscribeFromTextGenerationInterruption =
       onTextGenerationInterrupted(() => self.location.reload());
 
-    await runCompletion(getMainPrompt(), (completionChunk) => {
+    await runCompletion(getMainPrompt(true), (completionChunk) => {
       if (!isAnswering) {
         isAnswering = true;
         updateLoadingToast("Generating response...");
@@ -325,7 +325,7 @@ function endsWithASign(text: string) {
   return text.endsWith(".") || text.endsWith("!") || text.endsWith("?");
 }
 
-function getMainPrompt() {
+function getMainPrompt(shouldIncludeUrl: boolean) {
   const numberOfSearchResultsToConsider = Math.min(
     Math.max(getNumberOfSearchResultsToConsiderSetting(), 0),
     10,
@@ -339,7 +339,10 @@ function getMainPrompt() {
     "",
     "Top web search results:",
     "",
-    getFormattedSearchResults(numberOfSearchResultsToConsider),
+    getFormattedSearchResults(
+      shouldIncludeUrl,
+      numberOfSearchResultsToConsider,
+    ),
     "",
     "Request:",
     "",
@@ -347,14 +350,21 @@ function getMainPrompt() {
   ].join("\n");
 }
 
-function getFormattedSearchResults(limit?: number) {
+function getFormattedSearchResults(shouldIncludeUrl: boolean, limit?: number) {
+  if (shouldIncludeUrl) {
+    return getSearchResults()
+      .slice(0, limit)
+      .map(
+        ([title, snippet, url], index) =>
+          `${index + 1}. [${title}](${url} "${snippet.replaceAll('"', "'")}")`,
+      )
+      .join("\n");
+  }
+
   return getSearchResults()
     .slice(0, limit)
-    .map(
-      ([title, snippet, url], index) =>
-        `${index + 1}. [${title}](${url} "${snippet.replaceAll('"', "'")}")`,
-    )
-    .join("\n");
+    .map(([title, snippet]) => `${title}\n${snippet}`)
+    .join("\n\n");
 }
 
 async function getKeywords(text: string, limit?: number) {

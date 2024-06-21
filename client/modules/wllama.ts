@@ -33,21 +33,6 @@ export async function initializeWllama(
   return wllama;
 }
 
-const commonSamplingConfig: SamplingConfig = {
-  temp: 0.35,
-  dynatemp_range: 0.25,
-  top_k: 0,
-  top_p: 1,
-  min_p: 0.05,
-  tfs_z: 0.95,
-  typical_p: 0.85,
-  penalty_freq: 0.5,
-  penalty_repeat: 1.176,
-  penalty_last_n: -1,
-  mirostat: 2,
-  mirostat_tau: 3.5,
-};
-
 export const availableModels: {
   [key in
     | "mobileDefault"
@@ -67,7 +52,7 @@ export const availableModels: {
   };
 } = {
   mobileDefault: {
-    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q4_K_M.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf",
     introduction:
       "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
@@ -77,7 +62,13 @@ export const availableModels: {
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
-    sampling: commonSamplingConfig,
+    sampling: {
+      temp: 0.35,
+      top_k: 35,
+      top_p: 0.55,
+      min_p: 0.05,
+      penalty_repeat: 1.176,
+    },
   },
   mobileLarger: {
     url: "https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-00001-of-00007.gguf",
@@ -90,7 +81,13 @@ export const availableModels: {
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
-    sampling: commonSamplingConfig,
+    sampling: {
+      temp: 0.35,
+      top_k: 35,
+      top_p: 0.55,
+      min_p: 0.05,
+      penalty_repeat: 1.176,
+    },
   },
   desktopDefault: {
     url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-0.5B-Instruct/resolve/main/Qwen2-0.5B-Instruct.Q8_0.shard-00001-of-00004.gguf",
@@ -103,7 +100,20 @@ export const availableModels: {
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
-    sampling: commonSamplingConfig,
+    sampling: {
+      temp: 0.35,
+      dynatemp_range: 0.25,
+      top_k: 0,
+      top_p: 1,
+      min_p: 0.05,
+      tfs_z: 0.95,
+      typical_p: 0.85,
+      penalty_freq: 0.5,
+      penalty_repeat: 1.176,
+      penalty_last_n: -1,
+      mirostat: 2,
+      mirostat_tau: 3.5,
+    },
   },
   desktopLarger: {
     url: "https://huggingface.co/Felladrin/gguf-sharded-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1.8b-chat.Q8_0.shard-00001-of-00026.gguf",
@@ -116,6 +126,19 @@ export const availableModels: {
     stopStrings: ["<|prompt|>", "<|answer|>", "</s>"],
     cacheType: "f16",
     contextSize: 2048,
-    sampling: commonSamplingConfig,
+    sampling: {
+      temp: 0.35,
+      dynatemp_range: 0.25,
+      top_k: 0,
+      top_p: 1,
+      min_p: 0.05,
+      tfs_z: 0.95,
+      typical_p: 0.85,
+      penalty_freq: 0.5,
+      penalty_repeat: 1.176,
+      penalty_last_n: -1,
+      mirostat: 2,
+      mirostat_tau: 3.5,
+    },
   },
 };
