@@ -1,20 +1,22 @@
+import memoizePromise from "p-memoize";
 import { getSearchTokenHash } from "./searchTokenHash";
 
 export type SearchResults = [title: string, snippet: string, url: string][];
 
-export async function search(
-  query: string,
-  limit?: number,
-): Promise<SearchResults> {
-  const searchUrl = new URL("/search", self.location.origin);
+export const search = memoizePromise(
+  async (query: string, limit?: number): Promise<SearchResults> => {
+    const searchUrl = new URL("/search", self.location.origin);
 
-  searchUrl.searchParams.set("q", query);
+    searchUrl.searchParams.set("q", query);
 
-  searchUrl.searchParams.set("token", await getSearchTokenHash());
+    searchUrl.searchParams.set("token", await getSearchTokenHash());
 
-  if (limit && limit > 0) searchUrl.searchParams.set("limit", limit.toString());
+    if (limit && limit > 0) {
+      searchUrl.searchParams.set("limit", limit.toString());
+    }
 
-  const response = await fetch(searchUrl.toString());
+    const response = await fetch(searchUrl.toString());
 
-  return response.ok ? response.json() : [];
-}
+    return response.ok ? response.json() : [];
+  },
+);
