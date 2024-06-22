@@ -14,11 +14,13 @@ RUN sed -i 's/- html/- json/' /usr/local/searxng/searx/settings.yml \
   && mkdir -p ${SEARXNG_SETTINGS_FOLDER}  \
   && chmod 777 ${SEARXNG_SETTINGS_FOLDER}
 ARG USERNAME=user
+ARG HOME_DIR=/home/${USERNAME}
+ARG APP_DIR=${HOME_DIR}/app
 RUN adduser -D -u 1000 ${USERNAME} \
-  && mkdir -p /home/${USERNAME}/app \
-  && chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
-USER user
-WORKDIR /home/${USERNAME}/app 
+  && mkdir -p ${APP_DIR} \
+  && chown -R ${USERNAME}:${USERNAME} ${HOME_DIR}
+USER ${USERNAME}
+WORKDIR ${APP_DIR} 
 COPY --chown=${USERNAME}:${USERNAME} ./package.json ./package.json
 COPY --chown=${USERNAME}:${USERNAME} ./package-lock.json ./package-lock.json
 COPY --chown=${USERNAME}:${USERNAME} ./.npmrc ./.npmrc
