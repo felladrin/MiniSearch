@@ -71,7 +71,7 @@ export const availableModels: {
     },
   },
   mobileLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.Q4_K_M.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.Q3_K_M.gguf",
     introduction:
       "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
@@ -79,21 +79,14 @@ export const availableModels: {
     assistantPrefix: "<|im_start|>assistant\n",
     assistantSuffix: "<|im_end|>\n",
     stopStrings: ["<|im_start|>", "<|im_end|>"],
-    cacheType: "q8_0",
+    cacheType: "f16",
     contextSize: 1536,
     sampling: {
       temp: 0.35,
-      dynatemp_range: 0.25,
-      top_k: 0,
-      top_p: 1,
+      top_k: 35,
+      top_p: 0.55,
       min_p: 0.05,
-      tfs_z: 0.95,
-      typical_p: 0.85,
-      penalty_freq: 0.5,
       penalty_repeat: 1.176,
-      penalty_last_n: -1,
-      mirostat: 2,
-      mirostat_tau: 3.5,
     },
   },
   desktopDefault: {
