@@ -116,14 +116,14 @@ export const availableModels: {
     },
   },
   desktopLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1.8b-chat.Q8_0.shard-00001-of-00026.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-1.5B-Instruct/resolve/main/Qwen2-1.5B-Instruct.Q8_0.shard-00001-of-00007.gguf",
     introduction:
-      "You are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.</s>",
-    userPrefix: "<|prompt|>",
-    userSuffix: "</s>",
-    assistantPrefix: "<|answer|>",
-    assistantSuffix: "</s>",
-    stopStrings: ["<|prompt|>", "<|answer|>", "</s>"],
+      "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
+    userPrefix: "<|im_start|>user\n",
+    userSuffix: "<|im_end|>\n",
+    assistantPrefix: "<|im_start|>assistant\n",
+    assistantSuffix: "<|im_end|>\n",
+    stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
     sampling: {
