@@ -52,7 +52,7 @@ export const availableModels: {
   };
 } = {
   mobileDefault: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q8_0.shard-00001-of-00007.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q4_K_M.shard-00001-of-00005.gguf",
     introduction:
       "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
@@ -61,7 +61,7 @@ export const availableModels: {
     assistantSuffix: "<|im_end|>\n",
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
-    contextSize: 1536,
+    contextSize: 2048,
     sampling: {
       temp: 0.35,
       top_k: 35,
@@ -71,7 +71,7 @@ export const availableModels: {
     },
   },
   mobileLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.Q3_K_M.shard-00001-of-00003.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q6_K.shard-00001-of-00006.gguf",
     introduction:
       "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
@@ -80,7 +80,7 @@ export const availableModels: {
     assistantSuffix: "<|im_end|>\n",
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
-    contextSize: 1536,
+    contextSize: 2048,
     sampling: {
       temp: 0.35,
       top_k: 35,
