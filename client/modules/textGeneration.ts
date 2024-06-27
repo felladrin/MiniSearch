@@ -201,7 +201,9 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
     },
     model: {
       n_threads: getNumberOfThreadsSetting(),
-      n_ctx: selectedModel.contextSize,
+      n_ctx:
+        selectedModel.contextSize -
+        (10 - getNumberOfSearchResultsToConsiderSetting()) * 100,
       cache_type_k: selectedModel.cacheType,
       parallelDownloads: isRunningOnMobile ? 1 : 3,
       embeddings: false,
