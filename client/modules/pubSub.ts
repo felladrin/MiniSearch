@@ -100,3 +100,7 @@ export const interruptTextGenerationPubSub = createPubSub();
 
 export const [interruptTextGeneration, onTextGenerationInterrupted] =
   interruptTextGenerationPubSub;
+
+export const [updateSearchPromise, , getSearchPromise] = createPubSub<
+  Promise<SearchResults>
+>(Promise.resolve([]));

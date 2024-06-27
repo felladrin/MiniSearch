@@ -14,6 +14,8 @@ import {
   interruptTextGeneration,
   onTextGenerationInterrupted,
   getNumberOfSearchResultsToConsiderSetting,
+  updateSearchPromise,
+  getSearchPromise,
 } from "./pubSub";
 import { search } from "./search";
 import toast from "react-hot-toast";
@@ -34,7 +36,7 @@ export async function prepareTextGeneration() {
 
   updateSearchResults([]);
 
-  const searchPromise = getSearchPromise(getQuery());
+  updateSearchPromise(startSearch(getQuery()));
 
   if (getDisableAiResponseSetting()) return;
 
@@ -56,12 +58,12 @@ export async function prepareTextGeneration() {
       if (isRunningOnSafari) generateTextWithWebGpu.reverse();
 
       try {
-        await generateTextWithWebGpu[0](searchPromise);
+        await generateTextWithWebGpu[0]();
       } catch (error) {
-        await generateTextWithWebGpu[1](searchPromise);
+        await generateTextWithWebGpu[1]();
       }
     } catch (error) {
-      await generateTextWithWllama(searchPromise);
+      await generateTextWithWllama();
     }
   } catch (error) {
     toast.error(
@@ -88,7 +90,7 @@ function dismissLoadingToast() {
   toast.dismiss("text-generation-loading-toast");
 }
 
-async function generateTextWithWebLlm(searchPromise: Promise<void>) {
+async function generateTextWithWebLlm() {
   const { CreateWebWorkerMLCEngine, CreateMLCEngine, hasModelInCache } =
     await import("@mlc-ai/web-llm");
 
@@ -137,7 +139,7 @@ async function generateTextWithWebLlm(searchPromise: Promise<void>) {
       });
 
   if (!getDisableAiResponseSetting()) {
-    await searchPromise;
+    await canStartResponding();
 
     updateLoadingToast("Preparing response...");
 
@@ -183,7 +185,7 @@ async function generateTextWithWebLlm(searchPromise: Promise<void>) {
   engine.unload();
 }
 
-async function generateTextWithWllama(searchPromise: Promise<void>) {
+async function generateTextWithWllama() {
   const { initializeWllama, availableModels } = await import("./wllama");
 
   const selectedModel = match([isRunningOnMobile, getUseLargerModelSetting()])
@@ -223,7 +225,7 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
   });
 
   if (!getDisableAiResponseSetting()) {
-    await searchPromise;
+    await canStartResponding();
 
     updateLoadingToast("Preparing response...");
 
@@ -282,7 +284,7 @@ async function generateTextWithWllama(searchPromise: Promise<void>) {
   await wllama.exit();
 }
 
-async function generateTextWithRatchet(searchPromise: Promise<void>) {
+async function generateTextWithRatchet() {
   const { initializeRatchet, runCompletion, exitRatchet } = await import(
     "./ratchet"
   );
@@ -292,7 +294,7 @@ async function generateTextWithRatchet(searchPromise: Promise<void>) {
   );
 
   if (!getDisableAiResponseSetting()) {
-    await searchPromise;
+    await canStartResponding();
 
     updateLoadingToast("Preparing response...");
 
@@ -376,7 +378,7 @@ async function getKeywords(text: string, limit?: number) {
     .slice(0, limit);
 }
 
-async function getSearchPromise(query: string) {
+async function startSearch(query: string) {
   toast.loading("Searching the web...", {
     id: "search-progress-toast",
     position: "bottom-center",
@@ -414,4 +416,12 @@ async function getSearchPromise(query: string) {
       {},
     ),
   );
+
+  return searchResults;
+}
+
+async function canStartResponding() {
+  if (getNumberOfSearchResultsToConsiderSetting() > 0) {
+    await getSearchPromise();
+  }
 }
