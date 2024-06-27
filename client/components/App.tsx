@@ -1,13 +1,6 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { Route } from "wouter";
 import { Main } from "./Main";
 
-const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <Main />,
-  },
-]);
-
 export function App() {
-  return <RouterProvider router={router} />;
+  return <Route path="/" component={Main} />;
 }

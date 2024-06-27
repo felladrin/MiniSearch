@@ -2,7 +2,7 @@ import { useEffect, useRef, FormEvent, useState, useCallback } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { getRandomQuerySuggestion } from "../modules/querySuggestions";
 import { SettingsButton } from "./SettingsButton";
-import { useNavigate } from "react-router-dom";
+import { useLocation } from "wouter";
 import { prepareTextGeneration } from "../modules/textGeneration";
 import { isMatching, match, Pattern } from "ts-pattern";
 
@@ -18,7 +18,7 @@ export function SearchForm({
   const windowInnerHeight = useWindowInnerHeight();
   const defaultSuggestedQuery = "Anything you need!";
   const [suggestedQuery, setSuggestedQuery] = useState(defaultSuggestedQuery);
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     prepareTextGeneration();
@@ -55,7 +55,7 @@ export function SearchForm({
 
     setTextAreaValue(queryToEncode);
 
-    navigate(`/?q=${encodeURIComponent(queryToEncode)}`);
+    navigate(`/?q=${encodeURIComponent(queryToEncode)}`, { replace: true });
 
     updateQuery(queryToEncode);
 
