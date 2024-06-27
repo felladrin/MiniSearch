@@ -30,7 +30,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Build and push Docker image
-        uses: docker/build-push-action@9e59c61762d23a085570d5f007c635af11a17c7f
+        uses: docker/build-push-action@af64c4e18f18907592d87ebdea2882bc1f27a07a
         with:
           context: .
           push: true
