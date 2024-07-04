@@ -229,19 +229,13 @@ async function generateTextWithWllama() {
 
     updateLoadingToast("Preparing response...");
 
-    const prompt = [
-      selectedModel.introduction,
-      selectedModel.userPrefix,
-      "Hello!",
-      selectedModel.userSuffix,
-      selectedModel.assistantPrefix,
-      "Hi! How can I help you?",
-      selectedModel.assistantSuffix,
-      selectedModel.userPrefix,
-      getMainPrompt(!isRunningOnMobile),
-      selectedModel.userSuffix,
-      selectedModel.assistantPrefix,
-    ].join("");
+    const prompt = selectedModel.buildPrompt(
+      getQuery(),
+      getFormattedSearchResults(
+        false,
+        Math.min(Math.max(getNumberOfSearchResultsToConsiderSetting(), 0), 10),
+      ),
+    );
 
     let isAnswering = false;
 

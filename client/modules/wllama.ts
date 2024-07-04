@@ -53,25 +53,31 @@ export const availableModels: {
     | "desktopDefault"
     | "desktopLarger"]: {
     url: string | string[];
-    introduction: string;
-    userPrefix: string;
-    userSuffix: string;
-    assistantPrefix: string;
-    assistantSuffix: string;
     stopStrings: string[];
     cacheType: "f16" | "q8_0" | "q4_0";
     contextSize: number;
     sampling: SamplingConfig;
+    buildPrompt: (query: string, searchResults: string) => string;
   };
 } = {
   mobileDefault: {
     url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q4_K_M.gguf",
-    introduction:
-      "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
-    userPrefix: "<|im_start|>user\n",
-    userSuffix: "<|im_end|>\n",
-    assistantPrefix: "<|im_start|>assistant\n",
-    assistantSuffix: "<|im_end|>\n",
+    buildPrompt: (query, searchResults) => `<|im_start|>system
+You are an AI assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
+<|im_start|>user
+Please, do a quick search for the following:
+
+${query}<|im_end|>
+<|im_start|>assistant
+Sure, here are the top search results:
+
+${searchResults}<|im_end|>
+<|im_start|>user
+Perfect! Now answer with your own words:
+
+${query}<|im_end|>
+<|im_start|>assistant
+`,
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
@@ -79,12 +85,22 @@ export const availableModels: {
   },
   mobileLarger: {
     url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q6_K.gguf",
-    introduction:
-      "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
-    userPrefix: "<|im_start|>user\n",
-    userSuffix: "<|im_end|>\n",
-    assistantPrefix: "<|im_start|>assistant\n",
-    assistantSuffix: "<|im_end|>\n",
+    buildPrompt: (query, searchResults) => `<|im_start|>system
+You are an AI assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
+<|im_start|>user
+Please, do a quick search for the following:
+
+${query}<|im_end|>
+<|im_start|>assistant
+Sure, here are the top search results:
+
+${searchResults}<|im_end|>
+<|im_start|>user
+Perfect! Now answer with your own words:
+
+${query}<|im_end|>
+<|im_start|>assistant
+`,
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
@@ -92,12 +108,20 @@ export const availableModels: {
   },
   desktopDefault: {
     url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-0.5B-Instruct/resolve/main/Qwen2-0.5B-Instruct.Q8_0.shard-00001-of-00004.gguf",
-    introduction:
-      "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
-    userPrefix: "<|im_start|>user\n",
-    userSuffix: "<|im_end|>\n",
-    assistantPrefix: "<|im_start|>assistant\n",
-    assistantSuffix: "<|im_end|>\n",
+    buildPrompt: (query, searchResults) => `<|im_start|>system
+You are a helpful assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
+<|im_start|>user
+Provide a concise response to the request below. If the information from the web search results below is useful, you can use it to complement your response. Otherwise, ignore it.
+
+Top web search results:
+
+${searchResults}
+
+Request:
+
+${query}<|im_end|>
+<|im_start|>assistant
+`,
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
@@ -105,12 +129,20 @@ export const availableModels: {
   },
   desktopLarger: {
     url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-1.5B-Instruct/resolve/main/Qwen2-1.5B-Instruct.Q8_0.shard-00001-of-00007.gguf",
-    introduction:
-      "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
-    userPrefix: "<|im_start|>user\n",
-    userSuffix: "<|im_end|>\n",
-    assistantPrefix: "<|im_start|>assistant\n",
-    assistantSuffix: "<|im_end|>\n",
+    buildPrompt: (query, searchResults) => `<|im_start|>system
+You are a helpful assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
+<|im_start|>user
+Provide a concise response to the request below. If the information from the web search results below is useful, you can use it to complement your response. Otherwise, ignore it.
+
+Top web search results:
+
+${searchResults}
+
+Request:
+
+${query}<|im_end|>
+<|im_start|>assistant
+`,
     stopStrings: ["<|im_start|>", "<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
