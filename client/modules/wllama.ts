@@ -65,7 +65,7 @@ export const availableModels: {
     buildPrompt: (query, searchResults) => `<|im_start|>system
 You are an AI assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
 <|im_start|>user
-Please, do a quick search for the following:
+Please search for the following:
 
 ${query}<|im_end|>
 <|im_start|>assistant
@@ -78,7 +78,7 @@ Perfect! Now answer with your own words:
 ${query}<|im_end|>
 <|im_start|>assistant
 `,
-    stopStrings: ["<|im_start|>", "<|im_end|>"],
+    stopStrings: ["<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
     sampling: commonSamplingConfig,
@@ -88,7 +88,7 @@ ${query}<|im_end|>
     buildPrompt: (query, searchResults) => `<|im_start|>system
 You are an AI assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
 <|im_start|>user
-Please, do a quick search for the following:
+Please search for the following:
 
 ${query}<|im_end|>
 <|im_start|>assistant
@@ -101,7 +101,7 @@ Perfect! Now answer with your own words:
 ${query}<|im_end|>
 <|im_start|>assistant
 `,
-    stopStrings: ["<|im_start|>", "<|im_end|>"],
+    stopStrings: ["<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
     sampling: commonSamplingConfig,
@@ -109,20 +109,22 @@ ${query}<|im_end|>
   desktopDefault: {
     url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-0.5B-Instruct/resolve/main/Qwen2-0.5B-Instruct.Q8_0.shard-00001-of-00004.gguf",
     buildPrompt: (query, searchResults) => `<|im_start|>system
-You are a helpful assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
+You are a helpful assistant.<|im_end|>
 <|im_start|>user
-Provide a concise response to the request below. If the information from the web search results below is useful, you can use it to complement your response. Otherwise, ignore it.
+Please search for the following:
 
-Top web search results:
+${query}<|im_end|>
+<|im_start|>assistant
+Sure, here are the top search results:
 
-${searchResults}
-
-Request:
+${searchResults}<|im_end|>
+<|im_start|>user
+Perfect! Now answer with your own words:
 
 ${query}<|im_end|>
 <|im_start|>assistant
 `,
-    stopStrings: ["<|im_start|>", "<|im_end|>"],
+    stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
     sampling: commonSamplingConfig,
@@ -130,20 +132,22 @@ ${query}<|im_end|>
   desktopLarger: {
     url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-1.5B-Instruct/resolve/main/Qwen2-1.5B-Instruct.Q8_0.shard-00001-of-00007.gguf",
     buildPrompt: (query, searchResults) => `<|im_start|>system
-You are a helpful assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
+You are a helpful assistant.<|im_end|>
 <|im_start|>user
-Provide a concise response to the request below. If the information from the web search results below is useful, you can use it to complement your response. Otherwise, ignore it.
+Please search for the following:
 
-Top web search results:
+${query}<|im_end|>
+<|im_start|>assistant
+Sure, here are the top search results:
 
-${searchResults}
-
-Request:
+${searchResults}<|im_end|>
+<|im_start|>user
+Perfect! Now answer with your own words:
 
 ${query}<|im_end|>
 <|im_start|>assistant
 `,
-    stopStrings: ["<|im_start|>", "<|im_end|>"],
+    stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
     sampling: commonSamplingConfig,
