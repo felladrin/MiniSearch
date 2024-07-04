@@ -65,7 +65,7 @@ export const availableModels: {
   };
 } = {
   mobileDefault: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.shard-00001-of-00005.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q4_K_M.gguf",
     introduction:
       "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
@@ -78,7 +78,7 @@ export const availableModels: {
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q6_K.shard-00001-of-00006.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q6_K.gguf",
     introduction:
       "<|im_start|>system\nYou are a highly knowledgeable and friendly assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>\n",
     userPrefix: "<|im_start|>user\n",
