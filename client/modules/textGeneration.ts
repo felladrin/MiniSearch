@@ -350,9 +350,12 @@ function getMainPrompt(shouldIncludeUrl: boolean) {
 }
 
 function getFormattedSearchResults(shouldIncludeUrl: boolean, limit?: number) {
+  const searchResults = getSearchResults().slice(0, limit);
+
+  if (searchResults.length === 0) return "No results found.";
+
   if (shouldIncludeUrl) {
-    return getSearchResults()
-      .slice(0, limit)
+    return searchResults
       .map(
         ([title, snippet, url], index) =>
           `${index + 1}. [${title}](${url} "${snippet.replaceAll('"', "'")}")`,
@@ -360,8 +363,7 @@ function getFormattedSearchResults(shouldIncludeUrl: boolean, limit?: number) {
       .join("\n");
   }
 
-  return getSearchResults()
-    .slice(0, limit)
+  return searchResults
     .map(([title, snippet]) => `${title}\n${snippet}`)
     .join("\n\n");
 }
