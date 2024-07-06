@@ -228,10 +228,7 @@ async function generateTextWithWllama() {
 
     const prompt = selectedModel.buildPrompt(
       getQuery(),
-      getFormattedSearchResults(
-        false,
-        Math.min(Math.max(getNumberOfSearchResultsToConsiderSetting(), 0), 10),
-      ),
+      getFormattedSearchResults(false),
     );
 
     let isAnswering = false;
@@ -322,35 +319,25 @@ function endsWithASign(text: string) {
 }
 
 function getMainPrompt(shouldIncludeUrl: boolean) {
-  const numberOfSearchResultsToConsider = Math.min(
-    Math.max(getNumberOfSearchResultsToConsiderSetting(), 0),
-    10,
-  );
+  return `Provide a concise response to the request below. Your response should be in the same language as the request.
+If the information from the web search results below is useful, you can use it to complement your response. Otherwise, ignore it.
 
-  if (numberOfSearchResultsToConsider === 0) return getQuery();
+Top web search results:
 
-  return [
-    "Provide a concise response to the request below.",
-    "Your response should be in the same language as the request.",
-    "If the information from the web search results below is useful, you can use it to complement your response. Otherwise, ignore it.",
-    "",
-    "Top web search results:",
-    "",
-    getFormattedSearchResults(
-      shouldIncludeUrl,
-      numberOfSearchResultsToConsider,
-    ),
-    "",
-    "Request:",
-    "",
-    getQuery(),
-  ].join("\n");
+${getFormattedSearchResults(shouldIncludeUrl)}
+
+The request:
+
+${getQuery()}`;
 }
 
-function getFormattedSearchResults(shouldIncludeUrl: boolean, limit?: number) {
-  const searchResults = getSearchResults().slice(0, limit);
+function getFormattedSearchResults(shouldIncludeUrl: boolean) {
+  const searchResults = getSearchResults().slice(
+    0,
+    getNumberOfSearchResultsToConsiderSetting(),
+  );
 
-  if (searchResults.length === 0) return "No results found.";
+  if (searchResults.length === 0) return "None.";
 
   if (shouldIncludeUrl) {
     return searchResults
