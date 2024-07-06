@@ -76,7 +76,7 @@ export const queryPubSub = createPubSub(
   new URLSearchParams(self.location.search).get("q") ?? "",
 );
 
-export const [updateQuery, , getQuery] = queryPubSub;
+export const [, , getQuery] = queryPubSub;
 
 export const responsePubSub = createPubSub("");
 

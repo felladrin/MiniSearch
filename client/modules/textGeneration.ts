@@ -1,6 +1,5 @@
 import { isWebGPUAvailable } from "./webGpu";
 import {
-  updateQuery,
   updateSearchResults,
   getDisableAiResponseSetting,
   getUseLargerModelSetting,
@@ -29,8 +28,6 @@ export async function prepareTextGeneration() {
   document.title = getQuery();
 
   interruptTextGeneration();
-
-  updateQuery(getQuery());
 
   updateResponse("");
 
