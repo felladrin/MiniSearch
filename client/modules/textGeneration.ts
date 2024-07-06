@@ -93,14 +93,15 @@ async function generateTextWithWebLlm() {
 
   const availableModels = {
     Llama: "Llama-3-8B-Instruct-q4f16_1-MLC",
-    Mistral: "Mistral-7B-Instruct-v0.2-q4f16_1-MLC",
+    Mistral: "Mistral-7B-Instruct-v0.3-q4f16_1-MLC",
     Gemma: "gemma-2b-it-q4f16_1-MLC",
     Phi: "Phi-3-mini-4k-instruct-q4f16_1-MLC",
     TinyLlama: "TinyLlama-1.1B-Chat-v0.4-q4f16_1-MLC",
+    Qwen: "Qwen2-7B-Instruct-q4f16_1-MLC",
   };
 
   const selectedModel = getUseLargerModelSetting()
-    ? availableModels.Llama
+    ? availableModels.Qwen
     : availableModels.Phi;
 
   const isModelCached = await hasModelInCache(selectedModel);
