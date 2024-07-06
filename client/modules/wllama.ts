@@ -61,7 +61,7 @@ export const availableModels: {
   };
 } = {
   mobileDefault: {
-    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q4_K_M.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf",
     buildPrompt: (query, searchResults) => `<|im_start|>system
 You are an AI assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
 <|im_start|>user
@@ -111,15 +111,11 @@ ${query}<|im_end|>
     buildPrompt: (query, searchResults) => `<|im_start|>system
 You are a helpful assistant.<|im_end|>
 <|im_start|>user
-Please search for the following:
+Take a look at these web search results:
 
-${query}<|im_end|>
-<|im_start|>assistant
-Sure, here are the top search results:
+${searchResults}
 
-${searchResults}<|im_end|>
-<|im_start|>user
-Perfect! Now answer with your own words:
+Now, using your own words, write an essay that responds to the following:
 
 ${query}<|im_end|>
 <|im_start|>assistant
@@ -130,22 +126,16 @@ ${query}<|im_end|>
     sampling: commonSamplingConfig,
   },
   desktopLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-1.5B-Instruct/resolve/main/Qwen2-1.5B-Instruct.Q8_0.shard-00001-of-00007.gguf",
-    buildPrompt: (query, searchResults) => `<|im_start|>system
-You are a helpful assistant.<|im_end|>
-<|im_start|>user
-Please search for the following:
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Phi-3-mini-4k-instruct/resolve/main/Phi-3-mini-4k-instruct.Q5_K_M.shard-00001-of-00018.gguf",
+    buildPrompt: (query, searchResults) => `<|system|>
+You are a helpful assistant. Your goal is to understand and respond to user inquiries with clarity.
+Always respond in the same language as the user.
+Also, if the information below is useful, you can use it to complement your response. Otherwise, ignore it.
 
-${query}<|im_end|>
-<|im_start|>assistant
-Sure, here are the top search results:
-
-${searchResults}<|im_end|>
-<|im_start|>user
-Perfect! Now answer with your own words:
-
-${query}<|im_end|>
-<|im_start|>assistant
+${searchResults}<|end|>
+<|user|>
+${query}<|end|>
+<|assistant|>
 `,
     stopStrings: [],
     cacheType: "f16",
