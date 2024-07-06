@@ -115,7 +115,7 @@ Take a look at these web search results:
 
 ${searchResults}
 
-Now, using your own words, write an essay that responds to the following:
+Now, using your own words, write a concise response to the following:
 
 ${query}<|im_end|>
 <|im_start|>assistant
@@ -128,12 +128,14 @@ ${query}<|im_end|>
   desktopLarger: {
     url: "https://huggingface.co/Felladrin/gguf-sharded-Phi-3-mini-4k-instruct/resolve/main/Phi-3-mini-4k-instruct.Q5_K_M.shard-00001-of-00018.gguf",
     buildPrompt: (query, searchResults) => `<|system|>
-You are a helpful assistant. Your goal is to understand and respond to user inquiries with clarity.
-Always respond in the same language as the user.
-Also, if the information below is useful, you can use it to complement your response. Otherwise, ignore it.
-
-${searchResults}<|end|>
+You are a helpful assistant.<|end|>
 <|user|>
+Take a look at these web search results:
+
+${searchResults}
+
+Now, using your own words, write a concise response to the following:
+
 ${query}<|end|>
 <|assistant|>
 `,

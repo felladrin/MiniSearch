@@ -320,14 +320,11 @@ function endsWithASign(text: string) {
 }
 
 function getMainPrompt(shouldIncludeUrl: boolean) {
-  return `Provide a concise response to the request below. Your response should be in the same language as the request.
-If the information from the web search results below is useful, you can use it to complement your response. Otherwise, ignore it.
-
-Top web search results:
+  return `Take a look at these web search results:
 
 ${getFormattedSearchResults(shouldIncludeUrl)}
 
-The request:
+Now, using your own words, write a concise response to the following:
 
 ${getQuery()}`;
 }
