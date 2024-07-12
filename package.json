@@ -15,7 +15,7 @@
   "dependencies": {
     "@braintree/browser-detection": "^2.0.0",
     "@huggingface/hub": "^0.15.1",
-    "@mlc-ai/web-llm": "0.2.47",
+    "@mlc-ai/web-llm": "0.2.48",
     "@ratchet-ml/ratchet-web": "^0.4.0",
     "@wllama/wllama": "^1.10.0",
     "create-pubsub": "^1.6.3",
