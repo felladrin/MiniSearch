@@ -201,12 +201,11 @@ async function generateTextWithWllama() {
     },
     model: {
       n_threads: getNumberOfThreadsSetting(),
-      n_ctx:
-        selectedModel.contextSize -
-        (10 - getNumberOfSearchResultsToConsiderSetting()) * 100,
+      n_ctx: selectedModel.contextSize,
       cache_type_k: selectedModel.cacheType,
       parallelDownloads: isRunningOnMobile ? 1 : 3,
       embeddings: false,
+      allowOffline: true,
       progressCallback: ({ loaded, total }) => {
         const progressPercentage = Math.round((loaded / total) * 100);
 
