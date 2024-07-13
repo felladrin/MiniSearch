@@ -50,7 +50,7 @@ export const [, , getNumberOfThreadsSetting] = numberOfThreadsSettingPubSub;
 
 export const searchResultsToConsiderSettingPubSub = createLocalStoragePubSub(
   "searchResultsToConsider",
-  5,
+  isRunningOnMobile ? 3 : 6,
 );
 
 export const [, , getNumberOfSearchResultsToConsiderSetting] =
