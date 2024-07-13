@@ -61,7 +61,7 @@ export const availableModels: {
   };
 } = {
   mobileDefault: {
-    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q6_K.gguf",
     buildPrompt: (query, searchResults) => `<|im_start|>system
 You are an AI assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
 <|im_start|>user
@@ -84,26 +84,19 @@ ${query}<|im_end|>
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q6_K.gguf",
-    buildPrompt: (query, searchResults) => `<|im_start|>system
-You are an AI assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
-<|im_start|>user
-Please search for the following:
+    url: "https://huggingface.co/Felladrin/gguf-MaxMini-Instruct-248M/resolve/main/MaxMini-Instruct-248M.Q6_K.gguf",
+    buildPrompt: (query, searchResults) => `### QUERY:
 
-${query}<|im_end|>
-<|im_start|>assistant
-Sure, here are the top search results:
+${query}
 
-${searchResults}<|im_end|>
-<|im_start|>user
-Perfect! Now answer with your own words:
+### RESULTS:
 
-${query}<|im_end|>
-<|im_start|>assistant
-`,
-    stopStrings: ["<|im_end|>"],
+${searchResults}
+
+### RESPONSE:`,
+    stopStrings: ["###"],
     cacheType: "f16",
-    contextSize: 2048,
+    contextSize: 1024,
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
