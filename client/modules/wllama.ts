@@ -84,7 +84,7 @@ ${query}<|im_end|>
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-MaxMini-Instruct-248M/resolve/main/MaxMini-Instruct-248M.Q6_K.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-MaxMini-Instruct-248M/resolve/main/MaxMini-Instruct-248M.Q4_K_M.gguf",
     buildPrompt: (query, searchResults) => `### QUERY:
 
 ${query}
