@@ -103,7 +103,7 @@ ${query}
 ### ASSISTANT:`,
     stopStrings: ["### USER:", "### ASSISTANT:"],
     cacheType: "f16",
-    contextSize: 2048,
+    contextSize: 1024,
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
