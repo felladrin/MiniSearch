@@ -84,19 +84,26 @@ ${query}<|im_end|>
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-MaxMini-Instruct-248M/resolve/main/MaxMini-Instruct-248M.Q4_K_M.gguf",
-    buildPrompt: (query, searchResults) => `### QUERY:
+    url: "https://huggingface.co/Felladrin/gguf-WizardVicuna-pythia-410m-deduped/resolve/3c2cec2723a32759c172f61ebb6e05d847ba943d/WizardVicuna-pythia-410m-deduped.Q3_K_M.gguf",
+    buildPrompt: (
+      query,
+      searchResults,
+    ) => `A chat between a curious user and an artificial intelligence assistant.
 
-${query}
-
-### RESULTS:
+The assistant has the following info.
 
 ${searchResults}
 
-### RESPONSE:`,
-    stopStrings: ["###"],
+### USER:
+Hello!
+### ASSISTANT:
+Hi! How can I help you?
+### USER:
+${query}
+### ASSISTANT:`,
+    stopStrings: ["### USER:", "### ASSISTANT:"],
     cacheType: "f16",
-    contextSize: 1024,
+    contextSize: 2048,
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
