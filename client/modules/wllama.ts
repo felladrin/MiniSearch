@@ -61,6 +61,27 @@ export const availableModels: {
   };
 } = {
   mobileDefault: {
+    url: "https://huggingface.co/Felladrin/gguf-Lite-Mistral-150M-v2-Instruct/resolve/main/Lite-Mistral-150M-v2-Instruct.Q6_K.gguf",
+    buildPrompt: (query, searchResults) => `<s>user
+Hello!</s> 
+<s>assistant
+Hi! How may I help you?</s>
+<s>user
+Take a look at these web search results:
+
+${searchResults}
+
+Now, using your own words, write a concise response to the following:
+
+${query}</s>
+<s>assistant
+`,
+    stopStrings: [],
+    cacheType: "f16",
+    contextSize: 2048,
+    sampling: commonSamplingConfig,
+  },
+  mobileLarger: {
     url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q6_K.gguf",
     buildPrompt: (query, searchResults) => `<|im_start|>system
 You are an AI assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
@@ -81,29 +102,6 @@ ${query}<|im_end|>
     stopStrings: ["<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
-    sampling: commonSamplingConfig,
-  },
-  mobileLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-WizardVicuna-pythia-410m-deduped/resolve/3c2cec2723a32759c172f61ebb6e05d847ba943d/WizardVicuna-pythia-410m-deduped.Q3_K_M.gguf",
-    buildPrompt: (
-      query,
-      searchResults,
-    ) => `A chat between a curious user and an artificial intelligence assistant.
-
-The assistant has the following info.
-
-${searchResults}
-
-### USER:
-Hello!
-### ASSISTANT:
-Hi! How can I help you?
-### USER:
-${query}
-### ASSISTANT:`,
-    stopStrings: ["### USER:", "### ASSISTANT:"],
-    cacheType: "f16",
-    contextSize: 1024,
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
