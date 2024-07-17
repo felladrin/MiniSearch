@@ -61,7 +61,7 @@ export const availableModels: {
   };
 } = {
   mobileDefault: {
-    url: "https://huggingface.co/Felladrin/gguf-Lite-Mistral-150M-v2-Instruct/resolve/main/Lite-Mistral-150M-v2-Instruct.Q6_K.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-Lite-Mistral-150M-v2-Instruct/resolve/main/Lite-Mistral-150M-v2-Instruct.F16.Q6_K.gguf",
     buildPrompt: (query, searchResults) => `<s>user
 Hello!</s> 
 <s>assistant
