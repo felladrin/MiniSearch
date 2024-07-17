@@ -105,19 +105,14 @@ ${query}<|im_end|>
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-0.5B-Instruct/resolve/main/Qwen2-0.5B-Instruct.Q8_0.shard-00001-of-00004.gguf",
-    buildPrompt: (query, searchResults) => `<|im_start|>system
-You are a helpful assistant.<|im_end|>
-<|im_start|>user
-Take a look at these web search results:
+    url: "https://huggingface.co/Felladrin/gguf-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.F16.Q6_K.gguf",
+    buildPrompt: (query, searchResults) => `<|prompt|>Context:
 
 ${searchResults}
 
-Now, using your own words, write a concise response to the following:
+Question:
 
-${query}<|im_end|>
-<|im_start|>assistant
-`,
+${query}</s><|answer|>`,
     stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
