@@ -33,7 +33,7 @@ export async function initializeWllama(
   return wllama;
 }
 
-const commonSamplingConfig = {
+const commonSamplingConfig: SamplingConfig = {
   temp: 0.35,
   dynatemp_range: 0.25,
   top_k: 35,
