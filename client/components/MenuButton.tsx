@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { SettingsForm } from "./SettingsForm";
+import { ActionsForm } from "./ActionsForm";
 import { toast } from "react-hot-toast";
 
-export function SettingsButton() {
+export function MenuButton() {
   const [isToastOpen, setToastOpen] = useState(false);
 
-  const toastId = "settings-toast";
+  const toastId = "menu-toast";
 
   const openToast = () => {
     setToastOpen(true);
@@ -13,6 +14,8 @@ export function SettingsButton() {
     toast(
       <div>
         <SettingsForm />
+        <hr />
+        <ActionsForm />
         <div
           style={{
             display: "flex",
@@ -21,7 +24,7 @@ export function SettingsButton() {
           }}
         >
           <button style={{ fontSize: "small" }} onClick={closeToast}>
-            Done
+            Close Menu
           </button>
         </div>
       </div>,
@@ -51,7 +54,7 @@ export function SettingsButton() {
         isToastOpen ? closeToast() : openToast();
       }}
     >
-      Settings
+      Menu
     </button>
   );
 }

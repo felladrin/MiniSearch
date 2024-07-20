@@ -1,7 +1,7 @@
 import { useEffect, useRef, FormEvent, useState, useCallback } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { getRandomQuerySuggestion } from "../modules/querySuggestions";
-import { SettingsButton } from "./SettingsButton";
+import { MenuButton } from "./MenuButton";
 import { useLocation } from "wouter";
 import { prepareTextGeneration } from "../modules/textGeneration";
 import { isMatching, match, Pattern } from "ts-pattern";
@@ -119,7 +119,7 @@ export function SearchForm({
           <button type="submit" style={{ width: "100%", fontSize: "small" }}>
             Search
           </button>
-          <SettingsButton />
+          <MenuButton />
         </div>
       </form>
     </div>
