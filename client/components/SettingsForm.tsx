@@ -48,7 +48,7 @@ export function SettingsForm() {
           checked={useLargerModel}
           onChange={(event) => setUseLargerModel(event.target.checked)}
           tooltipId="use-large-model-setting-tooltip"
-          tooltipContent="Generates better responses, but takes longer to load"
+          tooltipContent="Generates better responses, but takes longer to load."
         />
       </div>
       <div>
@@ -58,7 +58,7 @@ export function SettingsForm() {
           checked={disableAiResponse}
           onChange={(event) => setDisableAiResponse(event.target.checked)}
           tooltipId="disable-ai-setting-tooltip"
-          tooltipContent="Disables the AI response, in case you only want to see the links from the web search results"
+          tooltipContent="Disables the AI response, in case you only want to see the links from the web search results."
         />
       </div>
       {isWebGPUAvailable && (
@@ -69,7 +69,7 @@ export function SettingsForm() {
             checked={disableWebGpuUsage}
             onChange={(event) => setDisableWebGpuUsage(event.target.checked)}
             tooltipId="use-large-model-setting-tooltip"
-            tooltipContent="Disables the WebGPU and run smaller AI models only using the CPU"
+            tooltipContent="Disables the WebGPU and run smaller AI models only using the CPU."
           />
         </div>
       )}
