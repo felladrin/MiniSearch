@@ -145,7 +145,7 @@ async function generateTextWithWebLlm() {
 
     const completion = await engine.chat.completions.create({
       stream: true,
-      messages: [{ role: "user", content: getMainPrompt(true) }],
+      messages: [{ role: "user", content: getMainPrompt() }],
     });
 
     let streamedMessage = "";
@@ -228,7 +228,7 @@ async function generateTextWithWllama() {
 
     const prompt = selectedModel.buildPrompt(
       getQuery(),
-      getFormattedSearchResults(false),
+      getFormattedSearchResults(selectedModel.shouldIncludeUrlsOnPrompt),
     );
 
     let isAnswering = false;
@@ -293,7 +293,7 @@ async function generateTextWithRatchet() {
     const unsubscribeFromTextGenerationInterruption =
       onTextGenerationInterrupted(() => self.location.reload());
 
-    await runCompletion(getMainPrompt(true), (completionChunk) => {
+    await runCompletion(getMainPrompt(), (completionChunk) => {
       if (!isAnswering) {
         isAnswering = true;
         updateLoadingToast("Generating response...");
@@ -318,10 +318,10 @@ function endsWithASign(text: string) {
   return text.endsWith(".") || text.endsWith("!") || text.endsWith("?");
 }
 
-function getMainPrompt(shouldIncludeUrl: boolean) {
+function getMainPrompt() {
   return `Take a look at these web search results:
 
-${getFormattedSearchResults(shouldIncludeUrl)}
+${getFormattedSearchResults(true)}
 
 Now, using your own words, write a concise response to the following:
 

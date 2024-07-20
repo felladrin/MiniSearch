@@ -57,6 +57,7 @@ export const availableModels: {
     cacheType: "f16" | "q8_0" | "q4_0";
     contextSize: number;
     sampling: SamplingConfig;
+    shouldIncludeUrlsOnPrompt: boolean;
     buildPrompt: (query: string, searchResults: string) => string;
   };
 } = {
@@ -79,6 +80,7 @@ ${query}</s>
     stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
+    shouldIncludeUrlsOnPrompt: false,
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
@@ -102,6 +104,7 @@ ${query}<|im_end|>
     stopStrings: ["<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
+    shouldIncludeUrlsOnPrompt: false,
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
@@ -116,6 +119,7 @@ ${query}</s><|answer|>`,
     stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
+    shouldIncludeUrlsOnPrompt: true,
     sampling: commonSamplingConfig,
   },
   desktopLarger: {
@@ -135,6 +139,7 @@ ${query}<|end|>
     stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
+    shouldIncludeUrlsOnPrompt: true,
     sampling: commonSamplingConfig,
   },
 };
