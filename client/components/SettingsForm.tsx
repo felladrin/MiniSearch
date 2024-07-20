@@ -10,7 +10,6 @@ import { Tooltip } from "react-tooltip";
 import { isWebGPUAvailable } from "../modules/webGpu";
 import type { ChangeEventHandler, HTMLInputTypeAttribute } from "react";
 import { match, Pattern } from "ts-pattern";
-import { isRunningOnMobile } from "../modules/mobileDetection";
 
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -96,10 +95,7 @@ export function SettingsForm() {
           value={searchResultsToConsider}
           onChange={({ target }) =>
             setSearchResultsToConsider(
-              Math.min(
-                Math.max(Number(target.value), 0),
-                isRunningOnMobile ? 3 : 6,
-              ),
+              Math.min(Math.max(Number(target.value), 0), 6),
             )
           }
           tooltipId="search-results-to-reference-setting-tooltip"
