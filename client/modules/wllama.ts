@@ -108,14 +108,14 @@ ${query}<|im_end|>
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
-    url: "https://huggingface.co/Felladrin/gguf-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.F16.Q6_K.gguf",
-    buildPrompt: (query, searchResults) => `<|prompt|>Context:
+    url: "https://huggingface.co/Felladrin/gguf-sharded-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.shard-00001-of-00011.gguf",
+    buildPrompt: (query, searchResults) =>
+      `<|prompt|>${searchResults}
 
-${searchResults}
-
-Question:
-
-${query}</s><|answer|>`,
+I found these results on the web, but I'm feeling a bit lost. Can you help me?</s>
+<|answer|>Sure! What would you like to know? I'll do my best to fulfill your request.</s>
+<|prompt|>${query}</s>
+<|answer|>`,
     stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
@@ -127,12 +127,12 @@ ${query}</s><|answer|>`,
     buildPrompt: (query, searchResults) => `<|system|>
 You are a helpful assistant.<|end|>
 <|user|>
-Take a look at these web search results:
-
 ${searchResults}
 
-Now, using your own words, write a concise response to the following:
-
+I found these results on the web, but I'm feeling a bit lost. Can you help me?<|end|>
+<|assistant|>
+Sure! What would you like to know? I'll do my best to answer that in your language.<|end|>
+<|user|>
 ${query}<|end|>
 <|assistant|>
 `,
