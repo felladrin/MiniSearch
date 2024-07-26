@@ -62,7 +62,7 @@ export const availableModels: {
   };
 } = {
   mobileDefault: {
-    url: "https://huggingface.co/Felladrin/gguf-Lite-Mistral-150M-v2-Instruct/resolve/main/Lite-Mistral-150M-v2-Instruct.F16.Q8_0.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-Lite-Mistral-150M-v2-Instruct/resolve/main/Lite-Mistral-150M-v2-Instruct.F16.Q5_K.gguf",
     buildPrompt: (query, searchResults) => `<s>user
 ${searchResults}
 
@@ -80,13 +80,12 @@ ${query}</s>
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-LaMini-Flan-T5-77M/resolve/main/LaMini-Flan-T5-77M.F16.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-LaMini-Flan-T5-77M/resolve/main/LaMini-Flan-T5-77M.Q5_K_M.gguf",
     buildPrompt: (query, searchResults) =>
-      `Query:
+      `Summarize:
 ${query}
-Results:
-${searchResults.slice(0, 1024)}
-Summarized answer:`,
+
+${searchResults.slice(0, 1024)}...`,
     stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
@@ -94,38 +93,34 @@ Summarized answer:`,
     sampling: commonSamplingConfig,
   },
   desktopDefault: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.shard-00001-of-00011.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.F16.Q5_K.gguf",
     buildPrompt: (query, searchResults) =>
-      `<|prompt|>${searchResults}
+      `<|prompt|>
+${searchResults}
 
-I found these results on the web, but I'm feeling a bit lost. Can you help me?</s>
-<|answer|>Sure! What would you like to know? I'll do my best to fulfill your request.</s>
-<|prompt|>${query}</s>
+I found these results on the web. Can you help me with it?</s>
+<|answer|>
+Sure! What do you need?</s>
+<|prompt|>
+${query}</s>
 <|answer|>`,
     stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
-    shouldIncludeUrlsOnPrompt: true,
+    shouldIncludeUrlsOnPrompt: false,
     sampling: commonSamplingConfig,
   },
   desktopLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Phi-3-mini-4k-instruct/resolve/main/Phi-3-mini-4k-instruct.Q6_K_L.shard-00001-of-00034.gguf",
-    buildPrompt: (query, searchResults) => `<|system|>
-You are a helpful assistant.<|end|>
-<|user|>
-${searchResults}
+    url: "https://huggingface.co/Felladrin/gguf-LaMini-Flan-T5-248M/resolve/main/LaMini-Flan-T5-248M.Q5_K_M.gguf",
+    buildPrompt: (query, searchResults) =>
+      `Summarize:
+${query}
 
-I found these results on the web, but I'm feeling a bit lost. Can you help me?<|end|>
-<|assistant|>
-Sure! What would you like to know? I'll do my best to answer that in your language.<|end|>
-<|user|>
-${query}<|end|>
-<|assistant|>
-`,
+${searchResults.slice(0, 1024)}...`,
     stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
-    shouldIncludeUrlsOnPrompt: true,
+    shouldIncludeUrlsOnPrompt: false,
     sampling: commonSamplingConfig,
   },
 };
