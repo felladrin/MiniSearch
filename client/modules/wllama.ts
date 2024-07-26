@@ -123,7 +123,7 @@ I found these results on the web, but I'm feeling a bit lost. Can you help me?</
     sampling: commonSamplingConfig,
   },
   desktopLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Phi-3-mini-4k-instruct/resolve/main/Phi-3-mini-4k-instruct.Q5_K_M.shard-00001-of-00018.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Phi-3-mini-4k-instruct/resolve/main/Phi-3-mini-4k-instruct.Q6_K_L.shard-00001-of-00034.gguf",
     buildPrompt: (query, searchResults) => `<|system|>
 You are a helpful assistant.<|end|>
 <|user|>
