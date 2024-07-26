@@ -1,58 +1,53 @@
-import fetch from "node-fetch";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
+import { SearxngService } from "searxng";
+
+const searxng = new SearxngService({
+  baseURL: "http://127.0.0.1:8080",
+  defaultSearchParams: {
+    lang: "auto",
+    safesearch: 0,
+    format: "json",
+  },
+});
 
 export async function fetchSearXNG(query: string, limit?: number) {
   try {
-    const url = new URL("http://127.0.0.1:8080/search");
-
-    url.search = new URLSearchParams({
-      q: query,
-      language: "auto",
-      safesearch: "0",
-      format: "json",
-    }).toString();
-
-    const response = await fetch(url);
-
-    let { results } = (await response.json()) as {
-      results: { url: string; title: string; content: string }[];
-    };
+    let { results } = await searxng.search(query);
 
     const searchResults: [title: string, content: string, url: string][] = [];
 
-    if (results) {
-      if (limit && limit > 0) {
-        results = results.slice(0, limit);
+    if (limit && limit > 0) {
+      results = results.slice(0, limit);
+    }
+
+    const uniqueUrls = new Set<string>();
+
+    const processContent = (html: string): string => {
+      let text = convertHtmlToPlainText(html, { wordwrap: false }).trim();
+      text = stripEmojis(text, { preserveSpaces: true });
+      if (text.includes("...Missing:")) {
+        text = `${text.split("...Missing:")[0].trim()}...`;
       }
+      return text;
+    };
 
-      const uniqueUrls = new Set<string>();
+    for (const result of results) {
+      if (uniqueUrls.has(result.url) || !result.content) continue;
 
-      for (const result of results) {
-        if (uniqueUrls.has(result.url) || !result.content) continue;
+      const title = convertHtmlToPlainText(result.title, {
+        wordwrap: false,
+      }).trim();
 
-        const title = convertHtmlToPlainText(result.title, {
-          wordwrap: false,
-        }).trim();
+      const content = processContent(result.content);
 
-        let content = convertHtmlToPlainText(result.content, {
-          wordwrap: false,
-        }).trim();
+      if (title === "" || content === "") continue;
 
-        content = stripEmojis(content, { preserveSpaces: true });
+      const url = result.url;
 
-        if (content.includes("...Missing:")) {
-          content = `${content.split("...Missing:")[0].trim()}...`;
-        }
+      searchResults.push([title, content, url]);
 
-        if (title === "" || content === "") continue;
-
-        const url = result.url;
-
-        searchResults.push([title, content, url]);
-
-        uniqueUrls.add(url);
-      }
+      uniqueUrls.add(url);
     }
 
     return searchResults;
