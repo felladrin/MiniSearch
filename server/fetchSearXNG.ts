@@ -1,19 +1,19 @@
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
-import { SearxngService } from 'searxng'
+import { SearxngService } from "searxng";
 
 const searxng = new SearxngService({
-  baseURL: 'http://127.0.0.1:8080/search',
+  baseURL: "http://127.0.0.1:8080/search",
   defaultSearchParams: {
-    lang: 'auto',
+    lang: "auto",
     safesearch: 0,
-    format: 'json'
-  }
-})
+    format: "json",
+  },
+});
 
 export async function fetchSearXNG(query: string, limit?: number) {
   try {
-    let { results } = await searxng.search(query)
+    let { results } = await searxng.search(query);
 
     const searchResults: [title: string, content: string, url: string][] = [];
 
