@@ -27,7 +27,6 @@
     "markdown-to-jsx": "^7.3.2",
     "mobile-detect": "^1.4.5",
     "node-emoji": "^2.1.3",
-    "node-fetch": "^3.3.2",
     "node-llama-cpp": "^3.0.0-beta.22",
     "p-memoize": "^7.1.1",
     "prettier": "^3.0.3",
