@@ -26,9 +26,6 @@ export async function fetchSearXNG(query: string, limit?: number) {
     const processContent = (html: string): string => {
       let text = convertHtmlToPlainText(html, { wordwrap: false }).trim();
       text = stripEmojis(text, { preserveSpaces: true });
-      if (text.includes("...Missing:")) {
-        text = `${text.split("...Missing:")[0].trim()}...`;
-      }
       return text;
     };
 
