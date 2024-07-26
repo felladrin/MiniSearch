@@ -62,21 +62,13 @@ export const availableModels: {
   };
 } = {
   mobileDefault: {
-    url: "https://huggingface.co/Felladrin/gguf-Lite-Mistral-150M-v2-Instruct/resolve/main/Lite-Mistral-150M-v2-Instruct.F16.Q6_K.gguf",
-    buildPrompt: (query, searchResults) => `<s>user
-Hello!</s> 
-<s>assistant
-Hi! How may I help you?</s>
-<s>user
-Take a look at these web search results:
-
-${searchResults}
-
-Now, using your own words, write a concise response to the following:
-
-${query}</s>
-<s>assistant
-`,
+    url: "https://huggingface.co/Felladrin/gguf-LaMini-Flan-T5-77M/resolve/main/LaMini-Flan-T5-77M.F16.gguf",
+    buildPrompt: (query, searchResults) =>
+      `Query:
+${query}
+Results:
+${searchResults.slice(0, 1024)}
+Summarized answer:`,
     stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
@@ -84,24 +76,18 @@ ${query}</s>
     sampling: commonSamplingConfig,
   },
   mobileLarger: {
-    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q6_K.gguf",
-    buildPrompt: (query, searchResults) => `<|im_start|>system
-You are an AI assistant. Your goal is to understand and respond to user inquiries with clarity.<|im_end|>
-<|im_start|>user
-Please search for the following:
+    url: "https://huggingface.co/Felladrin/gguf-Lite-Mistral-150M-v2-Instruct/resolve/main/Lite-Mistral-150M-v2-Instruct.F16.Q8_0.gguf",
+    buildPrompt: (query, searchResults) => `<s>user
+${searchResults}
 
-${query}<|im_end|>
-<|im_start|>assistant
-Sure, here are the top search results:
-
-${searchResults}<|im_end|>
-<|im_start|>user
-Perfect! Now answer with your own words:
-
-${query}<|im_end|>
-<|im_start|>assistant
+I found these results on the web. Can you help me with it?</s> 
+<s>assistant
+Sure! What do you need?</s>
+<s>user
+${query}</s>
+<s>assistant
 `,
-    stopStrings: ["<|im_end|>"],
+    stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
     shouldIncludeUrlsOnPrompt: false,
