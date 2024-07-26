@@ -3,7 +3,7 @@ import { strip as stripEmojis } from "node-emoji";
 import { SearxngService } from "searxng";
 
 const searxng = new SearxngService({
-  baseURL: "http://127.0.0.1:8080/search",
+  baseURL: "http://127.0.0.1:8080",
   defaultSearchParams: {
     lang: "auto",
     safesearch: 0,
