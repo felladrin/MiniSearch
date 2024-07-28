@@ -36,7 +36,7 @@
     "react-hot-toast": "^2.4.1",
     "react-textarea-autosize": "^8.5.3",
     "react-tooltip": "^5.21.6",
-    "searxng": "^0.0.3",
+    "searxng": "^0.0.4",
     "temp-dir": "^3.0.0",
     "ts-pattern": "^5.2.0",
     "water.css": "^2.1.1",
