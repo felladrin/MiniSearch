@@ -319,12 +319,11 @@ function endsWithASign(text: string) {
 }
 
 function getMainPrompt() {
-  return `Take a look at these web search results:
+  return `${getFormattedSearchResults(true)}
 
-${getFormattedSearchResults(true)}
-
-Now, using your own words, write a concise response to the following:
-
+I found these results on the web.
+Can you help me with it?
+Here's what I need:
 ${getQuery()}`;
 }
 
