@@ -184,8 +184,8 @@ async function generateTextWithWllama() {
   const { initializeWllama, availableModels } = await import("./wllama");
 
   const selectedModel = match(isRunningOnMobile)
-    .with(true, () => availableModels.mobileDefault)
-    .with(false, () => availableModels.desktopDefault)
+    .with(true, () => availableModels.mobile)
+    .with(false, () => availableModels.desktop)
     .exhaustive();
 
   let loadingPercentage = 0;

@@ -47,7 +47,7 @@ const commonSamplingConfig: SamplingConfig = {
 };
 
 export const availableModels: {
-  [key in "mobileDefault" | "desktopDefault"]: {
+  [key in "mobile" | "desktop"]: {
     url: string | string[];
     stopStrings: string[];
     cacheType: "f16" | "q8_0" | "q4_0";
@@ -57,7 +57,7 @@ export const availableModels: {
     buildPrompt: (query: string, searchResults: string) => string;
   };
 } = {
-  mobileDefault: {
+  mobile: {
     url: "https://huggingface.co/Felladrin/gguf-Lite-Mistral-150M-v2-Instruct/resolve/main/Lite-Mistral-150M-v2-Instruct.F16.Q5_K.gguf",
     buildPrompt: (query, searchResults) => `${searchResults}</s>
 <s>user
@@ -70,7 +70,7 @@ ${query}</s>
     shouldIncludeUrlsOnPrompt: false,
     sampling: commonSamplingConfig,
   },
-  desktopDefault: {
+  desktop: {
     url: "https://huggingface.co/Felladrin/gguf-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.F16.Q5_K.gguf",
     buildPrompt: (query, searchResults) =>
       `${searchResults}</s>
