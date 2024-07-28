@@ -2,7 +2,6 @@ import { isWebGPUAvailable } from "./webGpu";
 import {
   updateSearchResults,
   getDisableAiResponseSetting,
-  getUseLargerModelSetting,
   updateResponse,
   getSearchResults,
   updateUrlsDescriptions,
@@ -100,9 +99,7 @@ async function generateTextWithWebLlm() {
     Qwen: "Qwen2-7B-Instruct-q4f16_1-MLC",
   };
 
-  const selectedModel = getUseLargerModelSetting()
-    ? availableModels.Qwen
-    : availableModels.Phi;
+  const selectedModel = availableModels.Phi;
 
   const isModelCached = await hasModelInCache(selectedModel);
 
@@ -186,11 +183,9 @@ async function generateTextWithWebLlm() {
 async function generateTextWithWllama() {
   const { initializeWllama, availableModels } = await import("./wllama");
 
-  const selectedModel = match([isRunningOnMobile, getUseLargerModelSetting()])
-    .with([true, false], () => availableModels.mobileDefault)
-    .with([true, true], () => availableModels.mobileLarger)
-    .with([false, false], () => availableModels.desktopDefault)
-    .with([false, true], () => availableModels.desktopLarger)
+  const selectedModel = match(isRunningOnMobile)
+    .with(true, () => availableModels.mobileDefault)
+    .with(false, () => availableModels.desktopDefault)
     .exhaustive();
 
   let loadingPercentage = 0;
@@ -321,9 +316,8 @@ function endsWithASign(text: string) {
 function getMainPrompt() {
   return `${getFormattedSearchResults(true)}
 
-I found these results on the web.
-Can you help me with it?
-Here's what I need:
+---
+
 ${getQuery()}`;
 }
 

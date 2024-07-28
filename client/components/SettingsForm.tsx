@@ -1,7 +1,6 @@
 import { usePubSub } from "create-pubsub/react";
 import {
   disableAiResponseSettingPubSub,
-  useLargerModelSettingPubSub,
   disableWebGpuUsageSettingPubSub,
   numberOfThreadsSettingPubSub,
   searchResultsToConsiderSettingPubSub,
@@ -15,9 +14,6 @@ import { isRunningOnMobile } from "../modules/mobileDetection";
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
     disableAiResponseSettingPubSub,
-  );
-  const [useLargerModel, setUseLargerModel] = usePubSub(
-    useLargerModelSettingPubSub,
   );
   const [disableWebGpuUsage, setDisableWebGpuUsage] = usePubSub(
     disableWebGpuUsageSettingPubSub,
@@ -40,16 +36,6 @@ export function SettingsForm() {
         }}
       >
         Settings
-      </div>
-      <div>
-        <SettingInput
-          label="Use a larger AI model"
-          type="checkbox"
-          checked={useLargerModel}
-          onChange={(event) => setUseLargerModel(event.target.checked)}
-          tooltipId="use-large-model-setting-tooltip"
-          tooltipContent="Generates better responses, but takes longer to load."
-        />
       </div>
       <div>
         <SettingInput

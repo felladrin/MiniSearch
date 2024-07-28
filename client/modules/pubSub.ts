@@ -24,13 +24,6 @@ export const disableAiResponseSettingPubSub = createLocalStoragePubSub(
 
 export const [, , getDisableAiResponseSetting] = disableAiResponseSettingPubSub;
 
-export const useLargerModelSettingPubSub = createLocalStoragePubSub(
-  "useLargerModel",
-  false,
-);
-
-export const [, , getUseLargerModelSetting] = useLargerModelSettingPubSub;
-
 export const disableWebGpuUsageSettingPubSub = createLocalStoragePubSub(
   "disableWebGpuUsage",
   false,
