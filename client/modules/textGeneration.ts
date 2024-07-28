@@ -200,7 +200,7 @@ async function generateTextWithWllama() {
       suppressNativeLog: !isDebugModeEnabled(),
     },
     model: {
-      n_threads: getNumberOfThreadsSetting(),
+      n_threads: isRunningOnMobile ? 1 : getNumberOfThreadsSetting(),
       n_ctx: selectedModel.contextSize,
       cache_type_k: selectedModel.cacheType,
       parallelDownloads: isRunningOnMobile ? 1 : 3,
