@@ -59,12 +59,7 @@ export const availableModels: {
 } = {
   mobileDefault: {
     url: "https://huggingface.co/Felladrin/gguf-Lite-Mistral-150M-v2-Instruct/resolve/main/Lite-Mistral-150M-v2-Instruct.F16.Q5_K.gguf",
-    buildPrompt: (query, searchResults) => `<s>user
-${searchResults}
-
-I found these results on the web. Can you help me with it?</s> 
-<s>assistant
-Sure! What do you need?</s>
+    buildPrompt: (query, searchResults) => `${searchResults}</s>
 <s>user
 ${query}</s>
 <s>assistant
@@ -78,13 +73,11 @@ ${query}</s>
   desktopDefault: {
     url: "https://huggingface.co/Felladrin/gguf-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.F16.Q5_K.gguf",
     buildPrompt: (query, searchResults) =>
-      `<|prompt|>
-${searchResults}
-
----
-
+      `${searchResults}</s>
+<|prompt|>
 ${query}</s>
-<|answer|>`,
+<|answer|>
+`,
     stopStrings: [],
     cacheType: "f16",
     contextSize: 2048,
