@@ -23,5 +23,3 @@ dist-ssr
 *.sln
 *.sw?
 
-# Folder for testing Transformer.js models locally
-/public/models
