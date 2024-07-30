@@ -34,11 +34,11 @@ export async function initializeWllama(
 }
 
 const commonSamplingConfig: SamplingConfig = {
-  temp: 0.35,
-  dynatemp_range: 0.25,
-  top_k: 35,
-  top_p: 0.55,
-  min_p: 0.05,
+  temp: 0.2,
+  dynatemp_range: 0.15,
+  top_k: 0,
+  top_p: 1,
+  min_p: 0.1,
   typical_p: 0.85,
   penalty_repeat: 1.176,
   penalty_last_n: -1,
@@ -58,13 +58,13 @@ export const availableModels: {
   };
 } = {
   mobile: {
-    url: "https://huggingface.co/Felladrin/gguf-Lite-Mistral-150M-v2-Instruct/resolve/main/Lite-Mistral-150M-v2-Instruct.F16.Q5_K.gguf",
-    buildPrompt: (query, searchResults) => `${searchResults}</s>
-<s>user
-${query}</s>
-<s>assistant
+    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf",
+    buildPrompt: (query, searchResults) => `${searchResults}<|im_end|>
+<|im_start|>user
+${query}<|im_end|>
+<|im_start|>assistant
 `,
-    stopStrings: [],
+    stopStrings: ["<|im_end|>"],
     cacheType: "f16",
     contextSize: 2048,
     shouldIncludeUrlsOnPrompt: false,
