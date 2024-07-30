@@ -90,18 +90,20 @@ async function generateTextWithWebLlm() {
   const { CreateWebWorkerMLCEngine, CreateMLCEngine, hasModelInCache } =
     await import("@mlc-ai/web-llm");
 
-  const availableModels = {
-    Llama: "Llama-3-8B-Instruct-q4f16_1-MLC",
-    Mistral: "Mistral-7B-Instruct-v0.3-q4f16_1-MLC",
-    Gemma: "gemma-2b-it-q4f16_1-MLC",
-    Phi: "Phi-3-mini-4k-instruct-q4f16_1-MLC",
-    TinyLlama: "TinyLlama-1.1B-Chat-v0.4-q4f16_1-MLC",
-    Qwen: "Qwen2-7B-Instruct-q4f16_1-MLC",
+  const appConfig = {
+    model_list: [
+      {
+        model_id: "mlc-q0f16-Qwen2-1.5B-Instruct",
+        model: "https://huggingface.co/Felladrin/mlc-q0f16-Qwen2-1.5B-Instruct",
+        model_lib:
+          "https://huggingface.co/Felladrin/mlc-q0f16-Qwen2-1.5B-Instruct/resolve/main/model.wasm",
+      },
+    ],
   };
 
-  const selectedModel = availableModels.Phi;
+  const selectedModelId = appConfig.model_list[0].model_id;
 
-  const isModelCached = await hasModelInCache(selectedModel);
+  const isModelCached = await hasModelInCache(selectedModelId, appConfig);
 
   let initProgressCallback:
     | import("@mlc-ai/web-llm").InitProgressCallback
@@ -122,13 +124,15 @@ async function generateTextWithWebLlm() {
         new Worker(new URL("./webLlmWorker.ts", import.meta.url), {
           type: "module",
         }),
-        selectedModel,
+        selectedModelId,
         {
+          appConfig,
           initProgressCallback,
           logLevel: isDebugModeEnabled() ? "DEBUG" : "SILENT",
         },
       )
-    : await CreateMLCEngine(selectedModel, {
+    : await CreateMLCEngine(selectedModelId, {
+        appConfig,
         initProgressCallback,
         logLevel: isDebugModeEnabled() ? "DEBUG" : "SILENT",
       });
