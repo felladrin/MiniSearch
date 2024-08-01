@@ -147,6 +147,8 @@ async function generateTextWithWebLlm() {
     const completion = await engine.chat.completions.create({
       stream: true,
       messages: [{ role: "user", content: getMainPrompt() }],
+      temperature: 0.65,
+      top_p: 0.55,
     });
 
     let streamedMessage = "";
