@@ -51,7 +51,11 @@ export function MenuButton() {
       style={{ fontSize: "small", marginRight: 0 }}
       onClick={(event) => {
         event.preventDefault();
-        isToastOpen ? closeToast() : openToast();
+        if (isToastOpen) {
+          closeToast();
+        } else {
+          openToast();
+        }
       }}
     >
       Menu
