@@ -36,7 +36,7 @@ Then, open http://localhost:7860 in your browser and start searching!
 You can build and run it from the source if you don't want to use MiniSearch's Docker Image. For that, clone this repository and run the following command:
 
 ```bash
-docker-compose -f docker-compose.production.yml up --build
+docker compose -f docker-compose.production.yml up --build
 ```
 
 ## Searching via browser's address bar
@@ -50,7 +50,7 @@ MiniSearch is open-source and contributions are welcome!
 Fork this repository and clone it. Then, start the development server by running the following command:
 
 ```bash
-docker-compose up
+docker compose up
 ```
 
 Make your changes, push them to your fork, and open a pull request!
