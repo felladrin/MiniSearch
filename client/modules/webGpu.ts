@@ -11,7 +11,7 @@ if (isWebGPUAvailable) {
       throw Error("Couldn't request WebGPU adapter.");
     }
     isWebGPUAvailable = true;
-  } catch (error) {
+  } catch {
     isWebGPUAvailable = false;
   }
 }
