@@ -9,6 +9,7 @@ import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.w
 import multiThreadWllamaJsUrl from "@wllama/wllama/esm/multi-thread/wllama.js?url";
 import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
 import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
+import { getNumberOfThreadsSetting } from "./pubSub";
 
 export async function initializeWllama(
   modelUrl: string | string[],
@@ -70,18 +71,32 @@ ${query}<|im_end|>
     shouldIncludeUrlsOnPrompt: false,
     sampling: commonSamplingConfig,
   },
-  desktop: {
-    url: "https://huggingface.co/Felladrin/gguf-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.F16.Q5_K.gguf",
-    buildPrompt: (query, searchResults) =>
-      `${searchResults}</s>
+  desktop:
+    getNumberOfThreadsSetting() < 4
+      ? {
+          url: "https://huggingface.co/Felladrin/gguf-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.F16.Q5_K.gguf",
+          buildPrompt: (query, searchResults) => `${searchResults}</s>
 <|prompt|>
 ${query}</s>
 <|answer|>
 `,
-    stopStrings: [],
-    cacheType: "f16",
-    contextSize: 2048,
-    shouldIncludeUrlsOnPrompt: false,
-    sampling: commonSamplingConfig,
-  },
+          stopStrings: [],
+          cacheType: "f16",
+          contextSize: 2048,
+          shouldIncludeUrlsOnPrompt: false,
+          sampling: commonSamplingConfig,
+        }
+      : {
+          url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-1.5B-Instruct-imat/resolve/main/qwen2-1-00001-of-00022.gguf",
+          buildPrompt: (query, searchResults) => `${searchResults}<|im_end|>
+<|im_start|>user
+${query}<|im_end|>
+<|im_start|>assistant
+`,
+          stopStrings: [],
+          cacheType: "f16",
+          contextSize: 2048,
+          shouldIncludeUrlsOnPrompt: false,
+          sampling: commonSamplingConfig,
+        },
 };
