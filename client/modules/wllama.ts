@@ -48,7 +48,7 @@ const commonSamplingConfig: SamplingConfig = {
 };
 
 export const availableModels: {
-  [key in "mobile" | "desktop"]: {
+  [key in "mobile" | "mobileFallback" | "desktop"]: {
     url: string | string[];
     stopStrings: string[];
     cacheType: "f16" | "q8_0" | "q4_0";
@@ -59,6 +59,18 @@ export const availableModels: {
   };
 } = {
   mobile: {
+    url: "https://huggingface.co/Felladrin/gguf-sharded-LaMini-Flan-T5-248M/resolve/main/lamini-flan-t5-248m-q5_k_s-imat-00001-of-00006.gguf",
+    buildPrompt: (query, searchResults) => `${searchResults.slice(0, 1280)}</s>
+
+Answer thinking step by step:
+${query}`,
+    stopStrings: [],
+    cacheType: "f16",
+    contextSize: 1024,
+    shouldIncludeUrlsOnPrompt: false,
+    sampling: commonSamplingConfig,
+  },
+  mobileFallback: {
     url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf",
     buildPrompt: (query, searchResults) => `${searchResults}<|im_end|>
 <|im_start|>user

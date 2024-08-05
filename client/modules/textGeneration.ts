@@ -59,7 +59,11 @@ export async function prepareTextGeneration() {
         await generateTextWithWebGpu[1]();
       }
     } catch {
-      await generateTextWithWllama();
+      try {
+        await generateTextWithWllama();
+      } catch {
+        await generateTextWithWllama(true);
+      }
     }
   } catch {
     toast.error(
@@ -186,11 +190,15 @@ async function generateTextWithWebLlm() {
   engine.unload();
 }
 
-async function generateTextWithWllama() {
+async function generateTextWithWllama(useFallbackModel?: boolean) {
   const { initializeWllama, availableModels } = await import("./wllama");
 
   const selectedModel = match(isRunningOnMobile)
-    .with(true, () => availableModels.mobile)
+    .with(true, () =>
+      useFallbackModel
+        ? availableModels.mobileFallback
+        : availableModels.mobile,
+    )
     .with(false, () => availableModels.desktop)
     .exhaustive();
 
