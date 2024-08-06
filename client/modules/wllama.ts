@@ -60,15 +60,24 @@ export const availableModels: {
 } = {
   mobile: {
     url: "https://huggingface.co/Felladrin/gguf-sharded-LaMini-Flan-T5-248M/resolve/main/lamini-flan-t5-248m-q5_k_s-imat-00001-of-00006.gguf",
-    buildPrompt: (query, searchResults) => `${searchResults.slice(0, 1280)}</s>
+    buildPrompt: (
+      query,
+      searchResults,
+    ) => `You are a highly knowledgeable assistant.
+Your goal is to understand and respond to my inquiry with clarity.
+Focus on delivering the most accurate information to me.
 
-Answer thinking step by step:
-${query}`,
+Keep in mind the following web search results and then answer my inquiry.
+${"```"}
+${searchResults.slice(0, 1280)}
+${"```"}
+
+My inquiry: ${query}`,
     stopStrings: [],
     cacheType: "f16",
     contextSize: 1024,
     shouldIncludeUrlsOnPrompt: false,
-    sampling: commonSamplingConfig,
+    sampling: { temp: 0.5, top_k: 0, top_p: 0.95, min_p: 0.1 },
   },
   mobileFallback: {
     url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf",
