@@ -80,17 +80,23 @@ My inquiry: ${query}`,
     sampling: { temp: 0.5, top_k: 0, top_p: 0.95, min_p: 0.1 },
   },
   mobileFallback: {
-    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.IQ3_XXS.shard-00001-of-00003.gguf",
     buildPrompt: (query, searchResults) => `${searchResults}<|im_end|>
 <|im_start|>user
 ${query}<|im_end|>
 <|im_start|>assistant
 `,
-    stopStrings: ["<|im_end|>"],
+    stopStrings: [],
     cacheType: "f16",
-    contextSize: 2048,
+    contextSize: 1280,
     shouldIncludeUrlsOnPrompt: false,
-    sampling: commonSamplingConfig,
+    sampling: {
+      temp: 0.65,
+      top_k: 35,
+      top_p: 0.55,
+      penalty_repeat: 1.1,
+      penalty_last_n: -1,
+    },
   },
   desktop:
     getNumberOfThreadsSetting() < 4

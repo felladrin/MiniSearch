@@ -97,6 +97,13 @@ async function generateTextWithWebLlm() {
   const appConfig = {
     model_list: [
       {
+        model_id: "mlc-q4f16_1-Qwen2-0.5B-Instruct",
+        model:
+          "https://huggingface.co/Felladrin/mlc-q4f16_1-Qwen2-0.5B-Instruct",
+        model_lib:
+          "https://huggingface.co/Felladrin/mlc-q4f16_1-Qwen2-0.5B-Instruct/resolve/main/model.wasm",
+      },
+      {
         model_id: "mlc-q0f16-Qwen2-1.5B-Instruct",
         model: "https://huggingface.co/Felladrin/mlc-q0f16-Qwen2-1.5B-Instruct",
         model_lib:
@@ -105,7 +112,8 @@ async function generateTextWithWebLlm() {
     ],
   };
 
-  const selectedModelId = appConfig.model_list[0].model_id;
+  const selectedModelId =
+    appConfig.model_list[isRunningOnMobile ? 0 : 1].model_id;
 
   const isModelCached = await hasModelInCache(selectedModelId, appConfig);
 
