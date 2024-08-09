@@ -59,44 +59,30 @@ export const availableModels: {
   };
 } = {
   mobile: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-LaMini-Flan-T5-248M/resolve/main/lamini-flan-t5-248m-q5_k_s-imat-00001-of-00006.gguf",
-    buildPrompt: (
-      query,
-      searchResults,
-    ) => `You are a highly knowledgeable assistant.
-Your goal is to understand and respond to my inquiry with clarity.
-Focus on delivering the most accurate information to me.
-
-Keep in mind the following web search results and then answer my inquiry.
-${"```"}
-${searchResults.slice(0, 1280)}
-${"```"}
-
-My inquiry: ${query}`,
+    url: "https://huggingface.co/Felladrin/gguf-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.F16.Q5_K.gguf",
+    buildPrompt: (query, searchResults) => `${searchResults}</s>
+<|prompt|>
+${query}</s>
+<|answer|>
+`,
     stopStrings: [],
     cacheType: "f16",
-    contextSize: 1024,
+    contextSize: 2048,
     shouldIncludeUrlsOnPrompt: false,
-    sampling: { temp: 0.5, top_k: 0, top_p: 0.95, min_p: 0.1 },
+    sampling: commonSamplingConfig,
   },
   mobileFallback: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.IQ3_XXS.shard-00001-of-00003.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf",
     buildPrompt: (query, searchResults) => `${searchResults}<|im_end|>
 <|im_start|>user
 ${query}<|im_end|>
 <|im_start|>assistant
 `,
-    stopStrings: [],
+    stopStrings: ["<|im_end|>"],
     cacheType: "f16",
-    contextSize: 1280,
+    contextSize: 2048,
     shouldIncludeUrlsOnPrompt: false,
-    sampling: {
-      temp: 0.65,
-      top_k: 35,
-      top_p: 0.55,
-      penalty_repeat: 1.1,
-      penalty_last_n: -1,
-    },
+    sampling: commonSamplingConfig,
   },
   desktop:
     getNumberOfThreadsSetting() < 4
