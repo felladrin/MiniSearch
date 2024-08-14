@@ -59,11 +59,11 @@ export const availableModels: {
   };
 } = {
   mobile: {
-    url: "https://huggingface.co/Felladrin/gguf-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.F16.Q5_K.gguf",
-    buildPrompt: (query, searchResults) => `${searchResults}</s>
-<|prompt|>
-${query}</s>
-<|answer|>
+    url: "https://huggingface.co/Felladrin/gguf-q5_k_m-imat-qwen2-0.5b-instruct/resolve/main/qwen2-0-00001-of-00003.gguf",
+    buildPrompt: (query, searchResults) => `${searchResults}<|im_end|>
+<|im_start|>user
+${query}<|im_end|>
+<|im_start|>assistant
 `,
     stopStrings: [],
     cacheType: "f16",
@@ -72,26 +72,26 @@ ${query}</s>
     sampling: commonSamplingConfig,
   },
   mobileFallback: {
-    url: "https://huggingface.co/Felladrin/gguf-Llama-160M-Chat-v1/resolve/main/Llama-160M-Chat-v1.Q5_K_M.gguf",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.IQ3_XXS.shard-00001-of-00003.gguf",
     buildPrompt: (query, searchResults) => `${searchResults}<|im_end|>
 <|im_start|>user
 ${query}<|im_end|>
 <|im_start|>assistant
 `,
-    stopStrings: ["<|im_end|>"],
+    stopStrings: [],
     cacheType: "f16",
-    contextSize: 2048,
+    contextSize: 1280,
     shouldIncludeUrlsOnPrompt: false,
     sampling: commonSamplingConfig,
   },
   desktop:
     getNumberOfThreadsSetting() < 4
       ? {
-          url: "https://huggingface.co/Felladrin/gguf-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat.F16.Q5_K.gguf",
-          buildPrompt: (query, searchResults) => `${searchResults}</s>
-<|prompt|>
-${query}</s>
-<|answer|>
+          url: "https://huggingface.co/Felladrin/gguf-q5_k_m-imat-qwen2-0.5b-instruct/resolve/main/qwen2-0-00001-of-00003.gguf",
+          buildPrompt: (query, searchResults) => `${searchResults}<|im_end|>
+<|im_start|>user
+${query}<|im_end|>
+<|im_start|>assistant
 `,
           stopStrings: [],
           cacheType: "f16",
