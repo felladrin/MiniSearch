@@ -102,7 +102,7 @@ export function SearchForm({
           onChange={handleInputChange}
           autoFocus
           minRows={1}
-          maxRows={6}
+          maxRows={8}
         />
         <div style={{ display: "flex", width: "100%" }}>
           {match(textAreaValue)
