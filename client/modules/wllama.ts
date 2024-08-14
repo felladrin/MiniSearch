@@ -100,7 +100,7 @@ ${query}<|im_end|>
           sampling: commonSamplingConfig,
         }
       : {
-          url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen2-1.5B-Instruct-imat/resolve/main/qwen2-1-00001-of-00022.gguf",
+          url: "https://huggingface.co/Felladrin/gguf-q5_k_l-imat-arcee-lite/resolve/main/arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
           buildPrompt: (query, searchResults) => `${searchResults}<|im_end|>
 <|im_start|>user
 ${query}<|im_end|>
