@@ -104,10 +104,10 @@ async function generateTextWithWebLlm() {
           "https://huggingface.co/Felladrin/mlc-q4f16_1-Qwen2-0.5B-Instruct/resolve/main/model.wasm",
       },
       {
-        model_id: "mlc-q0f16-Qwen2-1.5B-Instruct",
-        model: "https://huggingface.co/Felladrin/mlc-q0f16-Qwen2-1.5B-Instruct",
+        model_id: "mlc-q0f16-arcee-lite",
+        model: "https://huggingface.co/Felladrin/mlc-q0f16-arcee-lite",
         model_lib:
-          "https://huggingface.co/Felladrin/mlc-q0f16-Qwen2-1.5B-Instruct/resolve/main/model.wasm",
+          "https://huggingface.co/Felladrin/mlc-q0f16-arcee-lite/resolve/main/model.wasm",
       },
     ],
   };
