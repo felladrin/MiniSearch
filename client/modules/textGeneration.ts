@@ -243,7 +243,8 @@ async function generateTextWithWllama(useFallbackModel?: boolean) {
 
     updateLoadingToast("Preparing response...");
 
-    const prompt = selectedModel.buildPrompt(
+    const prompt = await selectedModel.buildPrompt(
+      wllama,
       getQuery(),
       getFormattedSearchResults(selectedModel.shouldIncludeUrlsOnPrompt),
     );
@@ -271,13 +272,6 @@ async function generateTextWithWllama(useFallbackModel?: boolean) {
         }
 
         updateResponse(currentText);
-
-        for (const stopString of selectedModel.stopStrings) {
-          if (currentText.includes(stopString)) {
-            updateResponse(currentText.replaceAll(stopString, ""));
-            abortSignal();
-          }
-        }
       },
     });
 
@@ -361,8 +355,8 @@ function getFormattedSearchResults(shouldIncludeUrl: boolean) {
   }
 
   return searchResults
-    .map(([title, snippet]) => `${title}\n${snippet}`)
-    .join("\n\n");
+    .map(([title, snippet]) => `- ${title} | ${snippet}`)
+    .join("\n");
 }
 
 async function getKeywords(text: string, limit?: number) {
