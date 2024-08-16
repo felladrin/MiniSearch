@@ -49,7 +49,7 @@ const commonSamplingConfig: SamplingConfig = {
 };
 
 export const availableModels: {
-  [key in "mobile" | "mobileFallback" | "desktop"]: {
+  [key in "mobile" | "desktop"]: {
     url: string | string[];
     cacheType: "f16" | "q8_0" | "q4_0";
     contextSize: number;
@@ -63,18 +63,6 @@ export const availableModels: {
   };
 } = {
   mobile: {
-    url: "https://huggingface.co/Felladrin/gguf-q5_k_m-imat-qwen2-0.5b-instruct/resolve/main/qwen2-0-00001-of-00003.gguf",
-    buildPrompt: (wllama, query, searchResults) =>
-      formatChat(wllama, [
-        { id: 0, role: "assistant", content: searchResults },
-        { id: 1, role: "user", content: query },
-      ]),
-    cacheType: "f16",
-    contextSize: 2048,
-    shouldIncludeUrlsOnPrompt: false,
-    sampling: commonSamplingConfig,
-  },
-  mobileFallback: {
     url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.IQ3_XXS.shard-00001-of-00003.gguf",
     buildPrompt: (wllama, query, searchResults) =>
       formatChat(wllama, [
@@ -117,7 +105,7 @@ export const availableModels: {
 export interface Message {
   id: number;
   content: string;
-  role: "user" | "assistant";
+  role: "system" | "user" | "assistant";
 }
 
 export const formatChat = async (wllama: Wllama, messages: Message[]) => {
