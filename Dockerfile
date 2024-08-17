@@ -28,4 +28,4 @@ RUN npm ci
 COPY --chown=${USERNAME}:${USERNAME} . .
 RUN npm run build
 ENTRYPOINT [ "/bin/sh", "-c" ]
-CMD [ "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & touch /etc/searxng/limiter.toml & npm start -- --host" ]
+CMD [ "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & (npx node-llama-cpp download && npm start -- --host)" ]
