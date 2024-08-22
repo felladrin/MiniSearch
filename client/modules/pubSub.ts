@@ -83,12 +83,6 @@ export const urlsDescriptionsPubSub = createPubSub<Record<string, string>>({});
 
 export const [updateUrlsDescriptions] = urlsDescriptionsPubSub;
 
-export const debugModeEnabledPubSub = createPubSub(
-  new URLSearchParams(self.location.search).has("debug"),
-);
-
-export const [, , isDebugModeEnabled] = debugModeEnabledPubSub;
-
 export const interruptTextGenerationPubSub = createPubSub();
 
 export const [interruptTextGeneration, onTextGenerationInterrupted] =

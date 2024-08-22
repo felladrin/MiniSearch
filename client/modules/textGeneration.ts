@@ -7,7 +7,6 @@ import {
   updateUrlsDescriptions,
   getDisableWebGpuUsageSetting,
   getNumberOfThreadsSetting,
-  isDebugModeEnabled,
   getQuery,
   interruptTextGeneration,
   onTextGenerationInterrupted,
@@ -23,6 +22,7 @@ import { search } from "./search";
 import { isRunningOnMobile } from "./mobileDetection";
 import { isRunningOnSafari } from "./browserDetection";
 import { match } from "ts-pattern";
+import { addLogEntry } from "./logEntries";
 
 export async function prepareTextGeneration() {
   if (getQuery() === "") return;
@@ -39,7 +39,7 @@ export async function prepareTextGeneration() {
 
   if (getDisableAiResponseSetting()) return;
 
-  if (isDebugModeEnabled()) console.time("Response Generation Time");
+  const responseGenerationStartTime = new Date().getTime();
 
   updateTextGenerationState("loadingModel");
 
@@ -70,9 +70,9 @@ export async function prepareTextGeneration() {
     updateTextGenerationState("failed");
   }
 
-  if (isDebugModeEnabled()) {
-    console.timeEnd("Response Generation Time");
-  }
+  addLogEntry(
+    `Response generation took ${new Date().getTime() - responseGenerationStartTime}ms`,
+  );
 }
 
 async function generateTextWithWebLlm() {
@@ -123,13 +123,13 @@ async function generateTextWithWebLlm() {
         {
           appConfig,
           initProgressCallback,
-          logLevel: isDebugModeEnabled() ? "DEBUG" : "SILENT",
+          logLevel: "SILENT",
         },
       )
     : await CreateMLCEngine(selectedModelId, {
         appConfig,
         initProgressCallback,
-        logLevel: isDebugModeEnabled() ? "DEBUG" : "SILENT",
+        logLevel: "SILENT",
       });
 
   if (!getDisableAiResponseSetting()) {
@@ -171,9 +171,9 @@ async function generateTextWithWebLlm() {
     }
   }
 
-  if (isDebugModeEnabled()) {
-    console.info(await engine.runtimeStatsText());
-  }
+  addLogEntry(
+    `WebLLM finished generating the response. Stats: ${await engine.runtimeStatsText()}`,
+  );
 
   engine.unload();
 }
@@ -190,7 +190,7 @@ async function generateTextWithWllama() {
 
   const wllama = await initializeWllama(selectedModel.url, {
     wllama: {
-      suppressNativeLog: !isDebugModeEnabled(),
+      suppressNativeLog: true,
     },
     model: {
       n_threads: isRunningOnMobile ? 1 : getNumberOfThreadsSetting(),
