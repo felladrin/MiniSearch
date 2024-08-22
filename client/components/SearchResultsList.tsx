@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { SearchResults } from "../modules/search";
-import { Tooltip } from "react-tooltip";
+import {
+  Whisper,
+  Tooltip,
+  PanelGroup,
+  Panel,
+  Stack,
+  Button,
+  Text,
+} from "rsuite";
 
 export function SearchResultsList({
   searchResults,
@@ -26,53 +34,56 @@ export function SearchResultsList({
   const shouldDisplayDomainBelowTitle = windowWidth < 720;
 
   return (
-    <ul>
+    <PanelGroup>
       {searchResults.map(([title, , url], index) => (
-        <li key={url}>
-          <Tooltip
-            id={`search-result-${index}`}
-            place="top-start"
-            variant="info"
-            opacity="1"
-          >
-            {url}
-          </Tooltip>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: shouldDisplayDomainBelowTitle ? 0 : "1rem",
-              flexDirection: shouldDisplayDomainBelowTitle ? "column" : "row",
-            }}
-          >
-            <a
-              href={url}
-              target="_blank"
-              data-tooltip-id={`search-result-${index}`}
+        <Panel
+          key={`search-result-${index}`}
+          header={
+            <Stack
+              justifyContent="space-between"
+              alignItems="flex-start"
+              spacing={shouldDisplayDomainBelowTitle ? 0 : "1rem"}
+              direction={shouldDisplayDomainBelowTitle ? "column" : "row"}
             >
-              {title}
-            </a>
-            <a
-              href={url}
-              target="_blank"
-              data-tooltip-id={`search-result-${index}`}
-            >
-              <cite
+              <Button
+                appearance="link"
+                href={url}
+                target="_blank"
                 style={{
-                  fontSize: "small",
-                  color: "gray",
-                  whiteSpace: "nowrap",
+                  textWrap: "wrap",
+                  padding: 0,
+                  color: "var(--rs-btn-link-text)",
+                  textAlign: "left",
+                  fontWeight: "bold",
                 }}
               >
-                {new URL(url).hostname.replace("www.", "")}
-              </cite>
-            </a>
-          </div>
-          {urlsDescriptions[url] && (
-            <blockquote>{urlsDescriptions[url]}</blockquote>
-          )}
-        </li>
+                {title}
+              </Button>
+              <Whisper
+                placement="top"
+                controlId={`search-result-${index}-for-domain`}
+                trigger="hover"
+                speaker={<Tooltip>{url}</Tooltip>}
+              >
+                <Button
+                  appearance="link"
+                  href={url}
+                  target="_blank"
+                  style={{ padding: 0 }}
+                >
+                  <Text as="cite" size="md">
+                    {new URL(url).hostname.replace("www.", "")}
+                  </Text>
+                </Button>
+              </Whisper>
+            </Stack>
+          }
+        >
+          <Text size="md" style={{ color: "rgb(119, 132, 145)" }}>
+            {urlsDescriptions[url]}
+          </Text>
+        </Panel>
       ))}
-    </ul>
+    </PanelGroup>
   );
 }

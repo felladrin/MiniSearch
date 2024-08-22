@@ -1,7 +1,9 @@
-import { Tooltip } from "react-tooltip";
-import toast from "react-hot-toast";
+import { Whisper, Tooltip, Button, VStack, Message } from "rsuite";
+import { useToaster } from "rsuite";
 
 export function ActionsForm() {
+  const toaster = useToaster();
+
   const handleClearDataButtonClick = async () => {
     const sureToDelete = self.confirm(
       "Are you sure you want to reset the settings and delete all files in cache?",
@@ -9,10 +11,11 @@ export function ActionsForm() {
 
     if (!sureToDelete) return;
 
-    toast.loading("Clearing data...", {
-      id: "clear-data-toast",
-      position: "bottom-center",
-    });
+    toaster.push(
+      <Message showIcon type="info" id="clear-data-toast" closable>
+        Clearing data...
+      </Message>,
+    );
 
     self.localStorage.clear();
 
@@ -24,49 +27,35 @@ export function ActionsForm() {
       if (databaseInfo.name) self.indexedDB.deleteDatabase(databaseInfo.name);
     }
 
-    toast.dismiss("clear-data-toast");
-
-    toast.success("Data cleared!", {
-      position: "bottom-center",
-    });
-
-    self.location.reload();
+    toaster.push(
+      <Message
+        showIcon
+        type="success"
+        id="clear-data-toast"
+        closable
+        onClose={() => self.location.reload()}
+      >
+        Data cleared!
+      </Message>,
+    );
   };
 
   return (
-    <div>
-      <div
-        style={{
-          textAlign: "center",
-          fontSize: "16px",
-          fontWeight: "bolder",
-          margin: "10px",
-        }}
+    <VStack>
+      <Whisper
+        placement="top"
+        controlId="clear-data-button"
+        trigger="hover"
+        speaker={
+          <Tooltip>
+            Reset settings and delete all files in cache to free up space.
+          </Tooltip>
+        }
       >
-        Actions
-      </div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginTop: "8px",
-        }}
-      >
-        <Tooltip
-          id="clear-data-button"
-          place="top-start"
-          variant="info"
-          style={{ maxWidth: "90vw" }}
-        />
-        <button
-          style={{ fontSize: "small" }}
-          onClick={handleClearDataButtonClick}
-          data-tooltip-id="clear-data-button"
-          data-tooltip-content="Reset settings and delete all files in cache to free up space."
-        >
-          Clear Data
-        </button>
-      </div>
-    </div>
+        <Button size="sm" onClick={handleClearDataButtonClick}>
+          Clear all data
+        </Button>
+      </Whisper>
+    </VStack>
   );
 }

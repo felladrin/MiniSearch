@@ -97,3 +97,27 @@ export const [interruptTextGeneration, onTextGenerationInterrupted] =
 export const [updateSearchPromise, , getSearchPromise] = createPubSub<
   Promise<SearchResults>
 >(Promise.resolve([]));
+
+export const textGenerationStatePubSub = createPubSub<
+  | "idle"
+  | "loadingModel"
+  | "awaitingSearchResults"
+  | "preparingToGenerate"
+  | "generating"
+  | "interrupted"
+  | "failed"
+  | "completed"
+>("idle");
+
+export const [updateTextGenerationState, , getTextGenerationState] =
+  textGenerationStatePubSub;
+
+export const searchStatePubSub = createPubSub<
+  "idle" | "running" | "failed" | "completed"
+>("idle");
+
+export const [updateSearchState] = searchStatePubSub;
+
+export const modelLoadingProgressPubSub = createPubSub(0);
+
+export const [updateModelLoadingProgress] = modelLoadingProgressPubSub;

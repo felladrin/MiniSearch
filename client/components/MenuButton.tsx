@@ -1,64 +1,47 @@
 import { useState } from "react";
 import { SettingsForm } from "./SettingsForm";
 import { ActionsForm } from "./ActionsForm";
-import { toast } from "react-hot-toast";
+import { Button, Drawer, Heading, VStack } from "rsuite";
 
 export function MenuButton() {
-  const [isToastOpen, setToastOpen] = useState(false);
+  const [isDrawerOpen, setDrawerOpen] = useState(false);
 
-  const toastId = "menu-toast";
-
-  const openToast = () => {
-    setToastOpen(true);
-
-    toast(
-      <div>
-        <SettingsForm />
-        <hr />
-        <ActionsForm />
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            marginTop: "8px",
-          }}
-        >
-          <button style={{ fontSize: "small" }} onClick={closeToast}>
-            Close Menu
-          </button>
-        </div>
-      </div>,
-      {
-        id: toastId,
-        duration: Infinity,
-        position: "bottom-center",
-        style: {
-          borderRadius: "10px",
-          background: "var(--background)",
-          color: "var(--text-main)",
-        },
-      },
-    );
+  const openDrawer = () => {
+    setDrawerOpen(true);
   };
 
-  const closeToast = () => {
-    setToastOpen(false);
-    toast.dismiss(toastId);
+  const closeDrawer = () => {
+    setDrawerOpen(false);
   };
 
   return (
-    <button
-      style={{ fontSize: "small", marginRight: 0 }}
-      onClick={(event) => {
-        event.preventDefault();
-        if (isToastOpen) {
-          closeToast();
-        } else {
-          openToast();
-        }
-      }}
-    >
-      Menu
-    </button>
+    <>
+      <Button
+        size="sm"
+        onClick={(event) => {
+          event.preventDefault();
+          if (isDrawerOpen) {
+            closeDrawer();
+          } else {
+            openDrawer();
+          }
+        }}
+      >
+        Menu
+      </Button>
+      <Drawer open={isDrawerOpen} onClose={closeDrawer} size="xs">
+        <Drawer.Header>
+          <Drawer.Title>Menu</Drawer.Title>
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack spacing={16}>
+            <Heading level={5}>Settings</Heading>
+            <SettingsForm />
+            <Heading level={5}>Actions</Heading>
+            <ActionsForm />
+          </VStack>
+        </Drawer.Body>
+      </Drawer>
+    </>
   );
 }

@@ -14,9 +14,12 @@ import {
   getNumberOfSearchResultsToConsiderSetting,
   updateSearchPromise,
   getSearchPromise,
+  updateTextGenerationState,
+  updateSearchState,
+  updateModelLoadingProgress,
+  getTextGenerationState,
 } from "./pubSub";
 import { search } from "./search";
-import toast from "react-hot-toast";
 import { isRunningOnMobile } from "./mobileDetection";
 import { isRunningOnSafari } from "./browserDetection";
 import { match } from "ts-pattern";
@@ -38,7 +41,7 @@ export async function prepareTextGeneration() {
 
   if (isDebugModeEnabled()) console.time("Response Generation Time");
 
-  updateLoadingToast("Loading AI model...");
+  updateTextGenerationState("loadingModel");
 
   try {
     try {
@@ -61,29 +64,15 @@ export async function prepareTextGeneration() {
     } catch {
       await generateTextWithWllama();
     }
+
+    updateTextGenerationState("completed");
   } catch {
-    toast.error(
-      "Could not generate response. The browser may be out of memory. Please close this tab and run this search again in a new one.",
-      { duration: 10000, position: "bottom-center" },
-    );
-  } finally {
-    dismissLoadingToast();
+    updateTextGenerationState("failed");
   }
 
   if (isDebugModeEnabled()) {
     console.timeEnd("Response Generation Time");
   }
-}
-
-function updateLoadingToast(text: string) {
-  toast.loading(text, {
-    id: "text-generation-loading-toast",
-    position: "bottom-center",
-  });
-}
-
-function dismissLoadingToast() {
-  toast.dismiss("text-generation-loading-toast");
 }
 
 async function generateTextWithWebLlm() {
@@ -118,12 +107,10 @@ async function generateTextWithWebLlm() {
     | undefined;
 
   if (isModelCached) {
-    updateLoadingToast("Preparing response...");
+    updateTextGenerationState("preparingToGenerate");
   } else {
     initProgressCallback = (report) => {
-      updateLoadingToast(
-        `Loading: ${report.text.replaceAll("[", "(").replaceAll("]", ")")}`,
-      );
+      updateModelLoadingProgress(Math.round(report.progress * 100));
     };
   }
 
@@ -148,9 +135,7 @@ async function generateTextWithWebLlm() {
   if (!getDisableAiResponseSetting()) {
     await canStartResponding();
 
-    updateLoadingToast("Preparing response...");
-
-    let isAnswering = false;
+    updateTextGenerationState("preparingToGenerate");
 
     const completion = await engine.chat.completions.create({
       stream: true,
@@ -161,12 +146,10 @@ async function generateTextWithWebLlm() {
 
     let streamedMessage = "";
 
-    let wasInterrupted = false;
-
     const unsubscribeFromTextGenerationInterruption =
       onTextGenerationInterrupted(async () => {
         await engine.interruptGenerate();
-        wasInterrupted = true;
+        updateTextGenerationState("interrupted");
       });
 
     for await (const chunk of completion) {
@@ -174,9 +157,8 @@ async function generateTextWithWebLlm() {
 
       if (deltaContent) streamedMessage += deltaContent;
 
-      if (!isAnswering) {
-        isAnswering = true;
-        updateLoadingToast("Generating response...");
+      if (getTextGenerationState() !== "generating") {
+        updateTextGenerationState("generating");
       }
 
       updateResponse(streamedMessage);
@@ -184,7 +166,9 @@ async function generateTextWithWebLlm() {
 
     unsubscribeFromTextGenerationInterruption();
 
-    if (wasInterrupted) updateResponse("");
+    if (getTextGenerationState() === "interrupted") {
+      updateResponse("");
+    }
   }
 
   if (isDebugModeEnabled()) {
@@ -220,11 +204,7 @@ async function generateTextWithWllama() {
 
         if (loadingPercentage !== progressPercentage) {
           loadingPercentage = progressPercentage;
-          updateLoadingToast(
-            loadingPercentage === 100
-              ? `AI model loaded.`
-              : `Loading: ${loadingPercentage}%`,
-          );
+          updateModelLoadingProgress(progressPercentage);
         }
       },
     },
@@ -233,7 +213,7 @@ async function generateTextWithWllama() {
   if (!getDisableAiResponseSetting()) {
     await canStartResponding();
 
-    updateLoadingToast("Preparing response...");
+    updateTextGenerationState("preparingToGenerate");
 
     const prompt = await selectedModel.buildPrompt(
       wllama,
@@ -241,16 +221,12 @@ async function generateTextWithWllama() {
       getFormattedSearchResults(selectedModel.shouldIncludeUrlsOnPrompt),
     );
 
-    let isAnswering = false;
-
     let abortTextGeneration: (() => void) | undefined;
-
-    let wasInterrupted = false;
 
     const unsubscribeFromTextGenerationInterruption =
       onTextGenerationInterrupted(() => {
         abortTextGeneration?.();
-        wasInterrupted = true;
+        updateTextGenerationState("interrupted");
       });
 
     await wllama.createCompletion(prompt, {
@@ -258,9 +234,8 @@ async function generateTextWithWllama() {
       onNewToken: (_token, _piece, currentText, { abortSignal }) => {
         abortTextGeneration = abortSignal;
 
-        if (!isAnswering) {
-          isAnswering = true;
-          updateLoadingToast("Generating response...");
+        if (getTextGenerationState() !== "generating") {
+          updateTextGenerationState("generating");
         }
 
         updateResponse(currentText);
@@ -269,7 +244,9 @@ async function generateTextWithWllama() {
 
     unsubscribeFromTextGenerationInterruption();
 
-    if (wasInterrupted) updateResponse("");
+    if (getTextGenerationState() === "interrupted") {
+      updateResponse("");
+    }
   }
 
   await wllama.exit();
@@ -280,16 +257,14 @@ async function generateTextWithRatchet() {
     "./ratchet"
   );
 
-  await initializeRatchet((loadingProgressPercentage) =>
-    updateLoadingToast(`Loading: ${Math.floor(loadingProgressPercentage)}%`),
-  );
+  await initializeRatchet((loadingProgressPercentage) => {
+    updateModelLoadingProgress(Math.round(loadingProgressPercentage));
+  });
 
   if (!getDisableAiResponseSetting()) {
     await canStartResponding();
 
-    updateLoadingToast("Preparing response...");
-
-    let isAnswering = false;
+    updateTextGenerationState("preparingToGenerate");
 
     let response = "";
 
@@ -297,9 +272,8 @@ async function generateTextWithRatchet() {
       onTextGenerationInterrupted(() => self.location.reload());
 
     await runCompletion(getMainPrompt(), (completionChunk) => {
-      if (!isAnswering) {
-        isAnswering = true;
-        updateLoadingToast("Generating response...");
+      if (getTextGenerationState() !== "generating") {
+        updateTextGenerationState("generating");
       }
 
       response += completionChunk;
@@ -358,10 +332,7 @@ async function getKeywords(text: string, limit?: number) {
 }
 
 async function startSearch(query: string) {
-  toast.loading("Searching the web...", {
-    id: "search-progress-toast",
-    position: "bottom-center",
-  });
+  updateSearchState("running");
 
   let searchResults = await search(
     query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query,
@@ -374,18 +345,7 @@ async function startSearch(query: string) {
     searchResults = await search(queryKeywords.join(" "), 30);
   }
 
-  if (searchResults.length === 0) {
-    toast(
-      "It looks like your current search did not return any results. Try refining your search by adding more keywords or rephrasing your query.",
-      {
-        position: "bottom-center",
-        duration: 10000,
-        icon: "💡",
-      },
-    );
-  }
-
-  toast.dismiss("search-progress-toast");
+  updateSearchState(searchResults.length === 0 ? "failed" : "completed");
 
   updateSearchResults(searchResults);
 
@@ -401,6 +361,7 @@ async function startSearch(query: string) {
 
 async function canStartResponding() {
   if (getNumberOfSearchResultsToConsiderSetting() > 0) {
+    updateTextGenerationState("awaitingSearchResults");
     await getSearchPromise();
   }
 }

@@ -5,6 +5,7 @@ import { MenuButton } from "./MenuButton";
 import { useLocation } from "wouter";
 import { prepareTextGeneration } from "../modules/textGeneration";
 import { isMatching, match, Pattern } from "ts-pattern";
+import { Button, HStack, Stack, VStack } from "rsuite";
 
 export function SearchForm({
   query,
@@ -82,45 +83,54 @@ export function SearchForm({
     }
   };
 
-  const style = match(query)
-    .with(Pattern.string.length(0), () => ({
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      height: windowInnerHeight * 0.8,
-    }))
-    .otherwise(() => undefined);
-
   return (
-    <div style={style}>
+    <div
+      style={match(query)
+        .with(Pattern.string.length(0), () => ({
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: windowInnerHeight * 0.8,
+        }))
+        .otherwise(() => undefined)}
+    >
       <form onSubmit={handleSubmit} style={{ width: "100%" }}>
-        <TextareaAutosize
-          value={textAreaValue}
-          placeholder={suggestedQuery}
-          ref={textAreaRef}
-          onKeyDown={handleKeyDown}
-          onChange={handleInputChange}
-          autoFocus
-          minRows={1}
-          maxRows={8}
-        />
-        <div style={{ display: "flex", width: "100%" }}>
-          {match(textAreaValue)
-            .with(Pattern.string.minLength(1), () => (
-              <button
-                type="button"
-                style={{ fontSize: "small" }}
-                onClick={handleClearButtonClick}
-              >
-                Clear
-              </button>
-            ))
-            .otherwise(() => null)}
-          <button type="submit" style={{ width: "100%", fontSize: "small" }}>
-            Search
-          </button>
-          <MenuButton />
-        </div>
+        <VStack>
+          <Stack.Item style={{ width: "100%" }}>
+            <TextareaAutosize
+              value={textAreaValue}
+              placeholder={suggestedQuery}
+              ref={textAreaRef}
+              onKeyDown={handleKeyDown}
+              onChange={handleInputChange}
+              className="rs-input"
+              autoFocus
+              minRows={1}
+              maxRows={8}
+            />
+          </Stack.Item>
+          <Stack.Item style={{ width: "100%" }}>
+            <HStack>
+              {match(textAreaValue)
+                .with(Pattern.string.minLength(1), () => (
+                  <Stack.Item>
+                    <Button size="sm" onClick={handleClearButtonClick}>
+                      Clear
+                    </Button>
+                  </Stack.Item>
+                ))
+                .otherwise(() => null)}
+              <Stack.Item grow={1}>
+                <Button size="sm" type="submit" block>
+                  Search
+                </Button>
+              </Stack.Item>
+              <Stack.Item>
+                <MenuButton />
+              </Stack.Item>
+            </HStack>
+          </Stack.Item>
+        </VStack>
       </form>
     </div>
   );

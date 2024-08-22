@@ -1,0 +1,45 @@
+@import "rsuite/styles/index.less";
+@import "inter-ui/inter.css";
+@import "inter-ui/inter-variable.css";
+
+@font-family-base:
+  InterVariable,
+  Inter,
+  system-ui,
+  -apple-system,
+  BlinkMacSystemFont,
+  Segoe UI,
+  Roboto,
+  Oxygen,
+  Ubuntu,
+  Cantarell,
+  Fira Sans,
+  Droid Sans,
+  Helvetica Neue,
+  "Segoe UI Emoji",
+  "Apple Color Emoji",
+  "Noto Color Emoji",
+  sans-serif;
+@font-size-base: 15px;
+@line-height-base: 1.65;
+
+:root,
+html,
+body {
+  font-family: @font-family-base;
+  font-feature-settings:
+    "liga" 1,
+    "calt" 1;
+  line-height: @line-height-base;
+  word-wrap: break-word;
+  text-rendering: optimizeLegibility;
+}
+
+.rs-text {
+  line-height: @line-height-base;
+}
+
+.rs-theme-dark {
+  --rs-text-primary: rgb(227, 228, 234);
+  --rs-body: rgb(21, 22, 28);
+}
