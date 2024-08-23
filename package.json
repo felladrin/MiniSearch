@@ -16,7 +16,7 @@
     "@braintree/browser-detection": "^2.0.0",
     "@huggingface/hub": "^0.15.1",
     "@huggingface/jinja": "^0.3.0",
-    "@mlc-ai/web-llm": "0.2.61",
+    "@mlc-ai/web-llm": "0.2.62",
     "@ratchet-ml/ratchet-web": "^0.4.0",
     "@wllama/wllama": "^1.10.0",
     "create-pubsub": "^1.6.3",
