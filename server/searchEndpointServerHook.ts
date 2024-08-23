@@ -61,7 +61,7 @@ export function searchEndpointServerHook<
 
     try {
       await rateLimiter.consume(token);
-    } catch (error) {
+    } catch {
       response.statusCode = 429;
       response.end("Too many requests.");
       return;
