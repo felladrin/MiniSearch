@@ -17,7 +17,7 @@ export async function getSearchTokenHash() {
   }
 
   const salt = new Uint8Array(16);
-  window.crypto.getRandomValues(salt);
+  crypto.getRandomValues(salt);
 
   const newSearchTokenHash = await argon2id({
     password,

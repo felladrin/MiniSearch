@@ -9,7 +9,7 @@ export const logEntriesPubSub = createPubSub<LogEntry[]>([]);
 
 const [updateLogEntries, , getLogEntries] = logEntriesPubSub;
 
-(window as unknown as { getLogEntries: typeof getLogEntries }).getLogEntries =
+(self as unknown as { getLogEntries: typeof getLogEntries }).getLogEntries =
   getLogEntries;
 
 export function addLogEntry(message: string) {
