@@ -21,6 +21,7 @@ import {
   Divider,
   Placeholder,
   Message,
+  Progress,
 } from "rsuite";
 
 export function Main() {
@@ -94,9 +95,30 @@ export function Main() {
                         </>
                       ),
                     )
+                    .with("loadingModel", () => {
+                      const isLoadingComplete =
+                        modelLoadingProgress === 100 ||
+                        modelLoadingProgress === 0;
+
+                      const strokeColor = isLoadingComplete
+                        ? "#52c41a"
+                        : "#3385ff";
+
+                      const status = isLoadingComplete ? "success" : "active";
+
+                      return (
+                        <>
+                          <Divider>Loading AI...</Divider>
+                          <Progress.Line
+                            percent={modelLoadingProgress}
+                            strokeColor={strokeColor}
+                            status={status}
+                          />
+                        </>
+                      );
+                    })
                     .with(
                       Pattern.union(
-                        "loadingModel",
                         "awaitingSearchResults",
                         "preparingToGenerate",
                       ),
@@ -104,10 +126,6 @@ export function Main() {
                         <>
                           <Divider>
                             {match(textGenerationState)
-                              .with(
-                                "loadingModel",
-                                () => `Loading AI: ${modelLoadingProgress}%`,
-                              )
                               .with(
                                 "awaitingSearchResults",
                                 () => "Awaiting search results...",
@@ -123,16 +141,18 @@ export function Main() {
                       ),
                     )
                     .with("failed", () => (
-                      <Message
-                        type="warning"
-                        centered
-                        showIcon
-                        header="Failed to generate response"
-                      >
-                        Could not generate response. The browser may be out of
-                        memory. Please close this tab and run this search again
-                        in a new one.
-                      </Message>
+                      <>
+                        <Divider>AI Response</Divider>
+                        <Message
+                          type="warning"
+                          centered
+                          showIcon
+                          header="Failed to generate response"
+                        >
+                          Could not generate response. It's possible that your
+                          browser or your system is out of memory.
+                        </Message>
+                      </>
                     ))
                     .otherwise(() => null)}
                 </Stack.Item>
