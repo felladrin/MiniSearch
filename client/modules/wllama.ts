@@ -4,7 +4,10 @@ import {
   WllamaConfig,
   SamplingConfig,
 } from "@wllama/wllama/esm";
-import CacheManager from "@wllama/wllama/esm/cache-manager";
+import CacheManager, {
+  CacheEntry,
+  CacheEntryMetadata,
+} from "@wllama/wllama/esm/cache-manager";
 import singleThreadWllamaJsUrl from "@wllama/wllama/esm/single-thread/wllama.js?url";
 import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
 import multiThreadWllamaJsUrl from "@wllama/wllama/esm/multi-thread/wllama.js?url";
@@ -110,18 +113,6 @@ export const formatChat = async (wllama: Wllama, messages: Message[]) => {
     add_generation_prompt: true,
   });
 };
-
-interface CacheEntry {
-  name: string;
-  size: number;
-  metadata: CacheEntryMetadata;
-}
-
-interface CacheEntryMetadata {
-  etag: string;
-  originalSize: number;
-  originalURL: string;
-}
 
 class CustomCacheManager implements CacheManager {
   private readonly cacheName: string;
