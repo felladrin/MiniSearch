@@ -13,7 +13,6 @@
     "test": "glob -c 'tsx --test' '**/*.test.ts'"
   },
   "dependencies": {
-    "@braintree/browser-detection": "^2.0.0",
     "@huggingface/hub": "^0.15.1",
     "@huggingface/jinja": "^0.3.0",
     "@mlc-ai/web-llm": "0.2.62",

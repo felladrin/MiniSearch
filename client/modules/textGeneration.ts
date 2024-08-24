@@ -20,7 +20,6 @@ import {
 } from "./pubSub";
 import { search } from "./search";
 import { isRunningOnMobile } from "./mobileDetection";
-import { isRunningOnSafari } from "./browserDetection";
 import { match } from "ts-pattern";
 import { addLogEntry } from "./logEntries";
 
@@ -49,18 +48,7 @@ export async function prepareTextGeneration() {
 
       if (getDisableWebGpuUsageSetting()) throw Error("WebGPU is disabled.");
 
-      const generateTextWithWebGpu = [
-        generateTextWithWebLlm,
-        generateTextWithRatchet,
-      ];
-
-      if (isRunningOnSafari) generateTextWithWebGpu.reverse();
-
-      try {
-        await generateTextWithWebGpu[0]();
-      } catch {
-        await generateTextWithWebGpu[1]();
-      }
+      await generateTextWithWebLlm();
     } catch {
       await generateTextWithWllama();
     }
@@ -256,49 +244,6 @@ async function generateTextWithWllama() {
   }
 
   await wllama.exit();
-}
-
-async function generateTextWithRatchet() {
-  const { initializeRatchet, runCompletion, exitRatchet } = await import(
-    "./ratchet"
-  );
-
-  await initializeRatchet((loadingProgressPercentage) => {
-    updateModelLoadingProgress(Math.round(loadingProgressPercentage));
-  });
-
-  if (!getDisableAiResponseSetting()) {
-    await canStartResponding();
-
-    updateTextGenerationState("preparingToGenerate");
-
-    let response = "";
-
-    const unsubscribeFromTextGenerationInterruption =
-      onTextGenerationInterrupted(() => self.location.reload());
-
-    await runCompletion(getMainPrompt(), (completionChunk) => {
-      if (getTextGenerationState() !== "generating") {
-        updateTextGenerationState("generating");
-      }
-
-      response += completionChunk;
-      updateResponse(response);
-    });
-
-    unsubscribeFromTextGenerationInterruption();
-
-    if (!endsWithASign(response)) {
-      response += ".";
-      updateResponse(response);
-    }
-  }
-
-  await exitRatchet();
-}
-
-function endsWithASign(text: string) {
-  return text.endsWith(".") || text.endsWith("!") || text.endsWith("?");
 }
 
 function getMainPrompt() {
