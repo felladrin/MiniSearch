@@ -68,21 +68,21 @@ export function Main() {
                                 span: {
                                   component: Text,
                                   props: {
-                                    size: 15,
+                                    size: "md",
                                     as: "span",
                                   },
                                 },
                                 p: {
                                   component: Text,
                                   props: {
-                                    size: 15,
+                                    size: "md",
                                     as: "p",
                                   },
                                 },
                                 li: {
                                   component: Text,
                                   props: {
-                                    size: 15,
+                                    size: "md",
                                     as: "li",
                                   },
                                 },
