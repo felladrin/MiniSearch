@@ -203,7 +203,6 @@ async function generateTextWithWllama() {
       n_threads: getNumberOfThreadsSetting(),
       n_ctx: selectedModel.contextSize,
       cache_type_k: selectedModel.cacheType,
-      parallelDownloads: isRunningOnMobile ? 1 : 3,
       embeddings: false,
       allowOffline: true,
       progressCallback: ({ loaded, total }) => {
