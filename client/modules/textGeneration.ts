@@ -20,7 +20,6 @@ import {
 } from "./pubSub";
 import { search } from "./search";
 import { isRunningOnMobile } from "./mobileDetection";
-import { match } from "ts-pattern";
 import { addLogEntry } from "./logEntries";
 
 export async function prepareTextGeneration() {
@@ -174,23 +173,18 @@ async function generateTextWithWebLlm() {
 }
 
 async function generateTextWithWllama() {
-  const { initializeWllama, availableModels } = await import("./wllama");
-
-  const selectedModel = match(isRunningOnMobile)
-    .with(true, () => availableModels.mobile)
-    .with(false, () => availableModels.desktop)
-    .exhaustive();
+  const { initializeWllama, model } = await import("./wllama");
 
   let loadingPercentage = 0;
 
-  const wllama = await initializeWllama(selectedModel.url, {
+  const wllama = await initializeWllama(model.url, {
     wllama: {
       suppressNativeLog: true,
     },
     model: {
       n_threads: getNumberOfThreadsSetting(),
-      n_ctx: selectedModel.contextSize,
-      cache_type_k: selectedModel.cacheType,
+      n_ctx: model.contextSize,
+      cache_type_k: model.cacheType,
       embeddings: false,
       allowOffline: true,
       progressCallback: ({ loaded, total }) => {
@@ -209,10 +203,10 @@ async function generateTextWithWllama() {
 
     updateTextGenerationState("preparingToGenerate");
 
-    const prompt = await selectedModel.buildPrompt(
+    const prompt = await model.buildPrompt(
       wllama,
       getQuery(),
-      getFormattedSearchResults(selectedModel.shouldIncludeUrlsOnPrompt),
+      getFormattedSearchResults(model.shouldIncludeUrlsOnPrompt),
     );
 
     let abortTextGeneration: (() => void) | undefined;
@@ -224,7 +218,7 @@ async function generateTextWithWllama() {
       });
 
     await wllama.createCompletion(prompt, {
-      sampling: selectedModel.sampling,
+      sampling: model.sampling,
       onNewToken: (_token, _piece, currentText, { abortSignal }) => {
         abortTextGeneration = abortSignal;
 

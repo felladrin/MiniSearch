@@ -51,59 +51,43 @@ const commonSamplingConfig: SamplingConfig = {
   mirostat_tau: 3.5,
 };
 
-export const availableModels: {
-  [key in "mobile" | "desktop"]: {
-    url: string | string[];
-    cacheType: "f16" | "q8_0" | "q4_0";
-    contextSize: number;
-    sampling: SamplingConfig;
-    shouldIncludeUrlsOnPrompt: boolean;
-    buildPrompt: (
-      wllama: Wllama,
-      query: string,
-      searchResults: string,
-    ) => Promise<string>;
-  };
-} = {
-  mobile: {
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.IQ3_XXS.shard-00001-of-00003.gguf",
-    buildPrompt: (wllama, query, searchResults) =>
-      formatChat(wllama, [
-        { id: 0, role: "system", content: searchResults },
-        { id: 1, role: "user", content: query },
-      ]),
-    cacheType: "f16",
-    contextSize: 1280,
-    shouldIncludeUrlsOnPrompt: false,
-    sampling: commonSamplingConfig,
-  },
-  desktop:
-    getNumberOfThreadsSetting() < 4
-      ? {
-          url: "https://huggingface.co/Felladrin/gguf-q5_k_m-imat-qwen2-0.5b-instruct/resolve/main/qwen2-0-00001-of-00003.gguf",
-          buildPrompt: (wllama, query, searchResults) =>
-            formatChat(wllama, [
-              { id: 0, role: "system", content: searchResults },
-              { id: 1, role: "user", content: query },
-            ]),
-          cacheType: "f16",
-          contextSize: 2048,
-          shouldIncludeUrlsOnPrompt: false,
-          sampling: commonSamplingConfig,
-        }
-      : {
-          url: "https://huggingface.co/Felladrin/gguf-q5_k_l-imat-arcee-lite/resolve/main/arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
-          buildPrompt: (wllama, query, searchResults) =>
-            formatChat(wllama, [
-              { id: 0, role: "system", content: searchResults },
-              { id: 1, role: "user", content: query },
-            ]),
-          cacheType: "f16",
-          contextSize: 2048,
-          shouldIncludeUrlsOnPrompt: false,
-          sampling: commonSamplingConfig,
-        },
-};
+export const model: {
+  url: string | string[];
+  cacheType: "f16" | "q8_0" | "q4_0";
+  contextSize: number;
+  sampling: SamplingConfig;
+  shouldIncludeUrlsOnPrompt: boolean;
+  buildPrompt: (
+    wllama: Wllama,
+    query: string,
+    searchResults: string,
+  ) => Promise<string>;
+} =
+  getNumberOfThreadsSetting() < 4
+    ? {
+        url: "https://huggingface.co/Felladrin/gguf-q5_k_m-imat-qwen2-0.5b-instruct/resolve/main/qwen2-0-00001-of-00003.gguf",
+        buildPrompt: (wllama, query, searchResults) =>
+          formatChat(wllama, [
+            { id: 0, role: "system", content: searchResults },
+            { id: 1, role: "user", content: query },
+          ]),
+        cacheType: "f16",
+        contextSize: 1280,
+        shouldIncludeUrlsOnPrompt: false,
+        sampling: commonSamplingConfig,
+      }
+    : {
+        url: "https://huggingface.co/Felladrin/gguf-q5_k_l-imat-arcee-lite/resolve/main/arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
+        buildPrompt: (wllama, query, searchResults) =>
+          formatChat(wllama, [
+            { id: 0, role: "system", content: searchResults },
+            { id: 1, role: "user", content: query },
+          ]),
+        cacheType: "f16",
+        contextSize: 2048,
+        shouldIncludeUrlsOnPrompt: false,
+        sampling: commonSamplingConfig,
+      };
 
 export interface Message {
   id: number;
