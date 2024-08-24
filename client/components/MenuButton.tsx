@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { SettingsForm } from "./SettingsForm";
 import { ActionsForm } from "./ActionsForm";
-import { Button, Drawer, Heading, VStack } from "rsuite";
+import { Button, Divider, Drawer, Heading, VStack } from "rsuite";
 
 export function MenuButton() {
   const [isDrawerOpen, setDrawerOpen] = useState(false);
@@ -37,6 +37,7 @@ export function MenuButton() {
           <VStack spacing={16}>
             <Heading level={5}>Settings</Heading>
             <SettingsForm />
+            <Divider />
             <Heading level={5}>Actions</Heading>
             <ActionsForm />
           </VStack>

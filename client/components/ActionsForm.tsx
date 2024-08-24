@@ -1,4 +1,4 @@
-import { Whisper, Tooltip, Button, VStack, Message } from "rsuite";
+import { Text, Button, VStack, Message } from "rsuite";
 import { useToaster } from "rsuite";
 
 export function ActionsForm() {
@@ -42,20 +42,12 @@ export function ActionsForm() {
 
   return (
     <VStack>
-      <Whisper
-        placement="top"
-        controlId="clear-data-button"
-        trigger="hover"
-        speaker={
-          <Tooltip>
-            Reset settings and delete all files in cache to free up space.
-          </Tooltip>
-        }
-      >
-        <Button size="sm" onClick={handleClearDataButtonClick}>
-          Clear all data
-        </Button>
-      </Whisper>
+      <Button size="sm" onClick={handleClearDataButtonClick}>
+        Clear all data
+      </Button>
+      <Text size="sm" muted>
+        Reset settings and delete all files in cache to free up space.
+      </Text>
     </VStack>
   );
 }

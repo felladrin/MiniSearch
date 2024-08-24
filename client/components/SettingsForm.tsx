@@ -7,7 +7,7 @@ import {
 } from "../modules/pubSub";
 import { isWebGPUAvailable } from "../modules/webGpu";
 import { match, Pattern } from "ts-pattern";
-import { Whisper, Tooltip, VStack, Stack, InputNumber, Checkbox } from "rsuite";
+import { VStack, Stack, InputNumber, Checkbox, Text, Divider } from "rsuite";
 
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -30,84 +30,51 @@ export function SettingsForm() {
           checked={disableAiResponse}
           onChange={(_, checked) => setDisableAiResponse(checked)}
         >
-          <Whisper
-            placement="top"
-            trigger="hover"
-            controlId="disable-ai-setting-tooltip"
-            speaker={
-              <Tooltip>
-                Disables the AI response, in case you only want to see the links
-                from the web search results.
-              </Tooltip>
-            }
-          >
-            Disable AI response
-          </Whisper>
+          Disable AI response
         </Checkbox>
+        <Text size="sm" muted>
+          Disables the AI response, in case you only want to see the links from
+          the web search results.
+        </Text>
       </Stack.Item>
-
+      <Divider />
       {isWebGPUAvailable && (
         <Stack.Item>
           <Checkbox
             checked={disableWebGpuUsage}
             onChange={(_, checked) => setDisableWebGpuUsage(checked)}
           >
-            <Whisper
-              placement="top"
-              trigger="hover"
-              controlId="disable-webgpu-setting-tooltip"
-              speaker={
-                <Tooltip>
-                  Disables the WebGPU usage, in case you only want to see the
-                  links from the web search results.
-                </Tooltip>
-              }
-            >
-              Disable WebGPU usage
-            </Whisper>
+            Disable WebGPU usage
           </Checkbox>
+          <Text size="sm" muted>
+            Disables the WebGPU usage, in case you only want to see the links
+            from the web search results.
+          </Text>
         </Stack.Item>
       )}
-
+      <Divider />
       {match([isWebGPUAvailable, disableWebGpuUsage])
         .with([false, Pattern.any], [Pattern.any, true], () => (
           <Stack.Item>
-            <Whisper
-              placement="top"
-              trigger="hover"
-              controlId="number-of-threads-setting-tooltip"
-              speaker={
-                <Tooltip>
-                  Number of threads to use for the AI model. Lower values will
-                  use less CPU, but may take longer to respond. A too-high value
-                  may cause the app to hang. Note that this value is ignored
-                  when using WebGPU.
-                </Tooltip>
-              }
-            >
+            <VStack>
               <InputNumber
                 prefix="CPU threads to use"
                 value={numberOfThreads}
                 onChange={(value) => setNumberOfThreads(Number(value))}
               />
-            </Whisper>
+              <Text size="sm" muted>
+                Number of threads to use for the AI model. Lower values will use
+                less CPU, but may take longer to respond. A too-high value may
+                cause the app to hang. Note that this value is ignored when
+                using WebGPU.
+              </Text>
+            </VStack>
           </Stack.Item>
         ))
         .otherwise(() => null)}
-
+      <Divider />
       <Stack.Item>
-        <Whisper
-          placement="top"
-          trigger="hover"
-          controlId="search-results-to-reference-setting-tooltip"
-          speaker={
-            <Tooltip>
-              Determines the number of search results to consider when
-              generating AI responses. A higher value may enhance accuracy, but
-              it will also increase response time.
-            </Tooltip>
-          }
-        >
+        <VStack>
           <InputNumber
             prefix="Search results to consider"
             value={searchResultsToConsider}
@@ -117,7 +84,12 @@ export function SettingsForm() {
               )
             }
           />
-        </Whisper>
+          <Text size="sm" muted>
+            Determines the number of search results to consider when generating
+            AI responses. A higher value may enhance accuracy, but it will also
+            increase response time.
+          </Text>
+        </VStack>
       </Stack.Item>
     </VStack>
   );
