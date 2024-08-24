@@ -42,7 +42,6 @@ export function SearchResultsList({
             <Stack
               justifyContent="space-between"
               alignItems="flex-start"
-              spacing={shouldDisplayDomainBelowTitle ? 0 : "1rem"}
               direction={shouldDisplayDomainBelowTitle ? "column" : "row"}
             >
               <Button
