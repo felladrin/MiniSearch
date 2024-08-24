@@ -21,7 +21,7 @@ export async function fetchSearXNG(query: string, limit?: number) {
       results = results.slice(0, limit);
     }
 
-    const uniqueUrls = new Set<string>();
+    const uniqueHostnames = new Set<string>();
 
     const processContent = (html: string): string => {
       let text = convertHtmlToPlainText(html, { wordwrap: false }).trim();
@@ -30,7 +30,9 @@ export async function fetchSearXNG(query: string, limit?: number) {
     };
 
     for (const result of results) {
-      if (uniqueUrls.has(result.url) || !result.content) continue;
+      const { hostname } = new URL(result.url);
+
+      if (uniqueHostnames.has(hostname) || !result.content) continue;
 
       const title = convertHtmlToPlainText(result.title, {
         wordwrap: false,
@@ -38,13 +40,11 @@ export async function fetchSearXNG(query: string, limit?: number) {
 
       const content = processContent(result.content);
 
-      if (title === "" || content === "") continue;
+      if (!title || !content) continue;
 
-      const url = result.url;
+      searchResults.push([title, content, result.url]);
 
-      searchResults.push([title, content, url]);
-
-      uniqueUrls.add(url);
+      uniqueHostnames.add(hostname);
     }
 
     return searchResults;
