@@ -83,11 +83,6 @@ export const urlsDescriptionsPubSub = createPubSub<Record<string, string>>({});
 
 export const [updateUrlsDescriptions] = urlsDescriptionsPubSub;
 
-export const interruptTextGenerationPubSub = createPubSub();
-
-export const [interruptTextGeneration, onTextGenerationInterrupted] =
-  interruptTextGenerationPubSub;
-
 export const [updateSearchPromise, , getSearchPromise] = createPubSub<
   Promise<SearchResults>
 >(Promise.resolve([]));

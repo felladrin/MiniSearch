@@ -22,6 +22,7 @@ import {
   Placeholder,
   Message,
   Progress,
+  Button,
 } from "rsuite";
 
 export function Main() {
@@ -29,7 +30,9 @@ export function Main() {
   const [response] = usePubSub(responsePubSub);
   const [searchResults] = usePubSub(searchResultsPubSub);
   const [urlsDescriptions] = usePubSub(urlsDescriptionsPubSub);
-  const [textGenerationState] = usePubSub(textGenerationStatePubSub);
+  const [textGenerationState, setTextGenerationState] = usePubSub(
+    textGenerationStatePubSub,
+  );
   const [searchState] = usePubSub(searchStatePubSub);
   const [modelLoadingProgress] = usePubSub(modelLoadingProgressPubSub);
 
@@ -62,36 +65,65 @@ export function Main() {
                       Pattern.union("generating", "interrupted", "completed"),
                       () => (
                         <>
-                          <Divider>AI Response</Divider>
-                          <Markdown
-                            options={{
-                              overrides: {
-                                span: {
-                                  component: Text,
-                                  props: {
-                                    size: "md",
-                                    as: "span",
+                          <Divider>
+                            {match(textGenerationState)
+                              .with(
+                                "generating",
+                                () => "Generating AI Response...",
+                              )
+                              .with(
+                                "interrupted",
+                                () => "AI Response (Interrupted)",
+                              )
+                              .otherwise(() => "AI Response")}
+                          </Divider>
+                          <VStack spacing={16}>
+                            {match(textGenerationState)
+                              .with("generating", () => (
+                                <Stack.Item alignSelf="center">
+                                  <Button
+                                    appearance="primary"
+                                    color="red"
+                                    size="sm"
+                                    onClick={() =>
+                                      setTextGenerationState("interrupted")
+                                    }
+                                  >
+                                    INTERRUPT
+                                  </Button>
+                                </Stack.Item>
+                              ))
+                              .otherwise(() => null)}
+                            <Markdown
+                              options={{
+                                overrides: {
+                                  span: {
+                                    component: Text,
+                                    props: {
+                                      size: "md",
+                                      as: "span",
+                                    },
+                                  },
+                                  p: {
+                                    component: Text,
+                                    props: {
+                                      size: "md",
+                                      as: "p",
+                                    },
+                                  },
+                                  li: {
+                                    component: Text,
+                                    props: {
+                                      size: "md",
+                                      as: "li",
+                                    },
                                   },
                                 },
-                                p: {
-                                  component: Text,
-                                  props: {
-                                    size: "md",
-                                    as: "p",
-                                  },
-                                },
-                                li: {
-                                  component: Text,
-                                  props: {
-                                    size: "md",
-                                    as: "li",
-                                  },
-                                },
-                              },
-                            }}
-                          >
-                            {response}
-                          </Markdown>
+                              }}
+                            >
+                              {response}
+                            </Markdown>
+                          </VStack>
                         </>
                       ),
                     )
@@ -132,7 +164,7 @@ export function Main() {
                               )
                               .with(
                                 "preparingToGenerate",
-                                () => "Preparing response...",
+                                () => "Preparing AI response...",
                               )
                               .otherwise(() => "Loading...")}
                           </Divider>

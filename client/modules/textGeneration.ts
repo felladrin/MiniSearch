@@ -8,8 +8,6 @@ import {
   getDisableWebGpuUsageSetting,
   getNumberOfThreadsSetting,
   getQuery,
-  interruptTextGeneration,
-  onTextGenerationInterrupted,
   getNumberOfSearchResultsToConsiderSetting,
   updateSearchPromise,
   getSearchPromise,
@@ -26,8 +24,6 @@ export async function prepareTextGeneration() {
   if (getQuery() === "") return;
 
   document.title = getQuery();
-
-  interruptTextGeneration();
 
   updateResponse("");
 
@@ -52,7 +48,9 @@ export async function prepareTextGeneration() {
       await generateTextWithWllama();
     }
 
-    updateTextGenerationState("completed");
+    if (getTextGenerationState() !== "interrupted") {
+      updateTextGenerationState("completed");
+    }
   } catch {
     updateTextGenerationState("failed");
   }
@@ -140,28 +138,18 @@ async function generateTextWithWebLlm() {
 
     let streamedMessage = "";
 
-    const unsubscribeFromTextGenerationInterruption =
-      onTextGenerationInterrupted(async () => {
-        await engine.interruptGenerate();
-        updateTextGenerationState("interrupted");
-      });
-
     for await (const chunk of completion) {
       const deltaContent = chunk.choices[0].delta.content;
 
       if (deltaContent) streamedMessage += deltaContent;
 
-      if (getTextGenerationState() !== "generating") {
+      if (getTextGenerationState() === "interrupted") {
+        await engine.interruptGenerate();
+      } else if (getTextGenerationState() !== "generating") {
         updateTextGenerationState("generating");
       }
 
       updateResponse(streamedMessage);
-    }
-
-    unsubscribeFromTextGenerationInterruption();
-
-    if (getTextGenerationState() === "interrupted") {
-      updateResponse("");
     }
   }
 
@@ -209,32 +197,18 @@ async function generateTextWithWllama() {
       getFormattedSearchResults(model.shouldIncludeUrlsOnPrompt),
     );
 
-    let abortTextGeneration: (() => void) | undefined;
-
-    const unsubscribeFromTextGenerationInterruption =
-      onTextGenerationInterrupted(() => {
-        abortTextGeneration?.();
-        updateTextGenerationState("interrupted");
-      });
-
     await wllama.createCompletion(prompt, {
       sampling: model.sampling,
       onNewToken: (_token, _piece, currentText, { abortSignal }) => {
-        abortTextGeneration = abortSignal;
-
-        if (getTextGenerationState() !== "generating") {
+        if (getTextGenerationState() === "interrupted") {
+          abortSignal();
+        } else if (getTextGenerationState() !== "generating") {
           updateTextGenerationState("generating");
         }
 
         updateResponse(currentText);
       },
     });
-
-    unsubscribeFromTextGenerationInterruption();
-
-    if (getTextGenerationState() === "interrupted") {
-      updateResponse("");
-    }
   }
 
   await wllama.exit();
