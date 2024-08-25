@@ -82,14 +82,12 @@ export function Main() {
                               .with("generating", () => (
                                 <Stack.Item alignSelf="center">
                                   <Button
-                                    appearance="primary"
-                                    color="red"
                                     size="sm"
                                     onClick={() =>
                                       setTextGenerationState("interrupted")
                                     }
                                   >
-                                    INTERRUPT
+                                    Stop generating
                                   </Button>
                                 </Stack.Item>
                               ))
