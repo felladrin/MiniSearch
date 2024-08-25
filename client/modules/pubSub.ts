@@ -1,6 +1,5 @@
 import { createPubSub } from "create-pubsub";
 import { SearchResults } from "./search";
-import { isRunningOnMobile } from "./mobileDetection";
 
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   const localStorageValue = localStorage.getItem(localStorageKey);
@@ -34,7 +33,7 @@ export const [, , getDisableWebGpuUsageSetting] =
 
 export const numberOfThreadsSettingPubSub = createLocalStoragePubSub(
   "numberOfThreads",
-  !isRunningOnMobile && (navigator.hardwareConcurrency ?? 1) > 1
+  (navigator.hardwareConcurrency ?? 1) > 1
     ? Math.max(navigator.hardwareConcurrency - 2, 2)
     : 1,
 );
@@ -43,7 +42,7 @@ export const [, , getNumberOfThreadsSetting] = numberOfThreadsSettingPubSub;
 
 export const searchResultsToConsiderSettingPubSub = createLocalStoragePubSub(
   "searchResultsToConsider",
-  isRunningOnMobile ? 3 : 6,
+  3,
 );
 
 export const [, , getNumberOfSearchResultsToConsiderSetting] =
