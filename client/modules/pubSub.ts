@@ -110,3 +110,10 @@ export const [updateSearchState] = searchStatePubSub;
 export const modelLoadingProgressPubSub = createPubSub(0);
 
 export const [updateModelLoadingProgress] = modelLoadingProgressPubSub;
+
+export const webLlmModelSettingPubSub = createLocalStoragePubSub(
+  "webLlmModel",
+  "mlc-q4f16_1-Qwen2-0.5B-Instruct",
+);
+
+export const [, , getWebLlmModelSetting] = webLlmModelSettingPubSub;

@@ -4,10 +4,19 @@ import {
   disableWebGpuUsageSettingPubSub,
   numberOfThreadsSettingPubSub,
   searchResultsToConsiderSettingPubSub,
+  webLlmModelSettingPubSub,
 } from "../modules/pubSub";
 import { isWebGPUAvailable } from "../modules/webGpu";
 import { match, Pattern } from "ts-pattern";
-import { VStack, Stack, InputNumber, Checkbox, Text, Divider } from "rsuite";
+import {
+  VStack,
+  Stack,
+  InputNumber,
+  Checkbox,
+  Text,
+  Divider,
+  SelectPicker,
+} from "rsuite";
 
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -22,6 +31,7 @@ export function SettingsForm() {
   const [searchResultsToConsider, setSearchResultsToConsider] = usePubSub(
     searchResultsToConsiderSettingPubSub,
   );
+  const [webLlmModel, setWebLlmModel] = usePubSub(webLlmModelSettingPubSub);
 
   return (
     <VStack>
@@ -54,6 +64,31 @@ export function SettingsForm() {
         </Stack.Item>
       )}
       {match([isWebGPUAvailable, disableWebGpuUsage])
+        .with([true, false], () => (
+          <Stack.Item>
+            <VStack>
+              <SelectPicker
+                label="WebGPU Model"
+                value={webLlmModel}
+                onChange={(value) => value && setWebLlmModel(value)}
+                data={[
+                  {
+                    label: "Qwen2 0.5B Instruct",
+                    value: "mlc-q4f16_1-Qwen2-0.5B-Instruct",
+                  },
+                  {
+                    label: "Phi 3.5 Mini Instruct",
+                    value: "mlc-q4f16-Phi-3.5-mini-instruct",
+                  },
+                ]}
+              />
+              <Text size="sm" muted>
+                Select the model to use for AI responses when WebGPU is enabled.
+              </Text>
+            </VStack>
+            <Divider />
+          </Stack.Item>
+        ))
         .with([false, Pattern.any], [Pattern.any, true], () => (
           <Stack.Item>
             <VStack>

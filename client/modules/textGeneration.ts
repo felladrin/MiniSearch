@@ -15,9 +15,9 @@ import {
   updateSearchState,
   updateModelLoadingProgress,
   getTextGenerationState,
+  getWebLlmModelSetting,
 } from "./pubSub";
 import { search } from "./search";
-import { isRunningOnMobile } from "./mobileDetection";
 import { addLogEntry } from "./logEntries";
 
 export async function prepareTextGeneration() {
@@ -89,8 +89,9 @@ async function generateTextWithWebLlm() {
     ],
   };
 
-  const selectedModelId =
-    appConfig.model_list[isRunningOnMobile ? 0 : 1].model_id;
+  const selectedModelId = getWebLlmModelSetting();
+
+  addLogEntry(`Selected WebLLM model: ${selectedModelId}`);
 
   const isModelCached = await hasModelInCache(selectedModelId, appConfig);
 
