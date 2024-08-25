@@ -71,13 +71,15 @@ export function SettingsForm() {
                 label="WebGPU Model"
                 value={webLlmModel}
                 onChange={(value) => value && setWebLlmModel(value)}
+                searchable={false}
+                style={{ width: 265 }}
                 data={[
                   {
-                    label: "Qwen2 0.5B Instruct",
+                    label: "Small (Qwen2 0.5B Instruct)",
                     value: "mlc-q4f16_1-Qwen2-0.5B-Instruct",
                   },
                   {
-                    label: "Phi 3.5 Mini Instruct",
+                    label: "Medium (Phi 3.5 Mini Instruct)",
                     value: "mlc-q4f16-Phi-3.5-mini-instruct",
                   },
                 ]}
