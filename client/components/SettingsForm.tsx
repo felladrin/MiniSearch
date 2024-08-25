@@ -36,8 +36,8 @@ export function SettingsForm() {
           Disables the AI response, in case you only want to see the links from
           the web search results.
         </Text>
+        <Divider />
       </Stack.Item>
-      <Divider />
       {isWebGPUAvailable && (
         <Stack.Item>
           <Checkbox
@@ -50,9 +50,9 @@ export function SettingsForm() {
             Disables the WebGPU usage, in case you only want to see the links
             from the web search results.
           </Text>
+          <Divider />
         </Stack.Item>
       )}
-      <Divider />
       {match([isWebGPUAvailable, disableWebGpuUsage])
         .with([false, Pattern.any], [Pattern.any, true], () => (
           <Stack.Item>
@@ -69,10 +69,10 @@ export function SettingsForm() {
                 using WebGPU.
               </Text>
             </VStack>
+            <Divider />
           </Stack.Item>
         ))
         .otherwise(() => null)}
-      <Divider />
       <Stack.Item>
         <VStack>
           <InputNumber
