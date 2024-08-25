@@ -68,7 +68,7 @@ export const model: {
 } =
   getNumberOfThreadsSetting() < 4
     ? {
-        url: "https://huggingface.co/Felladrin/gguf-q5_k_m-imat-qwen2-0.5b-instruct/resolve/main/qwen2-0-00001-of-00003.gguf",
+        url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.IQ3_XXS.shard-00001-of-00003.gguf",
         buildPrompt: (wllama, query, searchResults) =>
           formatChat(wllama, [
             { id: 0, role: "system", content: searchResults },
