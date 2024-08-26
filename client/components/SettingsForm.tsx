@@ -97,7 +97,9 @@ export function SettingsForm() {
               <InputNumber
                 prefix="CPU threads to use"
                 value={numberOfThreads}
-                onChange={(value) => setNumberOfThreads(Number(value))}
+                onChange={(value) =>
+                  setNumberOfThreads(Math.max(Number(value), 1))
+                }
               />
               <Text size="sm" muted>
                 Number of threads to use for the AI model. Lower values will use
