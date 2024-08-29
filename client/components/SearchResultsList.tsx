@@ -1,6 +1,13 @@
-import { useEffect, useState } from "react";
 import { SearchResults } from "../modules/search";
-import { Whisper, Tooltip, Panel, Stack, Button, Text } from "rsuite";
+import {
+  Whisper,
+  Tooltip,
+  Panel,
+  Stack,
+  Button,
+  Text,
+  useMediaQuery,
+} from "rsuite";
 import FadeIn from "react-fade-in";
 
 export function SearchResultsList({
@@ -10,21 +17,7 @@ export function SearchResultsList({
   searchResults: SearchResults;
   urlsDescriptions: Record<string, string>;
 }) {
-  const [windowWidth, setWindowWidth] = useState(self.innerWidth);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(self.innerWidth);
-    };
-
-    self.addEventListener("resize", handleResize);
-
-    return () => {
-      self.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
-  const shouldDisplayDomainBelowTitle = windowWidth < 720;
+  const [shouldDisplayDomainBelowTitle] = useMediaQuery("(max-width: 720px)");
 
   return (
     <FadeIn delay={200}>
