@@ -130,6 +130,10 @@ export function Main() {
                         modelLoadingProgress === 100 ||
                         modelLoadingProgress === 0;
 
+                      const percent = isLoadingComplete
+                        ? 100
+                        : modelLoadingProgress;
+
                       const strokeColor = isLoadingComplete
                         ? "#52c41a"
                         : "#3385ff";
@@ -140,7 +144,7 @@ export function Main() {
                         <>
                           <Divider>Loading AI...</Divider>
                           <Progress.Line
-                            percent={modelLoadingProgress}
+                            percent={percent}
                             strokeColor={strokeColor}
                             status={status}
                           />
