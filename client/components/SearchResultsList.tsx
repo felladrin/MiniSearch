@@ -1,14 +1,7 @@
 import { useEffect, useState } from "react";
 import { SearchResults } from "../modules/search";
-import {
-  Whisper,
-  Tooltip,
-  PanelGroup,
-  Panel,
-  Stack,
-  Button,
-  Text,
-} from "rsuite";
+import { Whisper, Tooltip, Panel, Stack, Button, Text } from "rsuite";
+import FadeIn from "react-fade-in";
 
 export function SearchResultsList({
   searchResults,
@@ -34,7 +27,7 @@ export function SearchResultsList({
   const shouldDisplayDomainBelowTitle = windowWidth < 720;
 
   return (
-    <PanelGroup>
+    <FadeIn delay={200}>
       {searchResults.map(([title, , url], index) => (
         <Panel
           key={`search-result-${index}`}
@@ -83,6 +76,6 @@ export function SearchResultsList({
           </Text>
         </Panel>
       ))}
-    </PanelGroup>
+    </FadeIn>
   );
 }
