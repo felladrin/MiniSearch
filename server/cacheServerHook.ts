@@ -7,7 +7,7 @@ export function cacheServerHook<T extends ViteDevServer | PreviewServer>(
   server.middlewares.use(async (request, response, next) => {
     response.setHeader(
       ...match<string, [name: string, value: string]>(request.url)
-        .with(Pattern.string.endsWith(".woff2"), () => [
+        .with(Pattern.string.startsWith("/assets/"), () => [
           "Cache-Control",
           "public, max-age=31536000, immutable",
         ])
@@ -19,7 +19,10 @@ export function cacheServerHook<T extends ViteDevServer | PreviewServer>(
           ),
           () => ["Cache-Control", "no-cache"],
         )
-        .otherwise(() => ["Cache-Control", "public, max-age=86400"]),
+        .otherwise(() => [
+          "Cache-Control",
+          "public, max-age=86400, must-revalidate",
+        ]),
     );
 
     next();
