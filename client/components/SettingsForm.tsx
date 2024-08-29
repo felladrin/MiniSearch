@@ -17,6 +17,7 @@ import {
   Divider,
   SelectPicker,
 } from "rsuite";
+import { webLlmModels } from "../modules/webLlm";
 
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -73,20 +74,10 @@ export function SettingsForm() {
                 onChange={(value) => value && setWebLlmModel(value)}
                 searchable={false}
                 style={{ width: 265 }}
-                data={[
-                  {
-                    label: "Small (Qwen2 0.5B Instruct)",
-                    value: "mlc-q4f16_1-Qwen2-0.5B-Instruct",
-                  },
-                  {
-                    label: "Medium (Arcee Lite)",
-                    value: "mlc-q0f16-arcee-lite",
-                  },
-                  {
-                    label: "Large (Phi 3.5 Mini Instruct)",
-                    value: "mlc-q4f16-Phi-3.5-mini-instruct",
-                  },
-                ]}
+                data={webLlmModels.map((model) => ({
+                  label: model.label,
+                  value: model.model_id,
+                }))}
               />
               <Text size="sm" muted>
                 Select the model to use for AI responses when WebGPU is enabled.
