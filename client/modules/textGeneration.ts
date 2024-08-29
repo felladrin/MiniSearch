@@ -74,6 +74,19 @@ async function generateTextWithWebLlm() {
           "https://huggingface.co/Felladrin/mlc-q4f16_1-Qwen2-0.5B-Instruct/resolve/main/model.wasm",
         overrides: {
           context_window_size: 2048,
+          temperature: 0,
+          frequency_penalty: 1.02,
+        },
+      },
+      {
+        model_id: "mlc-q0f16-arcee-lite",
+        model: "https://huggingface.co/Felladrin/mlc-q0f16-arcee-lite",
+        model_lib:
+          "https://huggingface.co/Felladrin/mlc-q0f16-arcee-lite/resolve/main/model.wasm",
+        overrides: {
+          context_window_size: 2048,
+          temperature: 0,
+          frequency_penalty: 1.02,
         },
       },
       {
@@ -84,6 +97,8 @@ async function generateTextWithWebLlm() {
           "https://huggingface.co/Felladrin/mlc-q4f16-Phi-3.5-mini-instruct/resolve/main/model.wasm",
         overrides: {
           context_window_size: 2048,
+          temperature: 0.7,
+          top_p: 0.7,
         },
       },
     ],
@@ -133,8 +148,6 @@ async function generateTextWithWebLlm() {
     const completion = await engine.chat.completions.create({
       stream: true,
       messages: [{ role: "user", content: getMainPrompt() }],
-      temperature: 0.7,
-      top_p: 0.7,
     });
 
     let streamedMessage = "";

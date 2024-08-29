@@ -79,7 +79,11 @@ export function SettingsForm() {
                     value: "mlc-q4f16_1-Qwen2-0.5B-Instruct",
                   },
                   {
-                    label: "Medium (Phi 3.5 Mini Instruct)",
+                    label: "Medium (Arcee Lite)",
+                    value: "mlc-q0f16-arcee-lite",
+                  },
+                  {
+                    label: "Large (Phi 3.5 Mini Instruct)",
                     value: "mlc-q4f16-Phi-3.5-mini-instruct",
                   },
                 ]}
