@@ -10,14 +10,15 @@ import {
   urlsDescriptionsPubSub,
 } from "../modules/pubSub";
 import { SearchForm } from "./SearchForm";
-import Markdown from "markdown-to-jsx";
+import Markdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import syntaxHighlighterStyle from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
 import { SearchResultsList } from "./SearchResultsList";
 import { match, Pattern } from "ts-pattern";
 import {
   CustomProvider,
   Stack,
   VStack,
-  Text,
   Divider,
   Placeholder,
   Message,
@@ -93,29 +94,32 @@ export function Main() {
                               ))
                               .otherwise(() => null)}
                             <Markdown
-                              options={{
-                                overrides: {
-                                  span: {
-                                    component: Text,
-                                    props: {
-                                      size: "md",
-                                      as: "span",
-                                    },
-                                  },
-                                  p: {
-                                    component: Text,
-                                    props: {
-                                      size: "md",
-                                      as: "p",
-                                    },
-                                  },
-                                  li: {
-                                    component: Text,
-                                    props: {
-                                      size: "md",
-                                      as: "li",
-                                    },
-                                  },
+                              components={{
+                                code(props) {
+                                  const { children, className, ref, ...rest } =
+                                    props;
+
+                                  const languageMatch = /language-(\w+)/.exec(
+                                    className || "",
+                                  );
+
+                                  return languageMatch ? (
+                                    <SyntaxHighlighter
+                                      {...rest}
+                                      ref={ref as never}
+                                      children={
+                                        children
+                                          ?.toString()
+                                          .replace(/\n$/, "") ?? ""
+                                      }
+                                      language={languageMatch[1]}
+                                      style={syntaxHighlighterStyle}
+                                    />
+                                  ) : (
+                                    <code {...rest} className={className}>
+                                      {children}
+                                    </code>
+                                  );
                                 },
                               }}
                             >
