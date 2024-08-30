@@ -93,39 +93,47 @@ export function Main() {
                                 </Stack.Item>
                               ))
                               .otherwise(() => null)}
-                            <Markdown
-                              components={{
-                                code(props) {
-                                  const { children, className, ref, ...rest } =
-                                    props;
+                            <Stack.Item style={{ width: "100%" }}>
+                              <Markdown
+                                components={{
+                                  code(props) {
+                                    const {
+                                      children,
+                                      className,
+                                      node,
+                                      ref,
+                                      ...rest
+                                    } = props;
 
-                                  const languageMatch = /language-(\w+)/.exec(
-                                    className || "",
-                                  );
+                                    void node;
 
-                                  return languageMatch ? (
-                                    <SyntaxHighlighter
-                                      {...rest}
-                                      ref={ref as never}
-                                      PreTag="div"
-                                      children={
-                                        children
-                                          ?.toString()
-                                          .replace(/\n$/, "") ?? ""
-                                      }
-                                      language={languageMatch[1]}
-                                      style={syntaxHighlighterStyle}
-                                    />
-                                  ) : (
-                                    <code {...rest} className={className}>
-                                      {children}
-                                    </code>
-                                  );
-                                },
-                              }}
-                            >
-                              {response}
-                            </Markdown>
+                                    const languageMatch = /language-(\w+)/.exec(
+                                      className || "",
+                                    );
+
+                                    return languageMatch ? (
+                                      <SyntaxHighlighter
+                                        {...rest}
+                                        ref={ref as never}
+                                        children={
+                                          children
+                                            ?.toString()
+                                            .replace(/\n$/, "") ?? ""
+                                        }
+                                        language={languageMatch[1]}
+                                        style={syntaxHighlighterStyle}
+                                      />
+                                    ) : (
+                                      <code {...rest} className={className}>
+                                        {children}
+                                      </code>
+                                    );
+                                  },
+                                }}
+                              >
+                                {response}
+                              </Markdown>
+                            </Stack.Item>
                           </VStack>
                         </>
                       ),
