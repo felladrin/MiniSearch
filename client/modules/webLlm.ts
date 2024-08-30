@@ -6,7 +6,7 @@ export const webLlmModels = [
     model_lib:
       "https://huggingface.co/Felladrin/mlc-q4f16_1-Qwen2-0.5B-Instruct/resolve/main/model.wasm",
     overrides: {
-      context_window_size: 2048,
+      context_window_size: 1280,
       temperature: 0,
       frequency_penalty: 1.02,
     },
@@ -18,7 +18,7 @@ export const webLlmModels = [
     model_lib:
       "https://huggingface.co/Felladrin/mlc-q4f16_1-arcee-lite/resolve/main/model.wasm",
     overrides: {
-      context_window_size: 2048,
+      context_window_size: 1280,
       temperature: 0,
       frequency_penalty: 1.02,
     },
