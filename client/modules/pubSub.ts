@@ -1,5 +1,6 @@
 import { createPubSub } from "create-pubsub";
 import { SearchResults } from "./search";
+import { isF16Supported } from "./webGpu";
 
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   const localStorageValue = localStorage.getItem(localStorageKey);
@@ -112,7 +113,9 @@ export const [updateModelLoadingProgress] = modelLoadingProgressPubSub;
 
 export const webLlmModelSettingPubSub = createLocalStoragePubSub(
   "webLlmModel",
-  "mlc-q4f16_1-Qwen2-0.5B-Instruct",
+  isF16Supported
+    ? "Qwen2-0.5B-Instruct-q4f16_1-MLC"
+    : "TinyLlama-1.1B-Chat-v1.0-q4f32_1-MLC",
 );
 
 export const [, , getWebLlmModelSetting] = webLlmModelSettingPubSub;

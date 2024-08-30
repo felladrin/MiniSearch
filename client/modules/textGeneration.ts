@@ -19,7 +19,6 @@ import {
 } from "./pubSub";
 import { search } from "./search";
 import { addLogEntry } from "./logEntries";
-import { webLlmModels } from "./webLlm";
 
 export async function prepareTextGeneration() {
   if (getQuery() === "") return;
@@ -65,15 +64,11 @@ async function generateTextWithWebLlm() {
   const { CreateWebWorkerMLCEngine, CreateMLCEngine, hasModelInCache } =
     await import("@mlc-ai/web-llm");
 
-  const appConfig = {
-    model_list: webLlmModels,
-  };
-
   const selectedModelId = getWebLlmModelSetting();
 
   addLogEntry(`Selected WebLLM model: ${selectedModelId}`);
 
-  const isModelCached = await hasModelInCache(selectedModelId, appConfig);
+  const isModelCached = await hasModelInCache(selectedModelId);
 
   let initProgressCallback:
     | import("@mlc-ai/web-llm").InitProgressCallback
@@ -94,13 +89,11 @@ async function generateTextWithWebLlm() {
         }),
         selectedModelId,
         {
-          appConfig,
           initProgressCallback,
           logLevel: "SILENT",
         },
       )
     : await CreateMLCEngine(selectedModelId, {
-        appConfig,
         initProgressCallback,
         logLevel: "SILENT",
       });
@@ -113,6 +106,8 @@ async function generateTextWithWebLlm() {
     const completion = await engine.chat.completions.create({
       stream: true,
       messages: [{ role: "user", content: getMainPrompt() }],
+      temperature: 0,
+      frequency_penalty: 1.02,
     });
 
     let streamedMessage = "";

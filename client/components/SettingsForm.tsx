@@ -6,7 +6,7 @@ import {
   searchResultsToConsiderSettingPubSub,
   webLlmModelSettingPubSub,
 } from "../modules/pubSub";
-import { isWebGPUAvailable } from "../modules/webGpu";
+import { isF16Supported, isWebGPUAvailable } from "../modules/webGpu";
 import { match, Pattern } from "ts-pattern";
 import {
   VStack,
@@ -17,7 +17,8 @@ import {
   Divider,
   SelectPicker,
 } from "rsuite";
-import { webLlmModels } from "../modules/webLlm";
+import { prebuiltAppConfig } from "@mlc-ai/web-llm";
+import { useRef } from "react";
 
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -33,6 +34,19 @@ export function SettingsForm() {
     searchResultsToConsiderSettingPubSub,
   );
   const [webLlmModel, setWebLlmModel] = usePubSub(webLlmModelSettingPubSub);
+  const webGpuModels = useRef(
+    prebuiltAppConfig.model_list
+      .filter((model) =>
+        model.model_id.endsWith(isF16Supported ? "q4f16_1-MLC" : "q4f32_1-MLC"),
+      )
+      .sort((a, b) => (a.vram_required_MB ?? 0) - (b.vram_required_MB ?? 0))
+      .map((model) => ({
+        label: `${model.model_id} (${
+          Math.round(model.vram_required_MB ?? 0) || "N/A"
+        } MB)`,
+        value: model.model_id,
+      })),
+  );
 
   return (
     <VStack>
@@ -72,13 +86,11 @@ export function SettingsForm() {
                 label="WebGPU Model"
                 value={webLlmModel}
                 onChange={(value) => value && setWebLlmModel(value)}
-                searchable={false}
+                placement="auto"
                 cleanable={false}
+                preventOverflow={true}
                 style={{ width: 265 }}
-                data={webLlmModels.map((model) => ({
-                  label: model.label,
-                  value: model.model_id,
-                }))}
+                data={webGpuModels.current}
               />
               <Text size="sm" muted>
                 Select the model to use for AI responses when WebGPU is enabled.
