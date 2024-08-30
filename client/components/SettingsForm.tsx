@@ -73,6 +73,7 @@ export function SettingsForm() {
                 value={webLlmModel}
                 onChange={(value) => value && setWebLlmModel(value)}
                 searchable={false}
+                cleanable={false}
                 style={{ width: 265 }}
                 data={webLlmModels.map((model) => ({
                   label: model.label,
