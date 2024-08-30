@@ -107,6 +107,7 @@ export function Main() {
                                     <SyntaxHighlighter
                                       {...rest}
                                       ref={ref as never}
+                                      PreTag="div"
                                       children={
                                         children
                                           ?.toString()
