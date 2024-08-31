@@ -34,16 +34,15 @@ export function SettingsForm() {
     searchResultsToConsiderSettingPubSub,
   );
   const [webLlmModel, setWebLlmModel] = usePubSub(webLlmModelSettingPubSub);
+  const suffix = isF16Supported ? "-q4f16_1-MLC" : "-q4f32_1-MLC";
   const webGpuModels = useRef(
     prebuiltAppConfig.model_list
-      .filter((model) =>
-        model.model_id.endsWith(isF16Supported ? "q4f16_1-MLC" : "q4f32_1-MLC"),
-      )
+      .filter((model) => model.model_id.endsWith(suffix))
       .sort((a, b) => (a.vram_required_MB ?? 0) - (b.vram_required_MB ?? 0))
       .map((model) => ({
-        label: `${model.model_id} (${
+        label: `${model.model_id.replace(suffix, "")} • ${
           Math.round(model.vram_required_MB ?? 0) || "N/A"
-        } MB)`,
+        } MB`,
         value: model.model_id,
       })),
   );
