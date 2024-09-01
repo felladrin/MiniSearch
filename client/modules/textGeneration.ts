@@ -105,7 +105,20 @@ async function generateTextWithWebLlm() {
 
     const completion = await engine.chat.completions.create({
       stream: true,
-      messages: [{ role: "user", content: getMainPrompt() }],
+      messages: [
+        {
+          role: "system",
+          content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question. Provide a concise and informative response to the user's inquiry in a short paragraph format.
+
+Web search results:
+${"```"}
+${getFormattedSearchResults(true)}
+${"```"}
+
+Please answer the user's inquiry based on the information provided or your general knowledge if the search results are not relevant. Include additional context or related information that might be useful or interesting to the user, even if not directly asked for in the inquiry. Always respond in the same language used by the user in their inquiry.`,
+        },
+        { role: "user", content: getQuery() },
+      ],
       temperature: 0,
       frequency_penalty: 1.02,
     });
@@ -186,14 +199,6 @@ async function generateTextWithWllama() {
   }
 
   await wllama.exit();
-}
-
-function getMainPrompt() {
-  return `${getFormattedSearchResults(true)}
-
----
-
-${getQuery()}`;
 }
 
 function getFormattedSearchResults(shouldIncludeUrl: boolean) {

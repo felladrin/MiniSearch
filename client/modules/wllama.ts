@@ -71,7 +71,18 @@ export const model: {
         url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.IQ3_XXS.shard-00001-of-00003.gguf",
         buildPrompt: (wllama, query, searchResults) =>
           formatChat(wllama, [
-            { id: 0, role: "system", content: searchResults },
+            {
+              id: 0,
+              role: "system",
+              content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question. Provide a concise and informative response to the user's inquiry in a short paragraph format.
+
+Web search results:
+${"```"}
+${searchResults}
+${"```"}
+
+Please answer the user's inquiry based on the information provided or your general knowledge if the search results are not relevant. Include additional context or related information that might be useful or interesting to the user, even if not directly asked for in the inquiry. Always respond in the same language used by the user in their inquiry.`,
+            },
             { id: 1, role: "user", content: query },
           ]),
         cacheType: "f16",
@@ -83,11 +94,22 @@ export const model: {
         url: "https://huggingface.co/Felladrin/gguf-q5_k_l-imat-arcee-lite/resolve/main/arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
         buildPrompt: (wllama, query, searchResults) =>
           formatChat(wllama, [
-            { id: 0, role: "system", content: searchResults },
+            {
+              id: 0,
+              role: "system",
+              content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question. Provide a concise and informative response to the user's inquiry in a short paragraph format.
+
+Web search results:
+${"```"}
+${searchResults}
+${"```"}
+
+Please answer the user's inquiry based on the information provided or your general knowledge if the search results are not relevant. Include additional context or related information that might be useful or interesting to the user, even if not directly asked for in the inquiry. Always respond in the same language used by the user in their inquiry.`,
+            },
             { id: 1, role: "user", content: query },
           ]),
         cacheType: "f16",
-        contextSize: 2048,
+        contextSize: 1280,
         shouldIncludeUrlsOnPrompt: false,
         sampling: commonSamplingConfig,
       };
