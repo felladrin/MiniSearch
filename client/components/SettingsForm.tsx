@@ -43,6 +43,24 @@ export function SettingsForm() {
           disabled, you'll only see web search results.
         </Form.HelpText>
       </Form.Group>
+      <Form.Group>
+        <Form.ControlLabel>Search results to consider</Form.ControlLabel>
+        <Form.Control
+          name={Setting.searchResultsToConsider}
+          accepter={Slider}
+          min={0}
+          max={6}
+          graduated
+          progress
+          renderMark={(mark) => mark}
+          style={{ marginLeft: "8px", marginRight: "16px" }}
+        />
+        <Form.HelpText>
+          Determines the number of search results to consider when generating AI
+          responses. A higher value may enhance accuracy, but it will also
+          increase response time.
+        </Form.HelpText>
+      </Form.Group>
       {isWebGPUAvailable && (
         <Form.Group>
           <Form.ControlLabel>WebGPU</Form.ControlLabel>
@@ -92,25 +110,7 @@ export function SettingsForm() {
         ))
         .otherwise(() => null)}
       <Form.Group>
-        <Form.ControlLabel>Search results to consider</Form.ControlLabel>
-        <Form.Control
-          name={Setting.searchResultsToConsider}
-          accepter={Slider}
-          min={0}
-          max={6}
-          graduated
-          progress
-          renderMark={(mark) => mark}
-          style={{ marginLeft: "8px", marginRight: "16px" }}
-        />
-        <Form.HelpText>
-          Determines the number of search results to consider when generating AI
-          responses. A higher value may enhance accuracy, but it will also
-          increase response time.
-        </Form.HelpText>
-      </Form.Group>
-      <Form.Group>
-        <Form.ControlLabel>Background</Form.ControlLabel>
+        <Form.ControlLabel>Background Image</Form.ControlLabel>
         <Form.Control
           name={Setting.backgroundImageUrl}
           accepter={SelectPicker}
