@@ -13,7 +13,7 @@ import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.w
 import multiThreadWllamaJsUrl from "@wllama/wllama/esm/multi-thread/wllama.js?url";
 import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
 import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
-import { getNumberOfThreadsSetting } from "./pubSub";
+import { getSettings } from "./pubSub";
 import { Template } from "@huggingface/jinja";
 
 export async function initializeWllama(
@@ -66,7 +66,7 @@ export const model: {
     searchResults: string,
   ) => Promise<string>;
 } =
-  getNumberOfThreadsSetting() < 4
+  getSettings().cpuThreads < 4
     ? {
         url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.IQ3_XXS.shard-00001-of-00003.gguf",
         buildPrompt: (wllama, query, searchResults) =>

@@ -1,21 +1,17 @@
 import { isWebGPUAvailable } from "./webGpu";
 import {
   updateSearchResults,
-  getDisableAiResponseSetting,
   updateResponse,
   getSearchResults,
   updateUrlsDescriptions,
-  getDisableWebGpuUsageSetting,
-  getNumberOfThreadsSetting,
   getQuery,
-  getNumberOfSearchResultsToConsiderSetting,
   updateSearchPromise,
   getSearchPromise,
   updateTextGenerationState,
   updateSearchState,
   updateModelLoadingProgress,
   getTextGenerationState,
-  getWebLlmModelSetting,
+  getSettings,
 } from "./pubSub";
 import { search } from "./search";
 import { addLogEntry } from "./logEntries";
@@ -31,7 +27,7 @@ export async function prepareTextGeneration() {
 
   updateSearchPromise(startSearch(getQuery()));
 
-  if (getDisableAiResponseSetting()) return;
+  if (!getSettings().enableAiResponse) return;
 
   const responseGenerationStartTime = new Date().getTime();
 
@@ -41,7 +37,7 @@ export async function prepareTextGeneration() {
     try {
       if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
 
-      if (getDisableWebGpuUsageSetting()) throw Error("WebGPU is disabled.");
+      if (!getSettings().enableWebGpu) throw Error("WebGPU is disabled.");
 
       await generateTextWithWebLlm();
     } catch {
@@ -64,7 +60,7 @@ async function generateTextWithWebLlm() {
   const { CreateWebWorkerMLCEngine, CreateMLCEngine, hasModelInCache } =
     await import("@mlc-ai/web-llm");
 
-  const selectedModelId = getWebLlmModelSetting();
+  const selectedModelId = getSettings().webLlmModelId;
 
   addLogEntry(`Selected WebLLM model: ${selectedModelId}`);
 
@@ -98,7 +94,7 @@ async function generateTextWithWebLlm() {
         logLevel: "SILENT",
       });
 
-  if (!getDisableAiResponseSetting()) {
+  if (getSettings().enableAiResponse) {
     await canStartResponding();
 
     updateTextGenerationState("preparingToGenerate");
@@ -157,7 +153,7 @@ async function generateTextWithWllama() {
       suppressNativeLog: true,
     },
     model: {
-      n_threads: getNumberOfThreadsSetting(),
+      n_threads: getSettings().cpuThreads,
       n_ctx: model.contextSize,
       cache_type_k: model.cacheType,
       embeddings: false,
@@ -173,7 +169,7 @@ async function generateTextWithWllama() {
     },
   });
 
-  if (!getDisableAiResponseSetting()) {
+  if (getSettings().enableAiResponse) {
     await canStartResponding();
 
     updateTextGenerationState("preparingToGenerate");
@@ -204,7 +200,7 @@ async function generateTextWithWllama() {
 function getFormattedSearchResults(shouldIncludeUrl: boolean) {
   const searchResults = getSearchResults().slice(
     0,
-    getNumberOfSearchResultsToConsiderSetting(),
+    getSettings().searchResultsToConsider,
   );
 
   if (searchResults.length === 0) return "None.";
@@ -258,7 +254,7 @@ async function startSearch(query: string) {
 }
 
 async function canStartResponding() {
-  if (getNumberOfSearchResultsToConsiderSetting() > 0) {
+  if (getSettings().searchResultsToConsider > 0) {
     updateTextGenerationState("awaitingSearchResults");
     await getSearchPromise();
   }

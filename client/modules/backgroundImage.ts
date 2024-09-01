@@ -1,4 +1,4 @@
-import { onBackgroundImageChange, getBackgroundImageSetting } from "./pubSub";
+import { getSettings, onSettingsChange } from "./pubSub";
 import blackBrickImageUrl from "../images/background/dark/black-brick.jpg?url";
 import blackCarbonImageUrl from "../images/background/dark/black-carbon.jpg?url";
 import blackConcreteImageUrl from "../images/background/dark/black-concrete.jpg?url";
@@ -45,7 +45,13 @@ function updateBackgroundImage(imageUrl: string) {
 }
 
 export function initializeBackgroundImageListener() {
-  onBackgroundImageChange((imageName) => updateBackgroundImage(imageName));
+  const unsubscribe = onSettingsChange((settings, previousSettings) => {
+    if (settings.backgroundImageUrl !== previousSettings.backgroundImageUrl) {
+      updateBackgroundImage(settings.backgroundImageUrl);
+    }
+  });
 
-  updateBackgroundImage(getBackgroundImageSetting());
+  updateBackgroundImage(getSettings().backgroundImageUrl);
+
+  return unsubscribe;
 }

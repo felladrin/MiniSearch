@@ -1,6 +1,7 @@
 import { usePubSub } from "create-pubsub/react";
 import {
-  getDisableAiResponseSetting,
+  getSettings,
+  updateSettings,
   modelLoadingProgressPubSub,
   queryPubSub,
   responsePubSub,
@@ -25,6 +26,9 @@ import {
   Progress,
   Button,
 } from "rsuite";
+import { useEffect } from "react";
+import { initializeBackgroundImageListener } from "../modules/backgroundImage";
+import { defaultSettings } from "../modules/settings";
 
 export function Main() {
   const [query, updateQuery] = usePubSub(queryPubSub);
@@ -36,6 +40,16 @@ export function Main() {
   );
   const [searchState] = usePubSub(searchStatePubSub);
   const [modelLoadingProgress] = usePubSub(modelLoadingProgressPubSub);
+
+  useEffect(() => {
+    updateSettings({ ...defaultSettings, ...getSettings() });
+
+    const stopBackgroundImageListener = initializeBackgroundImageListener();
+
+    return () => {
+      stopBackgroundImageListener();
+    };
+  }, []);
 
   return (
     <CustomProvider theme="dark">
@@ -54,8 +68,8 @@ export function Main() {
             <Stack.Item style={{ width: "100%" }}>
               <SearchForm query={query} updateQuery={updateQuery} />
             </Stack.Item>
-            {match([getDisableAiResponseSetting(), textGenerationState])
-              .with([false, Pattern.not("idle")], () => (
+            {match([getSettings().enableAiResponse, textGenerationState])
+              .with([true, Pattern.not("idle")], () => (
                 <Stack.Item style={{ width: "100%" }}>
                   {match(textGenerationState)
                     .with(

@@ -1,7 +1,6 @@
 import { createPubSub } from "create-pubsub";
 import { SearchResults } from "./search";
-import { isF16Supported } from "./webGpu";
-import { defaultBackgroundImageUrl } from "./backgroundImage";
+import { defaultSettings } from "./settings";
 
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   const localStorageValue = localStorage.getItem(localStorageKey);
@@ -17,38 +16,6 @@ function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
 
   return localStoragePubSub;
 }
-
-export const disableAiResponseSettingPubSub = createLocalStoragePubSub(
-  "disableAiResponse",
-  false,
-);
-
-export const [, , getDisableAiResponseSetting] = disableAiResponseSettingPubSub;
-
-export const disableWebGpuUsageSettingPubSub = createLocalStoragePubSub(
-  "disableWebGpuUsage",
-  false,
-);
-
-export const [, , getDisableWebGpuUsageSetting] =
-  disableWebGpuUsageSettingPubSub;
-
-export const numberOfThreadsSettingPubSub = createLocalStoragePubSub(
-  "numberOfThreads",
-  (navigator.hardwareConcurrency ?? 1) > 1
-    ? Math.max(navigator.hardwareConcurrency - 2, 2)
-    : 1,
-);
-
-export const [, , getNumberOfThreadsSetting] = numberOfThreadsSettingPubSub;
-
-export const searchResultsToConsiderSettingPubSub = createLocalStoragePubSub(
-  "searchResultsToConsider",
-  3,
-);
-
-export const [, , getNumberOfSearchResultsToConsiderSetting] =
-  searchResultsToConsiderSettingPubSub;
 
 export const querySuggestionsPubSub = createLocalStoragePubSub<string[]>(
   "querySuggestions",
@@ -112,18 +79,9 @@ export const modelLoadingProgressPubSub = createPubSub(0);
 
 export const [updateModelLoadingProgress] = modelLoadingProgressPubSub;
 
-export const webLlmModelSettingPubSub = createLocalStoragePubSub(
-  "webLlmModel",
-  isF16Supported
-    ? "Qwen2-0.5B-Instruct-q4f16_1-MLC"
-    : "TinyLlama-1.1B-Chat-v1.0-q4f32_1-MLC",
+export const settingsPubSub = createLocalStoragePubSub(
+  "settings",
+  defaultSettings,
 );
 
-export const [, , getWebLlmModelSetting] = webLlmModelSettingPubSub;
-
-export const backgroundImageSettingPubSub = createPubSub<string>(
-  defaultBackgroundImageUrl,
-);
-
-export const [, onBackgroundImageChange, getBackgroundImageSetting] =
-  backgroundImageSettingPubSub;
+export const [updateSettings, onSettingsChange, getSettings] = settingsPubSub;
