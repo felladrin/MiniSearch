@@ -39,19 +39,15 @@ export function Main() {
 
   return (
     <CustomProvider theme="dark">
-      <Stack
-        alignItems="center"
-        justifyContent="center"
-        style={{
-          margin: "20px auto",
-          padding: "0 10px",
-        }}
-      >
+      <Stack alignItems="center" justifyContent="center">
         <Stack.Item
           grow={1}
           style={{
-            width: "calc(100vw - 20px)",
+            padding: "16px 24px",
+            backgroundColor: "rgba(0, 0, 0, 0.2)",
             maxWidth: "800px",
+            height: "100%",
+            minHeight: "100vh",
           }}
         >
           <VStack>

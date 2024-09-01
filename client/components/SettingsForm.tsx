@@ -19,6 +19,8 @@ import {
 } from "rsuite";
 import { prebuiltAppConfig } from "@mlc-ai/web-llm";
 import { useRef } from "react";
+import { backgroundImageSettingPubSub } from "../modules/pubSub";
+import { backgroundImageOptions } from "../modules/backgroundImage";
 
 export function SettingsForm() {
   const [disableAiResponse, setDisableAiResponse] = usePubSub(
@@ -34,6 +36,9 @@ export function SettingsForm() {
     searchResultsToConsiderSettingPubSub,
   );
   const [webLlmModel, setWebLlmModel] = usePubSub(webLlmModelSettingPubSub);
+  const [backgroundImage, setBackgroundImage] = usePubSub(
+    backgroundImageSettingPubSub,
+  );
   const suffix = isF16Supported ? "-q4f16_1-MLC" : "-q4f32_1-MLC";
   const webGpuModels = useRef(
     prebuiltAppConfig.model_list
@@ -134,6 +139,25 @@ export function SettingsForm() {
             Determines the number of search results to consider when generating
             AI responses. A higher value may enhance accuracy, but it will also
             increase response time.
+          </Text>
+        </VStack>
+        <Divider />
+      </Stack.Item>
+      <Stack.Item>
+        <VStack>
+          <SelectPicker
+            label="Background"
+            value={backgroundImage}
+            onChange={(value) => value && setBackgroundImage(value)}
+            placement="auto"
+            searchable={false}
+            cleanable={false}
+            preventOverflow={true}
+            style={{ width: 265 }}
+            data={backgroundImageOptions}
+          />
+          <Text size="sm" muted>
+            Select a background image for decoration.
           </Text>
         </VStack>
       </Stack.Item>

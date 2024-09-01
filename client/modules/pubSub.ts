@@ -1,6 +1,7 @@
 import { createPubSub } from "create-pubsub";
 import { SearchResults } from "./search";
 import { isF16Supported } from "./webGpu";
+import { defaultBackgroundImageUrl } from "./backgroundImage";
 
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   const localStorageValue = localStorage.getItem(localStorageKey);
@@ -119,3 +120,10 @@ export const webLlmModelSettingPubSub = createLocalStoragePubSub(
 );
 
 export const [, , getWebLlmModelSetting] = webLlmModelSettingPubSub;
+
+export const backgroundImageSettingPubSub = createPubSub<string>(
+  defaultBackgroundImageUrl,
+);
+
+export const [, onBackgroundImageChange, getBackgroundImageSetting] =
+  backgroundImageSettingPubSub;
