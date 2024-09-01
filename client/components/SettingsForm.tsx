@@ -2,7 +2,7 @@ import { usePubSub } from "create-pubsub/react";
 import { settingsPubSub } from "../modules/pubSub";
 import { isF16Supported, isWebGPUAvailable } from "../modules/webGpu";
 import { match, Pattern } from "ts-pattern";
-import { InputNumber, SelectPicker, Form, Toggle } from "rsuite";
+import { InputNumber, SelectPicker, Form, Toggle, Slider } from "rsuite";
 import { prebuiltAppConfig } from "@mlc-ai/web-llm";
 import { useRef } from "react";
 import { backgroundImageOptions } from "../modules/backgroundImage";
@@ -23,21 +23,10 @@ export function SettingsForm() {
       })),
   );
 
-  const handleFormChange = (formValue: Settings) => {
-    formValue.cpuThreads = Math.max(Number(formValue.cpuThreads), 1);
-
-    formValue.searchResultsToConsider = Math.min(
-      Math.max(Number(formValue.searchResultsToConsider), 0),
-      6,
-    );
-
-    setSettings(formValue);
-  };
-
   return (
     <Form
       formValue={settings}
-      onChange={(formValue) => handleFormChange(formValue as Settings)}
+      onChange={(formValue) => setSettings(formValue as Settings)}
       fluid
       style={{ maxWidth: "100%" }}
     >
@@ -89,7 +78,11 @@ export function SettingsForm() {
         .with([false, Pattern.any], [Pattern.any, false], () => (
           <Form.Group>
             <Form.ControlLabel>CPU threads to use</Form.ControlLabel>
-            <Form.Control name={Setting.cpuThreads} accepter={InputNumber} />
+            <Form.Control
+              name={Setting.cpuThreads}
+              accepter={InputNumber}
+              min={1}
+            />
             <Form.HelpText>
               Number of threads to use for the AI model. Lower values will use
               less CPU, but may take longer to respond. A too-high value may
@@ -102,7 +95,13 @@ export function SettingsForm() {
         <Form.ControlLabel>Search results to consider</Form.ControlLabel>
         <Form.Control
           name={Setting.searchResultsToConsider}
-          accepter={InputNumber}
+          accepter={Slider}
+          min={0}
+          max={6}
+          graduated
+          progress
+          renderMark={(mark) => mark}
+          style={{ marginLeft: "8px", marginRight: "16px" }}
         />
         <Form.HelpText>
           Determines the number of search results to consider when generating AI
