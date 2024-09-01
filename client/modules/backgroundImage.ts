@@ -1,4 +1,3 @@
-import { getSettings, onSettingsChange } from "./pubSub";
 import blackBrickImageUrl from "../images/background/dark/black-brick.jpg?url";
 import blackCarbonImageUrl from "../images/background/dark/black-carbon.jpg?url";
 import blackConcreteImageUrl from "../images/background/dark/black-concrete.jpg?url";
@@ -35,23 +34,3 @@ export const backgroundImageOptions = [
     value: blackWallImageUrl,
   },
 ];
-
-function updateBackgroundImage(imageUrl: string) {
-  if (imageUrl === "none") {
-    document.body.style.backgroundImage = imageUrl;
-  } else {
-    document.body.style.backgroundImage = `url('${imageUrl}')`;
-  }
-}
-
-export function initializeBackgroundImageListener() {
-  const unsubscribe = onSettingsChange((settings, previousSettings) => {
-    if (settings.backgroundImageUrl !== previousSettings.backgroundImageUrl) {
-      updateBackgroundImage(settings.backgroundImageUrl);
-    }
-  });
-
-  updateBackgroundImage(getSettings().backgroundImageUrl);
-
-  return unsubscribe;
-}

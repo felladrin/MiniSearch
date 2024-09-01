@@ -1,7 +1,5 @@
 import { usePubSub } from "create-pubsub/react";
 import {
-  getSettings,
-  updateSettings,
   modelLoadingProgressPubSub,
   queryPubSub,
   responsePubSub,
@@ -9,6 +7,7 @@ import {
   searchStatePubSub,
   textGenerationStatePubSub,
   urlsDescriptionsPubSub,
+  settingsPubSub,
 } from "../modules/pubSub";
 import { SearchForm } from "./SearchForm";
 import Markdown from "react-markdown";
@@ -26,9 +25,6 @@ import {
   Progress,
   Button,
 } from "rsuite";
-import { useEffect } from "react";
-import { initializeBackgroundImageListener } from "../modules/backgroundImage";
-import { defaultSettings } from "../modules/settings";
 
 export function Main() {
   const [query, updateQuery] = usePubSub(queryPubSub);
@@ -40,16 +36,7 @@ export function Main() {
   );
   const [searchState] = usePubSub(searchStatePubSub);
   const [modelLoadingProgress] = usePubSub(modelLoadingProgressPubSub);
-
-  useEffect(() => {
-    updateSettings({ ...defaultSettings, ...getSettings() });
-
-    const stopBackgroundImageListener = initializeBackgroundImageListener();
-
-    return () => {
-      stopBackgroundImageListener();
-    };
-  }, []);
+  const [settings] = usePubSub(settingsPubSub);
 
   return (
     <CustomProvider theme="dark">
@@ -58,7 +45,10 @@ export function Main() {
           grow={1}
           style={{
             padding: "16px 24px",
-            backgroundColor: "rgba(0, 0, 0, 0.2)",
+            backgroundColor:
+              settings.backgroundImageUrl !== "none"
+                ? "rgba(0, 0, 0, 0.2)"
+                : undefined,
             maxWidth: "800px",
             height: "100%",
             minHeight: "100vh",
@@ -68,7 +58,7 @@ export function Main() {
             <Stack.Item style={{ width: "100%" }}>
               <SearchForm query={query} updateQuery={updateQuery} />
             </Stack.Item>
-            {match([getSettings().enableAiResponse, textGenerationState])
+            {match([settings.enableAiResponse, textGenerationState])
               .with([true, Pattern.not("idle")], () => (
                 <Stack.Item style={{ width: "100%" }}>
                   {match(textGenerationState)
