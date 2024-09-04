@@ -68,13 +68,13 @@ export const model: {
 } =
   getSettings().cpuThreads < 4
     ? {
-        url: "https://huggingface.co/Felladrin/gguf-sharded-Qwen1.5-0.5B-Chat_llamafy/resolve/main/Qwen1.5-0.5B-Chat_llamafy.IQ3_XXS.shard-00001-of-00003.gguf",
+        url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-smollm-360M-instruct-add-basics/resolve/main/smollm-360m-instruct-add-basics-q5_k_m-imat-00001-of-00005.gguf",
         buildPrompt: (wllama, query, searchResults) =>
           formatChat(wllama, [
             {
               id: 0,
               role: "system",
-              content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question. Provide a concise and informative response to the user's inquiry in a short paragraph format.
+              content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question.
 
 Web search results:
 ${"```"}
@@ -97,7 +97,7 @@ Please answer the user's inquiry based on the information provided or your gener
             {
               id: 0,
               role: "system",
-              content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question. Provide a concise and informative response to the user's inquiry in a short paragraph format.
+              content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question.
 
 Web search results:
 ${"```"}
