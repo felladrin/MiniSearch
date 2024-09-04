@@ -40,17 +40,22 @@ export function Main() {
 
   return (
     <CustomProvider theme="dark">
-      <Stack alignItems="center" justifyContent="center">
+      <Stack
+        alignItems="center"
+        justifyContent="center"
+        style={{
+          height: "100%",
+          backgroundColor:
+            settings.backgroundImageUrl !== "none"
+              ? "rgba(0, 0, 0, 0.2)"
+              : undefined,
+        }}
+      >
         <Stack.Item
           grow={1}
           style={{
             padding: "16px 24px",
-            backgroundColor:
-              settings.backgroundImageUrl !== "none"
-                ? "rgba(0, 0, 0, 0.2)"
-                : undefined,
             maxWidth: "800px",
-            height: "100%",
             minHeight: "100vh",
           }}
         >
