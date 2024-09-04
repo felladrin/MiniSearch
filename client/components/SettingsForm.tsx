@@ -23,12 +23,21 @@ export function SettingsForm() {
       })),
   );
 
+  const handleChange = (formValue: Record<string, unknown>) => {
+    if (formValue.cpuThreads && typeof formValue.cpuThreads !== "number") {
+      const cpuThreadsAsNumber = Number(formValue.cpuThreads);
+      formValue.cpuThreads = isNaN(cpuThreadsAsNumber) ? 1 : cpuThreadsAsNumber;
+    }
+
+    setSettings(formValue as Settings);
+  };
+
   return (
     <Form
       formValue={settings}
-      onChange={(formValue) => setSettings(formValue as Settings)}
-      fluid
+      onChange={handleChange}
       style={{ maxWidth: "100%" }}
+      fluid
     >
       <Form.Group>
         <Form.ControlLabel>AI Response</Form.ControlLabel>
