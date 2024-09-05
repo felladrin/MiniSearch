@@ -193,7 +193,7 @@ async function generateTextWithWllama() {
           updateTextGenerationState("generating");
         }
 
-        streamedMessage += currentText;
+        streamedMessage = currentText;
 
         updateResponseRateLimited(streamedMessage);
       },
