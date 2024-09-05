@@ -132,8 +132,10 @@ Please answer the user's inquiry based on the information provided or your gener
         updateTextGenerationState("generating");
       }
 
-      updateResponse(streamedMessage);
+      updateResponseRateLimited(streamedMessage);
     }
+
+    updateResponse(streamedMessage);
   }
 
   addLogEntry(
@@ -180,6 +182,8 @@ async function generateTextWithWllama() {
       getFormattedSearchResults(model.shouldIncludeUrlsOnPrompt),
     );
 
+    let streamedMessage = "";
+
     await wllama.createCompletion(prompt, {
       sampling: model.sampling,
       onNewToken: (_token, _piece, currentText, { abortSignal }) => {
@@ -189,9 +193,13 @@ async function generateTextWithWllama() {
           updateTextGenerationState("generating");
         }
 
-        updateResponse(currentText);
+        streamedMessage += currentText;
+
+        updateResponseRateLimited(streamedMessage);
       },
     });
+
+    updateResponse(streamedMessage);
   }
 
   await wllama.exit();
@@ -259,3 +267,17 @@ async function canStartResponding() {
     await getSearchPromise();
   }
 }
+
+function updateResponseRateLimited(text: string) {
+  const currentTime = Date.now();
+
+  if (
+    currentTime - updateResponseRateLimited.lastUpdateTime >=
+    updateResponseRateLimited.updateInterval
+  ) {
+    updateResponse(text);
+    updateResponseRateLimited.lastUpdateTime = currentTime;
+  }
+}
+updateResponseRateLimited.lastUpdateTime = 0;
+updateResponseRateLimited.updateInterval = 1000 / 12;
