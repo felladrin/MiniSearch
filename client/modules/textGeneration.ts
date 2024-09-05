@@ -146,9 +146,11 @@ Please answer the user's inquiry based on the information provided or your gener
 }
 
 async function generateTextWithWllama() {
-  const { initializeWllama, model } = await import("./wllama");
+  const { initializeWllama, wllamaModels } = await import("./wllama");
 
   let loadingPercentage = 0;
+
+  const model = wllamaModels[getSettings().wllamaModelId];
 
   const wllama = await initializeWllama(model.url, {
     wllama: {

@@ -7,6 +7,7 @@ import { prebuiltAppConfig } from "@mlc-ai/web-llm";
 import { useRef } from "react";
 import { backgroundImageOptions } from "../modules/backgroundImage";
 import { Setting, Settings } from "../modules/settings";
+import { wllamaModels } from "../modules/wllama";
 
 export function SettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
@@ -21,6 +22,13 @@ export function SettingsForm() {
         } MB`,
         value: model.model_id,
       })),
+  );
+
+  const wllamaModelOptions = useRef(
+    Object.entries(wllamaModels).map(([value, { label }]) => ({
+      label,
+      value,
+    })),
   );
 
   const handleChange = (formValue: Record<string, unknown>) => {
@@ -90,7 +98,7 @@ export function SettingsForm() {
       {match([isWebGPUAvailable, settings.enableWebGpu])
         .with([true, true], () => (
           <Form.Group>
-            <Form.ControlLabel>WebGPU Model</Form.ControlLabel>
+            <Form.ControlLabel>AI Model</Form.ControlLabel>
             <Form.Control
               name={Setting.webLlmModelId}
               accepter={SelectPicker}
@@ -100,24 +108,40 @@ export function SettingsForm() {
               data={webGpuModels.current}
             />
             <Form.HelpText>
-              Select the model to use for AI responses when WebGPU is enabled.
+              Select the model to use for AI responses.
             </Form.HelpText>
           </Form.Group>
         ))
         .with([false, Pattern.any], [Pattern.any, false], () => (
-          <Form.Group>
-            <Form.ControlLabel>CPU threads to use</Form.ControlLabel>
-            <Form.Control
-              name={Setting.cpuThreads}
-              accepter={InputNumber}
-              min={1}
-            />
-            <Form.HelpText>
-              Number of threads to use for the AI model. Lower values will use
-              less CPU, but may take longer to respond. A too-high value may
-              cause the app to hang.
-            </Form.HelpText>
-          </Form.Group>
+          <>
+            <Form.Group>
+              <Form.ControlLabel>AI Model</Form.ControlLabel>
+              <Form.Control
+                name={Setting.wllamaModelId}
+                accepter={SelectPicker}
+                cleanable={false}
+                placement="auto"
+                preventOverflow={true}
+                data={wllamaModelOptions.current}
+              />
+              <Form.HelpText>
+                Select the model to use for AI responses.
+              </Form.HelpText>
+            </Form.Group>
+            <Form.Group>
+              <Form.ControlLabel>CPU threads to use</Form.ControlLabel>
+              <Form.Control
+                name={Setting.cpuThreads}
+                accepter={InputNumber}
+                min={1}
+              />
+              <Form.HelpText>
+                Number of threads to use for the AI model. Lower values will use
+                less CPU, but may take longer to respond. A too-high value may
+                cause the app to hang.
+              </Form.HelpText>
+            </Form.Group>
+          </>
         ))
         .otherwise(() => null)}
       <Form.Group>

@@ -13,7 +13,6 @@ import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.w
 import multiThreadWllamaJsUrl from "@wllama/wllama/esm/multi-thread/wllama.js?url";
 import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
 import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
-import { getSettings } from "./pubSub";
 import { Template } from "@huggingface/jinja";
 
 export async function initializeWllama(
@@ -54,7 +53,8 @@ const commonSamplingConfig: SamplingConfig = {
   mirostat_tau: 3.5,
 };
 
-export const model: {
+export interface WllamaModel {
+  label: string;
   url: string | string[];
   cacheType: "f16" | "q8_0" | "q4_0";
   contextSize: number;
@@ -65,54 +65,58 @@ export const model: {
     query: string,
     searchResults: string,
   ) => Promise<string>;
-} =
-  getSettings().cpuThreads < 4
-    ? {
-        url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-smollm-360M-instruct-add-basics/resolve/main/smollm-360m-instruct-add-basics-q5_k_m-imat-00001-of-00005.gguf",
-        buildPrompt: (wllama, query, searchResults) =>
-          formatChat(wllama, [
-            {
-              id: 0,
-              role: "system",
-              content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question.
+}
+
+export const wllamaModels: Record<string, WllamaModel> = {
+  "smollm-360M-instruct": {
+    label: "SmolLM 360M Instruct • 290 MB",
+    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-smollm-360M-instruct-add-basics/resolve/main/smollm-360m-instruct-add-basics-q5_k_m-imat-00001-of-00005.gguf",
+    buildPrompt: (wllama, query, searchResults) =>
+      formatChat(wllama, [
+        {
+          id: 0,
+          role: "system",
+          content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question.
 
 Web search results:
+${"```"}
+${searchResults}  
+${"```"}
+
+Please answer the user's inquiry based on the information provided or your general knowledge if the search results are not relevant. Include additional context or related information that might be useful or interesting to the user, even if not directly asked for in the inquiry. Always respond in the same language used by the user in their inquiry.`,
+        },
+        { id: 1, role: "user", content: query },
+      ]),
+    cacheType: "f16",
+    contextSize: 1280,
+    shouldIncludeUrlsOnPrompt: false,
+    sampling: commonSamplingConfig,
+  },
+  "arcee-lite": {
+    label: "Arcee Lite • 1.43 GB",
+    url: "https://huggingface.co/Felladrin/gguf-q5_k_l-imat-arcee-lite/resolve/main/arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
+    buildPrompt: (wllama, query, searchResults) =>
+      formatChat(wllama, [
+        {
+          id: 0,
+          role: "system",
+          content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question.
+
+Web search results:  
 ${"```"}
 ${searchResults}
 ${"```"}
 
 Please answer the user's inquiry based on the information provided or your general knowledge if the search results are not relevant. Include additional context or related information that might be useful or interesting to the user, even if not directly asked for in the inquiry. Always respond in the same language used by the user in their inquiry.`,
-            },
-            { id: 1, role: "user", content: query },
-          ]),
-        cacheType: "f16",
-        contextSize: 1280,
-        shouldIncludeUrlsOnPrompt: false,
-        sampling: commonSamplingConfig,
-      }
-    : {
-        url: "https://huggingface.co/Felladrin/gguf-q5_k_l-imat-arcee-lite/resolve/main/arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
-        buildPrompt: (wllama, query, searchResults) =>
-          formatChat(wllama, [
-            {
-              id: 0,
-              role: "system",
-              content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question.
-
-Web search results:
-${"```"}
-${searchResults}
-${"```"}
-
-Please answer the user's inquiry based on the information provided or your general knowledge if the search results are not relevant. Include additional context or related information that might be useful or interesting to the user, even if not directly asked for in the inquiry. Always respond in the same language used by the user in their inquiry.`,
-            },
-            { id: 1, role: "user", content: query },
-          ]),
-        cacheType: "f16",
-        contextSize: 1280,
-        shouldIncludeUrlsOnPrompt: false,
-        sampling: commonSamplingConfig,
-      };
+        },
+        { id: 1, role: "user", content: query },
+      ]),
+    cacheType: "f16",
+    contextSize: 1280,
+    shouldIncludeUrlsOnPrompt: false,
+    sampling: commonSamplingConfig,
+  },
+};
 
 export interface Message {
   id: number;
