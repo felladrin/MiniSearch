@@ -1,4 +1,4 @@
-FROM searxng/searxng:2024.8.16-29056b9dd
+FROM searxng/searxng:2024.9.6-9eda4044b
 ENV PORT ${PORT:-7860}
 EXPOSE ${PORT}
 RUN apk add --update \
