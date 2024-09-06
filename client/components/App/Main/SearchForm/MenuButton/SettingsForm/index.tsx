@@ -1,13 +1,16 @@
 import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "../modules/pubSub";
-import { isF16Supported, isWebGPUAvailable } from "../modules/webGpu";
+import { settingsPubSub } from "../../../../../../modules/pubSub";
+import {
+  isF16Supported,
+  isWebGPUAvailable,
+} from "../../../../../../modules/webGpu";
 import { match, Pattern } from "ts-pattern";
 import { InputNumber, SelectPicker, Form, Toggle, Slider } from "rsuite";
 import { prebuiltAppConfig } from "@mlc-ai/web-llm";
 import { useRef } from "react";
-import { backgroundImageOptions } from "../modules/backgroundImage";
-import { Setting, Settings } from "../modules/settings";
-import { wllamaModels } from "../modules/wllama";
+import { backgroundImageOptions } from "../../../../../../modules/backgroundImage";
+import { Setting, Settings } from "../../../../../../modules/settings";
+import { wllamaModels } from "../../../../../../modules/wllama";
 
 export function SettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);

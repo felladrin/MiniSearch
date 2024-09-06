@@ -1,7 +1,7 @@
 import { Route } from "wouter";
 import { Main } from "./Main";
-import { useInitializeSettings } from "../hooks/useInitializeSettings";
-import { useBackgroundImageEffect } from "../hooks/useBackgroundImageEffect";
+import { useInitializeSettings } from "./useInitializeSettings";
+import { useBackgroundImageEffect } from "./useBackgroundImageEffect";
 
 export function App() {
   const settings = useInitializeSettings();

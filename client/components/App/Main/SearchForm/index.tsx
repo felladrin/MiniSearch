@@ -1,9 +1,9 @@
 import { useEffect, useRef, FormEvent, useState, useCallback } from "react";
 import TextareaAutosize from "react-textarea-autosize";
-import { getRandomQuerySuggestion } from "../modules/querySuggestions";
+import { getRandomQuerySuggestion } from "../../../../modules/querySuggestions";
 import { MenuButton } from "./MenuButton";
 import { useLocation } from "wouter";
-import { prepareTextGeneration } from "../modules/textGeneration";
+import { prepareTextGeneration } from "../../../../modules/textGeneration";
 import { isMatching, match, Pattern } from "ts-pattern";
 import { Button, HStack, Stack, VStack } from "rsuite";
 

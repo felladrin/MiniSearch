@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "../modules/pubSub";
-import { defaultSettings } from "../modules/settings";
+import { settingsPubSub } from "../../modules/pubSub";
+import { defaultSettings } from "../../modules/settings";
 
 /**
  * A custom React hook that initializes the application settings.

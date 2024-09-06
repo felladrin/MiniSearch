@@ -8,7 +8,7 @@ import {
   textGenerationStatePubSub,
   urlsDescriptionsPubSub,
   settingsPubSub,
-} from "../modules/pubSub";
+} from "../../../modules/pubSub";
 import { SearchForm } from "./SearchForm";
 import Markdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";

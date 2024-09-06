@@ -1,4 +1,4 @@
-import { SearchResults } from "../modules/search";
+import { SearchResults } from "../../../../modules/search";
 import {
   Whisper,
   Tooltip,
