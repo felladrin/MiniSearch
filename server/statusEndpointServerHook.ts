@@ -13,7 +13,6 @@ export function statusEndpointServerHook<
 
     const status = {
       uptime: prettyMilliseconds(new Date().getTime() - serverStartTime, {
-        compact: true,
         verbose: true,
       }),
       sessions: getVerifiedTokensAmount(),
