@@ -12,7 +12,6 @@ Live demo: https://felladrin-minisearch.hf.space
 - **Integrated**: Search from the browser address bar by setting it as the default search engine
 - **Time-saver**: AI responses enhanced with search results
 - **Efficient**: Models are loaded and cached only when needed
-- **Optimized**: Aims for the balance between size and performance
 - **Open-source**: [The code is available for inspection and contribution at GitHub](https://github.com/felladrin/MiniSearch)
 
 ## Prerequisites
