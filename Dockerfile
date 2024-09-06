@@ -26,6 +26,7 @@ COPY --chown=${USERNAME}:${USERNAME} ./package-lock.json ./package-lock.json
 COPY --chown=${USERNAME}:${USERNAME} ./.npmrc ./.npmrc
 RUN npm ci
 COPY --chown=${USERNAME}:${USERNAME} . .
+RUN git config --global --add safe.directory ${APP_DIR}
 RUN npm run build
 ENTRYPOINT [ "/bin/sh", "-c" ]
-CMD [ "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & (npx node-llama-cpp download && npm start -- --host)" ]
+CMD [ "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & (npm start -- --host)" ]

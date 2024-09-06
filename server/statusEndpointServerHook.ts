@@ -11,16 +11,23 @@ export function statusEndpointServerHook<
   server.middlewares.use(async (request, response, next) => {
     if (!request.url.startsWith("/status")) return next();
 
-    response.setHeader("Content-Type", "application/json");
-    response.end(
-      JSON.stringify({
-        uptime: prettyMilliseconds(new Date().getTime() - serverStartTime, {
-          compact: true,
-          verbose: true,
-        }),
-        sessions: getVerifiedTokensAmount(),
-        searches: getSearchesSinceLastRestart(),
+    const status = {
+      uptime: prettyMilliseconds(new Date().getTime() - serverStartTime, {
+        compact: true,
+        verbose: true,
       }),
-    );
+      sessions: getVerifiedTokensAmount(),
+      searches: getSearchesSinceLastRestart(),
+      build: {
+        timestamp: new Date(
+          server.config.define.VITE_BUILD_DATE_TIME,
+        ).toISOString(),
+        gitCommit: JSON.parse(server.config.define.VITE_COMMIT_SHORT_HASH),
+      },
+    };
+
+    response.setHeader("Content-Type", "application/json");
+
+    response.end(JSON.stringify(status));
   });
 }

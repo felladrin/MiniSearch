@@ -7,6 +7,7 @@ import { compressionServerHook } from "./server/compressionServerHook";
 import { crossOriginServerHook } from "./server/crossOriginServerHook";
 import { cacheServerHook } from "./server/cacheServerHook";
 import { getSearchToken, regenerateSearchToken } from "./server/searchToken";
+import getGitCommitHash from "helper-git-hash";
 
 export default defineConfig(({ command }) => {
   if (command === "build") regenerateSearchToken();
@@ -15,6 +16,8 @@ export default defineConfig(({ command }) => {
     root: "./client",
     define: {
       VITE_SEARCH_TOKEN: JSON.stringify(getSearchToken()),
+      VITE_BUILD_DATE_TIME: Date.now(),
+      VITE_COMMIT_SHORT_HASH: JSON.stringify(getGitCommitHash({ short: true })),
     },
     server: {
       host: process.env.HOST,

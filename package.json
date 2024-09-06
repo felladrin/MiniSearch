@@ -19,6 +19,7 @@
     "@wllama/wllama": "^1.10.0",
     "create-pubsub": "^1.6.3",
     "hash-wasm": "^4.11.0",
+    "helper-git-hash": "^1.0.0",
     "html-to-text": "^9.0.5",
     "http-compression": "^1.0.20",
     "inter-ui": "^4.0.2",
