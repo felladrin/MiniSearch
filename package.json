@@ -26,6 +26,7 @@
     "node-emoji": "^2.1.3",
     "node-llama-cpp": "^3.0.0-beta.22",
     "prettier": "^3.0.3",
+    "pretty-ms": "^9.1.0",
     "rate-limiter-flexible": "^5.0.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

@@ -1,6 +1,7 @@
 import { PreviewServer, ViteDevServer } from "vite";
 import { getSearchesSinceLastRestart } from "./searchesSinceLastRestart";
 import { getVerifiedTokensAmount } from "./verifiedTokens";
+import prettyMilliseconds from "pretty-ms";
 
 const serverStartTime = new Date().getTime();
 
@@ -10,16 +11,15 @@ export function statusEndpointServerHook<
   server.middlewares.use(async (request, response, next) => {
     if (!request.url.startsWith("/status")) return next();
 
-    const secondsSinceLastRestart = Math.floor(
-      (new Date().getTime() - serverStartTime) / 1000,
-    );
-
     response.setHeader("Content-Type", "application/json");
     response.end(
       JSON.stringify({
-        secondsSinceLastRestart,
-        searchesSinceLastRestart: getSearchesSinceLastRestart(),
-        tokensVerifiedSinceLastRestart: getVerifiedTokensAmount(),
+        uptime: prettyMilliseconds(new Date().getTime() - serverStartTime, {
+          compact: true,
+          verbose: true,
+        }),
+        sessions: getVerifiedTokensAmount(),
+        searches: getSearchesSinceLastRestart(),
       }),
     );
   });
