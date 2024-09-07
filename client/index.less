@@ -1,6 +1,7 @@
 @import "rsuite/styles/index.less";
 @import "inter-ui/inter.css";
 @import "inter-ui/inter-variable.css";
+@import "react-medium-image-zoom/dist/styles.css";
 
 @font-family-base:
   InterVariable,
@@ -42,4 +43,13 @@ body {
 .rs-theme-dark {
   --rs-text-primary: rgb(227, 228, 234);
   --rs-body: rgb(21, 22, 28);
+
+  .custom-zoom [data-rmiz-modal-overlay="visible"] {
+    background-color: rgba(21, 22, 28, 0.95);
+  }
+
+  .custom-zoom [data-rmiz-btn-unzoom] {
+    color: var(--rs-btn-default-text);
+    background-color: var(--rs-btn-default-bg);
+  }
 }

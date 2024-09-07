@@ -33,6 +33,7 @@
     "react-dom": "^18.2.0",
     "react-fade-in": "^2.0.1",
     "react-markdown": "^9.0.1",
+    "react-medium-image-zoom": "^5.2.9",
     "react-syntax-highlighter": "^15.5.0",
     "react-textarea-autosize": "^8.5.3",
     "rsuite": "^5.69.0",
