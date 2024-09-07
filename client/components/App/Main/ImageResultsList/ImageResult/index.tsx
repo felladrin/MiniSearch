@@ -1,4 +1,4 @@
-import { Stack, VStack, Avatar, HStack, Button, Text } from "rsuite";
+import { Stack, Avatar, Button, Text, Notification } from "rsuite";
 import Zoom from "react-medium-image-zoom";
 
 export function ImageResult({
@@ -23,48 +23,50 @@ export function ImageResult({
         {modalState === "LOADED" && (
           <>
             {buttonUnzoom}
-            <VStack
+            <Stack
+              justifyContent="center"
               style={{
-                backgroundColor: "rgba(21, 22, 28, 0.95)",
-                padding: "16px",
+                margin: "16px",
                 position: "absolute",
                 inset: "auto 0 0 0",
               }}
             >
-              <Stack.Item alignSelf="center">
-                <Text as="cite" maxLines={1}>
-                  {title || "Untitled"}
-                </Text>
-              </Stack.Item>
-              <Stack.Item alignSelf="center">
-                <HStack alignItems="center" justifyContent="center" wrap>
+              <Notification closable>
+                <Stack direction="row" alignItems="center" spacing={16}>
                   <Stack.Item>
                     <Button
-                      appearance="link"
-                      href={url}
-                      target="_blank"
-                      size="xs"
-                      title="Click to visit the page where the image was found"
-                      rel="noopener noreferrer"
-                    >
-                      {new URL(url).hostname}
-                    </Button>
-                  </Stack.Item>
-                  <Stack.Item>
-                    <Button
-                      appearance="link"
                       href={sourceUrl}
                       target="_blank"
-                      size="xs"
                       title="Click to see the image in full size"
                       rel="noopener noreferrer"
                     >
-                      full resolution
+                      View in full
+                      <br />
+                      resolution
                     </Button>
                   </Stack.Item>
-                </HStack>
-              </Stack.Item>
-            </VStack>
+                  <Stack.Item>
+                    <Stack
+                      direction="column"
+                      alignItems="flex-start"
+                      spacing={8}
+                    >
+                      <Text as="cite">{title || "Untitled"}</Text>
+                      <Button
+                        appearance="ghost"
+                        href={url}
+                        target="_blank"
+                        size="xs"
+                        title="Click to visit the page where the image was found"
+                        rel="noopener noreferrer"
+                      >
+                        {new URL(url).hostname}
+                      </Button>
+                    </Stack>
+                  </Stack.Item>
+                </Stack>
+              </Notification>
+            </Stack>
           </>
         )}
       </>
