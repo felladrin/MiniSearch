@@ -6,7 +6,6 @@ import {
   searchResultsPubSub,
   searchStatePubSub,
   textGenerationStatePubSub,
-  urlsDescriptionsPubSub,
   settingsPubSub,
 } from "../../../modules/pubSub";
 import { SearchForm } from "./SearchForm";
@@ -24,19 +23,52 @@ import {
   Message,
   Progress,
   Button,
+  Grid,
+  Row,
+  Col,
 } from "rsuite";
+import { ImageResultsList } from "./ImageResultsList";
+import { useMemo } from "react";
 
 export function Main() {
   const [query, updateQuery] = usePubSub(queryPubSub);
   const [response] = usePubSub(responsePubSub);
   const [searchResults] = usePubSub(searchResultsPubSub);
-  const [urlsDescriptions] = usePubSub(urlsDescriptionsPubSub);
   const [textGenerationState, setTextGenerationState] = usePubSub(
     textGenerationStatePubSub,
   );
   const [searchState] = usePubSub(searchStatePubSub);
   const [modelLoadingProgress] = usePubSub(modelLoadingProgressPubSub);
   const [settings] = usePubSub(settingsPubSub);
+
+  const MarkdownComponent = useMemo(() => {
+    return (
+      <Markdown
+        components={{
+          code(props) {
+            const { children, className, node, ref, ...rest } = props;
+            void node;
+            const languageMatch = /language-(\w+)/.exec(className || "");
+            return languageMatch ? (
+              <SyntaxHighlighter
+                {...rest}
+                ref={ref as never}
+                children={children?.toString().replace(/\n$/, "") ?? ""}
+                language={languageMatch[1]}
+                style={syntaxHighlighterStyle}
+              />
+            ) : (
+              <code {...rest} className={className}>
+                {children}
+              </code>
+            );
+          },
+        }}
+      >
+        {response}
+      </Markdown>
+    );
+  }, [response]);
 
   return (
     <CustomProvider theme="dark">
@@ -99,45 +131,7 @@ export function Main() {
                               ))
                               .otherwise(() => null)}
                             <Stack.Item style={{ width: "100%" }}>
-                              <Markdown
-                                components={{
-                                  code(props) {
-                                    const {
-                                      children,
-                                      className,
-                                      node,
-                                      ref,
-                                      ...rest
-                                    } = props;
-
-                                    void node;
-
-                                    const languageMatch = /language-(\w+)/.exec(
-                                      className || "",
-                                    );
-
-                                    return languageMatch ? (
-                                      <SyntaxHighlighter
-                                        {...rest}
-                                        ref={ref as never}
-                                        children={
-                                          children
-                                            ?.toString()
-                                            .replace(/\n$/, "") ?? ""
-                                        }
-                                        language={languageMatch[1]}
-                                        style={syntaxHighlighterStyle}
-                                      />
-                                    ) : (
-                                      <code {...rest} className={className}>
-                                        {children}
-                                      </code>
-                                    );
-                                  },
-                                }}
-                              >
-                                {response}
-                              </Markdown>
+                              {MarkdownComponent}
                             </Stack.Item>
                           </VStack>
                         </>
@@ -217,7 +211,31 @@ export function Main() {
                     .with("running", () => (
                       <>
                         <Divider>Searching the web...</Divider>
-                        <Placeholder.Paragraph rows={8} active />
+                        <Grid fluid>
+                          <Row gutter={16}>
+                            <Col xs={6}>
+                              <Placeholder.Graph active height={100} />
+                            </Col>
+                            <Col xs={6}>
+                              <Placeholder.Graph active height={100} />
+                            </Col>
+                            <Col xs={6}>
+                              <Placeholder.Graph active height={100} />
+                            </Col>
+                            <Col xs={6}>
+                              <Placeholder.Graph active height={100} />
+                            </Col>
+                          </Row>
+                          <Row>
+                            <Col xs={24}>
+                              <Placeholder.Paragraph
+                                rows={8}
+                                style={{ marginTop: "16px" }}
+                                active
+                              />
+                            </Col>
+                          </Row>
+                        </Grid>
                       </>
                     ))
                     .with("failed", () => (
@@ -237,10 +255,18 @@ export function Main() {
                     ))
                     .with("completed", () => (
                       <>
-                        <Divider>Search Results</Divider>
+                        {settings.enableImageSearch &&
+                          searchResults.imageResults.length > 0 && (
+                            <>
+                              <Divider>Images</Divider>
+                              <ImageResultsList
+                                imageResults={searchResults.imageResults}
+                              />
+                            </>
+                          )}
+                        <Divider>Links</Divider>
                         <SearchResultsList
-                          searchResults={searchResults}
-                          urlsDescriptions={urlsDescriptions}
+                          searchResults={searchResults.textResults}
                         />
                       </>
                     ))

@@ -43,17 +43,16 @@ export const responsePubSub = createPubSub("");
 
 export const [updateResponse] = responsePubSub;
 
-export const searchResultsPubSub = createPubSub<SearchResults>([]);
+export const searchResultsPubSub = createPubSub<SearchResults>({
+  textResults: [],
+  imageResults: [],
+});
 
 export const [updateSearchResults, , getSearchResults] = searchResultsPubSub;
 
-export const urlsDescriptionsPubSub = createPubSub<Record<string, string>>({});
-
-export const [updateUrlsDescriptions] = urlsDescriptionsPubSub;
-
 export const [updateSearchPromise, , getSearchPromise] = createPubSub<
   Promise<SearchResults>
->(Promise.resolve([]));
+>(Promise.resolve({ textResults: [], imageResults: [] }));
 
 export const textGenerationStatePubSub = createPubSub<
   | "idle"

@@ -83,6 +83,19 @@ export function SettingsForm() {
           </Form.HelpText>
         </Form.Group>
       )}
+      <Form.Group>
+        <Form.ControlLabel>Image Search</Form.ControlLabel>
+        <Form.Control
+          name={Setting.enableImageSearch}
+          accepter={Toggle}
+          unCheckedChildren="Disabled"
+          checkedChildren="Enabled"
+        />
+        <Form.HelpText>
+          Enable or disable image search results. When enabled, relevant images
+          will be displayed alongside web search results.
+        </Form.HelpText>
+      </Form.Group>
       {isWebGPUAvailable && (
         <Form.Group>
           <Form.ControlLabel>WebGPU</Form.ControlLabel>

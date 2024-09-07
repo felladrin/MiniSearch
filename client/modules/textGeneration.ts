@@ -3,7 +3,6 @@ import {
   updateSearchResults,
   updateResponse,
   getSearchResults,
-  updateUrlsDescriptions,
   getQuery,
   updateSearchPromise,
   getSearchPromise,
@@ -23,7 +22,7 @@ export async function prepareTextGeneration() {
 
   updateResponse("");
 
-  updateSearchResults([]);
+  updateSearchResults({ textResults: [], imageResults: [] });
 
   updateSearchPromise(startSearch(getQuery()));
 
@@ -208,7 +207,7 @@ async function generateTextWithWllama() {
 }
 
 function getFormattedSearchResults(shouldIncludeUrl: boolean) {
-  const searchResults = getSearchResults().slice(
+  const searchResults = getSearchResults().textResults.slice(
     0,
     getSettings().searchResultsToConsider,
   );
@@ -243,22 +242,17 @@ async function startSearch(query: string) {
     30,
   );
 
-  if (searchResults.length === 0) {
+  if (searchResults.textResults.length === 0) {
     const queryKeywords = await getKeywords(query, 10);
 
     searchResults = await search(queryKeywords.join(" "), 30);
   }
 
-  updateSearchState(searchResults.length === 0 ? "failed" : "completed");
+  updateSearchState(
+    searchResults.textResults.length === 0 ? "failed" : "completed",
+  );
 
   updateSearchResults(searchResults);
-
-  updateUrlsDescriptions(
-    searchResults.reduce(
-      (acc, [, snippet, url]) => ({ ...acc, [url]: snippet }),
-      {},
-    ),
-  );
 
   return searchResults;
 }

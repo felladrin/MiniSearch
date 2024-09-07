@@ -24,10 +24,8 @@ export function searchEndpointServerHook<
     );
 
     const limitParam = searchParams.get("limit");
-
     const limit =
       limitParam && Number(limitParam) > 0 ? Number(limitParam) : undefined;
-
     const query = searchParams.get("q");
 
     if (!query) {
@@ -67,25 +65,26 @@ export function searchEndpointServerHook<
       return;
     }
 
-    const searchResults = await fetchSearXNG(query, limit);
+    const { textResults, imageResults } = await fetchSearXNG(query, limit);
 
     incrementSearchesSinceLastRestart();
 
-    if (searchResults.length === 0) {
+    if (textResults.length === 0 && imageResults.length === 0) {
       response.setHeader("Content-Type", "application/json");
-      response.end(JSON.stringify([]));
+      response.end(JSON.stringify({ textResults: [], imageResults: [] }));
       return;
     }
 
     try {
+      const rankedTextResults = await rankSearchResults(query, textResults);
       response.setHeader("Content-Type", "application/json");
       response.end(
-        JSON.stringify(await rankSearchResults(query, searchResults)),
+        JSON.stringify({ textResults: rankedTextResults, imageResults }),
       );
     } catch (error) {
       console.error("Error ranking search results:", error);
       response.setHeader("Content-Type", "application/json");
-      response.end(JSON.stringify(searchResults));
+      response.end(JSON.stringify({ textResults, imageResults }));
     }
   });
 }

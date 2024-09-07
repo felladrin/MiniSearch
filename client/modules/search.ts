@@ -1,7 +1,15 @@
 import { getSearchTokenHash } from "./searchTokenHash";
 import { name } from "../../package.json";
 
-export type SearchResults = [title: string, snippet: string, url: string][];
+export type SearchResults = {
+  textResults: [title: string, snippet: string, url: string][];
+  imageResults: [
+    title: string,
+    url: string,
+    thumbnailUrl: string,
+    sourceUrl: string,
+  ][];
+};
 
 /**
  * Creates a cached version of a search function using IndexedDB for storage.
@@ -78,13 +86,10 @@ function cacheSearchWithIndexedDB(
    * @returns A string representation of the hash in base-36.
    */
   function hashQuery(query: string): string {
-    let hash = 0;
-    for (let i = 0; i < query.length; i++) {
-      const char = query.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash;
-    }
-    return hash.toString(36);
+    return query
+      .split("")
+      .reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0)
+      .toString(36);
   }
 
   const dbPromise = openDB();
@@ -97,7 +102,11 @@ function cacheSearchWithIndexedDB(
     const store = transaction.objectStore(storeName);
     const key = hashQuery(query);
     const cachedResult = await new Promise<
-      { results: SearchResults; timestamp: number } | undefined
+      | {
+          results: SearchResults;
+          timestamp: number;
+        }
+      | undefined
     >((resolve) => {
       const request = store.get(key);
       request.onerror = () => resolve(undefined);
@@ -132,6 +141,8 @@ export const search = cacheSearchWithIndexedDB(
 
     const response = await fetch(searchUrl.toString());
 
-    return response.ok ? response.json() : [];
+    return response.ok
+      ? response.json()
+      : { textResults: [], imageResults: [] };
   },
 );
