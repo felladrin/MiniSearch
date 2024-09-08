@@ -108,8 +108,6 @@ async function generateTextWithWebLlm() {
         },
         { role: "user", content: getQuery() },
       ],
-      temperature: 0,
-      frequency_penalty: 1.02,
     });
 
     let streamedMessage = "";
