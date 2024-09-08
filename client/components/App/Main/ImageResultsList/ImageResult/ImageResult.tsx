@@ -1,5 +1,6 @@
 import { Stack, Avatar, Button, Text, Notification } from "rsuite";
 import Zoom from "react-medium-image-zoom";
+import { getHostname } from "../../../../../modules/stringFormatters";
 
 export function ImageResult({
   title,
@@ -60,7 +61,7 @@ export function ImageResult({
                         title="Click to visit the page where the image was found"
                         rel="noopener noreferrer"
                       >
-                        {new URL(url).hostname}
+                        {getHostname(url)}
                       </Button>
                     </Stack>
                   </Stack.Item>

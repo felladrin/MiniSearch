@@ -9,6 +9,7 @@ import {
   VStack,
 } from "rsuite";
 import FadeIn from "react-fade-in";
+import { getHostname } from "../../../../modules/stringFormatters";
 
 export function SearchResultsList({
   searchResults,
@@ -28,6 +29,7 @@ export function SearchResultsList({
       {searchResults.map(([title, snippet, url], index) => (
         <VStack key={`search-result-${index}`} spacing={16}>
           <Stack
+            spacing={16}
             justifyContent="space-between"
             alignItems="flex-start"
             direction={shouldDisplayDomainBelowTitle ? "column" : "row"}
@@ -59,7 +61,7 @@ export function SearchResultsList({
                 style={{ padding: 0 }}
               >
                 <Text as="cite" size="md">
-                  {new URL(url).hostname.replace("www.", "")}
+                  {getHostname(url)}
                 </Text>
               </Button>
             </Whisper>
