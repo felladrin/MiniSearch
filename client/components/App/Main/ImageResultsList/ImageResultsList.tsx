@@ -28,9 +28,9 @@ export function ImageResultsList({
         wrapperTag={HStack}
         onComplete={() => setIsFadeInComplete(true)}
       >
-        {imageResults.map(([title, url, thumbnailUrl, sourceUrl], index) => (
+        {imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => (
           <ImageResult
-            key={index}
+            key={sourceUrl}
             title={title}
             url={url}
             thumbnailUrl={thumbnailUrl}

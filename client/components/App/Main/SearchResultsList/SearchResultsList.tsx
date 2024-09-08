@@ -32,8 +32,8 @@ export function SearchResultsList({
         </Stack>
       )}
     >
-      {searchResults.map(([title, snippet, url], index) => (
-        <Fragment key={`search-result-${index}`}>
+      {searchResults.map(([title, snippet, url]) => (
+        <Fragment key={url}>
           <Stack.Item style={{ width: "100%" }}>
             <Stack
               spacing={16}
@@ -57,7 +57,6 @@ export function SearchResultsList({
               </Button>
               <Whisper
                 placement="top"
-                controlId={`search-result-${index}-for-domain`}
                 trigger="hover"
                 speaker={<Tooltip>{url}</Tooltip>}
               >
