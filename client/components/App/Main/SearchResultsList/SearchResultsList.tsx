@@ -10,7 +10,7 @@ import {
 } from "rsuite";
 import FadeIn from "react-fade-in";
 import { getHostname } from "../../../../modules/stringFormatters";
-import { Fragment, ReactNode } from "react";
+import { ReactNode } from "react";
 
 export function SearchResultsList({
   searchResults,
@@ -26,14 +26,14 @@ export function SearchResultsList({
       wrapperTag={({ children }: { children: ReactNode }) => (
         <VStack spacing={40}>{children}</VStack>
       )}
-      childTag={({ children }: { children: ReactNode }) => (
-        <Stack direction="column" spacing={16} style={{ width: "100%" }}>
-          {children}
-        </Stack>
-      )}
     >
       {searchResults.map(([title, snippet, url]) => (
-        <Fragment key={url}>
+        <Stack
+          key={url}
+          direction="column"
+          spacing={16}
+          style={{ width: "100%" }}
+        >
           <Stack.Item style={{ width: "100%" }}>
             <Stack
               spacing={16}
@@ -78,7 +78,7 @@ export function SearchResultsList({
               {snippet}
             </Text>
           </Stack.Item>
-        </Fragment>
+        </Stack>
       ))}
     </FadeIn>
   );
