@@ -38,6 +38,7 @@ export function SearchResultsList({
             <Stack
               spacing={16}
               justifyContent="space-between"
+              alignItems="flex-start"
               direction={shouldDisplayDomainBelowTitle ? "column" : "row"}
               style={{ width: "100%" }}
             >
