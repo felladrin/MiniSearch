@@ -31,6 +31,7 @@ export async function fetchSearXNG(query: string, limit?: number) {
     }
 
     const uniqueHostnames = new Set<string>();
+    const uniqueSourceUrls = new Set<string>();
 
     const processContent = (html: string): string => {
       return stripEmojis(
@@ -71,9 +72,15 @@ export async function fetchSearXNG(query: string, limit?: number) {
 
     const resolvedImageResults = await Promise.all(imagePromises);
     imageResults.push(
-      ...resolvedImageResults.filter(
-        (result): result is [string, string, string, string] => result !== null,
-      ),
+      ...resolvedImageResults
+        .filter(
+          (result): result is [string, string, string, string] =>
+            result !== null && !uniqueSourceUrls.has(result[3]),
+        )
+        .map((result) => {
+          uniqueSourceUrls.add(result[3]);
+          return result;
+        }),
     );
 
     results
