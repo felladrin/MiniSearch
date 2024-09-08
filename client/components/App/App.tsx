@@ -1,5 +1,5 @@
 import { Route } from "wouter";
-import { Main } from "./Main";
+import { Main } from "./Main/Main";
 import { useInitializeSettings } from "./useInitializeSettings";
 import { useBackgroundImageEffect } from "./useBackgroundImageEffect";
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { SettingsForm } from "./SettingsForm";
-import { ActionsForm } from "./ActionsForm";
+import { SettingsForm } from "./SettingsForm/SettingsForm";
+import { ActionsForm } from "./ActionsForm/ActionsForm";
 import { Button, Drawer, Panel, PanelGroup, IconButton, Stack } from "rsuite";
 import { Icon } from "@rsuite/icons";
 import { FaGithub } from "react-icons/fa";

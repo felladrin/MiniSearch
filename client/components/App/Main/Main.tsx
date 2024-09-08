@@ -8,11 +8,11 @@ import {
   textGenerationStatePubSub,
   settingsPubSub,
 } from "../../../modules/pubSub";
-import { SearchForm } from "./SearchForm";
+import { SearchForm } from "./SearchForm/SearchForm";
 import Markdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import syntaxHighlighterStyle from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
-import { SearchResultsList } from "./SearchResultsList";
+import { SearchResultsList } from "./SearchResultsList/SearchResultsList";
 import { match, Pattern } from "ts-pattern";
 import {
   CustomProvider,
@@ -27,7 +27,7 @@ import {
   Row,
   Col,
 } from "rsuite";
-import { ImageResultsList } from "./ImageResultsList";
+import { ImageResultsList } from "./ImageResultsList/ImageResultsList";
 import { useMemo } from "react";
 
 export function Main() {

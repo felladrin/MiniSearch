@@ -2,7 +2,7 @@ import { HStack } from "rsuite";
 import { SearchResults } from "../../../../modules/search";
 import FadeIn from "react-fade-in";
 import { useState } from "react";
-import { ImageResult } from "./ImageResult";
+import { ImageResult } from "./ImageResult/ImageResult";
 
 export function ImageResultsList({
   imageResults,
