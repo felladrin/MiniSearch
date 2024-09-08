@@ -48,49 +48,44 @@ export function MenuButton() {
       <Drawer open={isDrawerOpen} onClose={closeDrawer} size="xs">
         <Drawer.Header>
           <Drawer.Title>
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
+            <Whisper
+              followCursor
+              placement="auto"
+              speaker={
+                <Tooltip>
+                  <Stack direction="column">
+                    <span>{repoName}</span>
+                    <span>
+                      {`v${getSemanticVersion(VITE_BUILD_DATE_TIME)}+${VITE_COMMIT_SHORT_HASH}`}
+                    </span>
+                    <span>
+                      Released{" "}
+                      {prettyMilliseconds(
+                        new Date().getTime() -
+                          new Date(VITE_BUILD_DATE_TIME).getTime(),
+                        {
+                          compact: true,
+                          verbose: true,
+                        },
+                      )}{" "}
+                      ago
+                    </span>
+                  </Stack>
+                </Tooltip>
+              }
             >
-              <Whisper
-                followCursor
-                placement="auto"
-                speaker={
-                  <Tooltip>
-                    <Stack direction="column">
-                      <span>{repoName}</span>
-                      <span>
-                        {`v${getSemanticVersion(VITE_BUILD_DATE_TIME)}+${VITE_COMMIT_SHORT_HASH}`}
-                      </span>
-                      <span>
-                        Released{" "}
-                        {prettyMilliseconds(
-                          new Date().getTime() -
-                            new Date(VITE_BUILD_DATE_TIME).getTime(),
-                          {
-                            compact: true,
-                            verbose: true,
-                          },
-                        )}{" "}
-                        ago
-                      </span>
-                    </Stack>
-                  </Tooltip>
-                }
-              >
-                {repoName}
-              </Whisper>
-
-              <IconButton
-                appearance="subtle"
-                href={repository.url}
-                target="_blank"
-                icon={<Icon as={FaGithub} />}
-                circle
-              />
-            </Stack>
+              {repoName}
+            </Whisper>
           </Drawer.Title>
+          <Drawer.Actions>
+            <IconButton
+              appearance="subtle"
+              href={repository.url}
+              target="_blank"
+              icon={<Icon as={FaGithub} />}
+              circle
+            />
+          </Drawer.Actions>
         </Drawer.Header>
         <Drawer.Body style={{ padding: 0 }}>
           <PanelGroup>
