@@ -2,8 +2,16 @@
   "name": "mini-search",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/felladrin/MiniSearch"
+  },
+  "bugs": {
+    "url": "https://github.com/felladrin/MiniSearch/issues"
+  },
+  "homepage": "https://felladrin-minisearch.hf.space",
+  "type": "module",
   "scripts": {
     "start": "vite preview",
     "build": "vite build",
@@ -32,6 +40,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-fade-in": "^2.0.1",
+    "react-icons": "^5.3.0",
     "react-markdown": "^9.0.1",
     "react-medium-image-zoom": "^5.2.9",
     "react-syntax-highlighter": "^15.5.0",
