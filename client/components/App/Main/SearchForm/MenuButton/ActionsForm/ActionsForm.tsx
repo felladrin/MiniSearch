@@ -1,7 +1,10 @@
-import { Text, Button, VStack, Message } from "rsuite";
-import { useToaster } from "rsuite";
+import { Text, Button, VStack, Message, useToaster } from "rsuite";
+import { useState } from "react";
+import { LogsModal } from "./LogsModal/LogsModal";
 
 export function ActionsForm() {
+  const [isLogsModalOpen, setLogsModalOpen] = useState(false);
+
   const toaster = useToaster();
 
   const handleClearDataButtonClick = async () => {
@@ -40,14 +43,33 @@ export function ActionsForm() {
     );
   };
 
+  const isLogsButtonVisible = self.location.hash.includes("#logs");
+
   return (
-    <VStack>
-      <Button size="sm" onClick={handleClearDataButtonClick}>
-        Clear all data
-      </Button>
-      <Text size="sm" muted>
-        Reset settings and delete all files in cache to free up space.
-      </Text>
+    <VStack spacing={16}>
+      <VStack>
+        <Button size="sm" onClick={handleClearDataButtonClick}>
+          Clear all data
+        </Button>
+        <Text size="sm" muted>
+          Reset settings and delete all files in cache to free up space.
+        </Text>
+      </VStack>
+      {isLogsButtonVisible && (
+        <VStack>
+          <Button size="sm" onClick={() => setLogsModalOpen(true)}>
+            Show logs
+          </Button>
+          <Text size="sm" muted>
+            View application logs for troubleshooting and monitoring app
+            activity.
+          </Text>
+          <LogsModal
+            open={isLogsModalOpen}
+            onClose={() => setLogsModalOpen(false)}
+          />
+        </VStack>
+      )}
     </VStack>
   );
 }
