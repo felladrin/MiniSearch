@@ -10,6 +10,7 @@ import {
 } from "rsuite";
 import FadeIn from "react-fade-in";
 import { getHostname } from "../../../../modules/stringFormatters";
+import { Fragment, ReactNode } from "react";
 
 export function SearchResultsList({
   searchResults,
@@ -22,54 +23,62 @@ export function SearchResultsList({
     <FadeIn
       delay={200}
       transitionDuration={750}
-      wrapperTag={({ children }: { children: React.ReactNode }) => (
+      wrapperTag={({ children }: { children: ReactNode }) => (
         <VStack spacing={40}>{children}</VStack>
+      )}
+      childTag={({ children }: { children: ReactNode }) => (
+        <Stack direction="column" spacing={16} style={{ width: "100%" }}>
+          {children}
+        </Stack>
       )}
     >
       {searchResults.map(([title, snippet, url], index) => (
-        <VStack key={`search-result-${index}`} spacing={16}>
-          <Stack
-            spacing={16}
-            justifyContent="space-between"
-            alignItems="flex-start"
-            direction={shouldDisplayDomainBelowTitle ? "column" : "row"}
-            style={{ width: "100%" }}
-          >
-            <Button
-              appearance="link"
-              href={url}
-              target="_blank"
-              style={{
-                textWrap: "wrap",
-                padding: 0,
-                textAlign: "left",
-                fontWeight: "bold",
-              }}
-            >
-              {title}
-            </Button>
-            <Whisper
-              placement="top"
-              controlId={`search-result-${index}-for-domain`}
-              trigger="hover"
-              speaker={<Tooltip>{url}</Tooltip>}
+        <Fragment key={`search-result-${index}`}>
+          <Stack.Item style={{ width: "100%" }}>
+            <Stack
+              spacing={16}
+              justifyContent="space-between"
+              direction={shouldDisplayDomainBelowTitle ? "column" : "row"}
+              style={{ width: "100%" }}
             >
               <Button
                 appearance="link"
                 href={url}
                 target="_blank"
-                style={{ padding: 0 }}
+                style={{
+                  textWrap: "wrap",
+                  padding: 0,
+                  textAlign: "left",
+                  fontWeight: "bold",
+                }}
               >
-                <Text as="cite" size="md">
-                  {getHostname(url)}
-                </Text>
+                {title}
               </Button>
-            </Whisper>
-          </Stack>
-          <Text size="md" style={{ color: "rgb(119, 132, 145)" }}>
-            {snippet}
-          </Text>
-        </VStack>
+              <Whisper
+                placement="top"
+                controlId={`search-result-${index}-for-domain`}
+                trigger="hover"
+                speaker={<Tooltip>{url}</Tooltip>}
+              >
+                <Button
+                  appearance="link"
+                  href={url}
+                  target="_blank"
+                  style={{ padding: 0 }}
+                >
+                  <Text as="cite" size="md">
+                    {getHostname(url)}
+                  </Text>
+                </Button>
+              </Whisper>
+            </Stack>
+          </Stack.Item>
+          <Stack.Item style={{ width: "100%" }}>
+            <Text size="md" style={{ color: "rgb(119, 132, 145)" }}>
+              {snippet}
+            </Text>
+          </Stack.Item>
+        </Fragment>
       ))}
     </FadeIn>
   );
