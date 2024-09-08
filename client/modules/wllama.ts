@@ -14,6 +14,7 @@ import multiThreadWllamaJsUrl from "@wllama/wllama/esm/multi-thread/wllama.js?ur
 import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
 import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
 import { Template } from "@huggingface/jinja";
+import { getSystemPrompt } from "./systemPrompt";
 
 export async function initializeWllama(
   modelUrl: string | string[],
@@ -62,14 +63,7 @@ const defaultModelConfig: WllamaModel = {
       {
         id: 0,
         role: "system",
-        content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question.
-
-Web search results:
-${"```"}
-${searchResults}  
-${"```"}
-
-Please answer the user's inquiry based on the information provided or your general knowledge if the search results are not relevant. Include additional context or related information that might be useful or interesting to the user, even if not directly asked for in the inquiry. Always respond in the same language used by the user in their inquiry.`,
+        content: getSystemPrompt(searchResults),
       },
       { id: 1, role: "user", content: query },
     ]),
@@ -102,14 +96,7 @@ export const wllamaModels: Record<string, WllamaModel> = {
     label: "Danube 3 500M • 368 MB",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat-q5_k_m-imat-00001-of-00003.gguf",
     buildPrompt: (_, query, searchResults) =>
-      Promise.resolve(`You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question.
-
-Web search results:
-${"```"}
-${searchResults}  
-${"```"}
-
-Please answer the user's inquiry based on the information provided or your general knowledge if the search results are not relevant. Include additional context or related information that might be useful or interesting to the user, even if not directly asked for in the inquiry. Always respond in the same language used by the user in their inquiry.
+      Promise.resolve(`${getSystemPrompt(searchResults)}
 <|prompt|>
 ${query}</s>
 <|answer|>
@@ -135,14 +122,7 @@ ${query}</s>
     label: "Gemma 2 2B • 1.92 GB",
     url: "https://huggingface.co/Felladrin/gguf-sharded-gemma-2-2b-it-abliterated/resolve/main/gemma-2-2b-it-abliterated-q5_k_m-imat-00001-of-00009.gguf",
     buildPrompt: (_, query, searchResults) =>
-      Promise.resolve(`You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question.
-
-Web search results:
-${"```"}
-${searchResults}  
-${"```"}
-
-Please answer the user's inquiry based on the information provided or your general knowledge if the search results are not relevant. Include additional context or related information that might be useful or interesting to the user, even if not directly asked for in the inquiry. Always respond in the same language used by the user in their inquiry.
+      Promise.resolve(`${getSystemPrompt(searchResults)}
 <bos><start_of_turn>user
 ${query}<end_of_turn>
 <start_of_turn>model

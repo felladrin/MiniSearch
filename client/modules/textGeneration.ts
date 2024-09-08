@@ -14,6 +14,7 @@ import {
 } from "./pubSub";
 import { search } from "./search";
 import { addLogEntry } from "./logEntries";
+import { getSystemPrompt } from "./systemPrompt";
 
 export async function prepareTextGeneration() {
   if (getQuery() === "") return;
@@ -103,14 +104,7 @@ async function generateTextWithWebLlm() {
       messages: [
         {
           role: "system",
-          content: `You are an AI assistant tasked with answering questions based on provided web search results and a user inquiry. Analyze the search results and use them as background information if relevant to the inquiry, but you may disregard them if they don't contribute to answering the question.
-
-Web search results:
-${"```"}
-${getFormattedSearchResults(true)}
-${"```"}
-
-Please answer the user's inquiry based on the information provided or your general knowledge if the search results are not relevant. Include additional context or related information that might be useful or interesting to the user, even if not directly asked for in the inquiry. Always respond in the same language used by the user in their inquiry.`,
+          content: getSystemPrompt(getFormattedSearchResults(true)),
         },
         { role: "user", content: getQuery() },
       ],

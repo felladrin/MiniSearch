@@ -5,12 +5,24 @@ import {
   isWebGPUAvailable,
 } from "../../../../../../modules/webGpu";
 import { match, Pattern } from "ts-pattern";
-import { InputNumber, SelectPicker, Form, Toggle, Slider } from "rsuite";
+import {
+  InputNumber,
+  SelectPicker,
+  Form,
+  Toggle,
+  Slider,
+  Input,
+  Text,
+} from "rsuite";
 import { prebuiltAppConfig } from "@mlc-ai/web-llm";
-import { useRef } from "react";
+import { forwardRef, useRef } from "react";
 import { backgroundImageOptions } from "../../../../../../modules/backgroundImage";
 import { Setting, Settings } from "../../../../../../modules/settings";
 import { wllamaModels } from "../../../../../../modules/wllama";
+
+const Textarea = forwardRef((props, ref) => (
+  <Input {...props} as="textarea" ref={ref as never} />
+));
 
 export function SettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
@@ -160,6 +172,73 @@ export function SettingsForm() {
           </>
         ))
         .otherwise(() => null)}
+      <Form.Group>
+        <Form.ControlLabel>Instructions for AI</Form.ControlLabel>
+        <Form.Control
+          name="prompt"
+          accepter={Textarea}
+          value={settings[Setting.systemPrompt]}
+          onChange={(value) =>
+            setSettings({ ...settings, [Setting.systemPrompt]: value })
+          }
+          style={{ width: "100%", minHeight: "150px" }}
+        />
+        <Form.HelpText>
+          Customize instructions for the AI to tailor its responses.
+          <br />
+          For example:
+          <ul>
+            <li>
+              Specify preferences
+              <ul>
+                <li>
+                  <Text as="cite" muted>
+                    "use simple language"
+                  </Text>
+                </li>
+                <li>
+                  <Text as="cite" muted>
+                    "provide step-by-step explanations"
+                  </Text>
+                </li>
+              </ul>
+            </li>
+            <li>
+              Set a response style
+              <ul>
+                <li>
+                  <Text as="cite" muted>
+                    "answer in a friendly tone"
+                  </Text>
+                </li>
+                <li>
+                  <Text as="cite" muted>
+                    "write your response in Spanish"
+                  </Text>
+                </li>
+              </ul>
+            </li>
+            <li>
+              Provide context about the audience
+              <ul>
+                <li>
+                  <Text as="cite" muted>
+                    "you're talking to a high school student"
+                  </Text>
+                </li>
+                <li>
+                  <Text as="cite" muted>
+                    "consider that your audience is composed of professionals in
+                    the field of graphic design"
+                  </Text>
+                </li>
+              </ul>
+            </li>
+          </ul>
+          Note: The special tag <Text as="code">{`{{searchResults}}`}</Text>{" "}
+          will be replaced with the search results.
+        </Form.HelpText>
+      </Form.Group>
       <Form.Group>
         <Form.ControlLabel>Background Image</Form.ControlLabel>
         <Form.Control

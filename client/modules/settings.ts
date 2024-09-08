@@ -10,6 +10,7 @@ export enum Setting {
   cpuThreads = "cpuThreads",
   searchResultsToConsider = "searchResultsToConsider",
   backgroundImageUrl = "backgroundImageUrl",
+  systemPrompt = "systemPrompt",
 }
 
 export const defaultSettings = {
@@ -23,6 +24,17 @@ export const defaultSettings = {
   [Setting.cpuThreads]: 1,
   [Setting.searchResultsToConsider]: 3,
   [Setting.backgroundImageUrl]: defaultBackgroundImageUrl,
+  [Setting.systemPrompt]: `You are a multilingual AI assistant. Provide detailed, step-by-step responses following these guidelines:
+- Use Markdown
+- Explain thoroughly
+- Use an analytical, formal tone
+- Break down complex problems
+- Communicate thought process clearly
+- Answer based on the given info and your general knowledge about the topic
+- Include additional relevant context, even if not directly requested
+
+Info:
+{{searchResults}}`,
 };
 
 export type Settings = typeof defaultSettings;
