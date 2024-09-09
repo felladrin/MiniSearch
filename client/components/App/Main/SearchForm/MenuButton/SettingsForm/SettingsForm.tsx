@@ -19,7 +19,6 @@ import { forwardRef, useRef } from "react";
 import { backgroundImageOptions } from "../../../../../../modules/backgroundImage";
 import { Setting, Settings } from "../../../../../../modules/settings";
 import { wllamaModels } from "../../../../../../modules/wllama";
-import { addLogEntry } from "../../../../../../modules/logEntries";
 
 const Textarea = forwardRef((props, ref) => (
   <Input {...props} as="textarea" ref={ref as never} />
@@ -54,7 +53,6 @@ export function SettingsForm() {
     }
 
     setSettings(formValue as Settings);
-    addLogEntry("User updated the settings");
   };
 
   return (

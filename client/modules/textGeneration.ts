@@ -56,10 +56,10 @@ export async function prepareTextGeneration() {
   }
 
   addLogEntry(
-    `Response generation took ${
-      (prettyMilliseconds(new Date().getTime() - responseGenerationStartTime),
-      { verbose: true })
-    }`,
+    `Response generation took ${prettyMilliseconds(
+      new Date().getTime() - responseGenerationStartTime,
+      { verbose: true },
+    )}`,
   );
 }
 
