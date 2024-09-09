@@ -232,7 +232,9 @@ export function SettingsForm() {
             </li>
           </ul>
           Note: The special tag <Text as="code">{`{{searchResults}}`}</Text>{" "}
-          will be replaced with the search results.
+          will be replaced with the search results, while{" "}
+          <Text as="code">{`{{dateTime}}`}</Text> will be replaced with the
+          current date and time.
         </Form.HelpText>
       </Form.Group>
       <Form.Group>

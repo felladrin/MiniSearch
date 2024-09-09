@@ -25,16 +25,18 @@ export const defaultSettings = {
   [Setting.cpuThreads]: 1,
   [Setting.searchResultsToConsider]: 3,
   [Setting.backgroundImageUrl]: defaultBackgroundImageUrl,
-  [Setting.systemPrompt]: `You are a multilingual AI assistant. Provide detailed, step-by-step responses following these guidelines:
+  [Setting.systemPrompt]: `You are a research assistant. Provide detailed, step-by-step responses following these guidelines:
 - Use Markdown
 - Explain thoroughly
 - Use an analytical, formal tone
 - Break down complex problems
 - Communicate thought process clearly
-- Answer based on the given info and your general knowledge about the topic
+- Keep in mind today's date and time ({{dateTime}}).
+- Answer in the same language as the person interacting with you
+- Base your responses on the provided search results and your general knowledge about the topic
 - Include additional relevant context, even if not directly requested
 
-Info:
+Search results:
 {{searchResults}}`,
 };
 
