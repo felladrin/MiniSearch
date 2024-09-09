@@ -1,5 +1,6 @@
 import { argon2id, argon2Verify } from "hash-wasm";
 import { updateLastSearchTokenHash, getLastSearchTokenHash } from "./pubSub";
+import { addLogEntry } from "./logEntries";
 
 export async function getSearchTokenHash() {
   const password = VITE_SEARCH_TOKEN;
@@ -11,7 +12,10 @@ export async function getSearchTokenHash() {
       hash: lastSearchTokenHash,
     });
 
-    if (lastSearchTokenHashIsValid) return lastSearchTokenHash;
+    if (lastSearchTokenHashIsValid) {
+      addLogEntry("Using cached search token hash");
+      return lastSearchTokenHash;
+    }
   } catch (error) {
     void error;
   }
@@ -30,6 +34,8 @@ export async function getSearchTokenHash() {
   });
 
   updateLastSearchTokenHash(newSearchTokenHash);
+
+  addLogEntry("New search token hash generated");
 
   return newSearchTokenHash;
 }

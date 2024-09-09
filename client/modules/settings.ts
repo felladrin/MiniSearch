@@ -1,4 +1,5 @@
 import { defaultBackgroundImageUrl } from "./backgroundImage";
+import { addLogEntry } from "./logEntries";
 import { isF16Supported } from "./webGpu";
 
 export enum Setting {
@@ -36,5 +37,9 @@ export const defaultSettings = {
 Info:
 {{searchResults}}`,
 };
+
+addLogEntry(
+  `Number of logical processors in CPU: ${navigator.hardwareConcurrency ?? "unknown"}`,
+);
 
 export type Settings = typeof defaultSettings;

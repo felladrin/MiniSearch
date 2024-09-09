@@ -1,5 +1,6 @@
 import { getSearchTokenHash } from "./searchTokenHash";
 import { name } from "../../package.json";
+import { addLogEntry } from "./logEntries";
 
 export type SearchResults = {
   textResults: [title: string, snippet: string, url: string][];
@@ -95,6 +96,7 @@ function cacheSearchWithIndexedDB(
   const dbPromise = openDB();
 
   return async (query: string, limit?: number): Promise<SearchResults> => {
+    addLogEntry("Starting new search");
     if (!indexedDB) return fn(query, limit);
 
     const db = await dbPromise;
@@ -114,7 +116,12 @@ function cacheSearchWithIndexedDB(
     });
 
     if (cachedResult && Date.now() - cachedResult.timestamp < timeToLive) {
+      addLogEntry(
+        `Search cache hit, returning cached results containing ${cachedResult.results.textResults.length} texts and ${cachedResult.results.imageResults.length} images`,
+      );
       return cachedResult.results;
+    } else {
+      addLogEntry("Search cache miss, fetching new results");
     }
 
     const results = await fn(query, limit);
@@ -122,6 +129,10 @@ function cacheSearchWithIndexedDB(
     const writeTransaction = db.transaction(storeName, "readwrite");
     const writeStore = writeTransaction.objectStore(storeName);
     writeStore.put({ results, timestamp: Date.now() }, key);
+
+    addLogEntry(
+      `Search completed with ${results.textResults.length} text results and ${results.imageResults.length} image results`,
+    );
 
     return results;
   };

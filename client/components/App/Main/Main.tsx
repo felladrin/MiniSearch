@@ -28,7 +28,8 @@ import {
   Col,
 } from "rsuite";
 import { ImageResultsList } from "./ImageResultsList/ImageResultsList";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { addLogEntry } from "../../../modules/logEntries";
 
 export function Main() {
   const [query, updateQuery] = usePubSub(queryPubSub);
@@ -40,6 +41,14 @@ export function Main() {
   const [searchState] = usePubSub(searchStatePubSub);
   const [modelLoadingProgress] = usePubSub(modelLoadingProgressPubSub);
   const [settings] = usePubSub(settingsPubSub);
+
+  useEffect(() => {
+    addLogEntry(`Search state changed to '${searchState}'`);
+  }, [searchState]);
+
+  useEffect(() => {
+    addLogEntry(`Text generation state changed to '${textGenerationState}'`);
+  }, [textGenerationState]);
 
   const MemoizedAiResponseSection = useMemo(
     () =>

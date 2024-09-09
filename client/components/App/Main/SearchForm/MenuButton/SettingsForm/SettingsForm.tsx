@@ -19,6 +19,7 @@ import { forwardRef, useRef } from "react";
 import { backgroundImageOptions } from "../../../../../../modules/backgroundImage";
 import { Setting, Settings } from "../../../../../../modules/settings";
 import { wllamaModels } from "../../../../../../modules/wllama";
+import { addLogEntry } from "../../../../../../modules/logEntries";
 
 const Textarea = forwardRef((props, ref) => (
   <Input {...props} as="textarea" ref={ref as never} />
@@ -53,6 +54,7 @@ export function SettingsForm() {
     }
 
     setSettings(formValue as Settings);
+    addLogEntry("User updated the settings");
   };
 
   return (
@@ -175,12 +177,8 @@ export function SettingsForm() {
       <Form.Group>
         <Form.ControlLabel>Instructions for AI</Form.ControlLabel>
         <Form.Control
-          name="prompt"
+          name={Setting.systemPrompt}
           accepter={Textarea}
-          value={settings[Setting.systemPrompt]}
-          onChange={(value) =>
-            setSettings({ ...settings, [Setting.systemPrompt]: value })
-          }
           style={{ width: "100%", minHeight: "150px" }}
         />
         <Form.HelpText>

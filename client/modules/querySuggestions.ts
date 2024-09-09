@@ -1,4 +1,5 @@
 import { getQuerySuggestions, updateQuerySuggestions } from "./pubSub";
+import { addLogEntry } from "./logEntries";
 
 export async function getRandomQuerySuggestion() {
   if (getQuerySuggestions().length === 0) await refillQuerySuggestions(25);
@@ -25,4 +26,6 @@ async function refillQuerySuggestions(limit?: number) {
   updateQuerySuggestions(
     querySuggestionsList.sort(() => Math.random() - 0.5).slice(0, limit),
   );
+
+  addLogEntry(`Query suggestions refilled with ${limit} suggestions`);
 }

@@ -11,6 +11,7 @@ import {
 import FadeIn from "react-fade-in";
 import { getHostname } from "../../../../modules/stringFormatters";
 import { ReactNode } from "react";
+import { addLogEntry } from "../../../../modules/logEntries";
 
 export function SearchResultsList({
   searchResults,
@@ -51,6 +52,9 @@ export function SearchResultsList({
                   padding: 0,
                   textAlign: "left",
                   fontWeight: "bold",
+                }}
+                onClick={() => {
+                  addLogEntry("User clicked a text result");
                 }}
               >
                 {title}

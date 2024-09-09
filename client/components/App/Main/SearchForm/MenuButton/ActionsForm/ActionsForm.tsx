@@ -1,6 +1,7 @@
 import { Text, Button, VStack, Message, useToaster } from "rsuite";
 import { useState } from "react";
 import { LogsModal } from "./LogsModal/LogsModal";
+import { addLogEntry } from "../../../../../../modules/logEntries";
 
 export function ActionsForm() {
   const [isLogsModalOpen, setLogsModalOpen] = useState(false);
@@ -13,6 +14,8 @@ export function ActionsForm() {
     );
 
     if (!sureToDelete) return;
+
+    addLogEntry("User initiated data clearing");
 
     toaster.push(
       <Message showIcon type="info" id="clear-data-toast" closable>
@@ -41,9 +44,19 @@ export function ActionsForm() {
         Data cleared!
       </Message>,
     );
+
+    addLogEntry("All data cleared successfully");
   };
 
-  const isLogsButtonVisible = self.location.hash.includes("#logs");
+  const handleShowLogsButtonClick = () => {
+    addLogEntry("User opened the logs modal");
+    setLogsModalOpen(true);
+  };
+
+  const handleCloseLogsButtonClick = () => {
+    addLogEntry("User closed the logs modal");
+    setLogsModalOpen(false);
+  };
 
   return (
     <VStack spacing={16}>
@@ -55,21 +68,18 @@ export function ActionsForm() {
           Reset settings and delete all files in cache to free up space.
         </Text>
       </VStack>
-      {isLogsButtonVisible && (
-        <VStack>
-          <Button size="sm" onClick={() => setLogsModalOpen(true)}>
-            Show logs
-          </Button>
-          <Text size="sm" muted>
-            View application logs for troubleshooting and monitoring app
-            activity.
-          </Text>
-          <LogsModal
-            open={isLogsModalOpen}
-            onClose={() => setLogsModalOpen(false)}
-          />
-        </VStack>
-      )}
+      <VStack>
+        <Button size="sm" onClick={handleShowLogsButtonClick}>
+          Show logs
+        </Button>
+        <Text size="sm" muted>
+          View session logs for debugging.
+        </Text>
+        <LogsModal
+          open={isLogsModalOpen}
+          onClose={handleCloseLogsButtonClick}
+        />
+      </VStack>
     </VStack>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { usePubSub } from "create-pubsub/react";
 import { settingsPubSub } from "../../modules/pubSub";
 import { defaultSettings } from "../../modules/settings";
+import { addLogEntry } from "../../modules/logEntries";
 
 /**
  * A custom React hook that initializes the application settings.
@@ -25,7 +26,10 @@ import { defaultSettings } from "../../modules/settings";
 export function useInitializeSettings() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
 
-  useEffect(() => setSettings({ ...defaultSettings, ...settings }), []);
+  useEffect(() => {
+    setSettings({ ...defaultSettings, ...settings });
+    addLogEntry("Settings initialized");
+  }, []);
 
   return settings;
 }

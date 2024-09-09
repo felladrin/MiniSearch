@@ -6,6 +6,7 @@ import { useLocation } from "wouter";
 import { prepareTextGeneration } from "../../../../modules/textGeneration";
 import { isMatching, match, Pattern } from "ts-pattern";
 import { Button, HStack, Stack, VStack } from "rsuite";
+import { addLogEntry } from "../../../../modules/logEntries";
 
 export function SearchForm({
   query,
@@ -47,6 +48,7 @@ export function SearchForm({
     setSuggestedQuery(await getRandomQuerySuggestion());
     setTextAreaValue("");
     textAreaRef.current?.focus();
+    addLogEntry("User cleaned the search query field");
   };
 
   const startSearching = useCallback(() => {
@@ -61,6 +63,10 @@ export function SearchForm({
     updateQuery(queryToEncode);
 
     prepareTextGeneration();
+
+    addLogEntry(
+      `User submitted a search with ${queryToEncode.length} characters length`,
+    );
   }, [textAreaValue, suggestedQuery, updateQuery]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {

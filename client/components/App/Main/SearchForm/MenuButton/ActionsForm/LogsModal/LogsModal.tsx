@@ -1,4 +1,4 @@
-import { Modal, Table, Divider, Pagination } from "rsuite";
+import { Modal, Table, Pagination, Message, Button, Stack } from "rsuite";
 import { usePubSub } from "create-pubsub/react";
 import { logEntriesPubSub } from "../../../../../../../modules/logEntries";
 import { useState } from "react";
@@ -20,34 +20,61 @@ export function LogsModal({
     setLimit(dataKey);
   };
 
-  const data = logEntries.filter((_, i) => {
+  const data = logEntries.filter((_, index) => {
     const start = limit * (page - 1);
     const end = start + limit;
-    return i >= start && i < end;
+    return index >= start && index < end;
   });
+
+  const downloadLogsAsJson = () => {
+    const jsonString = JSON.stringify(logEntries, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "logs.json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       size={"calc(100% - 120px)"}
-      onEntered={() => {
-        setLoading(false);
-      }}
+      onEntered={() => setLoading(false)}
     >
       <Modal.Header>
         <Modal.Title>Logs</Modal.Title>
       </Modal.Header>
       {!loading && (
         <>
-          <Divider />
-          <Table
-            height={400}
-            data={data}
-            wordWrap="break-word"
-            // headerHeight={30}
-            rowHeight={25}
-          >
+          <Message showIcon bordered type="info" style={{ margin: "20px 0 " }}>
+            <Stack
+              direction="row"
+              spacing={16}
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <span>
+                These logs are stored only in your browser for private use. They
+                are not sent automatically and are only for debugging purposes
+                in case you need to{" "}
+                <a
+                  href="https://github.com/felladrin/MiniSearch/issues/new?labels=bug&template=bug_report.yml"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  report a bug
+                </a>
+                .
+              </span>
+              <Button onClick={downloadLogsAsJson}>Download Logs</Button>
+            </Stack>
+          </Message>
+          <Table height={535} data={data} wordWrap="break-word" rowHeight={25}>
             <Table.Column width={200} align="center">
               <Table.HeaderCell>Time</Table.HeaderCell>
               <Table.Cell>

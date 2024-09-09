@@ -15,6 +15,7 @@ import {
 import { search } from "./search";
 import { addLogEntry } from "./logEntries";
 import { getSystemPrompt } from "./systemPrompt";
+import prettyMilliseconds from "pretty-ms";
 
 export async function prepareTextGeneration() {
   if (getQuery() === "") return;
@@ -40,19 +41,25 @@ export async function prepareTextGeneration() {
       if (!getSettings().enableWebGpu) throw Error("WebGPU is disabled.");
 
       await generateTextWithWebLlm();
-    } catch {
+    } catch (error) {
+      addLogEntry(`Skipping text generation with WebLLM: ${error}`);
+      addLogEntry(`Starting text generation with Wllama`);
       await generateTextWithWllama();
     }
 
     if (getTextGenerationState() !== "interrupted") {
       updateTextGenerationState("completed");
     }
-  } catch {
+  } catch (error) {
+    addLogEntry(`Error generating text: ${error}`);
     updateTextGenerationState("failed");
   }
 
   addLogEntry(
-    `Response generation took ${new Date().getTime() - responseGenerationStartTime}ms`,
+    `Response generation took ${
+      (prettyMilliseconds(new Date().getTime() - responseGenerationStartTime),
+      { verbose: true })
+    }`,
   );
 }
 

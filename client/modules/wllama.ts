@@ -15,6 +15,7 @@ import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.was
 import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
 import { Template } from "@huggingface/jinja";
 import { getSystemPrompt } from "./systemPrompt";
+import { addLogEntry } from "./logEntries";
 
 export async function initializeWllama(
   modelUrl: string | string[],
@@ -23,6 +24,8 @@ export async function initializeWllama(
     model?: DownloadModelConfig;
   },
 ) {
+  addLogEntry("Initializing Wllama");
+
   const wllama = new Wllama(
     {
       "single-thread/wllama.js": singleThreadWllamaJsUrl,
@@ -37,6 +40,8 @@ export async function initializeWllama(
   wllama.cacheManager = new CustomCacheManager("wllama-cache");
 
   await wllama.loadModelFromUrl(modelUrl, config?.model);
+
+  addLogEntry("Wllama initialized successfully");
 
   return wllama;
 }

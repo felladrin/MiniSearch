@@ -16,16 +16,19 @@ import { FaGithub } from "react-icons/fa";
 import { repository } from "../../../../../../package.json";
 import prettyMilliseconds from "pretty-ms";
 import { getSemanticVersion } from "../../../../../modules/stringFormatters";
+import { addLogEntry } from "../../../../../modules/logEntries";
 
 export function MenuButton() {
   const [isDrawerOpen, setDrawerOpen] = useState(false);
 
   const openDrawer = () => {
     setDrawerOpen(true);
+    addLogEntry("User opened the menu");
   };
 
   const closeDrawer = () => {
     setDrawerOpen(false);
+    addLogEntry("User closed the menu");
   };
 
   const repoName = repository.url.split("/").pop();
@@ -84,6 +87,7 @@ export function MenuButton() {
               target="_blank"
               icon={<Icon as={FaGithub} />}
               circle
+              onClick={() => addLogEntry("User clicked the GitHub link")}
             />
           </Drawer.Actions>
         </Drawer.Header>

@@ -1,6 +1,7 @@
 import { Stack, Avatar, Button, Text, Notification } from "rsuite";
 import Zoom from "react-medium-image-zoom";
 import { getHostname } from "../../../../../modules/stringFormatters";
+import { addLogEntry } from "../../../../../modules/logEntries";
 
 export function ImageResult({
   title,
@@ -60,6 +61,9 @@ export function ImageResult({
                         size="xs"
                         title="Click to visit the page where the image was found"
                         rel="noopener noreferrer"
+                        onClick={() => {
+                          addLogEntry("User clicked an image result");
+                        }}
                       >
                         {getHostname(url)}
                       </Button>
