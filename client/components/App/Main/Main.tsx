@@ -57,8 +57,13 @@ export function Main() {
           <Stack.Item style={{ width: "100%" }}>
             {match(textGenerationState)
               .with(
-                Pattern.union("generating", "interrupted", "completed"),
-                () => (
+                Pattern.union(
+                  "generating",
+                  "interrupted",
+                  "completed",
+                  "failed",
+                ),
+                (textGenerationState) => (
                   <>
                     <Divider>
                       {match(textGenerationState)
@@ -118,6 +123,21 @@ export function Main() {
                           {response}
                         </Markdown>
                       </Stack.Item>
+                      {match(textGenerationState)
+                        .with("failed", () => (
+                          <Stack.Item alignSelf="center">
+                            <Message
+                              type="warning"
+                              centered
+                              showIcon
+                              header="Failed to generate response"
+                            >
+                              Could not generate response. It's possible that
+                              your browser or your system is out of memory.
+                            </Message>
+                          </Stack.Item>
+                        ))
+                        .otherwise(() => null)}
                     </VStack>
                   </>
                 ),
@@ -145,7 +165,7 @@ export function Main() {
               })
               .with(
                 Pattern.union("awaitingSearchResults", "preparingToGenerate"),
-                () => (
+                (textGenerationState) => (
                   <>
                     <Divider>
                       {match(textGenerationState)
@@ -157,26 +177,12 @@ export function Main() {
                           "preparingToGenerate",
                           () => "Preparing AI response...",
                         )
-                        .otherwise(() => "Loading...")}
+                        .exhaustive()}
                     </Divider>
                     <Placeholder.Paragraph rows={4} active />
                   </>
                 ),
               )
-              .with("failed", () => (
-                <>
-                  <Divider>AI Response</Divider>
-                  <Message
-                    type="warning"
-                    centered
-                    showIcon
-                    header="Failed to generate response"
-                  >
-                    Could not generate response. It's possible that your browser
-                    or your system is out of memory.
-                  </Message>
-                </>
-              ))
               .otherwise(() => null)}
           </Stack.Item>
         ))
