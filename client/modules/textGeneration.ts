@@ -185,12 +185,25 @@ async function generateTextWithWllama() {
     let streamedMessage = "";
 
     await wllama.createCompletion(prompt, {
+      stopTokens: model.stopTokens,
       sampling: model.sampling,
       onNewToken: (_token, _piece, currentText, { abortSignal }) => {
         if (getTextGenerationState() === "interrupted") {
           abortSignal();
         } else if (getTextGenerationState() !== "generating") {
           updateTextGenerationState("generating");
+        }
+
+        if (model.stopStrings) {
+          for (const stopString of model.stopStrings) {
+            if (
+              currentText.slice(-(stopString.length * 2)).includes(stopString)
+            ) {
+              abortSignal();
+              currentText = currentText.slice(0, -stopString.length);
+              break;
+            }
+          }
         }
 
         streamedMessage = currentText;

@@ -58,6 +58,8 @@ export interface WllamaModel {
     query: string,
     searchResults: string,
   ) => Promise<string>;
+  stopStrings?: string[];
+  stopTokens?: number[];
 }
 
 const defaultModelConfig: WllamaModel = {
@@ -133,10 +135,21 @@ ${query}<end_of_turn>
 <start_of_turn>model
 `),
   },
+  "olmo-7b": {
+    ...defaultModelConfig,
+    label: "OLMo 7B • 2.67 GB",
+    url: "https://huggingface.co/Felladrin/OLMo-7B-0424-Instruct-hf-IQ3_XXS-GGUF/resolve/main/olmo-7b-0424-instruct-hf-iq3_xxs-imat-00001-of-00015.gguf",
+  },
   "phi-3.5-mini-3.8b": {
     ...defaultModelConfig,
     label: "Phi 3.5 Mini 3.8B • 2.82 GB",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-phi-3.5-mini-instruct/resolve/main/phi-3-00001-of-00025.gguf",
+  },
+  "yi-1.5-6b": {
+    ...defaultModelConfig,
+    label: "Yi 1.5 6B • 3.24 GB",
+    url: "https://huggingface.co/Felladrin/gguf-Q3_K_L-Yi-1.5-6B-Chat/resolve/main/Yi-1.5-6B-Chat-Q3_K_L.shard-00001-of-00032.gguf",
+    stopStrings: ["<|im_end|>"],
   },
 };
 
