@@ -135,11 +135,6 @@ ${query}<end_of_turn>
 <start_of_turn>model
 `),
   },
-  "olmo-7b": {
-    ...defaultModelConfig,
-    label: "OLMo 7B • 2.67 GB",
-    url: "https://huggingface.co/Felladrin/OLMo-7B-0424-Instruct-hf-IQ3_XXS-GGUF/resolve/main/olmo-7b-0424-instruct-hf-iq3_xxs-imat-00001-of-00015.gguf",
-  },
   "phi-3.5-mini-3.8b": {
     ...defaultModelConfig,
     label: "Phi 3.5 Mini 3.8B • 2.82 GB",
@@ -147,9 +142,23 @@ ${query}<end_of_turn>
   },
   "yi-1.5-6b": {
     ...defaultModelConfig,
-    label: "Yi 1.5 6B • 3.24 GB",
-    url: "https://huggingface.co/Felladrin/gguf-Q3_K_L-Yi-1.5-6B-Chat/resolve/main/Yi-1.5-6B-Chat-Q3_K_L.shard-00001-of-00032.gguf",
+    label: "Yi 1.5 6B • 3.67 GB",
+    url: "https://huggingface.co/Felladrin/gguf-Q4_K_M-Yi-1.5-6B-Chat/resolve/main/yi-1-00001-of-00019.gguf",
     stopStrings: ["<|im_end|>"],
+    sampling: { temp: 0 },
+  },
+  "falcon-mamba-7b": {
+    ...defaultModelConfig,
+    label: "Falcon Mamba 7B • 3.51 GB",
+    url: "https://huggingface.co/Felladrin/gguf-Q3_K_XL-falcon-mamba-7b/resolve/main/falcon-mamba-7b-Q3_K_XL.shard-00001-of-00013.gguf",
+    stopStrings: ["<|im_end|>"],
+    sampling: { temp: 0 },
+  },
+  "llama-3.1-supernova-8b": {
+    ...defaultModelConfig,
+    label: "Llama 3.1 SuperNova 8B • 3.69 GB",
+    url: "https://huggingface.co/Felladrin/gguf-Q2_K_L-Llama-3.1-SuperNova-Lite/resolve/main/Llama-3.1-SuperNova-Lite-Q2_K_L.shard-00001-of-00007.gguf",
+    contextSize: 1792,
   },
 };
 
