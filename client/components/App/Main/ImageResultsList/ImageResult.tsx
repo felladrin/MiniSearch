@@ -95,6 +95,8 @@ export function ImageResult({
           objectFit: "cover",
           height: "120px",
           width: "120px",
+          borderRadius: "4px",
+          border: "2px solid var(--mantine-color-default-border)",
         }}
       />
     </Zoom>
