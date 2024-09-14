@@ -1,15 +1,14 @@
-import { Text, Button, VStack, Message, useToaster } from "rsuite";
+import { Text, Button, Stack } from "@mantine/core";
 import { useState } from "react";
-import { LogsModal } from "./LogsModal/LogsModal";
+import { LogsModal } from "./LogsModal";
 import { addLogEntry } from "../../../../../../modules/logEntries";
+import { notifications } from "@mantine/notifications";
 
 export function ActionsForm() {
   const [isLogsModalOpen, setLogsModalOpen] = useState(false);
 
-  const toaster = useToaster();
-
   const handleClearDataButtonClick = async () => {
-    const sureToDelete = self.confirm(
+    const sureToDelete = window.confirm(
       "Are you sure you want to reset the settings and delete all files in cache?",
     );
 
@@ -17,33 +16,28 @@ export function ActionsForm() {
 
     addLogEntry("User initiated data clearing");
 
-    toaster.push(
-      <Message showIcon type="info" id="clear-data-toast" closable>
-        Clearing data...
-      </Message>,
-    );
+    notifications.show({
+      title: "Clearing data...",
+      message: "Please wait while we clear your data.",
+      color: "blue",
+    });
 
-    self.localStorage.clear();
+    window.localStorage.clear();
 
-    for (const cacheName of await self.caches.keys()) {
-      await self.caches.delete(cacheName);
+    for (const cacheName of await window.caches.keys()) {
+      await window.caches.delete(cacheName);
     }
 
-    for (const databaseInfo of await self.indexedDB.databases()) {
-      if (databaseInfo.name) self.indexedDB.deleteDatabase(databaseInfo.name);
+    for (const databaseInfo of await window.indexedDB.databases()) {
+      if (databaseInfo.name) window.indexedDB.deleteDatabase(databaseInfo.name);
     }
 
-    toaster.push(
-      <Message
-        showIcon
-        type="success"
-        id="clear-data-toast"
-        closable
-        onClose={() => self.location.reload()}
-      >
-        Data cleared!
-      </Message>,
-    );
+    notifications.show({
+      title: "Data cleared!",
+      message: "All data has been successfully cleared.",
+      color: "green",
+      onClose: () => window.location.reload(),
+    });
 
     addLogEntry("All data cleared successfully");
   };
@@ -59,27 +53,29 @@ export function ActionsForm() {
   };
 
   return (
-    <VStack spacing={16}>
-      <VStack>
-        <Button size="sm" onClick={handleClearDataButtonClick}>
-          Clear all data
+    <Stack gap="lg">
+      <Stack gap="xs">
+        <Button onClick={handleClearDataButtonClick} variant="default">
+          <Stack align="flex-start" gap="xs">
+            Clear all data
+          </Stack>
         </Button>
-        <Text size="sm" muted>
+        <Text size="xs" c="dimmed">
           Reset settings and delete all files in cache to free up space.
         </Text>
-      </VStack>
-      <VStack>
-        <Button size="sm" onClick={handleShowLogsButtonClick}>
+      </Stack>
+      <Stack gap="xs">
+        <Button size="sm" onClick={handleShowLogsButtonClick} variant="default">
           Show logs
         </Button>
-        <Text size="sm" muted>
+        <Text size="xs" c="dimmed">
           View session logs for debugging.
         </Text>
         <LogsModal
-          open={isLogsModalOpen}
+          opened={isLogsModalOpen}
           onClose={handleCloseLogsButtonClick}
         />
-      </VStack>
-    </VStack>
+      </Stack>
+    </Stack>
   );
 }

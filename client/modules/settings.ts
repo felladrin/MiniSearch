@@ -1,4 +1,3 @@
-import { defaultBackgroundImageUrl } from "./backgroundImage";
 import { addLogEntry } from "./logEntries";
 import { isF16Supported } from "./webGpu";
 
@@ -10,7 +9,6 @@ export enum Setting {
   wllamaModelId = "wllamaModelId",
   cpuThreads = "cpuThreads",
   searchResultsToConsider = "searchResultsToConsider",
-  backgroundImageUrl = "backgroundImageUrl",
   systemPrompt = "systemPrompt",
 }
 
@@ -24,7 +22,6 @@ export const defaultSettings = {
   [Setting.wllamaModelId]: "default",
   [Setting.cpuThreads]: 1,
   [Setting.searchResultsToConsider]: 3,
-  [Setting.backgroundImageUrl]: defaultBackgroundImageUrl,
   [Setting.systemPrompt]: `You are a research assistant. Provide detailed, step-by-step responses following these guidelines:
 - Use Markdown
 - Explain thoroughly

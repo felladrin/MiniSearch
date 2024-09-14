@@ -1,11 +1,10 @@
 import { useEffect, useRef, FormEvent, useState, useCallback } from "react";
-import TextareaAutosize from "react-textarea-autosize";
 import { getRandomQuerySuggestion } from "../../../../modules/querySuggestions";
 import { MenuButton } from "./MenuButton/MenuButton";
 import { useLocation } from "wouter";
 import { prepareTextGeneration } from "../../../../modules/textGeneration";
 import { isMatching, match, Pattern } from "ts-pattern";
-import { Button, HStack, Stack, VStack } from "rsuite";
+import { Button, Group, Stack, Textarea } from "@mantine/core";
 import { addLogEntry } from "../../../../modules/logEntries";
 
 export function SearchForm({
@@ -101,42 +100,36 @@ export function SearchForm({
         .otherwise(() => undefined)}
     >
       <form onSubmit={handleSubmit} style={{ width: "100%" }}>
-        <VStack>
-          <Stack.Item style={{ width: "100%" }}>
-            <TextareaAutosize
-              value={textAreaValue}
-              placeholder={suggestedQuery}
-              ref={textAreaRef}
-              onKeyDown={handleKeyDown}
-              onChange={handleInputChange}
-              className="rs-input"
-              autoFocus
-              minRows={1}
-              maxRows={8}
-            />
-          </Stack.Item>
-          <Stack.Item style={{ width: "100%" }}>
-            <HStack>
-              {match(textAreaValue)
-                .with(Pattern.string.minLength(1), () => (
-                  <Stack.Item>
-                    <Button size="sm" onClick={handleClearButtonClick}>
-                      Clear
-                    </Button>
-                  </Stack.Item>
-                ))
-                .otherwise(() => null)}
-              <Stack.Item grow={1}>
-                <Button size="sm" type="submit" block>
-                  Search
+        <Stack gap="xs">
+          <Textarea
+            value={textAreaValue}
+            placeholder={suggestedQuery}
+            ref={textAreaRef}
+            onKeyDown={handleKeyDown}
+            onChange={handleInputChange}
+            autosize
+            minRows={1}
+            maxRows={8}
+            autoFocus
+          />
+          <Group gap="xs">
+            {match(textAreaValue)
+              .with(Pattern.string.minLength(1), () => (
+                <Button
+                  size="xs"
+                  onClick={handleClearButtonClick}
+                  variant="default"
+                >
+                  Clear
                 </Button>
-              </Stack.Item>
-              <Stack.Item>
-                <MenuButton />
-              </Stack.Item>
-            </HStack>
-          </Stack.Item>
-        </VStack>
+              ))
+              .otherwise(() => null)}
+            <Button size="xs" type="submit" variant="default" flex={1}>
+              Search
+            </Button>
+            <MenuButton />
+          </Group>
+        </Stack>
       </form>
     </div>
   );
