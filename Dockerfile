@@ -29,4 +29,4 @@ COPY --chown=${USERNAME}:${USERNAME} . .
 RUN git config --global --add safe.directory ${APP_DIR}
 RUN npm run build
 ENTRYPOINT [ "/bin/sh", "-c" ]
-CMD [ "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & (npm start -- --host)" ]
+CMD [ "/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f & npx pm2 start ecosystem.config.cjs && npx pm2 logs production-server" ]
