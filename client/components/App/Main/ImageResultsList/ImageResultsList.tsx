@@ -10,9 +10,8 @@ export function ImageResultsList({
   return (
     <Carousel slideSize="0" slideGap="xs" align="start" dragFree loop>
       {imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => (
-        <Carousel.Slide>
+        <Carousel.Slide key={sourceUrl}>
           <ImageResult
-            key={sourceUrl}
             title={title}
             url={url}
             thumbnailUrl={thumbnailUrl}
