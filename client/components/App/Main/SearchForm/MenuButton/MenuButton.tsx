@@ -6,7 +6,8 @@ import {
   Drawer,
   Accordion,
   ActionIcon,
-  Tooltip,
+  HoverCard,
+  Stack,
   Group,
   Center,
 } from "@mantine/core";
@@ -42,21 +43,24 @@ export function MenuButton() {
         onClose={closeDrawer}
         size="md"
         title={
-          <Group>
+          <Group gap="xs">
             <ActionIcon
               variant="subtle"
               component="a"
               color="var(--mantine-color-text)"
               href={repository.url}
               target="_blank"
-              size="sm"
               onClick={() => addLogEntry("User clicked the GitHub link")}
             >
-              <IconBrandGithub />
+              <IconBrandGithub size={16} />
             </ActionIcon>
-            <Tooltip
-              label={
-                <>
+
+            <HoverCard shadow="md" withArrow>
+              <HoverCard.Target>
+                <Center>{repoName}</Center>
+              </HoverCard.Target>
+              <HoverCard.Dropdown>
+                <Stack gap="xs">
                   <Center>{repoName}</Center>
                   <Center>
                     {`v${getSemanticVersion(VITE_BUILD_DATE_TIME)}+${VITE_COMMIT_SHORT_HASH}`}
@@ -73,11 +77,9 @@ export function MenuButton() {
                     )}{" "}
                     ago
                   </Center>
-                </>
-              }
-            >
-              <span>{repoName}</span>
-            </Tooltip>
+                </Stack>
+              </HoverCard.Dropdown>
+            </HoverCard>
           </Group>
         }
       >
