@@ -158,7 +158,7 @@ ${query}<end_of_turn>
     ...defaultModelConfig,
     label: "Llama 3.1 SuperNova 8B • 3.69 GB",
     url: "https://huggingface.co/Felladrin/gguf-Q2_K_L-Llama-3.1-SuperNova-Lite/resolve/main/Llama-3.1-SuperNova-Lite-Q2_K_L.shard-00001-of-00007.gguf",
-    contextSize: 1792,
+    contextSize: 1536,
   },
 };
 
