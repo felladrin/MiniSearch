@@ -1,6 +1,5 @@
-import { Box, Group, ScrollArea } from "@mantine/core";
+import { Carousel } from "@mantine/carousel";
 import { SearchResults } from "../../../../modules/search";
-import FadeIn from "react-fade-in";
 import { ImageResult } from "./ImageResult";
 
 export function ImageResultsList({
@@ -9,20 +8,18 @@ export function ImageResultsList({
   imageResults: SearchResults["imageResults"];
 }) {
   return (
-    <ScrollArea w={"100%"} scrollbars="x">
-      <Box w={imageResults.length * 256} my="sm">
-        <FadeIn delay={150} transitionDuration={1500} wrapperTag={Group}>
-          {imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => (
-            <ImageResult
-              key={sourceUrl}
-              title={title}
-              url={url}
-              thumbnailUrl={thumbnailUrl}
-              sourceUrl={sourceUrl}
-            />
-          ))}
-        </FadeIn>
-      </Box>
-    </ScrollArea>
+    <Carousel slideSize="0" slideGap="xs" align="start" dragFree loop>
+      {imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => (
+        <Carousel.Slide>
+          <ImageResult
+            key={sourceUrl}
+            title={title}
+            url={url}
+            thumbnailUrl={thumbnailUrl}
+            sourceUrl={sourceUrl}
+          />
+        </Carousel.Slide>
+      ))}
+    </Carousel>
   );
 }
