@@ -1,10 +1,16 @@
 import { SearchResults } from "../../../../modules/search";
-import { Tooltip, Stack, Text, Flex, UnstyledButton } from "@mantine/core";
+import {
+  Tooltip,
+  Stack,
+  Text,
+  Flex,
+  UnstyledButton,
+  Transition,
+} from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
-import FadeIn from "react-fade-in";
 import { getHostname } from "../../../../modules/stringFormatters";
-import { ReactNode } from "react";
 import { addLogEntry } from "../../../../modules/logEntries";
+import { useEffect, useState } from "react";
 
 export function SearchResultsList({
   searchResults,
@@ -12,17 +18,21 @@ export function SearchResultsList({
   searchResults: SearchResults["textResults"];
 }) {
   const shouldDisplayDomainBelowTitle = useMediaQuery("(max-width: 720px)");
+  const [isMounted, setMounted] = useState(false);
 
-  return (
-    <FadeIn
-      delay={200}
-      transitionDuration={750}
-      wrapperTag={({ children }: { children: ReactNode }) => (
-        <Stack gap={40}>{children}</Stack>
-      )}
+  useEffect(() => setMounted(true), []);
+
+  return searchResults.map(([title, snippet, url], index) => (
+    <Transition
+      key={url}
+      mounted={isMounted}
+      transition="fade"
+      timingFunction="ease"
+      enterDelay={index * 200}
+      duration={750}
     >
-      {searchResults.map(([title, snippet, url]) => (
-        <Stack key={url} gap={16}>
+      {(styles) => (
+        <Stack gap={16} style={styles}>
           <Flex
             gap={shouldDisplayDomainBelowTitle ? 0 : 16}
             justify="space-between"
@@ -62,7 +72,7 @@ export function SearchResultsList({
             {snippet}
           </Text>
         </Stack>
-      ))}
-    </FadeIn>
-  );
+      )}
+    </Transition>
+  ));
 }
