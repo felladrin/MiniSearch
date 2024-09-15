@@ -107,8 +107,9 @@ export function SettingsForm() {
               label="AI Model"
               description={
                 <>
-                  <div>Select the model to use for AI responses.</div>
-                  <div>Recommended: Phi-3.5-mini-instruct</div>
+                  <span>Select the model to use for AI responses.</span>
+                  <br />
+                  <span>Recommended: Phi-3.5-mini-instruct</span>
                 </>
               }
               data={webGpuModels.current}
@@ -121,8 +122,9 @@ export function SettingsForm() {
                 label="AI Model"
                 description={
                   <>
-                    <div>Select the model to use for AI responses.</div>
-                    <div>Recommended: Qwen 2 0.5B</div>
+                    <span>Select the model to use for AI responses.</span>
+                    <br />
+                    <span>Recommended: Qwen 2 0.5B</span>
                   </>
                 }
                 data={wllamaModelOptions.current}
@@ -143,10 +145,11 @@ export function SettingsForm() {
           descriptionProps={{ component: "div" }}
           description={
             <>
-              <div>
+              <span>
                 Customize instructions for the AI to tailor its responses.
-              </div>
-              <div>For example:</div>
+              </span>
+              <br />
+              <span>For example:</span>
               <ul>
                 <li>
                   Specify preferences
@@ -173,12 +176,12 @@ export function SettingsForm() {
                   </ul>
                 </li>
               </ul>
-              <div>
+              <span>
                 Note: The special tag <code>{`{{searchResults}}`}</code> will be
                 replaced with the search results, while{" "}
                 <code>{`{{dateTime}}`}</code> will be replaced with the current
                 date and time.
-              </div>
+              </span>
             </>
           }
           autosize
