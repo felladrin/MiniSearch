@@ -11,15 +11,22 @@ import syntaxHighlighterStyle from "react-syntax-highlighter/dist/esm/styles/pri
 import { match, Pattern } from "ts-pattern";
 import {
   Stack,
-  Divider,
+  ScrollArea,
+  Text,
+  Card,
+  ActionIcon,
+  Group,
+  CopyButton,
+  Tooltip,
   Skeleton,
   Alert,
   Progress,
   Button,
   Center,
   TypographyStylesProvider,
+  Badge,
 } from "@mantine/core";
-import { IconInfoCircle } from "@tabler/icons-react";
+import { IconCheck, IconCopy, IconInfoCircle } from "@tabler/icons-react";
 import { useMemo } from "react";
 import { PublishFunction } from "create-pubsub";
 
@@ -89,55 +96,86 @@ function AiResponseContent({
   >;
 }) {
   return (
-    <>
-      <Divider
-        variant="dashed"
-        labelPosition="center"
-        label={match(textGenerationState)
-          .with("generating", () => "Generating AI Response...")
-          .with("interrupted", () => "AI Response (Interrupted)")
-          .otherwise(() => "AI Response")}
-      />
-      <Stack gap="xs">
-        {match(textGenerationState)
-          .with("generating", () => (
-            <Center>
-              <Button
-                variant="default"
-                size="xs"
-                onClick={() => setTextGenerationState("interrupted")}
-              >
-                Stop generating
-              </Button>
-            </Center>
-          ))
-          .otherwise(() => null)}
-        <TypographyStylesProvider>
-          <Markdown
-            components={{
-              code(props) {
-                const { children, className, node, ref, ...rest } = props;
-                void node;
-                const languageMatch = /language-(\w+)/.exec(className || "");
-                return languageMatch ? (
-                  <SyntaxHighlighter
-                    {...rest}
-                    ref={ref as never}
-                    children={children?.toString().replace(/\n$/, "") ?? ""}
-                    language={languageMatch[1]}
-                    style={syntaxHighlighterStyle}
-                  />
-                ) : (
-                  <code {...rest} className={className}>
-                    {children}
-                  </code>
-                );
-              },
-            }}
-          >
-            {response}
-          </Markdown>
-        </TypographyStylesProvider>
+    <Card withBorder shadow="sm" radius="md">
+      <Card.Section withBorder inheritPadding py="xs">
+        <Group justify="space-between">
+          <Group gap="xs" align="center">
+            <Text fw={500}>
+              {match(textGenerationState)
+                .with("generating", () => "Generating AI Response...")
+                .otherwise(() => "AI Response")}
+            </Text>
+            {match(textGenerationState)
+              .with("interrupted", () => (
+                <Badge variant="light" color="yellow" size="xs">
+                  Interrupted
+                </Badge>
+              ))
+              .otherwise(() => null)}
+          </Group>
+          <Group gap="xs" align="center">
+            {match(textGenerationState)
+              .with("generating", () => (
+                <Center>
+                  <Button
+                    variant="default"
+                    size="xs"
+                    onClick={() => setTextGenerationState("interrupted")}
+                  >
+                    Stop generating
+                  </Button>
+                </Center>
+              ))
+              .otherwise(() => null)}
+            <CopyButton value={response} timeout={2000}>
+              {({ copied, copy }) => (
+                <Tooltip
+                  label={copied ? "Copied" : "Copy response"}
+                  withArrow
+                  position="right"
+                >
+                  <ActionIcon
+                    color={copied ? "teal" : "gray"}
+                    variant="subtle"
+                    onClick={copy}
+                  >
+                    {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                  </ActionIcon>
+                </Tooltip>
+              )}
+            </CopyButton>
+          </Group>
+        </Group>
+      </Card.Section>
+      <Card.Section withBorder>
+        <ScrollArea.Autosize mah={300} type="auto" offsetScrollbars>
+          <TypographyStylesProvider px="md" pt="md">
+            <Markdown
+              components={{
+                code(props) {
+                  const { children, className, node, ref, ...rest } = props;
+                  void node;
+                  const languageMatch = /language-(\w+)/.exec(className || "");
+                  return languageMatch ? (
+                    <SyntaxHighlighter
+                      {...rest}
+                      ref={ref as never}
+                      children={children?.toString().replace(/\n$/, "") ?? ""}
+                      language={languageMatch[1]}
+                      style={syntaxHighlighterStyle}
+                    />
+                  ) : (
+                    <code {...rest} className={className}>
+                      {children}
+                    </code>
+                  );
+                },
+              }}
+            >
+              {response}
+            </Markdown>
+          </TypographyStylesProvider>
+        </ScrollArea.Autosize>
         {match(textGenerationState)
           .with("failed", () => (
             <Alert
@@ -151,8 +189,8 @@ function AiResponseContent({
             </Alert>
           ))
           .otherwise(() => null)}
-      </Stack>
-    </>
+      </Card.Section>
+    </Card>
   );
 }
 
@@ -167,15 +205,14 @@ function LoadingModelContent({
   const strokeColor = isLoadingComplete ? "#52c41a" : "#3385ff";
 
   return (
-    <>
-      <Divider
-        mb="sm"
-        variant="dashed"
-        labelPosition="center"
-        label="Loading AI..."
-      />
-      <Progress color={strokeColor} value={percent} />
-    </>
+    <Card withBorder shadow="sm" radius="md">
+      <Card.Section withBorder inheritPadding py="xs">
+        <Text fw={500}>Loading AI...</Text>
+      </Card.Section>
+      <Card.Section withBorder inheritPadding py="md">
+        <Progress color={strokeColor} value={percent} animated />
+      </Card.Section>
+    </Card>
   );
 }
 
@@ -185,22 +222,23 @@ function PreparingContent({
   textGenerationState: string;
 }) {
   return (
-    <>
-      <Divider
-        mb="sm"
-        variant="dashed"
-        labelPosition="center"
-        label={match(textGenerationState)
-          .with("awaitingSearchResults", () => "Awaiting search results...")
-          .with("preparingToGenerate", () => "Preparing AI response...")
-          .otherwise(() => null)}
-      />
-      <Stack>
-        <Skeleton height={8} radius="xl" />
-        <Skeleton height={8} width="70%" radius="xl" />
-        <Skeleton height={8} radius="xl" />
-        <Skeleton height={8} width="43%" radius="xl" />
-      </Stack>
-    </>
+    <Card withBorder shadow="sm" radius="md">
+      <Card.Section withBorder inheritPadding py="xs">
+        <Text fw={500}>
+          {match(textGenerationState)
+            .with("awaitingSearchResults", () => "Awaiting search results...")
+            .with("preparingToGenerate", () => "Preparing AI response...")
+            .otherwise(() => null)}
+        </Text>
+      </Card.Section>
+      <Card.Section withBorder inheritPadding py="md">
+        <Stack>
+          <Skeleton height={8} radius="xl" />
+          <Skeleton height={8} width="70%" radius="xl" />
+          <Skeleton height={8} radius="xl" />
+          <Skeleton height={8} width="43%" radius="xl" />
+        </Stack>
+      </Card.Section>
+    </Card>
   );
 }
