@@ -49,6 +49,7 @@ export function SearchResultsList({
                 href={url}
                 target="_blank"
                 fs="italic"
+                ta="end"
                 onClick={() => {
                   addLogEntry("User clicked a text result");
                 }}
