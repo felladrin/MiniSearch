@@ -10,7 +10,7 @@ export function ImageResultsList({
 }) {
   return (
     <ScrollArea w={"100%"} scrollbars="x">
-      <Box w={imageResults.length * 136} my="sm">
+      <Box w={imageResults.length * 256} my="sm">
         <FadeIn delay={150} transitionDuration={1500} wrapperTag={Group}>
           {imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => (
             <ImageResult

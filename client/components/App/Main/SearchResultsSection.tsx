@@ -45,10 +45,10 @@ function RunningSearchContent() {
       />
       <Stack>
         <Group>
-          <Skeleton flex={1} height={120} />
-          <Skeleton flex={1} height={120} />
-          <Skeleton flex={1} height={120} />
-          <Skeleton flex={1} height={120} />
+          <Skeleton flex={1} height={180} />
+          <Skeleton flex={1} height={180} />
+          <Skeleton flex={1} height={180} />
+          <Skeleton flex={1} height={180} />
         </Group>
         <Stack>
           <Skeleton height={8} radius="xl" />

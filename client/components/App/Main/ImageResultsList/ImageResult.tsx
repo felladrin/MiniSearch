@@ -93,8 +93,8 @@ export function ImageResult({
         src={thumbnailUrl}
         style={{
           objectFit: "cover",
-          height: "120px",
-          width: "120px",
+          height: "180px",
+          width: "240px",
           borderRadius: "4px",
           border: "2px solid var(--mantine-color-default-border)",
         }}
