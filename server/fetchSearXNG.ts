@@ -1,22 +1,41 @@
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
-import { SearxngService } from "searxng";
+import { SearxngSearchResult, SearxngService } from "searxng";
 import axios from "axios";
 
 const searxng = new SearxngService({
   baseURL: "http://127.0.0.1:8080",
   defaultSearchParams: {
     lang: "auto",
-    safesearch: 0,
+    safesearch: 1,
     format: "json",
+    categories: ["web"],
   },
 });
 
 export async function fetchSearXNG(query: string, limit?: number) {
   try {
-    let { results } = await searxng.search(query, {
-      categories: ["general", "news", "images"],
-    });
+    const resultsResponse = await searxng.search(query);
+
+    let graphicalSearchResults: SearxngSearchResult[] = [];
+    let textualSearchResults: SearxngSearchResult[] = [];
+
+    const isVideosOrImagesCategory = (category: string): boolean => {
+      return category === "images" || category === "videos";
+    };
+
+    for (const result of resultsResponse.results) {
+      if (isVideosOrImagesCategory(result.category)) {
+        graphicalSearchResults.push(result);
+      } else {
+        textualSearchResults.push(result);
+      }
+    }
+
+    if (limit && limit > 0) {
+      textualSearchResults = textualSearchResults.slice(0, limit);
+      graphicalSearchResults = graphicalSearchResults.slice(0, limit);
+    }
 
     const textResults: [title: string, content: string, url: string][] = [];
     const imageResults: [
@@ -25,10 +44,6 @@ export async function fetchSearXNG(query: string, limit?: number) {
       thumbnailUrl: string,
       sourceUrl: string,
     ][] = [];
-
-    if (limit && limit > 0) {
-      results = results.slice(0, limit);
-    }
 
     const uniqueHostnames = new Set<string>();
     const uniqueSourceUrls = new Set<string>();
@@ -40,35 +55,45 @@ export async function fetchSearXNG(query: string, limit?: number) {
       );
     };
 
-    const imagePromises = results
-      .filter((result) => result.category === "images")
-      .map(async (result) => {
-        let thumbnailUrlIsValid = true;
+    const imagePromises = graphicalSearchResults.map(async (result) => {
+      const thumbnailSource =
+        result.category === "videos" ? result.thumbnail : result.thumbnail_src;
 
+      let thumbnailSourceIsValid = true;
+
+      try {
+        new URL(thumbnailSource);
+      } catch {
+        thumbnailSourceIsValid = false;
+      }
+
+      if (thumbnailSourceIsValid) {
         try {
-          new URL(result.thumbnail_src);
-        } catch {
-          thumbnailUrlIsValid = false;
-        }
+          const axiosResponse = await axios.get(thumbnailSource, {
+            responseType: "arraybuffer",
+          });
 
-        if (thumbnailUrlIsValid) {
-          try {
-            const axiosResponse = await axios.get(result.thumbnail_src, {
-              responseType: "arraybuffer",
-            });
+          const contentType = axiosResponse.headers["content-type"];
+          const base64 = Buffer.from(axiosResponse.data).toString("base64");
+          const thumbnailUrl = `data:${contentType};base64,${base64}`;
 
-            const contentType = axiosResponse.headers["content-type"];
-            const base64 = Buffer.from(axiosResponse.data).toString("base64");
-            const thumbnailUrl = `data:${contentType};base64,${base64}`;
-
+          if (result.category === "videos") {
+            return [
+              result.title,
+              result.url,
+              thumbnailUrl,
+              result.iframe_src || result.url,
+            ];
+          } else {
             return [result.title, result.url, thumbnailUrl, result.img_src];
-          } catch {
-            return null;
           }
+        } catch {
+          return null;
         }
+      }
 
-        return null;
-      });
+      return null;
+    });
 
     const resolvedImageResults = await Promise.all(imagePromises);
     imageResults.push(
@@ -83,24 +108,22 @@ export async function fetchSearXNG(query: string, limit?: number) {
         }),
     );
 
-    results
-      .filter((result) => result.category === "general")
-      .forEach((result) => {
-        const { hostname } = new URL(result.url);
+    textualSearchResults.forEach((result) => {
+      const { hostname } = new URL(result.url);
 
-        if (!uniqueHostnames.has(hostname) && result.content) {
-          const title = convertHtmlToPlainText(result.title, {
-            wordwrap: false,
-          }).trim();
+      if (!uniqueHostnames.has(hostname) && result.content) {
+        const title = convertHtmlToPlainText(result.title, {
+          wordwrap: false,
+        }).trim();
 
-          const content = processContent(result.content);
+        const content = processContent(result.content);
 
-          if (title && content) {
-            textResults.push([title, content, result.url]);
-            uniqueHostnames.add(hostname);
-          }
+        if (title && content) {
+          textResults.push([title, content, result.url]);
+          uniqueHostnames.add(hostname);
         }
-      });
+      }
+    });
 
     return { textResults, imageResults };
   } catch (e) {
