@@ -105,7 +105,12 @@ export function SettingsForm() {
           .with([true, true], () => (
             <Select
               label="AI Model"
-              description="Select the model to use for AI responses."
+              description={
+                <>
+                  <div>Select the model to use for AI responses.</div>
+                  <div>Recommended: Phi-3.5-mini-instruct</div>
+                </>
+              }
               data={webGpuModels.current}
               {...form.getInputProps(Setting.webLlmModelId)}
             />
@@ -114,7 +119,12 @@ export function SettingsForm() {
             <>
               <Select
                 label="AI Model"
-                description="Select the model to use for AI responses."
+                description={
+                  <>
+                    <div>Select the model to use for AI responses.</div>
+                    <div>Recommended: Qwen 2 0.5B</div>
+                  </>
+                }
                 data={wllamaModelOptions.current}
                 {...form.getInputProps(Setting.wllamaModelId)}
               />
@@ -133,9 +143,10 @@ export function SettingsForm() {
           descriptionProps={{ component: "div" }}
           description={
             <>
-              Customize instructions for the AI to tailor its responses.
-              <br />
-              For example:
+              <div>
+                Customize instructions for the AI to tailor its responses.
+              </div>
+              <div>For example:</div>
               <ul>
                 <li>
                   Specify preferences
@@ -162,10 +173,12 @@ export function SettingsForm() {
                   </ul>
                 </li>
               </ul>
-              Note: The special tag <code>{`{{searchResults}}`}</code> will be
-              replaced with the search results, while{" "}
-              <code>{`{{dateTime}}`}</code> will be replaced with the current
-              date and time.
+              <div>
+                Note: The special tag <code>{`{{searchResults}}`}</code> will be
+                replaced with the search results, while{" "}
+                <code>{`{{dateTime}}`}</code> will be replaced with the current
+                date and time.
+              </div>
             </>
           }
           autosize
