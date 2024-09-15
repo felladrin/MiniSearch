@@ -1,0 +1,44 @@
+name: Update SearXNG Docker Image
+
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-searxng-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get latest SearXNG image tag
+        id: get_latest_tag
+        run: |
+          LATEST_TAG=$(curl -s "https://hub.docker.com/v2/repositories/searxng/searxng/tags/?page_size=3&ordering=last_updated" | jq -r '.results[] | select(.name != "latest-build-cache" and .name != "latest") | .name' | head -n 1)
+          echo "LATEST_TAG=${LATEST_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Update Dockerfile
+        run: |
+          sed -i 's|FROM searxng/searxng:.*|FROM searxng/searxng:${{ steps.get_latest_tag.outputs.LATEST_TAG }}|' Dockerfile
+
+      - name: Check for changes
+        id: git_status
+        run: |
+          git diff --exit-code || echo "changes=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push if changed
+        if: steps.git_status.outputs.changes == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add Dockerfile
+          git commit -m "Update SearXNG Docker image to tag ${{ steps.get_latest_tag.outputs.LATEST_TAG }}"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
