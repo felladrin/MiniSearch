@@ -18,7 +18,7 @@ export async function fetchSearXNG(query: string, limit?: number) {
     const resultsResponse = await searxng.search(query);
 
     let graphicalSearchResults: SearxngSearchResult[] = [];
-    let textualSearchResults: SearxngSearchResult[] = [];
+    const textualSearchResults: SearxngSearchResult[] = [];
 
     const isVideosOrImagesCategory = (category: string): boolean => {
       return category === "images" || category === "videos";
@@ -33,11 +33,10 @@ export async function fetchSearXNG(query: string, limit?: number) {
     }
 
     if (limit && limit > 0) {
-      textualSearchResults = textualSearchResults.slice(0, limit);
       graphicalSearchResults = graphicalSearchResults.slice(0, limit);
     }
 
-    const textResults: [title: string, content: string, url: string][] = [];
+    let textResults: [title: string, content: string, url: string][] = [];
     const imageResults: [
       title: string,
       url: string,
@@ -124,6 +123,10 @@ export async function fetchSearXNG(query: string, limit?: number) {
         }
       }
     });
+
+    if (limit && limit > 0) {
+      textResults = textResults.slice(0, limit);
+    }
 
     return { textResults, imageResults };
   } catch (e) {
