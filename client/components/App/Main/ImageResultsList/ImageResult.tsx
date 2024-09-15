@@ -1,4 +1,4 @@
-import { Stack, Button, Text, Notification, Group } from "@mantine/core";
+import { Stack, Button, Text, Notification, Group, rem } from "@mantine/core";
 import Zoom from "react-medium-image-zoom";
 import { getHostname } from "../../../../modules/stringFormatters";
 import { addLogEntry } from "../../../../modules/logEntries";
@@ -30,14 +30,7 @@ export function ImageResult({
         {modalState === "LOADED" && (
           <>
             {buttonUnzoom}
-            <Stack
-              justify="center"
-              style={{
-                margin: "16px",
-                position: "absolute",
-                inset: "auto 0 0 0",
-              }}
-            >
+            <Stack justify="center" m={16} pos="absolute" inset="auto 0 0 0">
               {showNotification && (
                 <Notification
                   onClose={() => setShowNotification(false)}
@@ -93,10 +86,10 @@ export function ImageResult({
         src={thumbnailUrl}
         style={{
           objectFit: "cover",
-          height: "180px",
-          width: "240px",
-          borderRadius: "4px",
-          border: "2px solid var(--mantine-color-default-border)",
+          height: rem(180),
+          width: rem(240),
+          borderRadius: rem(4),
+          border: `${rem(2)} solid var(--mantine-color-default-border)`,
         }}
       />
     </Zoom>
