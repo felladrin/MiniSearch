@@ -67,15 +67,17 @@ async function generateTextWithWebLlm() {
   const { CreateWebWorkerMLCEngine, CreateMLCEngine, hasModelInCache } =
     await import("@mlc-ai/web-llm");
 
+  type InitProgressCallback = import("@mlc-ai/web-llm").InitProgressCallback;
+  type MLCEngineConfig = import("@mlc-ai/web-llm").MLCEngineConfig;
+  type ChatOptions = import("@mlc-ai/web-llm").ChatOptions;
+
   const selectedModelId = getSettings().webLlmModelId;
 
   addLogEntry(`Selected WebLLM model: ${selectedModelId}`);
 
   const isModelCached = await hasModelInCache(selectedModelId);
 
-  let initProgressCallback:
-    | import("@mlc-ai/web-llm").InitProgressCallback
-    | undefined;
+  let initProgressCallback: InitProgressCallback | undefined;
 
   if (isModelCached) {
     updateTextGenerationState("preparingToGenerate");
@@ -85,21 +87,27 @@ async function generateTextWithWebLlm() {
     };
   }
 
+  const engineConfig: MLCEngineConfig = {
+    initProgressCallback,
+    logLevel: "SILENT",
+  };
+
+  const chatOptions: ChatOptions = {
+    temperature: 0.6,
+    top_p: 0.9,
+    repetition_penalty: 1.176,
+  };
+
   const engine = Worker
     ? await CreateWebWorkerMLCEngine(
         new Worker(new URL("./webLlmWorker.ts", import.meta.url), {
           type: "module",
         }),
         selectedModelId,
-        {
-          initProgressCallback,
-          logLevel: "SILENT",
-        },
+        engineConfig,
+        chatOptions,
       )
-    : await CreateMLCEngine(selectedModelId, {
-        initProgressCallback,
-        logLevel: "SILENT",
-      });
+    : await CreateMLCEngine(selectedModelId, engineConfig, chatOptions);
 
   if (getSettings().enableAiResponse) {
     await canStartResponding();
