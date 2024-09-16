@@ -1,4 +1,12 @@
-import { useEffect, useRef, FormEvent, useState, useCallback } from "react";
+import {
+  useEffect,
+  useRef,
+  FormEvent,
+  useState,
+  useCallback,
+  ChangeEvent,
+  KeyboardEvent,
+} from "react";
 import { getRandomQuerySuggestion } from "../../../../modules/querySuggestions";
 import { MenuButton } from "./MenuButton/MenuButton";
 import { useLocation } from "wouter";
@@ -31,9 +39,7 @@ export function SearchForm({
     });
   }, []);
 
-  const handleInputChange = async (
-    event: React.ChangeEvent<HTMLTextAreaElement>,
-  ) => {
+  const handleInputChange = async (event: ChangeEvent<HTMLTextAreaElement>) => {
     const text = event.target.value;
 
     setTextAreaValue(text);
@@ -73,7 +79,7 @@ export function SearchForm({
     startSearching();
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     match(event)
       .with({ code: "Enter", shiftKey: false }, () => {
         event.preventDefault();
