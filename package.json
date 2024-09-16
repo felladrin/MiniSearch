@@ -40,6 +40,7 @@
     "keyword-extractor": "^0.0.28",
     "node-emoji": "^2.1.3",
     "node-llama-cpp": "^3.0.0-beta.22",
+    "openai": "^4.61.1",
     "pm2": "^5.4.2",
     "postcss": "^8.4.45",
     "postcss-preset-mantine": "^1.17.0",

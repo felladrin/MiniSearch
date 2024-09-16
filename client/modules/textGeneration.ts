@@ -16,6 +16,7 @@ import { search } from "./search";
 import { addLogEntry } from "./logEntries";
 import { getSystemPrompt } from "./systemPrompt";
 import prettyMilliseconds from "pretty-ms";
+import OpenAI from "openai";
 
 export async function prepareTextGeneration() {
   if (getQuery() === "") return;
@@ -35,16 +36,21 @@ export async function prepareTextGeneration() {
   updateTextGenerationState("loadingModel");
 
   try {
-    try {
-      if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
+    const settings = getSettings();
+    if (settings.inferenceType === "openai") {
+      await generateTextWithOpenAI();
+    } else {
+      try {
+        if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
 
-      if (!getSettings().enableWebGpu) throw Error("WebGPU is disabled.");
+        if (!settings.enableWebGpu) throw Error("WebGPU is disabled.");
 
-      await generateTextWithWebLlm();
-    } catch (error) {
-      addLogEntry(`Skipping text generation with WebLLM: ${error}`);
-      addLogEntry(`Starting text generation with Wllama`);
-      await generateTextWithWllama();
+        await generateTextWithWebLlm();
+      } catch (error) {
+        addLogEntry(`Skipping text generation with WebLLM: ${error}`);
+        addLogEntry(`Starting text generation with Wllama`);
+        await generateTextWithWllama();
+      }
     }
 
     if (getTextGenerationState() !== "interrupted") {
@@ -61,6 +67,49 @@ export async function prepareTextGeneration() {
       { verbose: true },
     )}`,
   );
+}
+
+async function generateTextWithOpenAI() {
+  const settings = getSettings();
+  const openai = new OpenAI({
+    baseURL: settings.openAiApiBaseUrl,
+    apiKey: settings.openAiApiKey,
+    dangerouslyAllowBrowser: true,
+  });
+
+  await canStartResponding();
+
+  updateTextGenerationState("preparingToGenerate");
+
+  const completion = await openai.chat.completions.create({
+    model: settings.openAiApiModel,
+    messages: [
+      {
+        role: "system",
+        content: getSystemPrompt(getFormattedSearchResults(true)),
+      },
+      { role: "user", content: getQuery() },
+    ],
+    stream: true,
+  });
+
+  let streamedMessage = "";
+
+  for await (const chunk of completion) {
+    const deltaContent = chunk.choices[0].delta.content;
+
+    if (deltaContent) streamedMessage += deltaContent;
+
+    if (getTextGenerationState() === "interrupted") {
+      break;
+    } else if (getTextGenerationState() !== "generating") {
+      updateTextGenerationState("generating");
+    }
+
+    updateResponseRateLimited(streamedMessage);
+  }
+
+  updateResponse(streamedMessage);
 }
 
 async function generateTextWithWebLlm() {

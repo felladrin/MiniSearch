@@ -10,6 +10,10 @@ export enum Setting {
   cpuThreads = "cpuThreads",
   searchResultsToConsider = "searchResultsToConsider",
   systemPrompt = "systemPrompt",
+  inferenceType = "inferenceType",
+  openAiApiBaseUrl = "openAiApiBaseUrl",
+  openAiApiKey = "openAiApiKey",
+  openAiApiModel = "openAiApiModel",
 }
 
 export const defaultSettings = {
@@ -35,6 +39,10 @@ export const defaultSettings = {
 
 Search results:
 {{searchResults}}`,
+  [Setting.inferenceType]: "browser",
+  [Setting.openAiApiBaseUrl]: "http://localhost:11434/v1",
+  [Setting.openAiApiKey]: "",
+  [Setting.openAiApiModel]: "",
 };
 
 addLogEntry(
@@ -42,3 +50,8 @@ addLogEntry(
 );
 
 export type Settings = typeof defaultSettings;
+
+export const inferenceTypes = [
+  { value: "browser", label: "Browser-Based Inference" },
+  { value: "openai", label: "OpenAI-Compatible API" },
+];

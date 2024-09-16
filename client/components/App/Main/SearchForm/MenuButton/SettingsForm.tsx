@@ -13,15 +13,20 @@ import {
   Switch,
   Textarea,
   Text,
+  TextInput,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { prebuiltAppConfig } from "@mlc-ai/web-llm";
-import { useRef } from "react";
-import { Setting } from "../../../../../modules/settings";
+import { useRef, useEffect, useState } from "react";
+import { Setting, inferenceTypes } from "../../../../../modules/settings";
 import { wllamaModels } from "../../../../../modules/wllama";
+import { OpenAI } from "openai";
 
 export function SettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
+  const [openAiModels, setOpenAiModels] = useState<
+    { label: string; value: string }[]
+  >([]);
 
   const suffix = isF16Supported ? "-q4f16_1-MLC" : "-q4f32_1-MLC";
 
@@ -49,6 +54,34 @@ export function SettingsForm() {
     onValuesChange: setSettings,
   });
 
+  useEffect(() => {
+    async function fetchOpenAiModels() {
+      try {
+        const openai = new OpenAI({
+          baseURL: settings.openAiApiBaseUrl,
+          apiKey: settings.openAiApiKey,
+          dangerouslyAllowBrowser: true,
+        });
+        const response = await openai.models.list();
+        const models = response.data.map((model) => ({
+          label: model.id,
+          value: model.id,
+        }));
+        setOpenAiModels(models);
+      } catch (error) {
+        console.error("Error fetching OpenAI models:", error);
+      }
+    }
+
+    if (form.values[Setting.inferenceType] === "openai") {
+      fetchOpenAiModels();
+    }
+  }, [
+    form.values[Setting.inferenceType],
+    settings.openAiApiBaseUrl,
+    settings.openAiApiKey,
+  ]);
+
   return (
     <form>
       <Stack gap="md">
@@ -61,28 +94,110 @@ export function SettingsForm() {
         />
 
         {form.values[Setting.enableAiResponse] && (
-          <Stack gap="xs" mb="md" ml={50}>
-            <Text size="sm">Search results to consider</Text>
-            <Text size="xs" c="dimmed">
-              Determines the number of search results to consider when
-              generating AI responses. A higher value may enhance accuracy, but
-              it will also increase response time.
-            </Text>
-            <Slider
-              {...form.getInputProps(Setting.searchResultsToConsider)}
-              min={0}
-              max={6}
-              marks={[
-                { value: 0, label: "0" },
-                { value: 1, label: "1" },
-                { value: 2, label: "2" },
-                { value: 3, label: "3" },
-                { value: 4, label: "4" },
-                { value: 5, label: "5" },
-                { value: 6, label: "6" },
-              ]}
+          <>
+            <Stack gap="xs" mb="md" ml={50}>
+              <Text size="sm">Search results to consider</Text>
+              <Text size="xs" c="dimmed">
+                Determines the number of search results to consider when
+                generating AI responses. A higher value may enhance accuracy,
+                but it will also increase response time.
+              </Text>
+              <Slider
+                {...form.getInputProps(Setting.searchResultsToConsider)}
+                min={0}
+                max={6}
+                marks={[
+                  { value: 0, label: "0" },
+                  { value: 1, label: "1" },
+                  { value: 2, label: "2" },
+                  { value: 3, label: "3" },
+                  { value: 4, label: "4" },
+                  { value: 5, label: "5" },
+                  { value: 6, label: "6" },
+                ]}
+              />
+            </Stack>
+
+            <Select
+              label="Inference Type"
+              data={inferenceTypes}
+              {...form.getInputProps(Setting.inferenceType)}
             />
-          </Stack>
+
+            {form.values[Setting.inferenceType] === "openai" && (
+              <>
+                <TextInput
+                  label="API Base URL"
+                  {...form.getInputProps(Setting.openAiApiBaseUrl)}
+                />
+                <Select
+                  label="API Model"
+                  data={openAiModels}
+                  {...form.getInputProps(Setting.openAiApiModel)}
+                />
+                <TextInput
+                  label="API Key (Optional)"
+                  type="password"
+                  {...form.getInputProps(Setting.openAiApiKey)}
+                />
+              </>
+            )}
+
+            {form.values[Setting.inferenceType] === "browser" && (
+              <>
+                {isWebGPUAvailable && (
+                  <Switch
+                    label="WebGPU"
+                    {...form.getInputProps(Setting.enableWebGpu, {
+                      type: "checkbox",
+                    })}
+                    description="Enable or disable WebGPU usage. When disabled, the app will use the CPU instead."
+                  />
+                )}
+
+                {match([isWebGPUAvailable, form.values[Setting.enableWebGpu]])
+                  .with([true, true], () => (
+                    <Select
+                      label="AI Model"
+                      description={
+                        <>
+                          <span>Select the model to use for AI responses.</span>
+                          <br />
+                          <span>Recommended: Phi-3.5-mini-instruct</span>
+                        </>
+                      }
+                      data={webGpuModels.current}
+                      {...form.getInputProps(Setting.webLlmModelId)}
+                    />
+                  ))
+                  .with([false, Pattern.any], [Pattern.any, false], () => (
+                    <>
+                      <Select
+                        label="AI Model"
+                        description={
+                          <>
+                            <span>
+                              Select the model to use for AI responses.
+                            </span>
+                            <br />
+                            <span>Recommended: Qwen 2 0.5B</span>
+                          </>
+                        }
+                        data={wllamaModelOptions.current}
+                        {...form.getInputProps(Setting.wllamaModelId)}
+                      />
+                      <NumberInput
+                        label="CPU threads to use"
+                        description="Number of threads to use for the AI model. Lower values will use less CPU, but may take longer to respond. A too-high value may cause the app to hang."
+                        min={1}
+                        {...form.getInputProps(Setting.cpuThreads)}
+                      />
+                    </>
+                  ))
+                  .otherwise(() => null)}
+              </>
+            )}
+          </>
         )}
 
         <Switch
@@ -92,53 +207,6 @@ export function SettingsForm() {
           })}
           description="Enable or disable image search results. When enabled, relevant images will be displayed alongside web search results."
         />
-
-        {isWebGPUAvailable && (
-          <Switch
-            label="WebGPU"
-            {...form.getInputProps(Setting.enableWebGpu, { type: "checkbox" })}
-            description="Enable or disable WebGPU usage. When disabled, the app will use the CPU instead."
-          />
-        )}
-
-        {match([isWebGPUAvailable, form.values[Setting.enableWebGpu]])
-          .with([true, true], () => (
-            <Select
-              label="AI Model"
-              description={
-                <>
-                  <span>Select the model to use for AI responses.</span>
-                  <br />
-                  <span>Recommended: Phi-3.5-mini-instruct</span>
-                </>
-              }
-              data={webGpuModels.current}
-              {...form.getInputProps(Setting.webLlmModelId)}
-            />
-          ))
-          .with([false, Pattern.any], [Pattern.any, false], () => (
-            <>
-              <Select
-                label="AI Model"
-                description={
-                  <>
-                    <span>Select the model to use for AI responses.</span>
-                    <br />
-                    <span>Recommended: Qwen 2 0.5B</span>
-                  </>
-                }
-                data={wllamaModelOptions.current}
-                {...form.getInputProps(Setting.wllamaModelId)}
-              />
-              <NumberInput
-                label="CPU threads to use"
-                description="Number of threads to use for the AI model. Lower values will use less CPU, but may take longer to respond. A too-high value may cause the app to hang."
-                min={1}
-                {...form.getInputProps(Setting.cpuThreads)}
-              />
-            </>
-          ))
-          .otherwise(() => null)}
 
         <Textarea
           label="Instructions for AI"
