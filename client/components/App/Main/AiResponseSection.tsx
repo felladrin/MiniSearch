@@ -41,7 +41,7 @@ export function AiResponseSection() {
   return useMemo(
     () =>
       match([settings.enableAiResponse, textGenerationState])
-        .with([true, Pattern.not("idle")], () =>
+        .with([true, Pattern.not("idle").select()], (textGenerationState) =>
           match(textGenerationState)
             .with(
               Pattern.union("generating", "interrupted", "completed", "failed"),
@@ -64,7 +64,7 @@ export function AiResponseSection() {
                 <PreparingContent textGenerationState={textGenerationState} />
               ),
             )
-            .otherwise(() => null),
+            .exhaustive(),
         )
         .otherwise(() => null),
     [

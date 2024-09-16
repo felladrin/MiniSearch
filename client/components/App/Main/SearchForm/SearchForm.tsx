@@ -3,7 +3,7 @@ import { getRandomQuerySuggestion } from "../../../../modules/querySuggestions";
 import { MenuButton } from "./MenuButton/MenuButton";
 import { useLocation } from "wouter";
 import { prepareTextGeneration } from "../../../../modules/textGeneration";
-import { isMatching, match, Pattern } from "ts-pattern";
+import { match, Pattern } from "ts-pattern";
 import { Button, Group, Stack, Textarea } from "@mantine/core";
 import { addLogEntry } from "../../../../modules/logEntries";
 
@@ -74,18 +74,12 @@ export function SearchForm({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const isPressingEnterWithoutShift = isMatching<Partial<typeof event>>(
-      {
-        code: "Enter",
-        shiftKey: false,
-      },
-      event,
-    );
-
-    if (isPressingEnterWithoutShift) {
-      event.preventDefault();
-      startSearching();
-    }
+    match(event)
+      .with({ code: "Enter", shiftKey: false }, () => {
+        event.preventDefault();
+        startSearching();
+      })
+      .otherwise(() => undefined);
   };
 
   return (

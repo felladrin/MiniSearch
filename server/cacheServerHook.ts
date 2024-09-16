@@ -5,25 +5,22 @@ export function cacheServerHook<T extends ViteDevServer | PreviewServer>(
   server: T,
 ) {
   server.middlewares.use(async (request, response, next) => {
-    response.setHeader(
-      ...match<string, [name: string, value: string]>(request.url)
-        .with(Pattern.string.startsWith("/assets/"), () => [
-          "Cache-Control",
-          "public, max-age=31536000, immutable",
-        ])
-        .with(
-          Pattern.union(
-            "/",
-            Pattern.string.startsWith("/?"),
-            Pattern.string.endsWith(".html"),
-          ),
-          () => ["Cache-Control", "no-cache"],
-        )
-        .otherwise(() => [
-          "Cache-Control",
-          "public, max-age=86400, must-revalidate",
-        ]),
-    );
+    const cacheControlValue = match(request.url)
+      .with(
+        Pattern.string.startsWith("/assets/"),
+        () => "public, max-age=31536000, immutable",
+      )
+      .with(
+        Pattern.union(
+          "/",
+          Pattern.string.startsWith("/?"),
+          Pattern.string.endsWith(".html"),
+        ),
+        () => "no-cache",
+      )
+      .otherwise(() => "public, max-age=86400, must-revalidate");
+
+    response.setHeader("Cache-Control", cacheControlValue);
 
     next();
   });
