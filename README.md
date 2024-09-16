@@ -1,8 +1,12 @@
 # MiniSearch
 
-A minimalist search engine with integrated browser-based AI.
+A minimalist web-searching app with an AI assistant that runs directly from your browser.
 
 Live demo: https://felladrin-minisearch.hf.space
+
+## Screenshot
+
+![MiniSearch Screenshot](https://github.com/user-attachments/assets/f8d72a8e-a725-42e9-9358-e6ebade2acb2)
 
 ## Features
 
