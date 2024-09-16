@@ -114,11 +114,6 @@ ${query}</s>
     label: "Qwen 2 0.5B • 420 MB",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-imat-qwen2-0.5b-instruct/resolve/main/qwen2-0-00001-of-00003.gguf",
   },
-  "tinydolphin-1.1b": {
-    ...defaultModelConfig,
-    label: "TinyDolphin 1.1B • 782 MB",
-    url: "https://huggingface.co/Felladrin/gguf-q5_k_m-tinydolphin-2.8.2-1.1b-laser/resolve/main/tinydolphin-2-00001-of-00009.gguf",
-  },
   "arcee-lite": {
     ...defaultModelConfig,
     label: "Arcee Lite 1.5B • 1.43 GB",
@@ -139,6 +134,11 @@ ${query}<end_of_turn>
     ...defaultModelConfig,
     label: "Phi 3.5 Mini 3.8B • 2.82 GB",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-phi-3.5-mini-instruct/resolve/main/phi-3-00001-of-00025.gguf",
+  },
+  "nemotron-mini-4b": {
+    ...defaultModelConfig,
+    label: "Nemotron Mini 4B • 3.55 GB",
+    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Nemotron-Mini-4B-Instruct/resolve/main/nemotron-mini-4b-instruct-q5_k_m-imat-00001-of-00004.gguf",
   },
   "yi-1.5-6b": {
     ...defaultModelConfig,
