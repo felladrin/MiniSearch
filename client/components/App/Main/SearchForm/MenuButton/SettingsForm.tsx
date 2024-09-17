@@ -127,18 +127,20 @@ export function SettingsForm() {
             {form.values[Setting.inferenceType] === "openai" && (
               <>
                 <TextInput
+                  required
                   label="API Base URL"
                   {...form.getInputProps(Setting.openAiApiBaseUrl)}
+                  description="Example: http://localhost:11434/v1"
+                />
+                <TextInput
+                  label="API Key"
+                  type="password"
+                  {...form.getInputProps(Setting.openAiApiKey)}
                 />
                 <Select
                   label="API Model"
                   data={openAiModels}
                   {...form.getInputProps(Setting.openAiApiModel)}
-                />
-                <TextInput
-                  label="API Key (Optional)"
-                  type="password"
-                  {...form.getInputProps(Setting.openAiApiKey)}
                 />
               </>
             )}

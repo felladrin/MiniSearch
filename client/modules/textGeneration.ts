@@ -90,6 +90,7 @@ async function generateTextWithOpenAI() {
       },
       { role: "user", content: getQuery() },
     ],
+    max_tokens: 2048,
     stream: true,
   });
 

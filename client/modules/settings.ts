@@ -40,7 +40,7 @@ export const defaultSettings = {
 Search results:
 {{searchResults}}`,
   [Setting.inferenceType]: "browser",
-  [Setting.openAiApiBaseUrl]: "http://localhost:11434/v1",
+  [Setting.openAiApiBaseUrl]: "",
   [Setting.openAiApiKey]: "",
   [Setting.openAiApiModel]: "",
 };
