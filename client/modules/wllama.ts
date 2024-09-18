@@ -62,9 +62,7 @@ export interface WllamaModel {
   stopTokens?: number[];
 }
 
-const defaultModelConfig: WllamaModel = {
-  label: "SmolLM 135M • 145 MB",
-  url: "https://huggingface.co/Felladrin/gguf-Q8_0-smollm-135M-instruct-v0.2/resolve/main/smollm-135m-instruct-add-basics-q8_0.gguf",
+const defaultModelConfig: Omit<WllamaModel, "label" | "url"> = {
   buildPrompt: (wllama, query, searchResults) =>
     formatChat(wllama, [
       {
@@ -92,7 +90,11 @@ const defaultModelConfig: WllamaModel = {
 };
 
 export const wllamaModels: Record<string, WllamaModel> = {
-  default: defaultModelConfig,
+  "smollm-135m": {
+    ...defaultModelConfig,
+    label: "SmolLM 135M • 145 MB",
+    url: "https://huggingface.co/Felladrin/gguf-Q8_0-smollm-135M-instruct-v0.2/resolve/main/smollm-135m-instruct-add-basics-q8_0.gguf",
+  },
   "smollm-360m": {
     ...defaultModelConfig,
     label: "SmolLM 360M • 290 MB",
@@ -134,6 +136,11 @@ ${query}<end_of_turn>
     ...defaultModelConfig,
     label: "Phi 3.5 Mini 3.8B • 2.82 GB",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-phi-3.5-mini-instruct/resolve/main/phi-3-00001-of-00025.gguf",
+  },
+  "magpielm-4b": {
+    ...defaultModelConfig,
+    label: "MagpieLM-4B • 3.23 GB",
+    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-MagpieLM-4B-Chat-v0.1/resolve/main/magpielm-4b-chat-v0-00001-of-00019.gguf",
   },
   "nemotron-mini-4b": {
     ...defaultModelConfig,
