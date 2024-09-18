@@ -18,7 +18,7 @@ import {
 import { useForm } from "@mantine/form";
 import { prebuiltAppConfig } from "@mlc-ai/web-llm";
 import { useRef, useEffect, useState } from "react";
-import { Setting, inferenceTypes } from "../../../../../modules/settings";
+import { inferenceTypes } from "../../../../../modules/settings";
 import { wllamaModels } from "../../../../../modules/wllama";
 import { OpenAI } from "openai";
 
@@ -105,11 +105,11 @@ export function SettingsForm() {
       }
     }
 
-    if (form.values[Setting.inferenceType] === "openai") {
+    if (form.values.inferenceType === "openai") {
       fetchOpenAiModels();
     }
   }, [
-    form.values[Setting.inferenceType],
+    form.values.inferenceType,
     settings.openAiApiBaseUrl,
     settings.openAiApiKey,
   ]);
@@ -119,13 +119,13 @@ export function SettingsForm() {
       <Stack gap="md">
         <Switch
           label="AI Response"
-          {...form.getInputProps(Setting.enableAiResponse, {
+          {...form.getInputProps("enableAiResponse", {
             type: "checkbox",
           })}
           description="Enable or disable AI-generated responses to your queries. When disabled, you'll only see web search results."
         />
 
-        {form.values[Setting.enableAiResponse] && (
+        {form.values.enableAiResponse && (
           <>
             <Stack gap="xs" mb="md" ml={50}>
               <Text size="sm">Search results to consider</Text>
@@ -135,7 +135,7 @@ export function SettingsForm() {
                 but it will also increase response time.
               </Text>
               <Slider
-                {...form.getInputProps(Setting.searchResultsToConsider)}
+                {...form.getInputProps("searchResultsToConsider")}
                 min={0}
                 max={6}
                 marks={[
@@ -153,49 +153,49 @@ export function SettingsForm() {
             <Select
               label="Inference Type"
               data={inferenceTypes}
-              {...form.getInputProps(Setting.inferenceType)}
+              {...form.getInputProps("inferenceType")}
             />
 
-            {form.values[Setting.inferenceType] === "openai" && (
+            {form.values.inferenceType === "openai" && (
               <>
                 <TextInput
                   required
                   label="API Base URL"
-                  {...form.getInputProps(Setting.openAiApiBaseUrl)}
+                  {...form.getInputProps("openAiApiBaseUrl")}
                   description="Example: http://localhost:11434/v1"
                 />
                 <TextInput
                   label="API Key"
                   type="password"
-                  {...form.getInputProps(Setting.openAiApiKey)}
+                  {...form.getInputProps("openAiApiKey")}
                 />
                 <Select
                   label="API Model"
                   data={openAiModels}
-                  {...form.getInputProps(Setting.openAiApiModel)}
+                  {...form.getInputProps("openAiApiModel")}
                 />
               </>
             )}
 
-            {form.values[Setting.inferenceType] === "browser" && (
+            {form.values.inferenceType === "browser" && (
               <>
                 {isWebGPUAvailable && (
                   <Switch
                     label="WebGPU"
-                    {...form.getInputProps(Setting.enableWebGpu, {
+                    {...form.getInputProps("enableWebGpu", {
                       type: "checkbox",
                     })}
                     description="Enable or disable WebGPU usage. When disabled, the app will use the CPU instead."
                   />
                 )}
 
-                {match([isWebGPUAvailable, form.values[Setting.enableWebGpu]])
+                {match([isWebGPUAvailable, form.values.enableWebGpu])
                   .with([true, true], () => (
                     <Select
                       label="AI Model"
                       description="Select the model to use for AI responses."
                       data={webGpuModels.current}
-                      {...form.getInputProps(Setting.webLlmModelId)}
+                      {...form.getInputProps("webLlmModelId")}
                     />
                   ))
                   .with([false, Pattern.any], [Pattern.any, false], () => (
@@ -204,13 +204,13 @@ export function SettingsForm() {
                         label="AI Model"
                         description="Select the model to use for AI responses."
                         data={wllamaModelOptions.current}
-                        {...form.getInputProps(Setting.wllamaModelId)}
+                        {...form.getInputProps("wllamaModelId")}
                       />
                       <NumberInput
                         label="CPU threads to use"
                         description="Number of threads to use for the AI model. Lower values will use less CPU, but may take longer to respond. A too-high value may cause the app to hang."
                         min={1}
-                        {...form.getInputProps(Setting.cpuThreads)}
+                        {...form.getInputProps("cpuThreads")}
                       />
                     </>
                   ))
@@ -222,7 +222,7 @@ export function SettingsForm() {
 
         <Switch
           label="Image Search"
-          {...form.getInputProps(Setting.enableImageSearch, {
+          {...form.getInputProps("enableImageSearch", {
             type: "checkbox",
           })}
           description="Enable or disable image search results. When enabled, relevant images will be displayed alongside web search results."
@@ -274,7 +274,7 @@ export function SettingsForm() {
           }
           autosize
           maxRows={10}
-          {...form.getInputProps(Setting.systemPrompt)}
+          {...form.getInputProps("systemPrompt")}
         />
       </Stack>
     </form>

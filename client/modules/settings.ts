@@ -1,32 +1,17 @@
 import { addLogEntry } from "./logEntries";
 import { isF16Supported } from "./webGpu";
 
-export enum Setting {
-  enableAiResponse = "enableAiResponse",
-  enableImageSearch = "enableImageSearch",
-  enableWebGpu = "enableWebGpu",
-  webLlmModelId = "webLlmModelId",
-  wllamaModelId = "wllamaModelId",
-  cpuThreads = "cpuThreads",
-  searchResultsToConsider = "searchResultsToConsider",
-  systemPrompt = "systemPrompt",
-  inferenceType = "inferenceType",
-  openAiApiBaseUrl = "openAiApiBaseUrl",
-  openAiApiKey = "openAiApiKey",
-  openAiApiModel = "openAiApiModel",
-}
-
 export const defaultSettings = {
-  [Setting.enableAiResponse]: true,
-  [Setting.enableWebGpu]: true,
-  [Setting.enableImageSearch]: true,
-  [Setting.webLlmModelId]: isF16Supported
+  enableAiResponse: true,
+  enableWebGpu: true,
+  enableImageSearch: true,
+  webLlmModelId: isF16Supported
     ? "Qwen2-0.5B-Instruct-q4f16_1-MLC"
     : "TinyLlama-1.1B-Chat-v1.0-q4f32_1-MLC",
-  [Setting.wllamaModelId]: "smollm-135m",
-  [Setting.cpuThreads]: 1,
-  [Setting.searchResultsToConsider]: 3,
-  [Setting.systemPrompt]: `You are a research assistant. Provide detailed, step-by-step responses following these guidelines:
+  wllamaModelId: "smollm-135m",
+  cpuThreads: 1,
+  searchResultsToConsider: 3,
+  systemPrompt: `You are a research assistant. Provide detailed, step-by-step responses following these guidelines:
 - Use Markdown
 - Explain thoroughly
 - Use an analytical, formal tone
@@ -39,10 +24,10 @@ export const defaultSettings = {
 
 Search results:
 {{searchResults}}`,
-  [Setting.inferenceType]: "browser",
-  [Setting.openAiApiBaseUrl]: "",
-  [Setting.openAiApiKey]: "",
-  [Setting.openAiApiModel]: "",
+  inferenceType: "browser",
+  openAiApiBaseUrl: "",
+  openAiApiKey: "",
+  openAiApiModel: "",
 };
 
 addLogEntry(
