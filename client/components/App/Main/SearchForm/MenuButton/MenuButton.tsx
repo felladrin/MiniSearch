@@ -10,6 +10,7 @@ import {
   Stack,
   Group,
   Center,
+  FocusTrap,
 } from "@mantine/core";
 import { IconBrandGithub } from "@tabler/icons-react";
 import { repository } from "../../../../../../package.json";
@@ -54,7 +55,6 @@ export function MenuButton() {
             >
               <IconBrandGithub size={16} />
             </ActionIcon>
-
             <HoverCard shadow="md" withArrow>
               <HoverCard.Target>
                 <Center>{repoName}</Center>
@@ -83,6 +83,7 @@ export function MenuButton() {
           </Group>
         }
       >
+        <FocusTrap.InitialFocus />
         <Drawer.Body>
           <Accordion variant="separated" multiple>
             <Accordion.Item value="settings">
