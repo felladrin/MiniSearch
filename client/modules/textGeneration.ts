@@ -90,6 +90,8 @@ async function generateTextWithOpenAI() {
       },
       { role: "user", content: getQuery() },
     ],
+    temperature: 0.6,
+    top_p: 0.9,
     max_tokens: 2048,
     stream: true,
   });
@@ -102,7 +104,7 @@ async function generateTextWithOpenAI() {
     if (deltaContent) streamedMessage += deltaContent;
 
     if (getTextGenerationState() === "interrupted") {
-      break;
+      completion.controller.abort();
     } else if (getTextGenerationState() !== "generating") {
       updateTextGenerationState("generating");
     }
