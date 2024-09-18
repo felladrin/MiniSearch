@@ -42,11 +42,43 @@ export function SettingsForm() {
       })),
   );
 
+  useEffect(
+    function validateWebGpuModel() {
+      const isCurrentModelValid = webGpuModels.current.some(
+        (model) => model.value === settings.webLlmModelId,
+      );
+
+      if (!isCurrentModelValid) {
+        setSettings({
+          ...settings,
+          webLlmModelId: webGpuModels.current[0].value,
+        });
+      }
+    },
+    [settings.webLlmModelId],
+  );
+
   const wllamaModelOptions = useRef(
     Object.entries(wllamaModels).map(([value, { label }]) => ({
       label,
       value,
     })),
+  );
+
+  useEffect(
+    function validateWllamaModel() {
+      const isCurrentModelValid = wllamaModelOptions.current.some(
+        (model) => model.value === settings.wllamaModelId,
+      );
+
+      if (!isCurrentModelValid) {
+        setSettings({
+          ...settings,
+          wllamaModelId: wllamaModelOptions.current[0].value,
+        });
+      }
+    },
+    [settings.wllamaModelId],
   );
 
   const form = useForm({
@@ -161,13 +193,7 @@ export function SettingsForm() {
                   .with([true, true], () => (
                     <Select
                       label="AI Model"
-                      description={
-                        <>
-                          <span>Select the model to use for AI responses.</span>
-                          <br />
-                          <span>Recommended: Phi-3.5-mini-instruct</span>
-                        </>
-                      }
+                      description="Select the model to use for AI responses."
                       data={webGpuModels.current}
                       {...form.getInputProps(Setting.webLlmModelId)}
                     />
@@ -176,15 +202,7 @@ export function SettingsForm() {
                     <>
                       <Select
                         label="AI Model"
-                        description={
-                          <>
-                            <span>
-                              Select the model to use for AI responses.
-                            </span>
-                            <br />
-                            <span>Recommended: Qwen 2 0.5B</span>
-                          </>
-                        }
+                        description="Select the model to use for AI responses."
                         data={wllamaModelOptions.current}
                         {...form.getInputProps(Setting.wllamaModelId)}
                       />
