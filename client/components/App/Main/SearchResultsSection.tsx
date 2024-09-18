@@ -5,7 +5,7 @@ import {
   settingsPubSub,
 } from "../../../modules/pubSub";
 import { match, Pattern } from "ts-pattern";
-import { Divider, Skeleton, Alert, Stack, Group } from "@mantine/core";
+import { Divider, Skeleton, Alert, Stack, Group, Space } from "@mantine/core";
 import { ImageResultsList } from "./ImageResultsList/ImageResultsList";
 import { SearchResultsList } from "./SearchResultsList/SearchResultsList";
 import { IconInfoCircle } from "@tabler/icons-react";
@@ -99,7 +99,10 @@ function CompletedSearchContent({
       <Divider variant="dashed" labelPosition="center" label="Search Results" />
       {match([settings.enableImageSearch, searchResults.imageResults.length])
         .with([true, Pattern.number.positive()], () => (
-          <ImageResultsList imageResults={searchResults.imageResults} />
+          <>
+            <ImageResultsList imageResults={searchResults.imageResults} />
+            <Space h={8} />
+          </>
         ))
         .otherwise(() => null)}
       <SearchResultsList searchResults={searchResults.textResults} />
