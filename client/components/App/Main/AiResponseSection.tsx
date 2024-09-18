@@ -1,34 +1,39 @@
-import { usePubSub } from "create-pubsub/react";
 import {
-  modelLoadingProgressPubSub,
-  responsePubSub,
-  textGenerationStatePubSub,
-  settingsPubSub,
-} from "../../../modules/pubSub";
+  ActionIcon,
+  Alert,
+  Badge,
+  Box,
+  Card,
+  CopyButton,
+  Group,
+  Progress,
+  ScrollArea,
+  Skeleton,
+  Stack,
+  Text,
+  Tooltip,
+  TypographyStylesProvider,
+} from "@mantine/core";
+import {
+  IconArrowsMaximize,
+  IconCheck,
+  IconCopy,
+  IconHandStop,
+  IconInfoCircle,
+} from "@tabler/icons-react";
+import { PublishFunction } from "create-pubsub";
+import { usePubSub } from "create-pubsub/react";
+import { useMemo, useState } from "react";
 import Markdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import syntaxHighlighterStyle from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
 import { match, Pattern } from "ts-pattern";
 import {
-  Stack,
-  ScrollArea,
-  Text,
-  Card,
-  ActionIcon,
-  Group,
-  CopyButton,
-  Tooltip,
-  Skeleton,
-  Alert,
-  Progress,
-  Button,
-  Center,
-  TypographyStylesProvider,
-  Badge,
-} from "@mantine/core";
-import { IconCheck, IconCopy, IconInfoCircle } from "@tabler/icons-react";
-import { useMemo } from "react";
-import { PublishFunction } from "create-pubsub";
+  modelLoadingProgressPubSub,
+  responsePubSub,
+  settingsPubSub,
+  textGenerationStatePubSub,
+} from "../../../modules/pubSub";
 
 export function AiResponseSection() {
   const [response] = usePubSub(responsePubSub);
@@ -95,6 +100,26 @@ function AiResponseContent({
     | "completed"
   >;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const removeScrollArea = () => {
+    setIsExpanded(true);
+  };
+
+  const ConditionalScrollArea = useMemo(
+    () =>
+      ({ children }: { children: React.ReactNode }) => {
+        return isExpanded ? (
+          <Box>{children}</Box>
+        ) : (
+          <ScrollArea.Autosize mah={300} type="auto" offsetScrollbars>
+            {children}
+          </ScrollArea.Autosize>
+        );
+      },
+    [isExpanded],
+  );
+
   return (
     <Card withBorder shadow="sm" radius="md">
       <Card.Section withBorder inheritPadding py="xs">
@@ -116,17 +141,28 @@ function AiResponseContent({
           <Group gap="xs" align="center">
             {match(textGenerationState)
               .with("generating", () => (
-                <Center>
-                  <Button
-                    variant="default"
-                    size="xs"
+                <Tooltip label="Interrupt generation">
+                  <ActionIcon
                     onClick={() => setTextGenerationState("interrupted")}
+                    variant="subtle"
+                    color="gray"
                   >
-                    Stop generating
-                  </Button>
-                </Center>
+                    <IconHandStop size={16} />
+                  </ActionIcon>
+                </Tooltip>
               ))
               .otherwise(() => null)}
+            {!isExpanded && (
+              <Tooltip label="Show full response without scroll bar">
+                <ActionIcon
+                  onClick={removeScrollArea}
+                  variant="subtle"
+                  color="gray"
+                >
+                  <IconArrowsMaximize size={16} />
+                </ActionIcon>
+              </Tooltip>
+            )}
             <CopyButton value={response} timeout={2000}>
               {({ copied, copy }) => (
                 <Tooltip
@@ -148,8 +184,8 @@ function AiResponseContent({
         </Group>
       </Card.Section>
       <Card.Section withBorder>
-        <ScrollArea.Autosize mah={300} type="auto" offsetScrollbars>
-          <TypographyStylesProvider px="md" pt="md">
+        <ConditionalScrollArea>
+          <TypographyStylesProvider p="md">
             <Markdown
               components={{
                 code(props) {
@@ -175,7 +211,7 @@ function AiResponseContent({
               {response}
             </Markdown>
           </TypographyStylesProvider>
-        </ScrollArea.Autosize>
+        </ConditionalScrollArea>
         {match(textGenerationState)
           .with("failed", () => (
             <Alert
