@@ -14,6 +14,7 @@ import {
   Textarea,
   Text,
   TextInput,
+  Group,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { prebuiltAppConfig } from "@mlc-ai/web-llm";
@@ -21,6 +22,7 @@ import { useRef, useEffect, useState } from "react";
 import { inferenceTypes } from "../../../../../modules/settings";
 import { wllamaModels } from "../../../../../modules/wllama";
 import { OpenAI } from "openai";
+import { IconInfoCircle } from "@tabler/icons-react";
 
 export function SettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
@@ -154,20 +156,33 @@ export function SettingsForm() {
             {form.values.inferenceType === "openai" && (
               <>
                 <TextInput
-                  required
-                  label="API Base URL"
                   {...form.getInputProps("openAiApiBaseUrl")}
-                  description="Example: http://localhost:11434/v1"
+                  label="API Base URL"
+                  placeholder="http://localhost:10001/v1"
+                  required
                 />
+                <Group gap="xs">
+                  <IconInfoCircle size={16} />
+                  <Text size="xs" c="dimmed" flex={1}>
+                    You may need to add{" "}
+                    <em>
+                      {`${self.location.protocol}//${self.location.hostname}`}
+                    </em>{" "}
+                    to the list of allowed network origins in your API server
+                    settings.
+                  </Text>
+                </Group>
                 <TextInput
+                  {...form.getInputProps("openAiApiKey")}
                   label="API Key"
                   type="password"
-                  {...form.getInputProps("openAiApiKey")}
+                  description="Optional, as local API servers usually do not require it."
                 />
                 <Select
+                  {...form.getInputProps("openAiApiModel")}
                   label="API Model"
                   data={openAiModels}
-                  {...form.getInputProps("openAiApiModel")}
+                  description="Optional, as some API servers don't provide a model list."
                 />
               </>
             )}
@@ -237,33 +252,45 @@ export function SettingsForm() {
                 <li>
                   Specify preferences
                   <ul>
-                    <li>"use simple language"</li>
-                    <li>"provide step-by-step explanations"</li>
+                    <li>
+                      <em>"use simple language"</em>
+                    </li>
+                    <li>
+                      <em>"provide step-by-step explanations"</em>
+                    </li>
                   </ul>
                 </li>
                 <li>
                   Set a response style
                   <ul>
-                    <li>"answer in a friendly tone"</li>
-                    <li>"write your response in Spanish"</li>
+                    <li>
+                      <em>"answer in a friendly tone"</em>
+                    </li>
+                    <li>
+                      <em>"write your response in Spanish"</em>
+                    </li>
                   </ul>
                 </li>
                 <li>
                   Provide context about the audience
                   <ul>
-                    <li>"you're talking to a high school student"</li>
                     <li>
-                      "consider that your audience is composed of professionals
-                      in the field of graphic design"
+                      <em>"you're talking to a high school student"</em>
+                    </li>
+                    <li>
+                      <em>
+                        "consider that your audience is composed of
+                        professionals in the field of graphic design"
+                      </em>
                     </li>
                   </ul>
                 </li>
               </ul>
               <span>
-                Note: The special tag <code>{`{{searchResults}}`}</code> will be
+                Note: The special tag <em>{`{{searchResults}}`}</em> will be
                 replaced with the search results, while{" "}
-                <code>{`{{dateTime}}`}</code> will be replaced with the current
-                date and time.
+                <em>{`{{dateTime}}`}</em> will be replaced with the current date
+                and time.
               </span>
             </>
           }
