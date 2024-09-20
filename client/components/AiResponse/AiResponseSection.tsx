@@ -33,7 +33,7 @@ import {
   responsePubSub,
   settingsPubSub,
   textGenerationStatePubSub,
-} from "../../../modules/pubSub";
+} from "../../modules/pubSub";
 
 export function AiResponseSection() {
   const [response] = usePubSub(responsePubSub);

@@ -3,17 +3,17 @@ import {
   queryPubSub,
   searchStatePubSub,
   textGenerationStatePubSub,
-} from "../../../modules/pubSub";
-import { SearchForm } from "./SearchForm/SearchForm";
+} from "../../modules/pubSub";
+import { SearchForm } from "../Search/Form/SearchForm";
 import { Container, Stack } from "@mantine/core";
 import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { useEffect } from "react";
-import { addLogEntry } from "../../../modules/logEntries";
-import { AiResponseSection } from "./AiResponseSection";
-import { SearchResultsSection } from "./SearchResultsSection";
+import { addLogEntry } from "../../modules/logEntries";
+import { AiResponseSection } from "../AiResponse/AiResponseSection";
+import { SearchResultsSection } from "../Search/Results/Textual/SearchResultsSection";
 
-export function Main() {
+export function Layout() {
   const [query, updateQuery] = usePubSub(queryPubSub);
   const [searchState] = usePubSub(searchStatePubSub);
   const [textGenerationState] = usePubSub(textGenerationStatePubSub);

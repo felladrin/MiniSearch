@@ -3,15 +3,15 @@ import {
   searchResultsPubSub,
   searchStatePubSub,
   settingsPubSub,
-} from "../../../modules/pubSub";
+} from "../../../../modules/pubSub";
 import { match, Pattern } from "ts-pattern";
 import { Divider, Skeleton, Alert, Stack, Group, Space } from "@mantine/core";
-import { ImageResultsList } from "./ImageResultsList/ImageResultsList";
-import { SearchResultsList } from "./SearchResultsList/SearchResultsList";
+import { ImageResultsList } from "../Graphical/ImageResultsList";
+import { SearchResultsList } from "./SearchResultsList";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { useMemo } from "react";
-import { Settings } from "../../../modules/settings";
-import { SearchResults } from "../../../modules/search";
+import { Settings } from "../../../../modules/settings";
+import { SearchResults } from "../../../../modules/search";
 
 export function SearchResultsSection() {
   const [searchResults] = usePubSub(searchResultsPubSub);

@@ -1,7 +1,7 @@
 import { Text, Button, Stack } from "@mantine/core";
 import { useState } from "react";
-import { LogsModal } from "./LogsModal";
-import { addLogEntry } from "../../../../../../modules/logEntries";
+import { LogsModal } from "../Logs/LogsModal";
+import { addLogEntry } from "../../modules/logEntries";
 import { notifications } from "@mantine/notifications";
 
 export function ActionsForm() {

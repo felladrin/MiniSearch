@@ -1,9 +1,6 @@
 import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "../../../../../modules/pubSub";
-import {
-  isF16Supported,
-  isWebGPUAvailable,
-} from "../../../../../modules/webGpu";
+import { settingsPubSub } from "../../modules/pubSub";
+import { isF16Supported, isWebGPUAvailable } from "../../modules/webGpu";
 import { match, Pattern } from "ts-pattern";
 import {
   NumberInput,
@@ -19,8 +16,8 @@ import {
 import { useForm } from "@mantine/form";
 import { prebuiltAppConfig } from "@mlc-ai/web-llm";
 import { useRef, useEffect, useState } from "react";
-import { inferenceTypes } from "../../../../../modules/settings";
-import { wllamaModels } from "../../../../../modules/wllama";
+import { inferenceTypes } from "../../modules/settings";
+import { wllamaModels } from "../../modules/wllama";
 import { OpenAI } from "openai";
 import { IconInfoCircle } from "@tabler/icons-react";
 

@@ -1,9 +1,9 @@
 import { Route } from "wouter";
-import { Main } from "./Main/Main";
+import { Layout } from "../Layout/Layout";
 import { useInitializeSettings } from "./useInitializeSettings";
 
-export function App() {
+export function Root() {
   useInitializeSettings();
 
-  return <Route path="/" component={Main} />;
+  return <Route path="/" component={Layout} />;
 }

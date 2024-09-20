@@ -7,13 +7,13 @@ import {
   ChangeEvent,
   KeyboardEvent,
 } from "react";
-import { getRandomQuerySuggestion } from "../../../../modules/querySuggestions";
-import { MenuButton } from "./MenuButton/MenuButton";
+import { getRandomQuerySuggestion } from "../../../modules/querySuggestions";
+import { MenuButton } from "../../Menu/MenuButton";
 import { useLocation } from "wouter";
-import { prepareTextGeneration } from "../../../../modules/textGeneration";
+import { prepareTextGeneration } from "../../../modules/textGeneration";
 import { match, Pattern } from "ts-pattern";
 import { Button, Group, Stack, Textarea } from "@mantine/core";
-import { addLogEntry } from "../../../../modules/logEntries";
+import { addLogEntry } from "../../../modules/logEntries";
 
 export function SearchForm({
   query,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { SettingsForm } from "./SettingsForm";
-import { ActionsForm } from "./ActionsForm/ActionsForm";
+import { ActionsForm } from "./ActionsForm";
 import {
   Button,
   Drawer,
@@ -13,10 +13,10 @@ import {
   FocusTrap,
 } from "@mantine/core";
 import { IconBrandGithub } from "@tabler/icons-react";
-import { repository } from "../../../../../../package.json";
+import { repository } from "../../../package.json";
 import prettyMilliseconds from "pretty-ms";
-import { getSemanticVersion } from "../../../../../modules/stringFormatters";
-import { addLogEntry } from "../../../../../modules/logEntries";
+import { getSemanticVersion } from "../../modules/stringFormatters";
+import { addLogEntry } from "../../modules/logEntries";
 
 export function MenuButton() {
   const [isDrawerOpen, setDrawerOpen] = useState(false);

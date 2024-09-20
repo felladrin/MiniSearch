@@ -8,7 +8,7 @@ import {
   Center,
 } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
-import { logEntriesPubSub } from "../../../../../../modules/logEntries";
+import { logEntriesPubSub } from "../../modules/logEntries";
 import { useState } from "react";
 import { IconInfoCircle } from "@tabler/icons-react";
 
