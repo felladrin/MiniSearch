@@ -16,7 +16,7 @@
     "start": "vite preview",
     "build": "vite build",
     "dev": "vite",
-    "lint": "prettier --check . && tsc && eslint --fix client && ts-prune",
+    "lint": "prettier --check . && tsc && eslint --fix client && ts-prune && jscpd client server",
     "format": "prettier --write .",
     "test": "glob -c 'tsx --test' '**/*.test.ts'"
   },
@@ -70,6 +70,7 @@
     "eslint": "^9.0.0",
     "glob": "^11.0.0",
     "globals": "^15.0.0",
+    "jscpd": "^4.0.5",
     "less": "^4.2.0",
     "ts-prune": "^0.10.3",
     "tsx": "^4.11.0",
