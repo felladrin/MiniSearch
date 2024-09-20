@@ -17,7 +17,7 @@ export async function rankSearchResults(
     await embeddingContext.getEmbeddingFor(query.toLocaleLowerCase())
   ).vector;
 
-  const documentsEmbeddings: number[][] = [];
+  const documentsEmbeddings: (readonly number[])[] = [];
 
   const documents = searchResults.map(([title, snippet, url]) =>
     `[${title}](${url} "${snippet.replaceAll('"', "'")}")`.toLocaleLowerCase(),
@@ -36,21 +36,16 @@ export async function rankSearchResults(
 
   const scoreThreshold = highestScore / 2;
 
-  const searchResultToScoreMap: Map<(typeof searchResults)[0], number> =
-    new Map();
-
-  scores.forEach((score, index) => {
-    if (score > scoreThreshold) {
-      searchResultToScoreMap.set(searchResults[index], score);
-    }
-  });
-
-  return Array.from(searchResultToScoreMap.keys()).sort((a, b) => {
-    return searchResultToScoreMap.get(b) - searchResultToScoreMap.get(a);
-  });
+  return searchResults
+    .map((result, index) => ({ result, score: scores[index] }))
+    .filter(({ score }) => score > scoreThreshold)
+    .map(({ result }) => result);
 }
 
-function calculateDotProduct(firstArray: number[], secondArray: number[]) {
+function calculateDotProduct(
+  firstArray: readonly number[],
+  secondArray: readonly number[],
+) {
   let result = 0;
 
   for (let index = 0; index < firstArray.length; index++) {
@@ -61,9 +56,9 @@ function calculateDotProduct(firstArray: number[], secondArray: number[]) {
 }
 
 async function loadModel() {
-  const hfRepo = "Felladrin/gguf-multi-qa-MiniLM-L6-cos-v1";
+  const hfRepo = "Felladrin/gguf-Q8_0-all-MiniLM-L6-v2";
 
-  const hfRepoFile = "multi-qa-MiniLM-L6-cos-v1.Q8_0.gguf";
+  const hfRepoFile = "all-minilm-l6-v2-q8_0.gguf";
 
   const localFilePath = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
