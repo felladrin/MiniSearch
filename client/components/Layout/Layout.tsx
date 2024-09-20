@@ -10,6 +10,7 @@ import { useEffect } from "react";
 import { addLogEntry } from "../../modules/logEntries";
 import { AiResponseSection } from "../AiResponse/AiResponseSection";
 import { SearchResultsSection } from "../Search/Results/Textual/SearchResultsSection";
+import { MenuButton } from "../Menu/MenuButton";
 
 export function Layout() {
   const [query, updateQuery] = usePubSub(queryPubSub);
@@ -27,7 +28,11 @@ export function Layout() {
   return (
     <Container p="lg">
       <Stack>
-        <SearchForm query={query} updateQuery={updateQuery} />
+        <SearchForm
+          query={query}
+          updateQuery={updateQuery}
+          additionalButtons={<MenuButton />}
+        />
         <AiResponseSection />
         <SearchResultsSection />
       </Stack>

@@ -6,9 +6,9 @@ import {
   useCallback,
   ChangeEvent,
   KeyboardEvent,
+  ReactNode,
 } from "react";
 import { getRandomQuerySuggestion } from "../../../modules/querySuggestions";
-import { MenuButton } from "../../Menu/MenuButton";
 import { useLocation } from "wouter";
 import { prepareTextGeneration } from "../../../modules/textGeneration";
 import { match, Pattern } from "ts-pattern";
@@ -18,9 +18,11 @@ import { addLogEntry } from "../../../modules/logEntries";
 export function SearchForm({
   query,
   updateQuery,
+  additionalButtons,
 }: {
   query: string;
   updateQuery: (query: string) => void;
+  additionalButtons?: ReactNode;
 }) {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const [textAreaValue, setTextAreaValue] = useState(query);
@@ -127,7 +129,7 @@ export function SearchForm({
             <Button size="xs" type="submit" variant="default" flex={1}>
               Search
             </Button>
-            <MenuButton />
+            {additionalButtons}
           </Group>
         </Stack>
       </form>
