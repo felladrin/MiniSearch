@@ -6,8 +6,6 @@ import {
 } from "../../modules/pubSub";
 import { SearchForm } from "../Search/Form/SearchForm";
 import { Container, Stack } from "@mantine/core";
-import { MantineProvider } from "@mantine/core";
-import { Notifications } from "@mantine/notifications";
 import { useEffect } from "react";
 import { addLogEntry } from "../../modules/logEntries";
 import { AiResponseSection } from "../AiResponse/AiResponseSection";
@@ -27,15 +25,12 @@ export function Layout() {
   }, [textGenerationState]);
 
   return (
-    <MantineProvider defaultColorScheme="dark">
-      <Notifications />
-      <Container p="lg">
-        <Stack>
-          <SearchForm query={query} updateQuery={updateQuery} />
-          <AiResponseSection />
-          <SearchResultsSection />
-        </Stack>
-      </Container>
-    </MantineProvider>
+    <Container p="lg">
+      <Stack>
+        <SearchForm query={query} updateQuery={updateQuery} />
+        <AiResponseSection />
+        <SearchResultsSection />
+      </Stack>
+    </Container>
   );
 }
