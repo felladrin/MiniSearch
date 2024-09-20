@@ -23,7 +23,7 @@ import {
 } from "@tabler/icons-react";
 import { PublishFunction } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
-import { useMemo, useState } from "react";
+import { ReactNode, useMemo, useState } from "react";
 import Markdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import syntaxHighlighterStyle from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
@@ -108,7 +108,7 @@ function AiResponseContent({
 
   const ConditionalScrollArea = useMemo(
     () =>
-      ({ children }: { children: React.ReactNode }) => {
+      ({ children }: { children: ReactNode }) => {
         return isExpanded ? (
           <Box>{children}</Box>
         ) : (
