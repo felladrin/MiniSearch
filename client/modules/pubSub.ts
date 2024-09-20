@@ -17,12 +17,12 @@ function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   return localStoragePubSub;
 }
 
-export const querySuggestionsPubSub = createLocalStoragePubSub<string[]>(
+const querySuggestionsPubSub = createLocalStoragePubSub<string[]>(
   "querySuggestions",
   [],
 );
 
-export const lastSearchTokenHashPubSub = createLocalStoragePubSub(
+const lastSearchTokenHashPubSub = createLocalStoragePubSub(
   "lastSearchTokenHash",
   "",
 );
@@ -83,4 +83,4 @@ export const settingsPubSub = createLocalStoragePubSub(
   defaultSettings,
 );
 
-export const [updateSettings, onSettingsChange, getSettings] = settingsPubSub;
+export const [, , getSettings] = settingsPubSub;

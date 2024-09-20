@@ -1,6 +1,6 @@
 import { createPubSub } from "create-pubsub";
 
-export type LogEntry = {
+type LogEntry = {
   timestamp: string;
   message: string;
 };
