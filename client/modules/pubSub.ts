@@ -1,5 +1,4 @@
 import { createPubSub } from "create-pubsub";
-import { SearchResults } from "./search";
 import { defaultSettings } from "./settings";
 
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
@@ -43,7 +42,9 @@ export const responsePubSub = createPubSub("");
 
 export const [updateResponse] = responsePubSub;
 
-export const searchResultsPubSub = createPubSub<SearchResults>({
+export const searchResultsPubSub = createPubSub<
+  import("./search").SearchResults
+>({
   textResults: [],
   imageResults: [],
 });
@@ -51,7 +52,7 @@ export const searchResultsPubSub = createPubSub<SearchResults>({
 export const [updateSearchResults, , getSearchResults] = searchResultsPubSub;
 
 export const [updateSearchPromise, , getSearchPromise] = createPubSub<
-  Promise<SearchResults>
+  Promise<import("./search").SearchResults>
 >(Promise.resolve({ textResults: [], imageResults: [] }));
 
 export const textGenerationStatePubSub = createPubSub<
