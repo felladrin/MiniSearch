@@ -11,7 +11,7 @@ export function InterfaceSettingsForm() {
   });
 
   return (
-    <form>
+    <Stack gap="md">
       <Switch
         label="Image Search"
         {...form.getInputProps("enableImageSearch", {
@@ -20,15 +20,13 @@ export function InterfaceSettingsForm() {
         description="Enable or disable image search results. When enabled, relevant images will be displayed alongside web search results."
       />
 
-      <Stack gap="md">
-        <Switch
-          label="Enter to Submit"
-          {...form.getInputProps("enterToSubmit", {
-            type: "checkbox",
-          })}
-          description="Enable or disable using Enter key to submit the search query. When disabled, you'll need to click the Search button or use Shift+Enter to submit."
-        />
-      </Stack>
-    </form>
+      <Switch
+        label="Enter to Submit"
+        {...form.getInputProps("enterToSubmit", {
+          type: "checkbox",
+        })}
+        description="Enable or disable using Enter key to submit the search query. When disabled, you'll need to click the Search button or use Shift+Enter to submit."
+      />
+    </Stack>
   );
 }
