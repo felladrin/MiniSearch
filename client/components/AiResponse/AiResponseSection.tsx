@@ -106,11 +106,11 @@ function AiResponseContent({
     () =>
       ({ children }: { children: ReactNode }) => {
         return isScrollAreaEnabled ? (
-          <Box>{children}</Box>
-        ) : (
           <ScrollArea.Autosize mah={300} type="auto" offsetScrollbars>
             {children}
           </ScrollArea.Autosize>
+        ) : (
+          <Box>{children}</Box>
         );
       },
     [isScrollAreaEnabled],
@@ -148,7 +148,7 @@ function AiResponseContent({
                 </Tooltip>
               ))
               .otherwise(() => null)}
-            {!isScrollAreaEnabled && (
+            {isScrollAreaEnabled && (
               <Tooltip label="Show full response without scroll bar">
                 <ActionIcon
                   onClick={() => setScrollAreaEnabled(false)}
