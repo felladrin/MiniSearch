@@ -127,6 +127,7 @@ export function AISettingsForm() {
         {...form.getInputProps("enableAiResponse", {
           type: "checkbox",
         })}
+        labelPosition="left"
         description="Enable or disable AI-generated responses to your queries. When disabled, you'll only see web search results."
       />
 
@@ -198,6 +199,7 @@ export function AISettingsForm() {
                   {...form.getInputProps("enableWebGpu", {
                     type: "checkbox",
                   })}
+                  labelPosition="left"
                   description="Enable or disable WebGPU usage. When disabled, the app will use the CPU instead."
                 />
               )}
