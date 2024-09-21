@@ -61,7 +61,7 @@ export function LogsModal({
             </a>
             .
           </span>
-          <Button onClick={downloadLogsAsJson} size="xs">
+          <Button onClick={downloadLogsAsJson} size="xs" data-autofocus>
             Download Logs
           </Button>
         </Group>
