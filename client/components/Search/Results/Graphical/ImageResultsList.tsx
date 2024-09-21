@@ -17,7 +17,7 @@ export function ImageResultsList({
     <Carousel slideSize="0" slideGap="xs" align="start" dragFree loop>
       {imageResults.map(([title, url, thumbnailUrl, sourceUrl], index) => (
         <Transition
-          key={sourceUrl}
+          key={index}
           mounted={isMounted}
           transition="fade"
           timingFunction="ease"
