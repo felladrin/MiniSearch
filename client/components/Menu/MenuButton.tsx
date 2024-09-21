@@ -19,7 +19,7 @@ import { getSemanticVersion } from "../../modules/stringFormatters";
 import { addLogEntry } from "../../modules/logEntries";
 import { InterfaceSettingsForm } from "./InterfaceSettingsForm";
 
-export function MenuButton() {
+export default function MenuButton() {
   const [isDrawerOpen, setDrawerOpen] = useState(false);
 
   const openDrawer = () => {

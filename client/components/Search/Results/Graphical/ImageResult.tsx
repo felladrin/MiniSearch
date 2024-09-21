@@ -1,6 +1,8 @@
-import { rem } from "@mantine/core";
+import { Center, Loader, rem } from "@mantine/core";
 import Zoom from "react-medium-image-zoom";
-import { CustomZoomContent } from "./CustomZoomContent";
+import { lazy, Suspense } from "react";
+
+const CustomZoomContent = lazy(() => import("./CustomZoomContent"));
 
 export function ImageResult({
   title,
@@ -16,14 +18,22 @@ export function ImageResult({
   return (
     <Zoom
       ZoomContent={({ buttonUnzoom, img, modalState }) => (
-        <CustomZoomContent
-          closeButtonComponent={buttonUnzoom}
-          imageComponent={img}
-          opened={modalState === "LOADED"}
-          title={title}
-          sourceUrl={sourceUrl}
-          url={url}
-        />
+        <Suspense
+          fallback={
+            <Center>
+              <Loader color="gray" />
+            </Center>
+          }
+        >
+          <CustomZoomContent
+            closeButtonComponent={buttonUnzoom}
+            imageComponent={img}
+            opened={modalState === "LOADED"}
+            title={title}
+            sourceUrl={sourceUrl}
+            url={url}
+          />
+        </Suspense>
       )}
       classDialog="custom-zoom"
     >

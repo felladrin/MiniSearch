@@ -12,7 +12,7 @@ interface CustomZoomContentProps {
   url: string;
 }
 
-export function CustomZoomContent({
+export default function CustomZoomContent({
   closeButtonComponent,
   imageComponent,
   opened,

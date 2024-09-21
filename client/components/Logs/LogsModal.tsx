@@ -12,7 +12,7 @@ import { logEntriesPubSub } from "../../modules/logEntries";
 import { useState } from "react";
 import { IconInfoCircle } from "@tabler/icons-react";
 
-export function LogsModal({
+export default function LogsModal({
   opened,
   onClose,
 }: {

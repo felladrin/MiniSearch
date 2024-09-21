@@ -1,8 +1,10 @@
-import { Text, Button, Stack } from "@mantine/core";
-import { useState } from "react";
-import { LogsModal } from "../Logs/LogsModal";
+import { Text, Button, Stack, Loader, Center } from "@mantine/core";
+import { Suspense, useState } from "react";
+import { lazy } from "react";
 import { addLogEntry } from "../../modules/logEntries";
 import { notifications } from "@mantine/notifications";
+
+const LogsModal = lazy(() => import("../Logs/LogsModal"));
 
 export function ActionsForm() {
   const [isLogsModalOpen, setLogsModalOpen] = useState(false);
@@ -65,16 +67,28 @@ export function ActionsForm() {
         </Text>
       </Stack>
       <Stack gap="xs">
-        <Button size="sm" onClick={handleShowLogsButtonClick} variant="default">
-          Show logs
-        </Button>
-        <Text size="xs" c="dimmed">
-          View session logs for debugging.
-        </Text>
-        <LogsModal
-          opened={isLogsModalOpen}
-          onClose={handleCloseLogsButtonClick}
-        />
+        <Suspense
+          fallback={
+            <Center>
+              <Loader color="gray" type="bars" />
+            </Center>
+          }
+        >
+          <Button
+            size="sm"
+            onClick={handleShowLogsButtonClick}
+            variant="default"
+          >
+            Show logs
+          </Button>
+          <Text size="xs" c="dimmed">
+            View session logs for debugging.
+          </Text>
+          <LogsModal
+            opened={isLogsModalOpen}
+            onClose={handleCloseLogsButtonClick}
+          />
+        </Suspense>
       </Stack>
     </Stack>
   );

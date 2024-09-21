@@ -6,11 +6,15 @@ import {
 } from "../../modules/pubSub";
 import { SearchForm } from "../Search/Form/SearchForm";
 import { Container, Stack } from "@mantine/core";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { addLogEntry } from "../../modules/logEntries";
-import { AiResponseSection } from "../AiResponse/AiResponseSection";
-import { SearchResultsSection } from "../Search/Results/Textual/SearchResultsSection";
-import { MenuButton } from "../Menu/MenuButton";
+import { lazy } from "react";
+
+const AiResponseSection = lazy(() => import("../AiResponse/AiResponseSection"));
+const SearchResultsSection = lazy(
+  () => import("../Search/Results/Textual/SearchResultsSection"),
+);
+const MenuButton = lazy(() => import("../Menu/MenuButton"));
 
 export function Layout() {
   const [query, updateQuery] = usePubSub(queryPubSub);
@@ -33,8 +37,12 @@ export function Layout() {
           updateQuery={updateQuery}
           additionalButtons={<MenuButton />}
         />
-        <AiResponseSection />
-        <SearchResultsSection />
+        <Suspense>
+          <AiResponseSection />
+        </Suspense>
+        <Suspense>
+          <SearchResultsSection />
+        </Suspense>
       </Stack>
     </Container>
   );

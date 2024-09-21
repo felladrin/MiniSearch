@@ -35,7 +35,7 @@ import {
   textGenerationStatePubSub,
 } from "../../modules/pubSub";
 
-export function AiResponseSection() {
+export default function AiResponseSection() {
   const [response] = usePubSub(responsePubSub);
   const [textGenerationState, setTextGenerationState] = usePubSub(
     textGenerationStatePubSub,

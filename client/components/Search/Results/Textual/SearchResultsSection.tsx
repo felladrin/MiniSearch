@@ -23,7 +23,7 @@ import { Settings } from "../../../../modules/settings";
 import { SearchResults } from "../../../../modules/search";
 import { useMediaQuery } from "@mantine/hooks";
 
-export function SearchResultsSection() {
+export default function SearchResultsSection() {
   const [searchResults] = usePubSub(searchResultsPubSub);
   const [searchState] = usePubSub(searchStatePubSub);
   const [settings] = usePubSub(settingsPubSub);
