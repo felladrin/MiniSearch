@@ -100,16 +100,12 @@ function AiResponseContent({
     | "completed"
   >;
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const removeScrollArea = () => {
-    setIsExpanded(true);
-  };
+  const [isScrollAreaEnabled, setScrollAreaEnabled] = useState(true);
 
   const ConditionalScrollArea = useMemo(
     () =>
       ({ children }: { children: ReactNode }) => {
-        return isExpanded ? (
+        return isScrollAreaEnabled ? (
           <Box>{children}</Box>
         ) : (
           <ScrollArea.Autosize mah={300} type="auto" offsetScrollbars>
@@ -117,7 +113,7 @@ function AiResponseContent({
           </ScrollArea.Autosize>
         );
       },
-    [isExpanded],
+    [isScrollAreaEnabled],
   );
 
   return (
@@ -152,10 +148,10 @@ function AiResponseContent({
                 </Tooltip>
               ))
               .otherwise(() => null)}
-            {!isExpanded && (
+            {!isScrollAreaEnabled && (
               <Tooltip label="Show full response without scroll bar">
                 <ActionIcon
-                  onClick={removeScrollArea}
+                  onClick={() => setScrollAreaEnabled(false)}
                   variant="subtle"
                   color="gray"
                 >
