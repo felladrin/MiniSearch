@@ -14,6 +14,7 @@ import { prepareTextGeneration } from "../../../modules/textGeneration";
 import { match, Pattern } from "ts-pattern";
 import { Button, Group, Stack, Textarea } from "@mantine/core";
 import { addLogEntry } from "../../../modules/logEntries";
+import { sleepUntilIdle } from "../../../modules/sleep";
 
 export function SearchForm({
   query,
@@ -32,7 +33,9 @@ export function SearchForm({
   const [, navigate] = useLocation();
 
   useEffect(() => {
-    prepareTextGeneration();
+    sleepUntilIdle().then(() => {
+      prepareTextGeneration();
+    });
   }, []);
 
   useEffect(() => {
