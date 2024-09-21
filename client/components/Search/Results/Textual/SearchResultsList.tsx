@@ -6,6 +6,7 @@ import {
   Flex,
   UnstyledButton,
   Transition,
+  em,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { getHostname } from "../../../../modules/stringFormatters";
@@ -17,7 +18,9 @@ export function SearchResultsList({
 }: {
   searchResults: SearchResults["textResults"];
 }) {
-  const shouldDisplayDomainBelowTitle = useMediaQuery("(max-width: 720px)");
+  const shouldDisplayDomainBelowTitle = useMediaQuery(
+    `(max-width: ${em(720)})`,
+  );
   const [isMounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
