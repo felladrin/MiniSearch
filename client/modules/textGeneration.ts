@@ -1,23 +1,22 @@
-import OpenAI from "openai";
-import prettyMilliseconds from "pretty-ms";
-import { addLogEntry } from "./logEntries";
+import { isWebGPUAvailable } from "./webGpu";
 import {
-  getQuery,
-  getSearchPromise,
-  getSearchResults,
-  getSettings,
-  getTextGenerationState,
-  updateModelLoadingProgress,
-  updateResponse,
-  updateSearchPromise,
   updateSearchResults,
-  updateSearchState,
+  updateResponse,
+  getSearchResults,
+  getQuery,
+  updateSearchPromise,
+  getSearchPromise,
   updateTextGenerationState,
+  updateSearchState,
+  updateModelLoadingProgress,
+  getTextGenerationState,
+  getSettings,
 } from "./pubSub";
 import { search } from "./search";
+import { addLogEntry } from "./logEntries";
 import { getSystemPrompt } from "./systemPrompt";
-import { isWebGPUAvailable } from "./webGpu";
-import { untilUiIsUpdated } from "./until";
+import prettyMilliseconds from "pretty-ms";
+import OpenAI from "openai";
 
 export async function prepareTextGeneration() {
   if (getQuery() === "") return;
@@ -35,8 +34,6 @@ export async function prepareTextGeneration() {
   const responseGenerationStartTime = new Date().getTime();
 
   updateTextGenerationState("loadingModel");
-
-  await untilUiIsUpdated();
 
   try {
     const settings = getSettings();
@@ -62,8 +59,6 @@ export async function prepareTextGeneration() {
   } catch (error) {
     addLogEntry(`Error generating text: ${error}`);
     updateTextGenerationState("failed");
-  } finally {
-    await untilUiIsUpdated();
   }
 
   addLogEntry(
@@ -85,8 +80,6 @@ async function generateTextWithOpenAI() {
   await canStartResponding();
 
   updateTextGenerationState("preparingToGenerate");
-
-  await untilUiIsUpdated();
 
   const completion = await openai.chat.completions.create({
     model: settings.openAiApiModel,
@@ -140,7 +133,6 @@ async function generateTextWithWebLlm() {
 
   if (isModelCached) {
     updateTextGenerationState("preparingToGenerate");
-    await untilUiIsUpdated();
   } else {
     initProgressCallback = (report) => {
       updateModelLoadingProgress(Math.round(report.progress * 100));
@@ -173,8 +165,6 @@ async function generateTextWithWebLlm() {
     await canStartResponding();
 
     updateTextGenerationState("preparingToGenerate");
-
-    await untilUiIsUpdated();
 
     const completion = await engine.chat.completions.create({
       stream: true,
@@ -245,8 +235,6 @@ async function generateTextWithWllama() {
     await canStartResponding();
 
     updateTextGenerationState("preparingToGenerate");
-
-    await untilUiIsUpdated();
 
     const prompt = await model.buildPrompt(
       wllama,
@@ -321,8 +309,6 @@ async function getKeywords(text: string, limit?: number) {
 async function startSearch(query: string) {
   updateSearchState("running");
 
-  await untilUiIsUpdated();
-
   let searchResults = await search(
     query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query,
     30,
@@ -340,15 +326,12 @@ async function startSearch(query: string) {
 
   updateSearchResults(searchResults);
 
-  await untilUiIsUpdated();
-
   return searchResults;
 }
 
 async function canStartResponding() {
   if (getSettings().searchResultsToConsider > 0) {
     updateTextGenerationState("awaitingSearchResults");
-    await untilUiIsUpdated();
     await getSearchPromise();
   }
 }
