@@ -12,73 +12,80 @@ import {
   Text,
   TextInput,
   Group,
+  ComboboxData,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { prebuiltAppConfig } from "@mlc-ai/web-llm";
-import { useRef, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { inferenceTypes } from "../../modules/settings";
-import { wllamaModels } from "../../modules/wllama";
 import { OpenAI } from "openai";
 import { IconInfoCircle } from "@tabler/icons-react";
 
 export function AISettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
-  const [openAiModels, setOpenAiModels] = useState<
-    { label: string; value: string }[]
-  >([]);
-
-  const suffix = isF16Supported ? "-q4f16_1-MLC" : "-q4f32_1-MLC";
-
-  const webGpuModels = useRef(
-    prebuiltAppConfig.model_list
-      .filter((model) => model.model_id.endsWith(suffix))
-      .sort((a, b) => (a.vram_required_MB ?? 0) - (b.vram_required_MB ?? 0))
-      .map((model) => ({
-        label: `${model.model_id.replace(suffix, "")} • ${
-          Math.round(model.vram_required_MB ?? 0) || "N/A"
-        } MB`,
-        value: model.model_id,
-      })),
+  const [openAiModels, setOpenAiModels] = useState<ComboboxData>([]);
+  const [webGpuModels, setWebGpuModels] = useState<ComboboxData>([]);
+  const [wllamaModelOptions, setWllamaModelOptions] = useState<ComboboxData>(
+    [],
   );
 
-  useEffect(
-    function validateWebGpuModel() {
-      const isCurrentModelValid = webGpuModels.current.some(
+  useEffect(() => {
+    async function loadWebGpuModels() {
+      const { prebuiltAppConfig } = await import("@mlc-ai/web-llm");
+
+      const suffix = isF16Supported ? "-q4f16_1-MLC" : "-q4f32_1-MLC";
+
+      const models = prebuiltAppConfig.model_list
+        .filter((model) => model.model_id.endsWith(suffix))
+        .sort((a, b) => (a.vram_required_MB ?? 0) - (b.vram_required_MB ?? 0))
+        .map((model) => ({
+          label: `${model.model_id.replace(suffix, "")} • ${
+            Math.round(model.vram_required_MB ?? 0) || "N/A"
+          } MB`,
+          value: model.model_id,
+        }));
+
+      setWebGpuModels(models);
+
+      const isCurrentModelValid = models.some(
         (model) => model.value === settings.webLlmModelId,
       );
 
       if (!isCurrentModelValid) {
         setSettings({
           ...settings,
-          webLlmModelId: webGpuModels.current[0].value,
+          webLlmModelId: models[0].value,
         });
       }
-    },
-    [settings.webLlmModelId],
-  );
+    }
 
-  const wllamaModelOptions = useRef(
-    Object.entries(wllamaModels).map(([value, { label }]) => ({
-      label,
-      value,
-    })),
-  );
+    loadWebGpuModels();
+  }, []);
 
-  useEffect(
-    function validateWllamaModel() {
-      const isCurrentModelValid = wllamaModelOptions.current.some(
+  useEffect(() => {
+    async function loadWllamaModels() {
+      const { wllamaModels } = await import("../../modules/wllama");
+
+      const models = Object.entries(wllamaModels).map(([value, { label }]) => ({
+        label,
+        value,
+      }));
+
+      setWllamaModelOptions(models);
+
+      const isCurrentModelValid = models.some(
         (model) => model.value === settings.wllamaModelId,
       );
 
       if (!isCurrentModelValid) {
         setSettings({
           ...settings,
-          wllamaModelId: wllamaModelOptions.current[0].value,
+          wllamaModelId: models[0].value,
         });
       }
-    },
-    [settings.wllamaModelId],
-  );
+    }
+
+    loadWllamaModels();
+  }, []);
 
   const form = useForm({
     initialValues: settings,
@@ -200,7 +207,7 @@ export function AISettingsForm() {
                   <Select
                     label="AI Model"
                     description="Select the model to use for AI responses."
-                    data={webGpuModels.current}
+                    data={webGpuModels}
                     {...form.getInputProps("webLlmModelId")}
                   />
                 ))
@@ -209,7 +216,7 @@ export function AISettingsForm() {
                     <Select
                       label="AI Model"
                       description="Select the model to use for AI responses."
-                      data={wllamaModelOptions.current}
+                      data={wllamaModelOptions}
                       {...form.getInputProps("wllamaModelId")}
                     />
                     <NumberInput
