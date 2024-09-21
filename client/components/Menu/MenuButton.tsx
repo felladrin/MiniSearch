@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SettingsForm } from "./SettingsForm";
+import { AISettingsForm } from "./AISettingsForm";
 import { ActionsForm } from "./ActionsForm";
 import {
   Button,
@@ -87,10 +87,10 @@ export function MenuButton() {
         <FocusTrap.InitialFocus />
         <Drawer.Body>
           <Accordion variant="separated" multiple>
-            <Accordion.Item value="settings">
-              <Accordion.Control>Settings</Accordion.Control>
+            <Accordion.Item value="aiSettings">
+              <Accordion.Control>AI Settings</Accordion.Control>
               <Accordion.Panel>
-                <SettingsForm />
+                <AISettingsForm />
               </Accordion.Panel>
             </Accordion.Item>
             <Accordion.Item value="interfaceSettings">

@@ -21,7 +21,7 @@ import { wllamaModels } from "../../modules/wllama";
 import { OpenAI } from "openai";
 import { IconInfoCircle } from "@tabler/icons-react";
 
-export function SettingsForm() {
+export function AISettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
   const [openAiModels, setOpenAiModels] = useState<
     { label: string; value: string }[]
@@ -126,7 +126,7 @@ export function SettingsForm() {
 
         {form.values.enableAiResponse && (
           <>
-            <Stack gap="xs" mb="md" ml={50}>
+            <Stack gap="xs" mb="md">
               <Text size="sm">Search results to consider</Text>
               <Text size="xs" c="dimmed">
                 Determines the number of search results to consider when

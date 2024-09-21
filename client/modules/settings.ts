@@ -38,6 +38,6 @@ addLogEntry(
 export type Settings = typeof defaultSettings;
 
 export const inferenceTypes = [
-  { value: "browser", label: "Browser-Based Inference" },
+  { value: "browser", label: "Browser-Based" },
   { value: "openai", label: "OpenAI-Compatible API" },
 ];
