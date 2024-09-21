@@ -17,7 +17,6 @@ if (isWebGPUAvailable) {
     if (!adapter) {
       throw Error("Couldn't request WebGPU adapter.");
     }
-    isWebGPUAvailable = true;
     isF16Supported = adapter.features.has("shader-f16");
   } catch {
     isWebGPUAvailable = false;
@@ -27,4 +26,7 @@ if (isWebGPUAvailable) {
 addLogEntry(
   `WebGPU availability: ${isWebGPUAvailable ? "available" : "unavailable"}`,
 );
-addLogEntry(`F16 support: ${isF16Supported ? "supported" : "not supported"}`);
+
+addLogEntry(
+  `WebGPU F16 Shader support: ${isF16Supported ? "supported" : "not supported"}`,
+);
