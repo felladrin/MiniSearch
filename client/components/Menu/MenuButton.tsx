@@ -17,6 +17,7 @@ import { repository } from "../../../package.json";
 import prettyMilliseconds from "pretty-ms";
 import { getSemanticVersion } from "../../modules/stringFormatters";
 import { addLogEntry } from "../../modules/logEntries";
+import { InterfaceSettingsForm } from "./InterfaceSettingsForm";
 
 export function MenuButton() {
   const [isDrawerOpen, setDrawerOpen] = useState(false);
@@ -90,6 +91,12 @@ export function MenuButton() {
               <Accordion.Control>Settings</Accordion.Control>
               <Accordion.Panel>
                 <SettingsForm />
+              </Accordion.Panel>
+            </Accordion.Item>
+            <Accordion.Item value="interfaceSettings">
+              <Accordion.Control>Interface Settings</Accordion.Control>
+              <Accordion.Panel>
+                <InterfaceSettingsForm />
               </Accordion.Panel>
             </Accordion.Item>
             <Accordion.Item value="actions">

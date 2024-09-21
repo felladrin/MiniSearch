@@ -15,6 +15,8 @@ import { match, Pattern } from "ts-pattern";
 import { Button, Group, Stack, Textarea } from "@mantine/core";
 import { addLogEntry } from "../../../modules/logEntries";
 import { sleepUntilIdle } from "../../../modules/sleep";
+import { settingsPubSub } from "../../../modules/pubSub";
+import { usePubSub } from "create-pubsub/react";
 
 export function SearchForm({
   query,
@@ -31,6 +33,7 @@ export function SearchForm({
   const defaultSuggestedQuery = "Anything you need!";
   const [suggestedQuery, setSuggestedQuery] = useState(defaultSuggestedQuery);
   const [, navigate] = useLocation();
+  const [settings] = usePubSub(settingsPubSub);
 
   useEffect(() => {
     sleepUntilIdle().then(() => {
@@ -85,8 +88,12 @@ export function SearchForm({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    match(event)
-      .with({ code: "Enter", shiftKey: false }, () => {
+    match([event, settings.enterToSubmit])
+      .with([{ code: "Enter", shiftKey: false }, true], () => {
+        event.preventDefault();
+        startSearching();
+      })
+      .with([{ code: "Enter", shiftKey: true }, false], () => {
         event.preventDefault();
         startSearching();
       })

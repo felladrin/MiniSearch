@@ -28,6 +28,7 @@ Search results:
   openAiApiBaseUrl: "",
   openAiApiKey: "",
   openAiApiModel: "",
+  enterToSubmit: true,
 };
 
 addLogEntry(
