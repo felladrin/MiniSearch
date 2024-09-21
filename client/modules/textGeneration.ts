@@ -302,7 +302,7 @@ function getFormattedSearchResults(shouldIncludeUrl: boolean) {
     return searchResults
       .map(
         ([title, snippet, url], index) =>
-          `${index + 1}. [${title}](${url} "${snippet.replaceAll('"', "'")}")`,
+          `${index + 1}. [${title}](${url}) | ${snippet}`,
       )
       .join("\n");
   }
