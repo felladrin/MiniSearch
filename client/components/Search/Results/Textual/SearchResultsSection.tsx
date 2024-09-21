@@ -5,13 +5,23 @@ import {
   settingsPubSub,
 } from "../../../../modules/pubSub";
 import { match, Pattern } from "ts-pattern";
-import { Divider, Skeleton, Alert, Stack, Group, Space } from "@mantine/core";
+import {
+  Divider,
+  Skeleton,
+  Alert,
+  Stack,
+  Group,
+  Space,
+  AspectRatio,
+  em,
+} from "@mantine/core";
 import { ImageResultsList } from "../Graphical/ImageResultsList";
 import { SearchResultsList } from "./SearchResultsList";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { useMemo } from "react";
 import { Settings } from "../../../../modules/settings";
 import { SearchResults } from "../../../../modules/search";
+import { useMediaQuery } from "@mantine/hooks";
 
 export function SearchResultsSection() {
   const [searchResults] = usePubSub(searchResultsPubSub);
@@ -35,6 +45,10 @@ export function SearchResultsSection() {
 }
 
 function RunningSearchContent() {
+  const hasSmallScreen = useMediaQuery(`(max-width: ${em(530)})`);
+
+  const numberOfSquareSkeletons = hasSmallScreen ? 4 : 6;
+
   return (
     <>
       <Divider
@@ -45,10 +59,11 @@ function RunningSearchContent() {
       />
       <Stack>
         <Group>
-          <Skeleton flex={1} height={180} />
-          <Skeleton flex={1} height={180} />
-          <Skeleton flex={1} height={180} />
-          <Skeleton flex={1} height={180} />
+          {[...Array(numberOfSquareSkeletons)].map((_, index) => (
+            <AspectRatio key={index} ratio={1} flex={1}>
+              <Skeleton />
+            </AspectRatio>
+          ))}
         </Group>
         <Stack>
           <Skeleton height={8} radius="xl" />
