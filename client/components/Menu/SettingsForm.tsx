@@ -227,14 +227,6 @@ export function SettingsForm() {
           </>
         )}
 
-        <Switch
-          label="Image Search"
-          {...form.getInputProps("enableImageSearch", {
-            type: "checkbox",
-          })}
-          description="Enable or disable image search results. When enabled, relevant images will be displayed alongside web search results."
-        />
-
         <Textarea
           label="Instructions for AI"
           descriptionProps={{ component: "div" }}

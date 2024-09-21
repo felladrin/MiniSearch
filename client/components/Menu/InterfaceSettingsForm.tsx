@@ -12,6 +12,14 @@ export function InterfaceSettingsForm() {
 
   return (
     <form>
+      <Switch
+        label="Image Search"
+        {...form.getInputProps("enableImageSearch", {
+          type: "checkbox",
+        })}
+        description="Enable or disable image search results. When enabled, relevant images will be displayed alongside web search results."
+      />
+
       <Stack gap="md">
         <Switch
           label="Enter to Submit"
