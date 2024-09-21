@@ -8,7 +8,7 @@ export const defaultSettings = {
   webLlmModelId: isF16Supported
     ? "Qwen2-0.5B-Instruct-q4f16_1-MLC"
     : "TinyLlama-1.1B-Chat-v1.0-q4f32_1-MLC",
-  wllamaModelId: "smollm-135m",
+  wllamaModelId: "qwen-2.5-0.5b",
   cpuThreads: 1,
   searchResultsToConsider: 3,
   systemPrompt: `You are a research assistant. Provide detailed, step-by-step responses following these guidelines:

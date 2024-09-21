@@ -111,10 +111,10 @@ ${query}</s>
 <|answer|>
 `),
   },
-  "qwen-2-0.5b": {
+  "qwen-2.5-0.5b": {
     ...defaultModelConfig,
-    label: "Qwen 2 0.5B • 420 MB",
-    url: "https://huggingface.co/Felladrin/gguf-q5_k_m-imat-qwen2-0.5b-instruct/resolve/main/qwen2-0-00001-of-00003.gguf",
+    label: "Qwen 2.5 0.5B • 420 MB",
+    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Qwen2.5-0.5B-Instruct/resolve/main/qwen2-00001-of-00003.gguf",
   },
   "arcee-lite": {
     ...defaultModelConfig,
