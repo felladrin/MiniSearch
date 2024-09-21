@@ -8,5 +8,5 @@
 
 .custom-zoom [data-rmiz-btn-unzoom] {
   color: var(--button-color);
-  background-color: var(--mantine-primary-color-filled);
+  background-color: var(--mantine-color-default);
 }
