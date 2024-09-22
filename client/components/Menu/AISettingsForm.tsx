@@ -152,9 +152,10 @@ export function AISettingsForm() {
           </Stack>
 
           <Select
+            {...form.getInputProps("inferenceType")}
             label="Inference Type"
             data={inferenceTypes}
-            {...form.getInputProps("inferenceType")}
+            allowDeselect={false}
           />
 
           {form.values.inferenceType === "openai" && (
@@ -187,6 +188,7 @@ export function AISettingsForm() {
                 label="API Model"
                 data={openAiModels}
                 description="Optional, as some API servers don't provide a model list."
+                allowDeselect={false}
               />
             </>
           )}
@@ -207,19 +209,21 @@ export function AISettingsForm() {
               {match([isWebGPUAvailable, form.values.enableWebGpu])
                 .with([true, true], () => (
                   <Select
+                    {...form.getInputProps("webLlmModelId")}
                     label="AI Model"
                     description="Select the model to use for AI responses."
                     data={webGpuModels}
-                    {...form.getInputProps("webLlmModelId")}
+                    allowDeselect={false}
                   />
                 ))
                 .with([false, Pattern.any], [Pattern.any, false], () => (
                   <>
                     <Select
+                      {...form.getInputProps("wllamaModelId")}
                       label="AI Model"
                       description="Select the model to use for AI responses."
                       data={wllamaModelOptions}
-                      {...form.getInputProps("wllamaModelId")}
+                      allowDeselect={false}
                     />
                     <NumberInput
                       label="CPU threads to use"
