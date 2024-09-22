@@ -116,6 +116,30 @@ ${query}</s>
     label: "Qwen 2.5 0.5B • 420 MB",
     url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Qwen2.5-0.5B-Instruct/resolve/main/qwen2-00001-of-00003.gguf",
   },
+  "llama-corn-1.1b": {
+    ...defaultModelConfig,
+    label: "LlamaCorn 1.1B • 782 MB",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_M-LlamaCorn-1.1B-Chat/resolve/main/model.shard-00001-of-00017.gguf",
+    buildPrompt: (_, query, searchResults) =>
+      Promise.resolve(`<|im_start|>system
+${getSystemPrompt(searchResults)}<|im_end|>
+<|im_start|>user
+${query}<|im_end|>
+<|im_start|>assistant
+`),
+    stopStrings: ["<|im_end|>"],
+  },
+  "danube2-1.8b": {
+    ...defaultModelConfig,
+    label: "Danube 2 1.8B • 1.3 GB",
+    url: "https://huggingface.co/Felladrin/gguf-q5_k_m-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1-00001-of-00021.gguf",
+    buildPrompt: (_, query, searchResults) =>
+      Promise.resolve(`${getSystemPrompt(searchResults)}
+<|prompt|>
+${query}</s>
+<|answer|>
+`),
+  },
   "arcee-lite": {
     ...defaultModelConfig,
     label: "Arcee Lite 1.5B • 1.43 GB",
