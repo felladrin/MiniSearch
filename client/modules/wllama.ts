@@ -129,6 +129,11 @@ ${query}<|im_end|>
 `),
     stopStrings: ["<|im_end|>"],
   },
+  "arcee-lite": {
+    ...defaultModelConfig,
+    label: "Arcee Lite 1.5B • 1.43 GB",
+    url: "https://huggingface.co/Felladrin/gguf-q5_k_l-imat-arcee-lite/resolve/main/arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
+  },
   "danube2-1.8b": {
     ...defaultModelConfig,
     label: "Danube 2 1.8B • 1.3 GB",
@@ -139,11 +144,6 @@ ${query}<|im_end|>
 ${query}</s>
 <|answer|>
 `),
-  },
-  "arcee-lite": {
-    ...defaultModelConfig,
-    label: "Arcee Lite 1.5B • 1.43 GB",
-    url: "https://huggingface.co/Felladrin/gguf-q5_k_l-imat-arcee-lite/resolve/main/arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
   },
   "gemma-2-2b": {
     ...defaultModelConfig,
