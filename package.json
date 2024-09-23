@@ -21,7 +21,7 @@
     "test": "glob -c 'tsx --test' '**/*.test.ts'"
   },
   "dependencies": {
-    "@huggingface/hub": "^0.15.1",
+    "@huggingface/hub": "^0.16.0",
     "@huggingface/jinja": "^0.3.0",
     "@mantine/carousel": "^7.12.2",
     "@mantine/core": "^7.12.2",
