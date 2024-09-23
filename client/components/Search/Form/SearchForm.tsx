@@ -17,6 +17,7 @@ import { addLogEntry } from "../../../modules/logEntries";
 import { sleepUntilIdle } from "../../../modules/sleep";
 import { settingsPubSub } from "../../../modules/pubSub";
 import { usePubSub } from "create-pubsub/react";
+import { postMessageToParentWindow } from "../../../modules/parentWindow";
 
 export function SearchForm({
   query,
@@ -71,7 +72,11 @@ export function SearchForm({
 
     setTextAreaValue(queryToEncode);
 
-    navigate(`/?q=${encodeURIComponent(queryToEncode)}`, { replace: true });
+    const queryString = `q=${encodeURIComponent(queryToEncode)}`;
+
+    postMessageToParentWindow({ queryString, hash: "" });
+
+    navigate(`/?${queryString}`, { replace: true });
 
     updateQuery(queryToEncode);
 
