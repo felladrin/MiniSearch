@@ -146,7 +146,6 @@ ${query}
     ...defaultModelConfig,
     label: "Pints 1.5B • 1.15 GB",
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K-1.5-Pints-2K-v0.1/resolve/main/model.shard-00001-of-00018.gguf",
-    contextSize: 2048,
   },
   "arcee-lite": {
     ...defaultModelConfig,
@@ -204,11 +203,16 @@ ${query}<end_of_turn>
     stopStrings: ["<|im_end|>"],
     sampling: { temp: 0 },
   },
+  "olmoe-1b-7b": {
+    ...defaultModelConfig,
+    label: "OLMoE 1B 7B • 3.7 GB",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Q3_K_XL-OLMoE-1B-7B-0924-Instruct/resolve/main/OLMoE-1B-7B-0924-Instruct-Q3_K_XL.shard-00001-of-00050.gguf",
+  },
   "llama-3.1-supernova-8b": {
     ...defaultModelConfig,
     label: "Llama 3.1 SuperNova 8B • 3.69 GB",
     url: "https://huggingface.co/Felladrin/gguf-Q2_K_L-Llama-3.1-SuperNova-Lite/resolve/main/Llama-3.1-SuperNova-Lite-Q2_K_L.shard-00001-of-00007.gguf",
-    contextSize: 1536,
+    cacheType: "q8_0",
   },
 };
 
