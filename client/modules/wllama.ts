@@ -129,6 +129,25 @@ ${query}<|im_end|>
 `),
     stopStrings: ["<|im_end|>"],
   },
+  "sheared-llama-1.3b": {
+    ...defaultModelConfig,
+    label: "Sheared LLaMA 1.3B • 1 GB",
+    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Sheared-LLaMA-1.3B-ShareGPT/resolve/main/model.shard-00001-of-00020.gguf",
+    buildPrompt: (_, query, searchResults) =>
+      Promise.resolve(`${getSystemPrompt(searchResults)}
+
+### Input:
+${query}
+
+### Response:
+`),
+  },
+  "pints-1.5b": {
+    ...defaultModelConfig,
+    label: "Pints 1.5B • 1.15 GB",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K-1.5-Pints-2K-v0.1/resolve/main/model.shard-00001-of-00018.gguf",
+    contextSize: 2048,
+  },
   "arcee-lite": {
     ...defaultModelConfig,
     label: "Arcee Lite 1.5B • 1.43 GB",
