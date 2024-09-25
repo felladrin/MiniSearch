@@ -116,6 +116,11 @@ ${query}</s>
     label: "Qwen 2.5 0.5B • 420 MB",
     url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Qwen2.5-0.5B-Instruct/resolve/main/qwen2-00001-of-00003.gguf",
   },
+  "llama-3.2-1b": {
+    ...defaultModelConfig,
+    label: "Llama 3.2 1B • 975 MB",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-1B-Instruct/resolve/main/model.shard-00001-of-00005.gguf",
+  },
   "llama-corn-1.1b": {
     ...defaultModelConfig,
     label: "LlamaCorn 1.1B • 782 MB",
@@ -173,6 +178,11 @@ ${query}</s>
 ${query}<end_of_turn>
 <start_of_turn>model
 `),
+  },
+  "llama-3.2-3b": {
+    ...defaultModelConfig,
+    label: "Llama 3.2 3B • 2.42 GB",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-3B-Instruct/resolve/main/model.shard-00001-of-00007.gguf",
   },
   "phi-3.5-mini-3.8b": {
     ...defaultModelConfig,
