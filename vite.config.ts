@@ -33,6 +33,7 @@ export default defineConfig(({ command }) => {
     },
     build: {
       target: "esnext",
+      chunkSizeWarningLimit: 5000,
     },
     plugins: [
       process.env.BASIC_SSL === "true" ? viteBasicSSLPlugin() : undefined,
