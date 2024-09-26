@@ -2,47 +2,12 @@ import { Text, Button, Stack, Loader, Center } from "@mantine/core";
 import { Suspense, useState } from "react";
 import { lazy } from "react";
 import { addLogEntry } from "../../modules/logEntries";
-import { notifications } from "@mantine/notifications";
+import { sleep } from "../../modules/sleep";
 
 const LogsModal = lazy(() => import("../Logs/LogsModal"));
 
 export function ActionsForm() {
   const [isLogsModalOpen, setLogsModalOpen] = useState(false);
-
-  const handleClearDataButtonClick = async () => {
-    const sureToDelete = window.confirm(
-      "Are you sure you want to reset the settings and delete all files in cache?",
-    );
-
-    if (!sureToDelete) return;
-
-    addLogEntry("User initiated data clearing");
-
-    notifications.show({
-      title: "Clearing data...",
-      message: "Please wait while we clear your data.",
-      color: "blue",
-    });
-
-    window.localStorage.clear();
-
-    for (const cacheName of await window.caches.keys()) {
-      await window.caches.delete(cacheName);
-    }
-
-    for (const databaseInfo of await window.indexedDB.databases()) {
-      if (databaseInfo.name) window.indexedDB.deleteDatabase(databaseInfo.name);
-    }
-
-    notifications.show({
-      title: "Data cleared!",
-      message: "All data has been successfully cleared.",
-      color: "green",
-      onClose: () => window.location.reload(),
-    });
-
-    addLogEntry("All data cleared successfully");
-  };
 
   const handleShowLogsButtonClick = () => {
     addLogEntry("User opened the logs modal");
@@ -56,16 +21,7 @@ export function ActionsForm() {
 
   return (
     <Stack gap="lg">
-      <Stack gap="xs">
-        <Button onClick={handleClearDataButtonClick} variant="default">
-          <Stack align="flex-start" gap="xs">
-            Clear all data
-          </Stack>
-        </Button>
-        <Text size="xs" c="dimmed">
-          Reset settings and delete all files in cache to free up space.
-        </Text>
-      </Stack>
+      <ClearDataButton />
       <Stack gap="xs">
         <Suspense
           fallback={
@@ -90,6 +46,60 @@ export function ActionsForm() {
           />
         </Suspense>
       </Stack>
+    </Stack>
+  );
+}
+
+function ClearDataButton() {
+  const [isClearingData, setIsClearingData] = useState(false);
+  const [hasClearedData, setHasClearedData] = useState(false);
+
+  const handleClearDataButtonClick = async () => {
+    const sureToDelete = self.confirm(
+      "Are you sure you want to reset the settings and delete all files in cache?",
+    );
+
+    if (!sureToDelete) return;
+
+    addLogEntry("User initiated data clearing");
+
+    setIsClearingData(true);
+
+    self.localStorage.clear();
+
+    for (const cacheName of await self.caches.keys()) {
+      await self.caches.delete(cacheName);
+    }
+
+    for (const databaseInfo of await self.indexedDB.databases()) {
+      if (databaseInfo.name) self.indexedDB.deleteDatabase(databaseInfo.name);
+    }
+
+    setIsClearingData(false);
+
+    setHasClearedData(true);
+
+    addLogEntry("All data cleared successfully");
+
+    await sleep(1000);
+
+    self.location.reload();
+  };
+
+  return (
+    <Stack gap="xs">
+      <Button
+        onClick={handleClearDataButtonClick}
+        variant="default"
+        loading={isClearingData}
+        loaderProps={{ type: "bars" }}
+        disabled={hasClearedData}
+      >
+        {hasClearedData ? "Data cleared" : "Clear all data"}
+      </Button>
+      <Text size="xs" c="dimmed">
+        Reset settings and delete all files in cache to free up space.
+      </Text>
     </Stack>
   );
 }
