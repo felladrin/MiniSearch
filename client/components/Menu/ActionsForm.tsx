@@ -7,45 +7,10 @@ import { sleep } from "../../modules/sleep";
 const LogsModal = lazy(() => import("../Logs/LogsModal"));
 
 export function ActionsForm() {
-  const [isLogsModalOpen, setLogsModalOpen] = useState(false);
-
-  const handleShowLogsButtonClick = () => {
-    addLogEntry("User opened the logs modal");
-    setLogsModalOpen(true);
-  };
-
-  const handleCloseLogsButtonClick = () => {
-    addLogEntry("User closed the logs modal");
-    setLogsModalOpen(false);
-  };
-
   return (
     <Stack gap="lg">
       <ClearDataButton />
-      <Stack gap="xs">
-        <Suspense
-          fallback={
-            <Center>
-              <Loader color="gray" type="bars" />
-            </Center>
-          }
-        >
-          <Button
-            size="sm"
-            onClick={handleShowLogsButtonClick}
-            variant="default"
-          >
-            Show logs
-          </Button>
-          <Text size="xs" c="dimmed">
-            View session logs for debugging.
-          </Text>
-          <LogsModal
-            opened={isLogsModalOpen}
-            onClose={handleCloseLogsButtonClick}
-          />
-        </Suspense>
-      </Stack>
+      <ShowLogsButton />
     </Stack>
   );
 }
@@ -100,6 +65,43 @@ function ClearDataButton() {
       <Text size="xs" c="dimmed">
         Reset settings and delete all files in cache to free up space.
       </Text>
+    </Stack>
+  );
+}
+
+function ShowLogsButton() {
+  const [isLogsModalOpen, setLogsModalOpen] = useState(false);
+
+  const handleShowLogsButtonClick = () => {
+    addLogEntry("User opened the logs modal");
+    setLogsModalOpen(true);
+  };
+
+  const handleCloseLogsButtonClick = () => {
+    addLogEntry("User closed the logs modal");
+    setLogsModalOpen(false);
+  };
+
+  return (
+    <Stack gap="xs">
+      <Suspense
+        fallback={
+          <Center>
+            <Loader color="gray" type="bars" />
+          </Center>
+        }
+      >
+        <Button size="sm" onClick={handleShowLogsButtonClick} variant="default">
+          Show logs
+        </Button>
+        <Text size="xs" c="dimmed">
+          View session logs for debugging.
+        </Text>
+        <LogsModal
+          opened={isLogsModalOpen}
+          onClose={handleCloseLogsButtonClick}
+        />
+      </Suspense>
     </Stack>
   );
 }
