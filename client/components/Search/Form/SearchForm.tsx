@@ -19,7 +19,7 @@ import { settingsPubSub } from "../../../modules/pubSub";
 import { usePubSub } from "create-pubsub/react";
 import { postMessageToParentWindow } from "../../../modules/parentWindow";
 
-export function SearchForm({
+export default function SearchForm({
   query,
   updateQuery,
   additionalButtons,

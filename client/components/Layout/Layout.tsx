@@ -4,19 +4,20 @@ import {
   searchStatePubSub,
   textGenerationStatePubSub,
 } from "../../modules/pubSub";
-import { SearchForm } from "../Search/Form/SearchForm";
 import { Container, Stack } from "@mantine/core";
 import { Suspense, useEffect } from "react";
 import { addLogEntry } from "../../modules/logEntries";
 import { lazy } from "react";
+import { match, Pattern } from "ts-pattern";
 
 const AiResponseSection = lazy(() => import("../AiResponse/AiResponseSection"));
 const SearchResultsSection = lazy(
   () => import("../Search/Results/Textual/SearchResultsSection"),
 );
 const MenuButton = lazy(() => import("../Menu/MenuButton"));
+const SearchForm = lazy(() => import("../Search/Form/SearchForm"));
 
-export function Layout() {
+export default function Layout() {
   const [query, updateQuery] = usePubSub(queryPubSub);
   const [searchState] = usePubSub(searchStatePubSub);
   const [textGenerationState] = usePubSub(textGenerationStatePubSub);
@@ -37,12 +38,20 @@ export function Layout() {
           updateQuery={updateQuery}
           additionalButtons={<MenuButton />}
         />
-        <Suspense>
-          <AiResponseSection />
-        </Suspense>
-        <Suspense>
-          <SearchResultsSection />
-        </Suspense>
+        {match(textGenerationState)
+          .with(Pattern.not("idle"), () => (
+            <Suspense>
+              <AiResponseSection />
+            </Suspense>
+          ))
+          .otherwise(() => null)}
+        {match(searchState)
+          .with(Pattern.not("idle"), () => (
+            <Suspense>
+              <SearchResultsSection />
+            </Suspense>
+          ))
+          .otherwise(() => null)}
       </Stack>
     </Container>
   );
