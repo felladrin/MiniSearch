@@ -28,7 +28,7 @@
     "@mantine/form": "^7.12.2",
     "@mantine/hooks": "^7.12.2",
     "@mantine/notifications": "^7.12.2",
-    "@mlc-ai/web-llm": "0.2.66",
+    "@mlc-ai/web-llm": "0.2.67",
     "@tabler/icons-react": "^3.16.0",
     "@wllama/wllama": "^1.10.0",
     "create-pubsub": "^1.6.3",
