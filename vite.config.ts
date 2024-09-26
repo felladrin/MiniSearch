@@ -7,6 +7,7 @@ import { compressionServerHook } from "./server/compressionServerHook";
 import { crossOriginServerHook } from "./server/crossOriginServerHook";
 import { cacheServerHook } from "./server/cacheServerHook";
 import { getSearchToken, regenerateSearchToken } from "./server/searchToken";
+import { visualizer } from "rollup-plugin-visualizer";
 import getGitCommitHash from "helper-git-hash";
 
 export default defineConfig(({ command }) => {
@@ -60,6 +61,9 @@ export default defineConfig(({ command }) => {
         name: "configure-server-cache",
         configurePreviewServer: cacheServerHook,
       },
+      visualizer({
+        filename: "vite-build-stats.html",
+      }),
     ],
   };
 });

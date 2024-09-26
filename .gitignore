@@ -3,3 +3,4 @@ node_modules
 /client/dist
 /server/models
 .vscode
+/vite-build-stats.html
