@@ -22,39 +22,11 @@ import { OpenAI } from "openai";
 import { IconInfoCircle } from "@tabler/icons-react";
 
 const WebLlmModelSelect = lazy(() => import("./WebLlmModelSelect"));
+const WllamaModelSelect = lazy(() => import("./WllamaModelSelect"));
 
 export function AISettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
   const [openAiModels, setOpenAiModels] = useState<ComboboxData>([]);
-  const [wllamaModelOptions, setWllamaModelOptions] = useState<ComboboxData>(
-    [],
-  );
-
-  useEffect(() => {
-    async function loadWllamaModels() {
-      const { wllamaModels } = await import("../../modules/wllama");
-
-      const models = Object.entries(wllamaModels).map(([value, { label }]) => ({
-        label,
-        value,
-      }));
-
-      setWllamaModelOptions(models);
-
-      const isCurrentModelValid = models.some(
-        (model) => model.value === settings.wllamaModelId,
-      );
-
-      if (!isCurrentModelValid) {
-        setSettings({
-          ...settings,
-          wllamaModelId: models[0].value,
-        });
-      }
-    }
-
-    loadWllamaModels();
-  }, []);
 
   const form = useForm({
     initialValues: settings,
@@ -188,13 +160,14 @@ export function AISettingsForm() {
                 ))
                 .with([false, Pattern.any], [Pattern.any, false], () => (
                   <>
-                    <Select
-                      {...form.getInputProps("wllamaModelId")}
-                      label="AI Model"
-                      description="Select the model to use for AI responses."
-                      data={wllamaModelOptions}
-                      allowDeselect={false}
-                    />
+                    <Suspense fallback={<Skeleton height={50} />}>
+                      <WllamaModelSelect
+                        value={form.values.wllamaModelId}
+                        onChange={(value) =>
+                          form.setFieldValue("wllamaModelId", value)
+                        }
+                      />
+                    </Suspense>
                     <NumberInput
                       label="CPU threads to use"
                       description="Number of threads to use for the AI model. Lower values will use less CPU, but may take longer to respond. A too-high value may cause the app to hang."
