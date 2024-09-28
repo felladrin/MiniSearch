@@ -7,15 +7,15 @@ import { defaultSettings } from "../../modules/settings";
 import { addLogEntry } from "../../modules/logEntries";
 import { Notifications } from "@mantine/notifications";
 
-const Layout = lazy(() => import("../Layout/Layout"));
+const MainPage = lazy(() => import("../Pages/Main/MainPage"));
 
-export function Root() {
+export function App() {
   useInitializeSettings();
 
   return (
     <MantineProvider defaultColorScheme="dark">
       <Notifications />
-      <Route path="/" component={Layout} />
+      <Route path="/" component={MainPage} />
     </MantineProvider>
   );
 }

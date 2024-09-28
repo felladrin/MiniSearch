@@ -3,21 +3,23 @@ import {
   queryPubSub,
   searchStatePubSub,
   textGenerationStatePubSub,
-} from "../../modules/pubSub";
+} from "../../../modules/pubSub";
 import { Container, Stack } from "@mantine/core";
 import { Suspense, useEffect } from "react";
-import { addLogEntry } from "../../modules/logEntries";
+import { addLogEntry } from "../../../modules/logEntries";
 import { lazy } from "react";
 import { match, Pattern } from "ts-pattern";
 
-const AiResponseSection = lazy(() => import("../AiResponse/AiResponseSection"));
-const SearchResultsSection = lazy(
-  () => import("../Search/Results/Textual/SearchResultsSection"),
+const AiResponseSection = lazy(
+  () => import("../../AiResponse/AiResponseSection"),
 );
-const MenuButton = lazy(() => import("../Menu/MenuButton"));
-const SearchForm = lazy(() => import("../Search/Form/SearchForm"));
+const SearchResultsSection = lazy(
+  () => import("../../Search/Results/Textual/SearchResultsSection"),
+);
+const MenuButton = lazy(() => import("../../Menu/MenuButton"));
+const SearchForm = lazy(() => import("../../Search/Form/SearchForm"));
 
-export default function Layout() {
+export default function MainPage() {
   const [query, updateQuery] = usePubSub(queryPubSub);
   const [searchState] = usePubSub(searchStatePubSub);
   const [textGenerationState] = usePubSub(textGenerationStatePubSub);

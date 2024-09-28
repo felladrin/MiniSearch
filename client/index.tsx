@@ -1,10 +1,10 @@
 import { createRoot } from "react-dom/client";
 import { addLogEntry } from "./modules/logEntries";
-import { Root } from "./components/Root/Root";
+import { App } from "./components/App/App";
 import "./index.css";
 
 createRoot(document.body.appendChild(document.createElement("div"))).render(
-  <Root />,
+  <App />,
 );
 
 addLogEntry("App initialized");
