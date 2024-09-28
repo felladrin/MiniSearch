@@ -9,7 +9,7 @@ import {
 } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import { logEntriesPubSub } from "../../modules/logEntries";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { IconInfoCircle } from "@tabler/icons-react";
 
 export default function LogsModal({
@@ -20,12 +20,21 @@ export default function LogsModal({
   onClose: () => void;
 }) {
   const [logEntries] = usePubSub(logEntriesPubSub);
+
   const [page, setPage] = useState(1);
 
-  const limit = 5;
-  const data = logEntries.slice((page - 1) * limit, page * limit);
+  const logEntriesPerPage = 5;
 
-  const downloadLogsAsJson = () => {
+  const logEntriesFromCurrentPage = useMemo(
+    () =>
+      logEntries.slice(
+        (page - 1) * logEntriesPerPage,
+        page * logEntriesPerPage,
+      ),
+    [logEntries, page, logEntriesPerPage],
+  );
+
+  const downloadLogsAsJson = useCallback(() => {
     const jsonString = JSON.stringify(logEntries, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -36,7 +45,7 @@ export default function LogsModal({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  };
+  }, [logEntries]);
 
   return (
     <Modal opened={opened} onClose={onClose} size="xl" title="Logs">
@@ -74,7 +83,7 @@ export default function LogsModal({
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
-          {data.map((entry, index) => (
+          {logEntriesFromCurrentPage.map((entry, index) => (
             <Table.Tr key={index}>
               <Table.Td>
                 {new Date(entry.timestamp).toLocaleTimeString()}
@@ -86,7 +95,7 @@ export default function LogsModal({
       </Table>
       <Center>
         <Pagination
-          total={Math.ceil(logEntries.length / limit)}
+          total={Math.ceil(logEntries.length / logEntriesPerPage)}
           value={page}
           onChange={setPage}
           size="sm"
