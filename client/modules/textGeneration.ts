@@ -18,7 +18,7 @@ import { getSystemPrompt } from "./systemPrompt";
 import prettyMilliseconds from "pretty-ms";
 import OpenAI from "openai";
 
-export async function prepareTextGeneration() {
+export async function searchAndRespond() {
   if (getQuery() === "") return;
 
   document.title = getQuery();

@@ -10,7 +10,7 @@ import {
 } from "react";
 import { getRandomQuerySuggestion } from "../../../modules/querySuggestions";
 import { useLocation } from "wouter";
-import { prepareTextGeneration } from "../../../modules/textGeneration";
+import { searchAndRespond } from "../../../modules/textGeneration";
 import { match, Pattern } from "ts-pattern";
 import { Button, Group, Stack, Textarea } from "@mantine/core";
 import { addLogEntry } from "../../../modules/logEntries";
@@ -38,7 +38,7 @@ export default function SearchForm({
 
   useEffect(() => {
     sleepUntilIdle().then(() => {
-      prepareTextGeneration();
+      searchAndRespond();
     });
   }, []);
 
@@ -80,7 +80,7 @@ export default function SearchForm({
 
     updateQuery(queryToEncode);
 
-    prepareTextGeneration();
+    searchAndRespond();
 
     addLogEntry(
       `User submitted a search with ${queryToEncode.length} characters length`,
