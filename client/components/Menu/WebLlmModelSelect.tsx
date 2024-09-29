@@ -46,6 +46,7 @@ export default function WebLlmModelSelect({
       description="Select the model to use for AI responses."
       data={webGpuModels}
       allowDeselect={false}
+      searchable
     />
   );
 }

@@ -130,6 +130,7 @@ export function AISettingsForm() {
                 data={openAiModels}
                 description="Optional, as some API servers don't provide a model list."
                 allowDeselect={false}
+                searchable
               />
             </>
           )}

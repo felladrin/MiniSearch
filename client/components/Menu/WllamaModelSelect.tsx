@@ -34,6 +34,7 @@ export default function WllamaModelSelect({
       description="Select the model to use for AI responses."
       data={wllamaModelOptions}
       allowDeselect={false}
+      searchable
     />
   );
 }
