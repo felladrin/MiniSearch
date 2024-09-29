@@ -8,7 +8,7 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 
-export function InterfaceSettingsForm() {
+export default function InterfaceSettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
   const form = useForm({
     initialValues: settings,

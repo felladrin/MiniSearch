@@ -24,7 +24,7 @@ import { IconInfoCircle } from "@tabler/icons-react";
 const WebLlmModelSelect = lazy(() => import("./WebLlmModelSelect"));
 const WllamaModelSelect = lazy(() => import("./WllamaModelSelect"));
 
-export function AISettingsForm() {
+export default function AISettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
   const [openAiModels, setOpenAiModels] = useState<ComboboxData>([]);
 

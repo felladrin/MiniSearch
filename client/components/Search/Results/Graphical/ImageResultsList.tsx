@@ -1,10 +1,11 @@
 import { Carousel } from "@mantine/carousel";
 import { SearchResults } from "../../../../modules/search";
-import { ImageResult } from "./ImageResult";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Transition } from "@mantine/core";
 
-export function ImageResultsList({
+const ImageResult = lazy(() => import("./ImageResult"));
+
+export default function ImageResultsList({
   imageResults,
 }: {
   imageResults: SearchResults["imageResults"];
@@ -26,12 +27,14 @@ export function ImageResultsList({
         >
           {(styles) => (
             <Carousel.Slide style={styles}>
-              <ImageResult
-                title={title}
-                url={url}
-                thumbnailUrl={thumbnailUrl}
-                sourceUrl={sourceUrl}
-              />
+              <Suspense>
+                <ImageResult
+                  title={title}
+                  url={url}
+                  thumbnailUrl={thumbnailUrl}
+                  sourceUrl={sourceUrl}
+                />
+              </Suspense>
             </Carousel.Slide>
           )}
         </Transition>

@@ -15,13 +15,14 @@ import {
   AspectRatio,
   em,
 } from "@mantine/core";
-import { ImageResultsList } from "../Graphical/ImageResultsList";
-import { SearchResultsList } from "./SearchResultsList";
 import { IconInfoCircle } from "@tabler/icons-react";
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { Settings } from "../../../../modules/settings";
 import { SearchResults } from "../../../../modules/search";
 import { useMediaQuery } from "@mantine/hooks";
+
+const ImageResultsList = lazy(() => import("../Graphical/ImageResultsList"));
+const SearchResultsList = lazy(() => import("../Textual/SearchResultsList"));
 
 export default function SearchResultsSection() {
   const [searchResults] = usePubSub(searchResultsPubSub);
@@ -114,13 +115,15 @@ function CompletedSearchContent({
       <Divider variant="dashed" labelPosition="center" label="Search Results" />
       {match([settings.enableImageSearch, searchResults.imageResults.length])
         .with([true, Pattern.number.positive()], () => (
-          <>
+          <Suspense>
             <ImageResultsList imageResults={searchResults.imageResults} />
             <Space h={8} />
-          </>
+          </Suspense>
         ))
         .otherwise(() => null)}
-      <SearchResultsList searchResults={searchResults.textResults} />
+      <Suspense>
+        <SearchResultsList searchResults={searchResults.textResults} />
+      </Suspense>
     </>
   );
 }

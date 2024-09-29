@@ -4,7 +4,7 @@ import { lazy, Suspense } from "react";
 
 const CustomZoomContent = lazy(() => import("./CustomZoomContent"));
 
-export function ImageResult({
+export default function ImageResult({
   title,
   url,
   thumbnailUrl,

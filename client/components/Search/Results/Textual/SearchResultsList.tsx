@@ -13,7 +13,7 @@ import { getHostname } from "../../../../modules/stringFormatters";
 import { addLogEntry } from "../../../../modules/logEntries";
 import { useEffect, useState } from "react";
 
-export function SearchResultsList({
+export default function SearchResultsList({
   searchResults,
 }: {
   searchResults: SearchResults["textResults"];

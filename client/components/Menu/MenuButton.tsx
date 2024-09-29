@@ -1,6 +1,4 @@
-import { useState } from "react";
-import { AISettingsForm } from "./AISettingsForm";
-import { ActionsForm } from "./ActionsForm";
+import { lazy, Suspense, useState } from "react";
 import {
   Button,
   Drawer,
@@ -17,7 +15,10 @@ import { repository } from "../../../package.json";
 import prettyMilliseconds from "pretty-ms";
 import { getSemanticVersion } from "../../modules/stringFormatters";
 import { addLogEntry } from "../../modules/logEntries";
-import { InterfaceSettingsForm } from "./InterfaceSettingsForm";
+
+const AISettingsForm = lazy(() => import("./AISettingsForm"));
+const ActionsForm = lazy(() => import("./ActionsForm"));
+const InterfaceSettingsForm = lazy(() => import("./InterfaceSettingsForm"));
 
 export default function MenuButton() {
   const [isDrawerOpen, setDrawerOpen] = useState(false);
@@ -90,19 +91,25 @@ export default function MenuButton() {
             <Accordion.Item value="aiSettings">
               <Accordion.Control>AI Settings</Accordion.Control>
               <Accordion.Panel>
-                <AISettingsForm />
+                <Suspense>
+                  <AISettingsForm />
+                </Suspense>
               </Accordion.Panel>
             </Accordion.Item>
             <Accordion.Item value="interfaceSettings">
               <Accordion.Control>Interface Settings</Accordion.Control>
               <Accordion.Panel>
-                <InterfaceSettingsForm />
+                <Suspense>
+                  <InterfaceSettingsForm />
+                </Suspense>
               </Accordion.Panel>
             </Accordion.Item>
             <Accordion.Item value="actions">
               <Accordion.Control>Actions</Accordion.Control>
               <Accordion.Panel>
-                <ActionsForm />
+                <Suspense>
+                  <ActionsForm />
+                </Suspense>
               </Accordion.Panel>
             </Accordion.Item>
           </Accordion>
