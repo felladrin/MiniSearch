@@ -1,7 +1,7 @@
 import { Stack, Button, Text } from "@mantine/core";
 import { useState } from "react";
-import { addLogEntry } from "../../modules/logEntries";
-import { sleep } from "../../modules/sleep";
+import { addLogEntry } from "../../../../modules/logEntries";
+import { sleep } from "../../../../modules/sleep";
 
 export default function ClearDataButton() {
   const [isClearingData, setIsClearingData] = useState(false);

@@ -1,5 +1,5 @@
 import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "../../modules/pubSub";
+import { settingsPubSub } from "../../../../modules/pubSub";
 import {
   Stack,
   Switch,

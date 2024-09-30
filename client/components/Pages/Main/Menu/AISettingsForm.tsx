@@ -1,6 +1,6 @@
 import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "../../modules/pubSub";
-import { isWebGPUAvailable } from "../../modules/webGpu";
+import { settingsPubSub } from "../../../../modules/pubSub";
+import { isWebGPUAvailable } from "../../../../modules/webGpu";
 import { match, Pattern } from "ts-pattern";
 import {
   NumberInput,
@@ -17,12 +17,16 @@ import {
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { inferenceTypes } from "../../modules/settings";
+import { inferenceTypes } from "../../../../modules/settings";
 import { OpenAI } from "openai";
 import { IconInfoCircle } from "@tabler/icons-react";
 
-const WebLlmModelSelect = lazy(() => import("./WebLlmModelSelect"));
-const WllamaModelSelect = lazy(() => import("./WllamaModelSelect"));
+const WebLlmModelSelect = lazy(
+  () => import("../../../AiResponse/WebLlmModelSelect"),
+);
+const WllamaModelSelect = lazy(
+  () => import("../../../AiResponse/WllamaModelSelect"),
+);
 
 export default function AISettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);

@@ -11,10 +11,10 @@ import {
   FocusTrap,
 } from "@mantine/core";
 import { IconBrandGithub } from "@tabler/icons-react";
-import { repository } from "../../../package.json";
+import { repository } from "../../../../../package.json";
 import prettyMilliseconds from "pretty-ms";
-import { getSemanticVersion } from "../../modules/stringFormatters";
-import { addLogEntry } from "../../modules/logEntries";
+import { getSemanticVersion } from "../../../../modules/stringFormatters";
+import { addLogEntry } from "../../../../modules/logEntries";
 
 const AISettingsForm = lazy(() => import("./AISettingsForm"));
 const ActionsForm = lazy(() => import("./ActionsForm"));

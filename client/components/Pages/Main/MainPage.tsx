@@ -16,7 +16,7 @@ const AiResponseSection = lazy(
 const SearchResultsSection = lazy(
   () => import("../../Search/Results/Textual/SearchResultsSection"),
 );
-const MenuButton = lazy(() => import("../../Menu/MenuButton"));
+const MenuButton = lazy(() => import("./Menu/MenuButton"));
 const SearchForm = lazy(() => import("../../Search/Form/SearchForm"));
 
 export default function MainPage() {

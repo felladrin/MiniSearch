@@ -2,7 +2,7 @@ import { Stack, Center, Loader, Button, Text } from "@mantine/core";
 import { useState, Suspense, lazy } from "react";
 import { addLogEntry } from "../../modules/logEntries";
 
-const LogsModal = lazy(() => import("../Logs/LogsModal"));
+const LogsModal = lazy(() => import("./LogsModal"));
 
 export default function ShowLogsButton() {
   const [isLogsModalOpen, setLogsModalOpen] = useState(false);
