@@ -82,7 +82,9 @@ export function searchEndpointServerHook<
         JSON.stringify({ textResults: rankedTextResults, imageResults }),
       );
     } catch (error) {
-      console.error("Error ranking search results:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error(`Error ranking search results: ${errorMessage}`);
       response.setHeader("Content-Type", "application/json");
       response.end(JSON.stringify({ textResults, imageResults }));
     }

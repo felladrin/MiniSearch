@@ -20,6 +20,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { inferenceTypes } from "../../../../modules/settings";
 import { OpenAI } from "openai";
 import { IconInfoCircle } from "@tabler/icons-react";
+import { addLogEntry } from "../../../../modules/logEntries";
 
 const WebLlmModelSelect = lazy(
   () => import("../../../AiResponse/WebLlmModelSelect"),
@@ -52,7 +53,9 @@ export default function AISettingsForm() {
         }));
         setOpenAiModels(models);
       } catch (error) {
-        console.error("Error fetching OpenAI models:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        addLogEntry(`Error fetching OpenAI models: ${errorMessage}`);
       }
     }
 

@@ -129,8 +129,9 @@ export async function fetchSearXNG(query: string, limit?: number) {
     }
 
     return { textResults, imageResults };
-  } catch (e) {
-    console.error(e);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Error fetching search results: ${errorMessage}`);
     return { textResults: [], imageResults: [] };
   }
 }
