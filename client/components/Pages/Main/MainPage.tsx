@@ -4,7 +4,7 @@ import {
   searchStatePubSub,
   textGenerationStatePubSub,
 } from "../../../modules/pubSub";
-import { Container, Stack } from "@mantine/core";
+import { Center, Container, Loader, Stack } from "@mantine/core";
 import { Suspense, useEffect } from "react";
 import { addLogEntry } from "../../../modules/logEntries";
 import { lazy } from "react";
@@ -33,13 +33,27 @@ export default function MainPage() {
   }, [textGenerationState]);
 
   return (
-    <Container p="lg">
-      <Stack>
-        <SearchForm
-          query={query}
-          updateQuery={updateQuery}
-          additionalButtons={<MenuButton />}
-        />
+    <Container>
+      <Stack
+        p="lg"
+        mih="100vh"
+        justify={match(query)
+          .with(Pattern.string.length(0), () => "center")
+          .otherwise(() => undefined)}
+      >
+        <Suspense
+          fallback={
+            <Center>
+              <Loader type="bars" />
+            </Center>
+          }
+        >
+          <SearchForm
+            query={query}
+            updateQuery={updateQuery}
+            additionalButtons={<MenuButton />}
+          />
+        </Suspense>
         {match(textGenerationState)
           .with(Pattern.not("idle"), () => (
             <Suspense>

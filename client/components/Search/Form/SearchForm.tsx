@@ -30,7 +30,6 @@ export default function SearchForm({
 }) {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const [textAreaValue, setTextAreaValue] = useState(query);
-  const windowInnerHeight = useWindowInnerHeight();
   const defaultSuggestedQuery = "Anything you need!";
   const [suggestedQuery, setSuggestedQuery] = useState(defaultSuggestedQuery);
   const [, navigate] = useLocation();
@@ -106,62 +105,37 @@ export default function SearchForm({
   };
 
   return (
-    <div
-      style={match(query)
-        .with(Pattern.string.length(0), () => ({
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: windowInnerHeight * 0.8,
-        }))
-        .otherwise(() => undefined)}
-    >
-      <form onSubmit={handleSubmit} style={{ width: "100%" }}>
-        <Stack gap="xs">
-          <Textarea
-            value={textAreaValue}
-            placeholder={suggestedQuery}
-            ref={textAreaRef}
-            onKeyDown={handleKeyDown}
-            onChange={handleInputChange}
-            autosize
-            minRows={1}
-            maxRows={8}
-            autoFocus
-          />
-          <Group gap="xs">
-            {match(textAreaValue)
-              .with(Pattern.string.minLength(1), () => (
-                <Button
-                  size="xs"
-                  onClick={handleClearButtonClick}
-                  variant="default"
-                >
-                  Clear
-                </Button>
-              ))
-              .otherwise(() => null)}
-            <Button size="xs" type="submit" variant="default" flex={1}>
-              Search
-            </Button>
-            {additionalButtons}
-          </Group>
-        </Stack>
-      </form>
-    </div>
+    <form onSubmit={handleSubmit} style={{ width: "100%" }}>
+      <Stack gap="xs">
+        <Textarea
+          value={textAreaValue}
+          placeholder={suggestedQuery}
+          ref={textAreaRef}
+          onKeyDown={handleKeyDown}
+          onChange={handleInputChange}
+          autosize
+          minRows={1}
+          maxRows={8}
+          autoFocus
+        />
+        <Group gap="xs">
+          {match(textAreaValue)
+            .with(Pattern.string.minLength(1), () => (
+              <Button
+                size="xs"
+                onClick={handleClearButtonClick}
+                variant="default"
+              >
+                Clear
+              </Button>
+            ))
+            .otherwise(() => null)}
+          <Button size="xs" type="submit" variant="default" flex={1}>
+            Search
+          </Button>
+          {additionalButtons}
+        </Group>
+      </Stack>
+    </form>
   );
-}
-
-function useWindowInnerHeight() {
-  const [windowInnerHeight, setWindowInnerHeight] = useState(self.innerHeight);
-
-  useEffect(() => {
-    const handleResize = () => setWindowInnerHeight(self.innerHeight);
-
-    self.addEventListener("resize", handleResize);
-
-    return () => self.removeEventListener("resize", handleResize);
-  }, []);
-
-  return windowInnerHeight;
 }
