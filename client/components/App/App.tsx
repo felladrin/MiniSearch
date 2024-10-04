@@ -1,21 +1,39 @@
-import { Route } from "wouter";
+import { Route, Switch } from "wouter";
 import { MantineProvider } from "@mantine/core";
-import { lazy, useEffect } from "react";
+import "@mantine/core/styles.css";
+import { lazy, useEffect, useState } from "react";
 import { usePubSub } from "create-pubsub/react";
 import { settingsPubSub } from "../../modules/pubSub";
 import { defaultSettings } from "../../modules/settings";
 import { addLogEntry } from "../../modules/logEntries";
 import { Notifications } from "@mantine/notifications";
+import "@mantine/notifications/styles.css";
+import { match } from "ts-pattern";
 
 const MainPage = lazy(() => import("../Pages/Main/MainPage"));
+const AccessPage = lazy(() => import("../Pages/AccessPage"));
 
 export function App() {
   useInitializeSettings();
 
+  const [hasValidatedAccessKey, setValidatedAccessKey] = useState(false);
+
   return (
     <MantineProvider defaultColorScheme="dark">
       <Notifications />
-      <Route path="/" component={MainPage} />
+      <Switch>
+        <Route path="/">
+          {match([VITE_ACCESS_KEYS_ENABLED, hasValidatedAccessKey])
+            .with([true, false], () => (
+              <AccessPage
+                onAccessKeyValid={() => setValidatedAccessKey(true)}
+              />
+            ))
+            .otherwise(() => (
+              <MainPage />
+            ))}
+        </Route>
+      </Switch>
     </MantineProvider>
   );
 }

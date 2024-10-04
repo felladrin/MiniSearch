@@ -9,6 +9,8 @@ import { cacheServerHook } from "./server/cacheServerHook";
 import { getSearchToken, regenerateSearchToken } from "./server/searchToken";
 import { visualizer } from "rollup-plugin-visualizer";
 import getGitCommitHash from "helper-git-hash";
+import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook";
+import "dotenv/config";
 
 export default defineConfig(({ command }) => {
   if (command === "build") regenerateSearchToken();
@@ -19,6 +21,9 @@ export default defineConfig(({ command }) => {
       VITE_SEARCH_TOKEN: JSON.stringify(getSearchToken()),
       VITE_BUILD_DATE_TIME: Date.now(),
       VITE_COMMIT_SHORT_HASH: JSON.stringify(getGitCommitHash({ short: true })),
+      VITE_ACCESS_KEYS_ENABLED: JSON.stringify(
+        Boolean(process.env.ACCESS_KEYS),
+      ),
     },
     server: {
       host: process.env.HOST,
@@ -61,6 +66,11 @@ export default defineConfig(({ command }) => {
       {
         name: "configure-server-cache",
         configurePreviewServer: cacheServerHook,
+      },
+      {
+        name: "configure-server-validate-access-key",
+        configureServer: validateAccessKeyServerHook,
+        configurePreviewServer: validateAccessKeyServerHook,
       },
       visualizer({
         filename: "vite-build-stats.html",

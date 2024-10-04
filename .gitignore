@@ -4,3 +4,4 @@ node_modules
 /server/models
 .vscode
 /vite-build-stats.html
+.env
