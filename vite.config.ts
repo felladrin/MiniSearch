@@ -10,7 +10,9 @@ import { getSearchToken, regenerateSearchToken } from "./server/searchToken";
 import { visualizer } from "rollup-plugin-visualizer";
 import getGitCommitHash from "helper-git-hash";
 import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook";
-import "dotenv/config";
+import dotenv from "dotenv";
+
+dotenv.config({ path: [".env", ".env.example"] });
 
 export default defineConfig(({ command }) => {
   if (command === "build") regenerateSearchToken();
@@ -23,6 +25,15 @@ export default defineConfig(({ command }) => {
       VITE_COMMIT_SHORT_HASH: JSON.stringify(getGitCommitHash({ short: true })),
       VITE_ACCESS_KEYS_ENABLED: JSON.stringify(
         Boolean(process.env.ACCESS_KEYS),
+      ),
+      VITE_WEBLLM_DEFAULT_F16_MODEL_ID: JSON.stringify(
+        process.env.WEBLLM_DEFAULT_F16_MODEL_ID,
+      ),
+      VITE_WEBLLM_DEFAULT_F32_MODEL_ID: JSON.stringify(
+        process.env.WEBLLM_DEFAULT_F32_MODEL_ID,
+      ),
+      VITE_WLLAMA_DEFAULT_MODEL_ID: JSON.stringify(
+        process.env.WLLAMA_DEFAULT_MODEL_ID,
       ),
     },
     server: {

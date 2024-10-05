@@ -4,3 +4,6 @@ declare const VITE_SEARCH_TOKEN: string;
 declare const VITE_BUILD_DATE_TIME: number;
 declare const VITE_COMMIT_SHORT_HASH: string;
 declare const VITE_ACCESS_KEYS_ENABLED: boolean;
+declare const VITE_WEBLLM_DEFAULT_F16_MODEL_ID: string;
+declare const VITE_WEBLLM_DEFAULT_F32_MODEL_ID: string;
+declare const VITE_WLLAMA_DEFAULT_MODEL_ID: string;
