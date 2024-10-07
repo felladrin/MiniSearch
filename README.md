@@ -24,34 +24,46 @@ Live demo: https://felladrin-minisearch.hf.space
 
 ## Getting started
 
-The easiest way to get started is by using [MiniSearch's Docker Image](https://github.com/felladrin/MiniSearch/pkgs/container/minisearch) by running the following command:
+There are two ways to get started with MiniSearch. Pick one that suits you best.
+
+**Option 1** - Use [MiniSearch's Docker Image](https://github.com/felladrin/MiniSearch/pkgs/container/minisearch) by running:
 
 ```bash
 docker run -p 7860:7860 ghcr.io/felladrin/minisearch:main
 ```
 
-Then, open http://localhost:7860 in your browser and start searching!
-
-## Building and running from source
-
-You can build and run it from the source if you don't want to use MiniSearch's Docker Image. For that, clone this repository and run the following command:
+**Option 2** - Build from source by cloning this repository and running:
 
 ```bash
 docker compose -f docker-compose.production.yml up --build
 ```
 
-## Searching via browser's address bar
+Then, open http://localhost:7860 in your browser and start searching!
 
-You can set MiniSearch as your browser's address-bar search engine using the pattern `http://localhost:7860/?q=%s`, in which your search term replaces `%s`.
+## Frequently asked questions
 
-## Contributing
+<details>
+  <summary>How can I contribute to MiniSearch?</summary>
+  <p>Fork this repository and clone it. Then, start the development server by running the following command:</p>
+  <p><code>docker compose up</code></p>
+  <p>Make your changes, push them to your fork, and open a pull request! All contributions are welcome!</p>
+</details>
 
-MiniSearch is open-source and contributions are welcome!
+<details>
+  <summary>How do I search via the browser's address bar?</summary>
+  <p>
+    You can set MiniSearch as your browser's address-bar search engine using the pattern <code>http://localhost:7860/?q=%s</code>, in which your search term replaces <code>%s</code>.
+  </p>
+</details>
 
-Fork this repository and clone it. Then, start the development server by running the following command:
-
-```bash
-docker compose up
-```
-
-Make your changes, push them to your fork, and open a pull request!
+<details>
+  <summary>Why is MiniSearch built upon SearXNG's Docker Image and using a single image instead of composing it from multiple services?</summary>
+  <p>There are a few reasons for this:</p>
+  <ul>
+    <li>MiniSearch utilizes SearXNG as its meta-search engine.</li>
+    <li>Manual installation of SearXNG is not trivial, so we use the docker image they provide, which has everything set up.</li>
+    <li>SearXNG only provides a Docker Image based on Alpine Linux.</li>
+    <li>The user of the image needs to be customized in a specific way to run on HuggingFace Spaces, where MiniSearch's demo runs.</li>
+    <li>HuggingFace only accepts a single docker image. It doesn’t run docker compose or multiple images, unfortunately.</li>
+  </ul>
+</details>
