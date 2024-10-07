@@ -3,7 +3,7 @@ import {
   searchResultsPubSub,
   searchStatePubSub,
   settingsPubSub,
-} from "../../../../modules/pubSub";
+} from "../../../modules/pubSub";
 import { match, Pattern } from "ts-pattern";
 import {
   Divider,
@@ -17,12 +17,12 @@ import {
 } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { lazy, Suspense, useMemo } from "react";
-import { Settings } from "../../../../modules/settings";
-import { SearchResults } from "../../../../modules/search";
+import { Settings } from "../../../modules/settings";
+import { SearchResults } from "../../../modules/search";
 import { useMediaQuery } from "@mantine/hooks";
 
-const ImageResultsList = lazy(() => import("../Graphical/ImageResultsList"));
-const SearchResultsList = lazy(() => import("../Textual/SearchResultsList"));
+const ImageResultsList = lazy(() => import("./Graphical/ImageResultsList"));
+const SearchResultsList = lazy(() => import("./Textual/SearchResultsList"));
 
 export default function SearchResultsSection() {
   const [searchResults] = usePubSub(searchResultsPubSub);

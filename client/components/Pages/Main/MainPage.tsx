@@ -14,7 +14,7 @@ const AiResponseSection = lazy(
   () => import("../../AiResponse/AiResponseSection"),
 );
 const SearchResultsSection = lazy(
-  () => import("../../Search/Results/Textual/SearchResultsSection"),
+  () => import("../../Search/Results/SearchResultsSection"),
 );
 const MenuButton = lazy(() => import("./Menu/MenuButton"));
 const SearchForm = lazy(() => import("../../Search/Form/SearchForm"));
