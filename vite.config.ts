@@ -10,6 +10,7 @@ import { getSearchToken, regenerateSearchToken } from "./server/searchToken";
 import { visualizer } from "rollup-plugin-visualizer";
 import getGitCommitHash from "helper-git-hash";
 import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook";
+import { internalApiEndpointServerHook } from "./server/internalApiEndpointServerHook";
 import dotenv from "dotenv";
 
 dotenv.config({ path: [".env", ".env.example"] });
@@ -34,6 +35,12 @@ export default defineConfig(({ command }) => {
       ),
       VITE_WLLAMA_DEFAULT_MODEL_ID: JSON.stringify(
         process.env.WLLAMA_DEFAULT_MODEL_ID,
+      ),
+      VITE_INTERNAL_API_ENABLED: JSON.stringify(
+        Boolean(process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL),
+      ),
+      VITE_INTERNAL_API_NAME: JSON.stringify(
+        process.env.INTERNAL_OPENAI_COMPATIBLE_API_NAME,
       ),
     },
     server: {
@@ -82,6 +89,11 @@ export default defineConfig(({ command }) => {
         name: "configure-server-validate-access-key",
         configureServer: validateAccessKeyServerHook,
         configurePreviewServer: validateAccessKeyServerHook,
+      },
+      {
+        name: "configure-server-internal-api-endpoint",
+        configureServer: internalApiEndpointServerHook,
+        configurePreviewServer: internalApiEndpointServerHook,
       },
       visualizer({
         filename: "vite-build-stats.html",

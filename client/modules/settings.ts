@@ -24,7 +24,7 @@ export const defaultSettings = {
 
 Search results:
 {{searchResults}}`,
-  inferenceType: "browser",
+  inferenceType: VITE_INTERNAL_API_ENABLED ? "internal" : "browser",
   openAiApiBaseUrl: "",
   openAiApiKey: "",
   openAiApiModel: "",
@@ -38,6 +38,9 @@ addLogEntry(
 export type Settings = typeof defaultSettings;
 
 export const inferenceTypes = [
+  ...(VITE_INTERNAL_API_ENABLED
+    ? [{ value: "internal", label: VITE_INTERNAL_API_NAME }]
+    : []),
   { value: "browser", label: "Browser-Based" },
   { value: "openai", label: "OpenAI-Compatible API" },
 ];
