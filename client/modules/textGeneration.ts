@@ -17,6 +17,7 @@ import { addLogEntry } from "./logEntries";
 import { getSystemPrompt } from "./systemPrompt";
 import prettyMilliseconds from "pretty-ms";
 import OpenAI from "openai";
+import { getSearchTokenHash } from "./searchTokenHash";
 
 export async function searchAndRespond() {
   if (getQuery() === "") return;
@@ -39,6 +40,8 @@ export async function searchAndRespond() {
     const settings = getSettings();
     if (settings.inferenceType === "openai") {
       await generateTextWithOpenAI();
+    } else if (settings.inferenceType === "internal") {
+      await generateTextWithInternalApi();
     } else {
       try {
         if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
@@ -110,6 +113,74 @@ async function generateTextWithOpenAI() {
     }
 
     updateResponseRateLimited(streamedMessage);
+  }
+
+  updateResponse(streamedMessage);
+}
+
+async function generateTextWithInternalApi() {
+  await canStartResponding();
+
+  updateTextGenerationState("preparingToGenerate");
+
+  const inferenceUrl = new URL("/inference", self.location.origin);
+
+  const tokenPrefix = "Bearer ";
+
+  const token = await getSearchTokenHash();
+
+  const response = await fetch(inferenceUrl.toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `${tokenPrefix}${token}`,
+    },
+    body: JSON.stringify({
+      messages: [
+        {
+          role: "system",
+          content: getSystemPrompt(getFormattedSearchResults(true)),
+        },
+        { role: "user", content: getQuery() },
+      ],
+      temperature: 0.6,
+      top_p: 0.9,
+      max_tokens: 2048,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let streamedMessage = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value);
+    const lines = chunk.split("\n");
+    const parsedLines = lines
+      .map((line) => line.replace(/^data: /, "").trim())
+      .filter((line) => line !== "" && line !== "[DONE]")
+      .map((line) => JSON.parse(line));
+
+    for (const parsedLine of parsedLines) {
+      const deltaContent = parsedLine.choices[0].delta.content;
+      if (deltaContent) streamedMessage += deltaContent;
+
+      if (getTextGenerationState() === "interrupted") {
+        reader.cancel();
+      } else if (getTextGenerationState() !== "generating") {
+        updateTextGenerationState("generating");
+      }
+
+      updateResponseRateLimited(streamedMessage);
+    }
   }
 
   updateResponse(streamedMessage);
