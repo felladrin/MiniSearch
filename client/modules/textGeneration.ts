@@ -170,9 +170,10 @@ async function generateTextWithWebLlm() {
       stream: true,
       messages: [
         {
-          role: "system",
+          role: "user",
           content: getSystemPrompt(getFormattedSearchResults(true)),
         },
+        { role: "assistant", content: "Ok!" },
         { role: "user", content: getQuery() },
       ],
     });
