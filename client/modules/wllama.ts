@@ -63,15 +63,13 @@ export interface WllamaModel {
 }
 
 const defaultModelConfig: Omit<WllamaModel, "label" | "url"> = {
-  buildPrompt: (wllama, query, searchResults) =>
-    formatChat(wllama, [
-      {
-        id: 0,
-        role: "system",
-        content: getSystemPrompt(searchResults),
-      },
-      { id: 1, role: "user", content: query },
-    ]),
+  buildPrompt: async (wllama, query, searchResults) => {
+    return formatChat(wllama, [
+      { id: 1, role: "user", content: getSystemPrompt(searchResults) },
+      { id: 2, role: "assistant", content: "Ok!" },
+      { id: 3, role: "user", content: query },
+    ]);
+  },
   cacheType: "f16",
   contextSize: 2048,
   shouldIncludeUrlsOnPrompt: false,
@@ -104,12 +102,6 @@ export const wllamaModels: Record<string, WllamaModel> = {
     ...defaultModelConfig,
     label: "Danube 3 500M • 368 MB",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat-q5_k_m-imat-00001-of-00003.gguf",
-    buildPrompt: (_, query, searchResults) =>
-      Promise.resolve(`${getSystemPrompt(searchResults)}
-<|prompt|>
-${query}</s>
-<|answer|>
-`),
   },
   "qwen-2.5-0.5b": {
     ...defaultModelConfig,
@@ -120,32 +112,6 @@ ${query}</s>
     ...defaultModelConfig,
     label: "Llama 3.2 1B • 975 MB",
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-1B-Instruct/resolve/main/model.shard-00001-of-00005.gguf",
-  },
-  "llama-corn-1.1b": {
-    ...defaultModelConfig,
-    label: "LlamaCorn 1.1B • 782 MB",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_M-LlamaCorn-1.1B-Chat/resolve/main/model.shard-00001-of-00017.gguf",
-    buildPrompt: (_, query, searchResults) =>
-      Promise.resolve(`<|im_start|>system
-${getSystemPrompt(searchResults)}<|im_end|>
-<|im_start|>user
-${query}<|im_end|>
-<|im_start|>assistant
-`),
-    stopStrings: ["<|im_end|>"],
-  },
-  "sheared-llama-1.3b": {
-    ...defaultModelConfig,
-    label: "Sheared LLaMA 1.3B • 1 GB",
-    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Sheared-LLaMA-1.3B-ShareGPT/resolve/main/model.shard-00001-of-00020.gguf",
-    buildPrompt: (_, query, searchResults) =>
-      Promise.resolve(`${getSystemPrompt(searchResults)}
-
-### Input:
-${query}
-
-### Response:
-`),
   },
   "pints-1.5b": {
     ...defaultModelConfig,
@@ -161,23 +127,11 @@ ${query}
     ...defaultModelConfig,
     label: "Danube 2 1.8B • 1.3 GB",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1-00001-of-00021.gguf",
-    buildPrompt: (_, query, searchResults) =>
-      Promise.resolve(`${getSystemPrompt(searchResults)}
-<|prompt|>
-${query}</s>
-<|answer|>
-`),
   },
   "gemma-2-2b": {
     ...defaultModelConfig,
     label: "Gemma 2 2B • 1.92 GB",
     url: "https://huggingface.co/Felladrin/gguf-sharded-gemma-2-2b-it-abliterated/resolve/main/gemma-2-2b-it-abliterated-q5_k_m-imat-00001-of-00009.gguf",
-    buildPrompt: (_, query, searchResults) =>
-      Promise.resolve(`${getSystemPrompt(searchResults)}
-<bos><start_of_turn>user
-${query}<end_of_turn>
-<start_of_turn>model
-`),
   },
   "llama-3.2-3b": {
     ...defaultModelConfig,
@@ -218,12 +172,6 @@ ${query}<end_of_turn>
     label: "OLMoE 1B 7B • 3.7 GB",
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q3_K_XL-OLMoE-1B-7B-0924-Instruct/resolve/main/OLMoE-1B-7B-0924-Instruct-Q3_K_XL.shard-00001-of-00050.gguf",
   },
-  "llama-3.1-supernova-8b": {
-    ...defaultModelConfig,
-    label: "Llama 3.1 SuperNova 8B • 3.69 GB",
-    url: "https://huggingface.co/Felladrin/gguf-Q2_K_L-Llama-3.1-SuperNova-Lite/resolve/main/Llama-3.1-SuperNova-Lite-Q2_K_L.shard-00001-of-00007.gguf",
-    cacheType: "q8_0",
-  },
 };
 
 export interface Message {
@@ -240,10 +188,12 @@ export const formatChat = async (wllama: Wllama, messages: Message[]) => {
     wllama.getChatTemplate() ?? defaultChatTemplate,
   );
 
+  const textDecoder = new TextDecoder();
+
   return template.render({
     messages,
-    bos_token: await wllama.detokenize([wllama.getBOS()]),
-    eos_token: await wllama.detokenize([wllama.getEOS()]),
+    bos_token: textDecoder.decode(await wllama.detokenize([wllama.getBOS()])),
+    eos_token: textDecoder.decode(await wllama.detokenize([wllama.getEOS()])),
     add_generation_prompt: true,
   });
 };
