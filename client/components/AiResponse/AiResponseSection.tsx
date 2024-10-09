@@ -5,14 +5,17 @@ import {
   modelLoadingProgressPubSub,
   responsePubSub,
   settingsPubSub,
+  queryPubSub,
   textGenerationStatePubSub,
 } from "../../modules/pubSub";
+import ChatInterface from "./ChatInterface";
 
 const AiResponseContent = lazy(() => import("./AiResponseContent"));
 const PreparingContent = lazy(() => import("./PreparingContent"));
 const LoadingModelContent = lazy(() => import("./LoadingModelContent"));
 
 export default function AiResponseSection() {
+  const [query] = usePubSub(queryPubSub);
   const [response] = usePubSub(responsePubSub);
   const [textGenerationState, setTextGenerationState] = usePubSub(
     textGenerationStatePubSub,
@@ -28,13 +31,21 @@ export default function AiResponseSection() {
             .with(
               Pattern.union("generating", "interrupted", "completed", "failed"),
               (textGenerationState) => (
-                <Suspense>
-                  <AiResponseContent
-                    textGenerationState={textGenerationState}
-                    response={response}
-                    setTextGenerationState={setTextGenerationState}
-                  />
-                </Suspense>
+                <>
+                  <Suspense>
+                    <AiResponseContent
+                      textGenerationState={textGenerationState}
+                      response={response}
+                      setTextGenerationState={setTextGenerationState}
+                    />
+                  </Suspense>
+                  {textGenerationState === "completed" && (
+                    <ChatInterface
+                      initialQuery={query}
+                      initialResponse={response}
+                    />
+                  )}
+                </>
               ),
             )
             .with("loadingModel", () => (
@@ -61,6 +72,7 @@ export default function AiResponseSection() {
       setTextGenerationState,
       modelLoadingProgress,
       response,
+      query,
     ],
   );
 }

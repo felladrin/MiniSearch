@@ -9,7 +9,6 @@ import {
   ScrollArea,
   Text,
   Tooltip,
-  TypographyStylesProvider,
 } from "@mantine/core";
 import {
   IconArrowsMaximize,
@@ -19,11 +18,10 @@ import {
   IconInfoCircle,
 } from "@tabler/icons-react";
 import { PublishFunction } from "create-pubsub";
-import { ReactNode, useMemo, useState } from "react";
-import Markdown from "react-markdown";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import syntaxHighlighterStyle from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
+import { lazy, ReactNode, Suspense, useMemo, useState } from "react";
 import { match } from "ts-pattern";
+
+const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
 
 export default function AiResponseContent({
   textGenerationState,
@@ -124,32 +122,9 @@ export default function AiResponseContent({
       </Card.Section>
       <Card.Section withBorder>
         <ConditionalScrollArea>
-          <TypographyStylesProvider p="md">
-            <Markdown
-              components={{
-                code(props) {
-                  const { children, className, node, ref, ...rest } = props;
-                  void node;
-                  const languageMatch = /language-(\w+)/.exec(className || "");
-                  return languageMatch ? (
-                    <SyntaxHighlighter
-                      {...rest}
-                      ref={ref as never}
-                      children={children?.toString().replace(/\n$/, "") ?? ""}
-                      language={languageMatch[1]}
-                      style={syntaxHighlighterStyle}
-                    />
-                  ) : (
-                    <code {...rest} className={className}>
-                      {children}
-                    </code>
-                  );
-                },
-              }}
-            >
-              {response}
-            </Markdown>
-          </TypographyStylesProvider>
+          <Suspense>
+            <FormattedMarkdown>{response}</FormattedMarkdown>
+          </Suspense>
         </ConditionalScrollArea>
         {match(textGenerationState)
           .with("failed", () => (

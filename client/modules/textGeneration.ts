@@ -18,6 +18,7 @@ import { getSystemPrompt } from "./systemPrompt";
 import prettyMilliseconds from "pretty-ms";
 import OpenAI from "openai";
 import { getSearchTokenHash } from "./searchTokenHash";
+import { ChatCompletionMessageParam } from "openai/resources/chat/completions.mjs";
 
 export async function searchAndRespond() {
   if (getQuery() === "") return;
@@ -421,3 +422,281 @@ function updateResponseRateLimited(text: string) {
 }
 updateResponseRateLimited.lastUpdateTime = 0;
 updateResponseRateLimited.updateInterval = 1000 / 12;
+
+class ChatGenerationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ChatGenerationError";
+  }
+}
+
+async function generateChatWithOpenAI(
+  messages: ChatMessage[],
+  onUpdate: (partialResponse: string) => void,
+) {
+  const settings = getSettings();
+  const openai = new OpenAI({
+    baseURL: settings.openAiApiBaseUrl,
+    apiKey: settings.openAiApiKey,
+    dangerouslyAllowBrowser: true,
+  });
+
+  const completion = await openai.chat.completions.create({
+    model: settings.openAiApiModel,
+    messages: messages as ChatCompletionMessageParam[],
+    temperature: 0.6,
+    top_p: 0.9,
+    max_tokens: 2048,
+    stream: true,
+  });
+
+  let streamedMessage = "";
+
+  for await (const chunk of completion) {
+    const deltaContent = chunk.choices[0].delta.content;
+
+    if (deltaContent) {
+      streamedMessage += deltaContent;
+      onUpdate(streamedMessage);
+    }
+
+    if (getTextGenerationState() === "interrupted") {
+      completion.controller.abort();
+      throw new ChatGenerationError("Chat generation interrupted");
+    }
+  }
+
+  return streamedMessage;
+}
+
+async function generateChatWithInternalApi(
+  messages: ChatMessage[],
+  onUpdate: (partialResponse: string) => void,
+) {
+  const inferenceUrl = new URL("/inference", self.location.origin);
+  const tokenPrefix = "Bearer ";
+  const token = await getSearchTokenHash();
+
+  const response = await fetch(inferenceUrl.toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `${tokenPrefix}${token}`,
+    },
+    body: JSON.stringify({
+      messages,
+      temperature: 0.6,
+      top_p: 0.9,
+      max_tokens: 2048,
+      stream: true,
+    }),
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let streamedMessage = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value);
+    const lines = chunk.split("\n");
+    const parsedLines = lines
+      .map((line) => line.replace(/^data: /, "").trim())
+      .filter((line) => line !== "" && line !== "[DONE]")
+      .map((line) => JSON.parse(line));
+
+    for (const parsedLine of parsedLines) {
+      const deltaContent = parsedLine.choices[0].delta.content;
+      if (deltaContent) {
+        streamedMessage += deltaContent;
+        onUpdate(streamedMessage);
+      }
+
+      if (getTextGenerationState() === "interrupted") {
+        reader.cancel();
+        throw new ChatGenerationError("Chat generation interrupted");
+      }
+    }
+  }
+
+  return streamedMessage;
+}
+
+async function generateChatWithWebLlm(
+  messages: ChatMessage[],
+  onUpdate: (partialResponse: string) => void,
+) {
+  const { CreateWebWorkerMLCEngine, CreateMLCEngine } = await import(
+    "@mlc-ai/web-llm"
+  );
+
+  type MLCEngineConfig = import("@mlc-ai/web-llm").MLCEngineConfig;
+  type ChatCompletionMessageParam =
+    import("@mlc-ai/web-llm").ChatCompletionMessageParam;
+
+  const selectedModelId = getSettings().webLlmModelId;
+
+  addLogEntry(`Selected WebLLM model for chat: ${selectedModelId}`);
+
+  const engineConfig: MLCEngineConfig = {
+    logLevel: "SILENT",
+  };
+
+  const chatOptions = {
+    temperature: 0.6,
+    top_p: 0.9,
+    repetition_penalty: 1.176,
+  };
+
+  const engine = Worker
+    ? await CreateWebWorkerMLCEngine(
+        new Worker(new URL("./webLlmWorker.ts", import.meta.url), {
+          type: "module",
+        }),
+        selectedModelId,
+        engineConfig,
+        chatOptions,
+      )
+    : await CreateMLCEngine(selectedModelId, engineConfig, chatOptions);
+
+  const completion = await engine.chat.completions.create({
+    stream: true,
+    messages: messages as ChatCompletionMessageParam[],
+  });
+
+  let streamedMessage = "";
+
+  for await (const chunk of completion) {
+    const deltaContent = chunk.choices[0].delta.content;
+
+    if (deltaContent) {
+      streamedMessage += deltaContent;
+      onUpdate(streamedMessage);
+    }
+
+    if (getTextGenerationState() === "interrupted") {
+      await engine.interruptGenerate();
+      throw new ChatGenerationError("Chat generation interrupted");
+    }
+  }
+
+  addLogEntry(
+    `WebLLM finished generating the chat response. Stats: ${await engine.runtimeStatsText()}`,
+  );
+
+  engine.unload();
+
+  return streamedMessage;
+}
+
+async function generateChatWithWllama(
+  messages: ChatMessage[],
+  onUpdate: (partialResponse: string) => void,
+) {
+  const { initializeWllama, wllamaModels } = await import("./wllama");
+
+  const model = wllamaModels[getSettings().wllamaModelId];
+
+  const wllama = await initializeWllama(model.url, {
+    wllama: {
+      suppressNativeLog: true,
+    },
+    model: {
+      n_threads: getSettings().cpuThreads,
+      n_ctx: model.contextSize,
+      cache_type_k: model.cacheType,
+      embeddings: false,
+      allowOffline: true,
+    },
+  });
+
+  const prompt = await model.buildPrompt(
+    wllama,
+    messages[messages.length - 1].content,
+    getFormattedSearchResults(model.shouldIncludeUrlsOnPrompt),
+  );
+
+  let streamedMessage = "";
+
+  await wllama.createCompletion(prompt, {
+    stopTokens: model.stopTokens,
+    sampling: model.sampling,
+    onNewToken: (_token, _piece, currentText, { abortSignal }) => {
+      if (getTextGenerationState() === "interrupted") {
+        abortSignal();
+        throw new ChatGenerationError("Chat generation interrupted");
+      }
+
+      if (model.stopStrings) {
+        for (const stopString of model.stopStrings) {
+          if (
+            currentText.slice(-(stopString.length * 2)).includes(stopString)
+          ) {
+            abortSignal();
+            currentText = currentText.slice(0, -stopString.length);
+            break;
+          }
+        }
+      }
+
+      streamedMessage = currentText;
+      onUpdate(streamedMessage);
+    },
+  });
+
+  await wllama.exit();
+
+  return streamedMessage;
+}
+
+export async function generateChatResponse(
+  message: string,
+  previousMessages: ChatMessage[],
+  onUpdate: (partialResponse: string) => void,
+) {
+  const settings = getSettings();
+  let response = "";
+
+  try {
+    const allMessages = [
+      {
+        role: "system",
+        content: getSystemPrompt(getFormattedSearchResults(true)),
+      },
+      ...previousMessages,
+      { role: "user", content: message },
+    ];
+
+    if (settings.inferenceType === "openai") {
+      response = await generateChatWithOpenAI(allMessages, onUpdate);
+    } else if (settings.inferenceType === "internal") {
+      response = await generateChatWithInternalApi(allMessages, onUpdate);
+    } else {
+      if (isWebGPUAvailable && settings.enableWebGpu) {
+        response = await generateChatWithWebLlm(allMessages, onUpdate);
+      } else {
+        response = await generateChatWithWllama(allMessages, onUpdate);
+      }
+    }
+  } catch (error) {
+    if (error instanceof ChatGenerationError) {
+      addLogEntry(`Chat generation interrupted: ${error.message}`);
+    } else {
+      addLogEntry(`Error generating chat response: ${error}`);
+    }
+    throw error;
+  }
+
+  return response;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant" | string;
+  content: string;
+}
