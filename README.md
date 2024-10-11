@@ -69,11 +69,10 @@ Then, open http://localhost:7860 in your browser and start searching!
 </details>
 
 <details>
-  <summary>What is the Internal OpenAI-compatible API option, and how do I use it?</summary>
-  <p>MiniSearch supports an Internal OpenAI-compatible API option for text generation. This feature allows you to leverage the API while maintaining the privacy and control benefits when serving MiniSearch for others. To use this feature:</p>
+  <summary>I want to serve MiniSearch to other users, allowing them to use my own OpenAI-Compatible API key, but without revealing it to them. Is it possible?</summary>
+  <p>Yes! In MiniSearch, we call this text-generation feature "Internal OpenAI-Compatible API". To use this it:</p>
   <ol>
-    <li>Set up your OpenAI-compatible API endpoint.</li>
-    <li>Configure the following environment variables in your <code>.env</code> file:
+    <li>Set up your OpenAI-Compatible API endpoint by configuring the following environment variables in your <code>.env</code> file:
       <ul>
         <li><code>INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL</code>: The base URL for your API</li>
         <li><code>INTERNAL_OPENAI_COMPATIBLE_API_KEY</code>: Your API access key</li>
@@ -81,7 +80,7 @@ Then, open http://localhost:7860 in your browser and start searching!
         <li><code>INTERNAL_OPENAI_COMPATIBLE_API_NAME</code>: The name to display in the UI</li>
       </ul>
     </li>
-    <li>Restart MiniSearch.</li>
+    <li>Restart MiniSearch server.</li>
     <li>In the MiniSearch menu, select the new option (named as per your <code>INTERNAL_OPENAI_COMPATIBLE_API_NAME</code> setting) from the inference type dropdown.</li>
   </ol>
 </details>
