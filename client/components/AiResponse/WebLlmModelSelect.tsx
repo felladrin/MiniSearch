@@ -17,7 +17,7 @@ export default function WebLlmModelSelect({
       .filter((model) => model.model_id.endsWith(suffix))
       .sort((a, b) => (a.vram_required_MB ?? 0) - (b.vram_required_MB ?? 0))
       .map((model) => ({
-        label: `${model.model_id.replace(suffix, "")} • ${Math.round(model.vram_required_MB ?? 0) || "N/A"} MB`,
+        label: `${Math.round(model.vram_required_MB ?? 0) || "N/A"} MB • ${model.model_id.replace(suffix, "")}`,
         value: model.model_id,
       }));
 
