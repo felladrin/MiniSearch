@@ -52,6 +52,9 @@ export default function AISettingsForm() {
           value: model.id,
         }));
         setOpenAiModels(models);
+        if (!form.values.openAiApiModel) {
+          form.setFieldValue("openAiApiModel", models[0].value);
+        }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
