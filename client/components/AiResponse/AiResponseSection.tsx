@@ -8,11 +8,11 @@ import {
   queryPubSub,
   textGenerationStatePubSub,
 } from "../../modules/pubSub";
-import ChatInterface from "./ChatInterface";
 
 const AiResponseContent = lazy(() => import("./AiResponseContent"));
 const PreparingContent = lazy(() => import("./PreparingContent"));
 const LoadingModelContent = lazy(() => import("./LoadingModelContent"));
+const ChatInterface = lazy(() => import("./ChatInterface"));
 
 export default function AiResponseSection() {
   const [query] = usePubSub(queryPubSub);
@@ -40,10 +40,12 @@ export default function AiResponseSection() {
                     />
                   </Suspense>
                   {textGenerationState === "completed" && (
-                    <ChatInterface
-                      initialQuery={query}
-                      initialResponse={response}
-                    />
+                    <Suspense>
+                      <ChatInterface
+                        initialQuery={query}
+                        initialResponse={response}
+                      />
+                    </Suspense>
                   )}
                 </>
               ),
