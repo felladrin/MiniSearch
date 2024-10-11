@@ -35,7 +35,7 @@ export default function MainPage() {
   return (
     <Container>
       <Stack
-        p="lg"
+        py="md"
         mih="100vh"
         justify={match(query)
           .with(Pattern.string.length(0), () => "center")

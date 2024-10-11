@@ -104,20 +104,20 @@ export default function ChatInterface({
       </Card.Section>
       <Stack gap="md" pt="md">
         {messages.slice(2).length > 0 && (
-          <Stack gap="md" mah="300px" style={{ overflowY: "auto" }}>
+          <Stack gap="md">
             {messages.slice(2).map((message, index) => (
               <Paper
                 key={index}
                 shadow="xs"
                 radius="xl"
                 p="sm"
-                maw="80%"
+                maw="90%"
                 style={{
                   alignSelf:
                     message.role === "user" ? "flex-end" : "flex-start",
                 }}
               >
-                <Suspense fallback={<Text>Loading...</Text>}>
+                <Suspense>
                   <FormattedMarkdown>
                     {`**${message.role === "user" ? "You" : "AI"}**: ${message.content}`}
                   </FormattedMarkdown>
@@ -129,12 +129,10 @@ export default function ChatInterface({
                 shadow="xs"
                 radius="xl"
                 p="sm"
-                maw="80%"
-                style={{
-                  alignSelf: "flex-start",
-                }}
+                maw="90%"
+                style={{ alignSelf: "flex-start" }}
               >
-                <Suspense fallback={<Text>Loading...</Text>}>
+                <Suspense>
                   <FormattedMarkdown>
                     {`**AI**: ${streamedResponse}`}
                   </FormattedMarkdown>
