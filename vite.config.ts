@@ -42,6 +42,9 @@ export default defineConfig(({ command }) => {
       VITE_INTERNAL_API_NAME: JSON.stringify(
         process.env.INTERNAL_OPENAI_COMPATIBLE_API_NAME,
       ),
+      VITE_DEFAULT_INFERENCE_TYPE: JSON.stringify(
+        process.env.DEFAULT_INFERENCE_TYPE,
+      ),
     },
     server: {
       host: process.env.HOST,
