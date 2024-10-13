@@ -8,6 +8,7 @@ import {
   Group,
   Center,
   FocusTrap,
+  DrawerProps,
 } from "@mantine/core";
 import { IconBrandGithub } from "@tabler/icons-react";
 import { repository } from "../../../../../package.json";
@@ -19,20 +20,13 @@ const AISettingsForm = lazy(() => import("./AISettingsForm"));
 const ActionsForm = lazy(() => import("./ActionsForm"));
 const InterfaceSettingsForm = lazy(() => import("./InterfaceSettingsForm"));
 
-export default function MenuDrawer({
-  opened,
-  onClose,
-}: {
-  opened: boolean;
-  onClose: () => void;
-}) {
+export default function MenuDrawer(drawerProps: DrawerProps) {
   const repoName = repository.url.split("/").pop();
 
   return (
     <Drawer
-      opened={opened}
+      {...drawerProps}
       position="right"
-      onClose={onClose}
       size="md"
       title={
         <Group gap="xs">
