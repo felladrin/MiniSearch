@@ -25,13 +25,6 @@ export default function MenuButton() {
     }
   }, [isDrawerLoaded]);
 
-  const DrawerFallback = () => {
-    useEffect(() => {
-      return () => handleDrawerLoad();
-    }, []);
-    return null;
-  };
-
   return (
     <>
       <Button
@@ -43,10 +36,18 @@ export default function MenuButton() {
         Menu
       </Button>
       {(isDrawerOpen || isDrawerLoaded) && (
-        <Suspense fallback={<DrawerFallback />}>
+        <Suspense fallback={<SuspenseListener onUnload={handleDrawerLoad} />}>
           <MenuDrawer onClose={closeDrawer} opened={isDrawerOpen} />
         </Suspense>
       )}
     </>
   );
+}
+
+function SuspenseListener({ onUnload }: { onUnload: () => void }) {
+  useEffect(() => {
+    return () => onUnload();
+  }, [onUnload]);
+
+  return null;
 }
