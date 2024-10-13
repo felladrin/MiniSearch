@@ -24,7 +24,7 @@ export const defaultSettings = {
 
 Search results:
 {{searchResults}}`,
-  inferenceType: VITE_INTERNAL_API_ENABLED ? "internal" : "browser",
+  inferenceType: VITE_DEFAULT_INFERENCE_TYPE,
   openAiApiBaseUrl: "",
   openAiApiKey: "",
   openAiApiModel: "",
