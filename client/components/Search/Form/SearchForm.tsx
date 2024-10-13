@@ -1,7 +1,6 @@
 import {
   useEffect,
   useRef,
-  FormEvent,
   useState,
   useCallback,
   ChangeEvent,
@@ -86,21 +85,18 @@ export default function SearchForm({
     );
   }, [textAreaValue, suggestedQuery, updateQuery]);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: { preventDefault: () => void }) => {
     event.preventDefault();
     startSearching();
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     match([event, settings.enterToSubmit])
-      .with([{ code: "Enter", shiftKey: false }, true], () => {
-        event.preventDefault();
-        startSearching();
-      })
-      .with([{ code: "Enter", shiftKey: true }, false], () => {
-        event.preventDefault();
-        startSearching();
-      })
+      .with(
+        [{ code: "Enter", shiftKey: false }, true],
+        [{ code: "Enter", shiftKey: true }, false],
+        () => handleSubmit(event),
+      )
       .otherwise(() => undefined);
   };
 
