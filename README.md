@@ -57,6 +57,27 @@ Then, open http://localhost:7860 in your browser and start searching!
 </details>
 
 <details>
+  <summary>Can I use custom models via OpenAI-Compatible API?</summary>
+  <p>
+    Yes! For this, open the Menu and change the "Inference Type" to <code>OpenAI-Compatible API</code>. Then configure the Base URL, and optionally set an API Key and a Model to use.
+  </p>
+</details>
+
+<details>
+  <summary>How do I restrict the access to my MiniSearch instance via password?</summary>
+  <p>
+    Create a <code>.env</code> file and set a value for <code>ACCESS_KEYS</code>. Then reset the MiniSearch docker container.
+  </p>
+  <p>
+    For example, if you to set the password to <code>PepperoniPizza</code>, then this is what you should add to your <code>.env</code>:<br/>
+    <code>ACCESS_KEYS="PepperoniPizza"</code>
+  </p>
+  <p>
+    You can find more examples in the <code>.env.example</code> file.
+  </p>
+</details>
+
+<details>
   <summary>Why is MiniSearch built upon SearXNG's Docker Image and using a single image instead of composing it from multiple services?</summary>
   <p>There are a few reasons for this:</p>
   <ul>
