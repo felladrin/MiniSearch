@@ -14,10 +14,11 @@ import {
   Group,
   ComboboxData,
   Skeleton,
+  Button,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { inferenceTypes } from "../../../../modules/settings";
+import { defaultSettings, inferenceTypes } from "../../../../modules/settings";
 import { OpenAI } from "openai";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { addLogEntry } from "../../../../modules/logEntries";
@@ -251,6 +252,15 @@ export default function AISettingsForm() {
             maxRows={10}
             {...form.getInputProps("systemPrompt")}
           />
+          <Button
+            size="xs"
+            variant="default"
+            onClick={() => {
+              form.setFieldValue("systemPrompt", defaultSettings.systemPrompt);
+            }}
+          >
+            Restore default instructions
+          </Button>
         </>
       )}
     </Stack>
