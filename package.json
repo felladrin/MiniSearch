@@ -16,7 +16,7 @@
     "start": "vite preview",
     "build": "vite build",
     "dev": "vite",
-    "lint": "prettier --check . && tsc && eslint --fix client && ts-prune && jscpd client server && dpdm --tree false --warning false vite.config.ts client",
+    "lint": "prettier --check . && tsc && eslint --fix client && ts-prune && jscpd client server && dpdm --no-tree --no-progress --no-warning vite.config.ts client",
     "format": "prettier --write .",
     "test": "glob -c 'tsx --test' '**/*.test.ts'"
   },
@@ -68,7 +68,7 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "@vitejs/plugin-basic-ssl": "^1.1.0",
     "@vitejs/plugin-react": "^4.0.3",
-    "dpdm": "^3.14.0",
+    "dpdm-fast": "^1.0.6",
     "eslint": "^9.0.0",
     "glob": "^11.0.0",
     "globals": "^15.0.0",
