@@ -73,7 +73,7 @@ export default function SearchResultsList({
                   </UnstyledButton>
                 </Tooltip>
               </Flex>
-              <Text size="sm" c="dimmed">
+              <Text size="sm" c="dimmed" style={{ wordWrap: "break-word" }}>
                 {snippet}
               </Text>
             </Stack>
