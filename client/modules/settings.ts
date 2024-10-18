@@ -11,11 +11,10 @@ export const defaultSettings = {
   wllamaModelId: VITE_WLLAMA_DEFAULT_MODEL_ID,
   cpuThreads: 1,
   searchResultsToConsider: 3,
-  systemPrompt: `Provide detailed responses in Markdown, following these guidelines:
-- Explain step-by-step and communicate your thought process.
-- Keep in mind today's date and time ({{dateTime}}).
+  systemPrompt: `Provide easy-to-read responses in Markdown format, following these guidelines:
 - Base your responses on the provided search results and your general knowledge about the topic.
-- Answer in the same language as the person interacting with you, using a natural and friendly tone.
+- Respond in the same language as the person interacting with you.
+- Keep in mind today's date and time ({{dateTime}}).
 - Include additional relevant context, even if not directly requested.
 
 Search results:

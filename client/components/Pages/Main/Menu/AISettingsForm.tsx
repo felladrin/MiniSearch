@@ -14,7 +14,6 @@ import {
   Group,
   ComboboxData,
   Skeleton,
-  Button,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -71,6 +70,13 @@ export default function AISettingsForm() {
     settings.openAiApiBaseUrl,
     settings.openAiApiKey,
   ]);
+
+  const isUsingCustomInstructions =
+    form.values.systemPrompt !== defaultSettings.systemPrompt;
+
+  const handleRestoreDefaultInstructions = () => {
+    form.setFieldValue("systemPrompt", defaultSettings.systemPrompt);
+  };
 
   return (
     <Stack gap="md">
@@ -241,26 +247,38 @@ export default function AISettingsForm() {
                   </li>
                 </ul>
                 <span>
-                  Note: The special tag <em>{`{{searchResults}}`}</em> will be
+                  The special tag <em>{`{{searchResults}}`}</em> will be
                   replaced with the search results, while{" "}
                   <em>{`{{dateTime}}`}</em> will be replaced with the current
                   date and time.
                 </span>
+                {isUsingCustomInstructions && (
+                  <>
+                    <br />
+                    <br />
+                    <span>
+                      Currently, you're using custom instructions. If you ever
+                      need to restore the default instructions, you can do so by
+                      clicking
+                    </span>{" "}
+                    <Text
+                      component="span"
+                      size="xs"
+                      c="blue"
+                      style={{ cursor: "pointer" }}
+                      onClick={handleRestoreDefaultInstructions}
+                    >
+                      here
+                    </Text>
+                    <span>.</span>
+                  </>
+                )}
               </>
             }
             autosize
             maxRows={10}
             {...form.getInputProps("systemPrompt")}
           />
-          <Button
-            size="xs"
-            variant="default"
-            onClick={() => {
-              form.setFieldValue("systemPrompt", defaultSettings.systemPrompt);
-            }}
-          >
-            Restore default instructions
-          </Button>
         </>
       )}
     </Stack>
