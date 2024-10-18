@@ -47,9 +47,11 @@ export async function fetchSearXNG(query: string, limit?: number) {
     const uniqueHostnames = new Set<string>();
     const uniqueSourceUrls = new Set<string>();
 
-    const processContent = (html: string): string => {
+    const processSnippet = (snippet: string): string => {
+      if (snippet.startsWith("[data:image")) return "";
+
       return stripEmojis(
-        convertHtmlToPlainText(html, { wordwrap: false }).trim(),
+        convertHtmlToPlainText(snippet, { wordwrap: false }).trim(),
         { preserveSpaces: true },
       );
     };
@@ -115,10 +117,10 @@ export async function fetchSearXNG(query: string, limit?: number) {
           wordwrap: false,
         }).trim();
 
-        const content = processContent(result.content);
+        const snippet = processSnippet(result.content);
 
-        if (title && content) {
-          textResults.push([title, content, result.url]);
+        if (title && snippet) {
+          textResults.push([title, snippet, result.url]);
           uniqueHostnames.add(hostname);
         }
       }
