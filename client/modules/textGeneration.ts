@@ -90,9 +90,10 @@ async function generateTextWithOpenAI() {
       model: settings.openAiApiModel,
       messages: [
         {
-          role: "system",
+          role: "user",
           content: getSystemPrompt(getFormattedSearchResults(true)),
         },
+        { role: "assistant", content: "Ok!" },
         { role: "user", content: getQuery() },
       ],
       temperature: 0.6,
@@ -146,9 +147,10 @@ async function generateTextWithInternalApi() {
     body: JSON.stringify({
       messages: [
         {
-          role: "system",
+          role: "user",
           content: getSystemPrompt(getFormattedSearchResults(true)),
         },
+        { role: "assistant", content: "Ok!" },
         { role: "user", content: getQuery() },
       ],
       temperature: 0.6,
@@ -670,8 +672,7 @@ async function generateChatWithWllama(
 }
 
 export async function generateChatResponse(
-  message: string,
-  previousMessages: ChatMessage[],
+  newMessages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
 ) {
   const settings = getSettings();
@@ -680,11 +681,11 @@ export async function generateChatResponse(
   try {
     const allMessages = [
       {
-        role: "system",
+        role: "user",
         content: getSystemPrompt(getFormattedSearchResults(true)),
       },
-      ...previousMessages,
-      { role: "user", content: message },
+      { role: "assistant", content: "Ok!" },
+      ...newMessages,
     ];
 
     if (settings.inferenceType === "openai") {

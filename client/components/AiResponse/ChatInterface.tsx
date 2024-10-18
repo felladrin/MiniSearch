@@ -60,7 +60,7 @@ export default function ChatInterface({
 
     try {
       addLogEntry("User sent a follow-up question");
-      await generateChatResponse(input, newMessages, (partialResponse) => {
+      await generateChatResponse(newMessages, (partialResponse) => {
         setStreamedResponse(partialResponse);
         latestResponseRef.current = partialResponse;
       });
