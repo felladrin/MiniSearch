@@ -143,7 +143,7 @@ export default function ChatInterface({
         )}
         <Group align="flex-end" style={{ position: "relative" }}>
           <Textarea
-            placeholder="Ask a follow-up question..."
+            placeholder="Anything else you would like to know?"
             value={input}
             onChange={(event) => setInput(event.currentTarget.value)}
             onKeyDown={handleKeyDown}
