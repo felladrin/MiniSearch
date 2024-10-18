@@ -688,15 +688,17 @@ export async function generateChatResponse(
       ...newMessages,
     ];
 
+    const lastMessages = allMessages.slice(-3);
+
     if (settings.inferenceType === "openai") {
-      response = await generateChatWithOpenAI(allMessages, onUpdate);
+      response = await generateChatWithOpenAI(lastMessages, onUpdate);
     } else if (settings.inferenceType === "internal") {
-      response = await generateChatWithInternalApi(allMessages, onUpdate);
+      response = await generateChatWithInternalApi(lastMessages, onUpdate);
     } else {
       if (isWebGPUAvailable && settings.enableWebGpu) {
-        response = await generateChatWithWebLlm(allMessages, onUpdate);
+        response = await generateChatWithWebLlm(lastMessages, onUpdate);
       } else {
-        response = await generateChatWithWllama(allMessages, onUpdate);
+        response = await generateChatWithWllama(lastMessages, onUpdate);
       }
     }
   } catch (error) {
