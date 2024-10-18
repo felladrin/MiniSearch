@@ -85,20 +85,27 @@ async function generateTextWithOpenAI() {
 
   updateTextGenerationState("preparingToGenerate");
 
-  const completion = await openai.chat.completions.create({
-    model: settings.openAiApiModel,
-    messages: [
-      {
-        role: "system",
-        content: getSystemPrompt(getFormattedSearchResults(true)),
+  const completion = await openai.chat.completions.create(
+    {
+      model: settings.openAiApiModel,
+      messages: [
+        {
+          role: "system",
+          content: getSystemPrompt(getFormattedSearchResults(true)),
+        },
+        { role: "user", content: getQuery() },
+      ],
+      temperature: 0.6,
+      top_p: 0.9,
+      max_tokens: 2048,
+      stream: true,
+    },
+    {
+      headers: {
+        "x-stainless-retry-count": null,
       },
-      { role: "user", content: getQuery() },
-    ],
-    temperature: 0.6,
-    top_p: 0.9,
-    max_tokens: 2048,
-    stream: true,
-  });
+    },
+  );
 
   let streamedMessage = "";
 
@@ -441,14 +448,21 @@ async function generateChatWithOpenAI(
     dangerouslyAllowBrowser: true,
   });
 
-  const completion = await openai.chat.completions.create({
-    model: settings.openAiApiModel,
-    messages: messages as ChatCompletionMessageParam[],
-    temperature: 0.6,
-    top_p: 0.9,
-    max_tokens: 2048,
-    stream: true,
-  });
+  const completion = await openai.chat.completions.create(
+    {
+      model: settings.openAiApiModel,
+      messages: messages as ChatCompletionMessageParam[],
+      temperature: 0.6,
+      top_p: 0.9,
+      max_tokens: 2048,
+      stream: true,
+    },
+    {
+      headers: {
+        "x-stainless-retry-count": null,
+      },
+    },
+  );
 
   let streamedMessage = "";
 

@@ -46,7 +46,11 @@ export default function AISettingsForm() {
           apiKey: settings.openAiApiKey,
           dangerouslyAllowBrowser: true,
         });
-        const response = await openai.models.list();
+        const response = await openai.models.list({
+          headers: {
+            "x-stainless-retry-count": null,
+          },
+        });
         const models = response.data.map((model) => ({
           label: model.id,
           value: model.id,
