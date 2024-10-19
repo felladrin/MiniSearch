@@ -48,12 +48,14 @@ export async function fetchSearXNG(query: string, limit?: number) {
     const uniqueSourceUrls = new Set<string>();
 
     const processSnippet = (snippet: string): string => {
-      if (snippet.startsWith("[data:image")) return "";
-
-      return stripEmojis(
+      const processedSnippet = stripEmojis(
         convertHtmlToPlainText(snippet, { wordwrap: false }).trim(),
         { preserveSpaces: true },
       );
+
+      if (processedSnippet.startsWith("[data:image")) return "";
+
+      return processedSnippet;
     };
 
     const imagePromises = graphicalSearchResults.map(async (result) => {
