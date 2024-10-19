@@ -16,7 +16,7 @@ import { search } from "./search";
 import { addLogEntry } from "./logEntries";
 import { getSystemPrompt } from "./systemPrompt";
 import prettyMilliseconds from "pretty-ms";
-import OpenAI from "openai";
+import { getOpenAiClient } from "./openai";
 import { getSearchTokenHash } from "./searchTokenHash";
 import { ChatCompletionMessageParam } from "openai/resources/chat/completions.mjs";
 
@@ -75,38 +75,30 @@ export async function searchAndRespond() {
 
 async function generateTextWithOpenAI() {
   const settings = getSettings();
-  const openai = new OpenAI({
+  const openai = getOpenAiClient({
     baseURL: settings.openAiApiBaseUrl,
     apiKey: settings.openAiApiKey,
-    dangerouslyAllowBrowser: true,
   });
 
   await canStartResponding();
 
   updateTextGenerationState("preparingToGenerate");
 
-  const completion = await openai.chat.completions.create(
-    {
-      model: settings.openAiApiModel,
-      messages: [
-        {
-          role: "user",
-          content: getSystemPrompt(getFormattedSearchResults(true)),
-        },
-        { role: "assistant", content: "Ok!" },
-        { role: "user", content: getQuery() },
-      ],
-      temperature: 0.6,
-      top_p: 0.9,
-      max_tokens: 2048,
-      stream: true,
-    },
-    {
-      headers: {
-        "x-stainless-retry-count": null,
+  const completion = await openai.chat.completions.create({
+    model: settings.openAiApiModel,
+    messages: [
+      {
+        role: "user",
+        content: getSystemPrompt(getFormattedSearchResults(true)),
       },
-    },
-  );
+      { role: "assistant", content: "Ok!" },
+      { role: "user", content: getQuery() },
+    ],
+    temperature: 0.6,
+    top_p: 0.9,
+    max_tokens: 2048,
+    stream: true,
+  });
 
   let streamedMessage = "";
 
@@ -444,27 +436,18 @@ async function generateChatWithOpenAI(
   onUpdate: (partialResponse: string) => void,
 ) {
   const settings = getSettings();
-  const openai = new OpenAI({
+  const openai = getOpenAiClient({
     baseURL: settings.openAiApiBaseUrl,
     apiKey: settings.openAiApiKey,
-    dangerouslyAllowBrowser: true,
   });
-
-  const completion = await openai.chat.completions.create(
-    {
-      model: settings.openAiApiModel,
-      messages: messages as ChatCompletionMessageParam[],
-      temperature: 0.6,
-      top_p: 0.9,
-      max_tokens: 2048,
-      stream: true,
-    },
-    {
-      headers: {
-        "x-stainless-retry-count": null,
-      },
-    },
-  );
+  const completion = await openai.chat.completions.create({
+    model: settings.openAiApiModel,
+    messages: messages as ChatCompletionMessageParam[],
+    temperature: 0.6,
+    top_p: 0.9,
+    max_tokens: 2048,
+    stream: true,
+  });
 
   let streamedMessage = "";
 

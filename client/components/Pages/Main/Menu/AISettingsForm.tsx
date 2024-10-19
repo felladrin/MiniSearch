@@ -18,7 +18,7 @@ import {
 import { useForm } from "@mantine/form";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { defaultSettings, inferenceTypes } from "../../../../modules/settings";
-import { OpenAI } from "openai";
+import { getOpenAiClient } from "../../../../modules/openai";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { addLogEntry } from "../../../../modules/logEntries";
 
@@ -41,16 +41,11 @@ export default function AISettingsForm() {
   useEffect(() => {
     async function fetchOpenAiModels() {
       try {
-        const openai = new OpenAI({
+        const openai = getOpenAiClient({
           baseURL: settings.openAiApiBaseUrl,
           apiKey: settings.openAiApiKey,
-          dangerouslyAllowBrowser: true,
         });
-        const response = await openai.models.list({
-          headers: {
-            "x-stainless-retry-count": null,
-          },
-        });
+        const response = await openai.models.list();
         const models = response.data.map((model) => ({
           label: model.id,
           value: model.id,
