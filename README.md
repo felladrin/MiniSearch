@@ -14,8 +14,8 @@ Live demo: https://felladrin-minisearch.hf.space
 - **Easy to use**: Minimalist yet intuitive interface for all users
 - **Cross-platform**: Models run inside the browser, both on desktop and mobile
 - **Integrated**: Search from the browser address bar by setting it as the default search engine
-- **Time-saver**: AI responses enhanced with search results
 - **Efficient**: Models are loaded and cached only when needed
+- **Customizable**: Tweakable settings for search results and text generation
 - **Open-source**: [The code is available for inspection and contribution at GitHub](https://github.com/felladrin/MiniSearch)
 
 ## Prerequisites
@@ -41,13 +41,6 @@ docker compose -f docker-compose.production.yml up --build
 Then, open http://localhost:7860 in your browser and start searching!
 
 ## Frequently asked questions
-
-<details>
-  <summary>How can I contribute to MiniSearch?</summary>
-  <p>Fork this repository and clone it. Then, start the development server by running the following command:</p>
-  <p><code>docker compose up</code></p>
-  <p>Make your changes, push them to your fork, and open a pull request! All contributions are welcome!</p>
-</details>
 
 <details>
   <summary>How do I search via the browser's address bar?</summary>
@@ -78,18 +71,6 @@ Then, open http://localhost:7860 in your browser and start searching!
 </details>
 
 <details>
-  <summary>Why is MiniSearch built upon SearXNG's Docker Image and using a single image instead of composing it from multiple services?</summary>
-  <p>There are a few reasons for this:</p>
-  <ul>
-    <li>MiniSearch utilizes SearXNG as its meta-search engine.</li>
-    <li>Manual installation of SearXNG is not trivial, so we use the docker image they provide, which has everything set up.</li>
-    <li>SearXNG only provides a Docker Image based on Alpine Linux.</li>
-    <li>The user of the image needs to be customized in a specific way to run on HuggingFace Spaces, where MiniSearch's demo runs.</li>
-    <li>HuggingFace only accepts a single docker image. It doesn't run docker compose or multiple images, unfortunately.</li>
-  </ul>
-</details>
-
-<details>
   <summary>I want to serve MiniSearch to other users, allowing them to use my own OpenAI-Compatible API key, but without revealing it to them. Is it possible?</summary>
   <p>Yes! In MiniSearch, we call this text-generation feature "Internal OpenAI-Compatible API". To use this it:</p>
   <ol>
@@ -104,4 +85,23 @@ Then, open http://localhost:7860 in your browser and start searching!
     <li>Restart MiniSearch server.</li>
     <li>In the MiniSearch menu, select the new option (named as per your <code>INTERNAL_OPENAI_COMPATIBLE_API_NAME</code> setting) from the inference type dropdown.</li>
   </ol>
+</details>
+
+<details>
+  <summary>How can I contribute to the development of this tool?</summary>
+  <p>Fork this repository and clone it. Then, start the development server by running the following command:</p>
+  <p><code>docker compose up</code></p>
+  <p>Make your changes, push them to your fork, and open a pull request! All contributions are welcome!</p>
+</details>
+
+<details>
+  <summary>Why is MiniSearch built upon SearXNG's Docker Image and using a single image instead of composing it from multiple services?</summary>
+  <p>There are a few reasons for this:</p>
+  <ul>
+    <li>MiniSearch utilizes SearXNG as its meta-search engine.</li>
+    <li>Manual installation of SearXNG is not trivial, so we use the docker image they provide, which has everything set up.</li>
+    <li>SearXNG only provides a Docker Image based on Alpine Linux.</li>
+    <li>The user of the image needs to be customized in a specific way to run on HuggingFace Spaces, where MiniSearch's demo runs.</li>
+    <li>HuggingFace only accepts a single docker image. It doesn't run docker compose or multiple images, unfortunately.</li>
+  </ul>
 </details>
