@@ -34,6 +34,7 @@
     "create-pubsub": "^1.6.3",
     "dotenv": "^16.4.5",
     "embla-carousel-react": "^8.3.0",
+    "gpt-tokenizer": "^2.5.1",
     "hash-wasm": "^4.11.0",
     "helper-git-hash": "^1.0.0",
     "html-to-text": "^9.0.5",

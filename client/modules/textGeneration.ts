@@ -19,6 +19,7 @@ import prettyMilliseconds from "pretty-ms";
 import { getOpenAiClient } from "./openai";
 import { getSearchTokenHash } from "./searchTokenHash";
 import { ChatCompletionMessageParam } from "openai/resources/chat/completions.mjs";
+import gptTokenizer from "gpt-tokenizer";
 
 export async function searchAndRespond() {
   if (getQuery() === "") return;
@@ -671,7 +672,21 @@ export async function generateChatResponse(
       ...newMessages,
     ];
 
-    const lastMessages = allMessages.slice(-3);
+    const lastMessagesReversed: ChatMessage[] = [];
+
+    let totalTokens = 0;
+
+    for (const message of allMessages.reverse()) {
+      const newTotalTokens =
+        totalTokens + gptTokenizer.encode(message.content).length;
+
+      if (newTotalTokens > 1280) break;
+
+      totalTokens = newTotalTokens;
+      lastMessagesReversed.push(message);
+    }
+
+    const lastMessages = lastMessagesReversed.reverse();
 
     if (settings.inferenceType === "openai") {
       response = await generateChatWithOpenAI(lastMessages, onUpdate);
