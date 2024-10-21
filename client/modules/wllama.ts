@@ -72,7 +72,7 @@ const defaultModelConfig: Omit<WllamaModel, "label" | "url"> = {
   },
   cacheType: "f16",
   contextSize: 2048,
-  shouldIncludeUrlsOnPrompt: false,
+  shouldIncludeUrlsOnPrompt: true,
   sampling: {
     temp: 0.2,
     dynatemp_range: 0.15,
