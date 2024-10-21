@@ -18,7 +18,7 @@
     "dev": "vite",
     "lint": "prettier --check . && tsc && eslint --fix client && ts-prune && jscpd client server && dpdm --no-tree --no-progress --no-warning vite.config.ts client",
     "format": "prettier --write .",
-    "test": "glob -c 'tsx --test' '**/*.test.ts'"
+    "test": "glob -c 'tsx --test' '**/*.test.ts' --ignore='node_modules/**'"
   },
   "dependencies": {
     "@huggingface/hub": "^0.18.0",
