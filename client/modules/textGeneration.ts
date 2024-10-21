@@ -47,6 +47,7 @@ export async function searchAndRespond() {
       await generateTextWithInternalApi();
     } else {
       await canDownloadModels();
+      updateTextGenerationState("loadingModel");
       try {
         if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
 
