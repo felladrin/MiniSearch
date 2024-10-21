@@ -11,6 +11,7 @@ import {
   updateModelLoadingProgress,
   getTextGenerationState,
   getSettings,
+  listenToSettingsChanges,
 } from "./pubSub";
 import { search } from "./search";
 import { addLogEntry } from "./logEntries";
@@ -45,6 +46,7 @@ export async function searchAndRespond() {
     } else if (settings.inferenceType === "internal") {
       await generateTextWithInternalApi();
     } else {
+      await canDownloadModels();
       try {
         if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
 
@@ -714,4 +716,19 @@ export async function generateChatResponse(
 export interface ChatMessage {
   role: "user" | "assistant" | string;
   content: string;
+}
+
+function canDownloadModels(): Promise<void> {
+  return new Promise((resolve) => {
+    if (getSettings().allowAiModelDownload) {
+      resolve();
+    } else {
+      updateTextGenerationState("awaitingModelDownloadAllowance");
+      listenToSettingsChanges((settings) => {
+        if (settings.allowAiModelDownload) {
+          resolve();
+        }
+      });
+    }
+  });
 }

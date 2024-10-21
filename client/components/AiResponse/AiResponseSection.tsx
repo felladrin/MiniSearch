@@ -13,6 +13,9 @@ const AiResponseContent = lazy(() => import("./AiResponseContent"));
 const PreparingContent = lazy(() => import("./PreparingContent"));
 const LoadingModelContent = lazy(() => import("./LoadingModelContent"));
 const ChatInterface = lazy(() => import("./ChatInterface"));
+const AiModelDownloadAllowanceContent = lazy(
+  () => import("./AiModelDownloadAllowanceContent"),
+);
 
 export default function AiResponseSection() {
   const [query] = usePubSub(queryPubSub);
@@ -50,6 +53,11 @@ export default function AiResponseSection() {
                 </>
               ),
             )
+            .with("awaitingModelDownloadAllowance", () => (
+              <Suspense>
+                <AiModelDownloadAllowanceContent />
+              </Suspense>
+            ))
             .with("loadingModel", () => (
               <Suspense>
                 <LoadingModelContent

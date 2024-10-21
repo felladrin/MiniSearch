@@ -57,6 +57,7 @@ export const [updateSearchPromise, , getSearchPromise] = createPubSub<
 
 export const textGenerationStatePubSub = createPubSub<
   | "idle"
+  | "awaitingModelDownloadAllowance"
   | "loadingModel"
   | "awaitingSearchResults"
   | "preparingToGenerate"
@@ -84,4 +85,4 @@ export const settingsPubSub = createLocalStoragePubSub(
   defaultSettings,
 );
 
-export const [, , getSettings] = settingsPubSub;
+export const [, listenToSettingsChanges, getSettings] = settingsPubSub;

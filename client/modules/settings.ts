@@ -26,6 +26,7 @@ Search results:
   openAiApiKey: "",
   openAiApiModel: "",
   enterToSubmit: true,
+  allowAiModelDownload: false,
 };
 
 addLogEntry(
