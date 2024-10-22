@@ -36,10 +36,23 @@ export async function rankSearchResults(
 
   const scoreThreshold = highestScore / 2;
 
-  return searchResults
+  const [firstResult, ...nextResults] = searchResults
     .map((result, index) => ({ result, score: scores[index] }))
-    .filter(({ score }) => score > scoreThreshold)
-    .map(({ result }) => result);
+    .filter(({ score }) => score > scoreThreshold);
+
+  const nextTopResultsCount = 5;
+
+  const nextTopResults = nextResults
+    .slice(0, nextTopResultsCount)
+    .sort((a, b) => b.score - a.score);
+
+  const remainingResults = nextResults
+    .slice(nextTopResultsCount)
+    .sort((a, b) => b.score - a.score);
+
+  return [firstResult, ...nextTopResults, ...remainingResults].map(
+    ({ result }) => result,
+  );
 }
 
 function calculateDotProduct(
