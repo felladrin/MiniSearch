@@ -15,7 +15,6 @@ export const defaultSettings = {
 - Base your responses on the provided search results and your general knowledge about the topic.
 - Answer in the same language in which I ask, with an analytical tone.
 - Use Markdown format, without headers.
-- Link your sources within the body of your response.
 - Keep in mind today's date and time ({{dateTime}}).
 - Include any additional relevant information you think would be good to know.
 
