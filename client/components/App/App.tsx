@@ -9,6 +9,7 @@ import { addLogEntry } from "../../modules/logEntries";
 import { Notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
 import { match } from "ts-pattern";
+import { verifyStoredAccessKey } from "../../modules/accessKey";
 
 const MainPage = lazy(() => import("../Pages/Main/MainPage"));
 const AccessPage = lazy(() => import("../Pages/AccessPage"));
@@ -17,6 +18,21 @@ export function App() {
   useInitializeSettings();
 
   const [hasValidatedAccessKey, setValidatedAccessKey] = useState(false);
+  const [isCheckingStoredKey, setCheckingStoredKey] = useState(true);
+
+  useEffect(() => {
+    async function checkStoredAccessKey() {
+      if (VITE_ACCESS_KEYS_ENABLED) {
+        const isValid = await verifyStoredAccessKey();
+        if (isValid) setValidatedAccessKey(true);
+      }
+      setCheckingStoredKey(false);
+    }
+
+    checkStoredAccessKey();
+  }, []);
+
+  if (isCheckingStoredKey) return null;
 
   return (
     <MantineProvider defaultColorScheme="dark">
