@@ -27,6 +27,9 @@ export default defineConfig(({ command }) => {
       VITE_ACCESS_KEYS_ENABLED: JSON.stringify(
         Boolean(process.env.ACCESS_KEYS),
       ),
+      VITE_ACCESS_KEY_TIMEOUT_HOURS: JSON.stringify(
+        Number(process.env.ACCESS_KEY_TIMEOUT_HOURS) || 0,
+      ),
       VITE_WEBLLM_DEFAULT_F16_MODEL_ID: JSON.stringify(
         process.env.WEBLLM_DEFAULT_F16_MODEL_ID,
       ),

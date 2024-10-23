@@ -1,4 +1,5 @@
 import { PreviewServer, ViteDevServer } from "vite";
+import { argon2Verify } from "hash-wasm";
 
 export function validateAccessKeyServerHook<
   T extends ViteDevServer | PreviewServer,
@@ -16,10 +17,28 @@ export function validateAccessKeyServerHook<
       body += chunk.toString();
     });
 
-    req.on("end", () => {
-      const { accessKey } = JSON.parse(body);
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ valid: accessKeys.includes(accessKey) }));
+    req.on("end", async () => {
+      try {
+        const { accessKeyHash } = JSON.parse(body);
+        let isValid = false;
+
+        for (const key of accessKeys) {
+          try {
+            if (await argon2Verify({ password: key, hash: accessKeyHash })) {
+              isValid = true;
+              break;
+            }
+          } catch {
+            continue;
+          }
+        }
+
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ valid: isValid }));
+      } catch {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ valid: false, error: "Invalid request" }));
+      }
     });
   });
 }
