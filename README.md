@@ -52,7 +52,7 @@ Then, open http://localhost:7860 in your browser and start searching!
 <details>
   <summary>Can I use custom models via OpenAI-Compatible API?</summary>
   <p>
-    Yes! For this, open the Menu and change the "Inference Type" to <code>OpenAI-Compatible API</code>. Then configure the Base URL, and optionally set an API Key and a Model to use.
+    Yes! For this, open the Menu and change the "AI Processing Location" to <code>Remote server (API)</code>. Then configure the Base URL, and optionally set an API Key and a Model to use.
   </p>
 </details>
 
@@ -83,7 +83,7 @@ Then, open http://localhost:7860 in your browser and start searching!
       </ul>
     </li>
     <li>Restart MiniSearch server.</li>
-    <li>In the MiniSearch menu, select the new option (named as per your <code>INTERNAL_OPENAI_COMPATIBLE_API_NAME</code> setting) from the inference type dropdown.</li>
+    <li>In the MiniSearch menu, select the new option (named as per your <code>INTERNAL_OPENAI_COMPATIBLE_API_NAME</code> setting) from the "AI Processing Location" dropdown.</li>
   </ol>
 </details>
 

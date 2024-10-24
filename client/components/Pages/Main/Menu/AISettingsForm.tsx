@@ -110,7 +110,7 @@ export default function AISettingsForm() {
 
           <Select
             {...form.getInputProps("inferenceType")}
-            label="Inference Type"
+            label="AI Processing Location"
             data={inferenceTypes}
             allowDeselect={false}
           />
@@ -120,7 +120,7 @@ export default function AISettingsForm() {
               <TextInput
                 {...form.getInputProps("openAiApiBaseUrl")}
                 label="API Base URL"
-                placeholder="http://localhost:10001/v1"
+                placeholder="http://localhost:11434/v1"
                 required
               />
               <Group gap="xs">
