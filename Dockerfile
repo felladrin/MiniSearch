@@ -48,6 +48,7 @@ WORKDIR ${APP_DIR}
 # This approach allows for dynamic configuration without relying on a `.env` file,
 # which might not be suitable for all deployment scenarios.
 ARG ACCESS_KEYS
+ARG ACCESS_KEY_TIMEOUT_HOURS
 ARG WEBLLM_DEFAULT_F16_MODEL_ID
 ARG WEBLLM_DEFAULT_F32_MODEL_ID
 ARG WLLAMA_DEFAULT_MODEL_ID
