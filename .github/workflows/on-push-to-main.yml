@@ -40,8 +40,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
   sync-to-hf:
-    # Temporarily disable this job
-    if: false
     needs: [test-lint-ping]
     name: Sync to HuggingFace Spaces
     runs-on: ubuntu-latest
