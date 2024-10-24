@@ -2,10 +2,10 @@
 FROM searxng/searxng:2024.10.23-b14d885f2
 
 # Set the default port to 7860 if not provided
-ENV PORT ${PORT:-7860}
+ENV PORT=7860
 
 # Expose the port specified by the PORT environment variable
-EXPOSE ${PORT}
+EXPOSE $PORT
 
 # Install necessary packages using Alpine's package manager
 RUN apk add --update \
