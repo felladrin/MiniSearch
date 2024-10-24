@@ -51,6 +51,7 @@ export default function AISettingsForm() {
           value: model.id,
         }));
         setOpenAiModels(models);
+        form.setFieldError("openAiApiModel", null);
         if (!form.values.openAiApiModel) {
           form.setFieldValue("openAiApiModel", models[0].value);
         }
@@ -58,6 +59,8 @@ export default function AISettingsForm() {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         addLogEntry(`Error fetching OpenAI models: ${errorMessage}`);
+        setOpenAiModels([]);
+        form.setFieldError("openAiApiModel", errorMessage);
       }
     }
 
