@@ -74,16 +74,8 @@ const defaultModelConfig: Omit<WllamaModel, "label" | "url"> = {
   contextSize: 2048,
   shouldIncludeUrlsOnPrompt: true,
   sampling: {
-    temp: 0.2,
-    dynatemp_range: 0.15,
-    top_k: 0,
-    top_p: 1,
-    min_p: 0.1,
-    typical_p: 0.85,
+    temp: 0.6,
     penalty_repeat: 1.176,
-    penalty_last_n: -1,
-    mirostat: 2,
-    mirostat_tau: 3.5,
   },
 };
 

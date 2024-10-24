@@ -19,8 +19,12 @@ import { getSystemPrompt } from "./systemPrompt";
 import prettyMilliseconds from "pretty-ms";
 import { getOpenAiClient } from "./openai";
 import { getSearchTokenHash } from "./searchTokenHash";
-import { ChatCompletionMessageParam } from "openai/resources/chat/completions.mjs";
+import {
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionMessageParam,
+} from "openai/resources/chat/completions.mjs";
 import gptTokenizer from "gpt-tokenizer";
+import { ChatOptions } from "@mlc-ai/web-llm";
 
 export async function searchAndRespond() {
   if (getQuery() === "") return;
@@ -99,7 +103,6 @@ async function generateTextWithOpenAI() {
       { role: "user", content: getQuery() },
     ],
     temperature: 0.6,
-    top_p: 0.9,
     max_tokens: 2048,
     stream: true,
   });
@@ -150,10 +153,9 @@ async function generateTextWithInternalApi() {
         { role: "user", content: getQuery() },
       ],
       temperature: 0.6,
-      top_p: 0.9,
       max_tokens: 2048,
       stream: true,
-    }),
+    } as ChatCompletionCreateParamsStreaming),
   });
 
   if (!response.ok || !response.body) {
@@ -223,7 +225,6 @@ async function generateTextWithWebLlm() {
 
   const chatOptions: ChatOptions = {
     temperature: 0.6,
-    top_p: 0.9,
     repetition_penalty: 1.176,
   };
 
@@ -448,7 +449,6 @@ async function generateChatWithOpenAI(
     model: settings.openAiApiModel,
     messages: messages as ChatCompletionMessageParam[],
     temperature: 0.6,
-    top_p: 0.9,
     max_tokens: 2048,
     stream: true,
   });
@@ -489,10 +489,9 @@ async function generateChatWithInternalApi(
     body: JSON.stringify({
       messages,
       temperature: 0.6,
-      top_p: 0.9,
       max_tokens: 2048,
       stream: true,
-    }),
+    } as ChatCompletionCreateParamsStreaming),
   });
 
   if (!response.ok || !response.body) {
@@ -551,9 +550,8 @@ async function generateChatWithWebLlm(
     logLevel: "SILENT",
   };
 
-  const chatOptions = {
+  const chatOptions: ChatOptions = {
     temperature: 0.6,
-    top_p: 0.9,
     repetition_penalty: 1.176,
   };
 
