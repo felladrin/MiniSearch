@@ -80,10 +80,11 @@ const defaultModelConfig: Omit<
   shouldIncludeUrlsOnPrompt: true,
   sampling: {
     temp: defaultSettings.inferenceTemperature,
-    top_p: defaultSettings.inferenceTopP,
-    penalty_freq: defaultSettings.inferenceFrequencyPenalty,
-    penalty_present: defaultSettings.inferencePresencePenalty,
     penalty_repeat: defaultSettings.inferenceRepeatPenalty,
+    min_p: 0.02,
+    // @ts-expect-error Wllama still doesn't have the following properties defined, although they are supported by the llama.cpp backend.
+    sampling_seq: "mx",
+    xtc_probability: 0.5,
   },
 };
 
