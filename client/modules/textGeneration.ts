@@ -93,6 +93,7 @@ async function generateTextWithOpenAI() {
   updateTextGenerationState("preparingToGenerate");
 
   const completion = await openai.chat.completions.create({
+    ...getDefaultChatCompletionCreateParamsStreaming(),
     model: settings.openAiApiModel,
     messages: [
       {
@@ -102,9 +103,6 @@ async function generateTextWithOpenAI() {
       { role: "assistant", content: "Ok!" },
       { role: "user", content: getQuery() },
     ],
-    temperature: 0.6,
-    max_tokens: 2048,
-    stream: true,
   });
 
   let streamedMessage = "";
@@ -144,6 +142,7 @@ async function generateTextWithInternalApi() {
       Authorization: `${tokenPrefix}${token}`,
     },
     body: JSON.stringify({
+      ...getDefaultChatCompletionCreateParamsStreaming(),
       messages: [
         {
           role: "user",
@@ -152,9 +151,6 @@ async function generateTextWithInternalApi() {
         { role: "assistant", content: "Ok!" },
         { role: "user", content: getQuery() },
       ],
-      temperature: 0.6,
-      max_tokens: 2048,
-      stream: true,
     } as ChatCompletionCreateParamsStreaming),
   });
 
@@ -224,7 +220,6 @@ async function generateTextWithWebLlm() {
   };
 
   const chatOptions: ChatOptions = {
-    temperature: 0.6,
     repetition_penalty: 1.176,
   };
 
@@ -245,7 +240,7 @@ async function generateTextWithWebLlm() {
     updateTextGenerationState("preparingToGenerate");
 
     const completion = await engine.chat.completions.create({
-      stream: true,
+      ...getDefaultChatCompletionCreateParamsStreaming(),
       messages: [
         {
           role: "user",
@@ -446,11 +441,9 @@ async function generateChatWithOpenAI(
     apiKey: settings.openAiApiKey,
   });
   const completion = await openai.chat.completions.create({
+    ...getDefaultChatCompletionCreateParamsStreaming(),
     model: settings.openAiApiModel,
     messages: messages as ChatCompletionMessageParam[],
-    temperature: 0.6,
-    max_tokens: 2048,
-    stream: true,
   });
 
   let streamedMessage = "";
@@ -487,10 +480,8 @@ async function generateChatWithInternalApi(
       Authorization: `${tokenPrefix}${token}`,
     },
     body: JSON.stringify({
+      ...getDefaultChatCompletionCreateParamsStreaming(),
       messages,
-      temperature: 0.6,
-      max_tokens: 2048,
-      stream: true,
     } as ChatCompletionCreateParamsStreaming),
   });
 
@@ -551,7 +542,6 @@ async function generateChatWithWebLlm(
   };
 
   const chatOptions: ChatOptions = {
-    temperature: 0.6,
     repetition_penalty: 1.176,
   };
 
@@ -567,7 +557,7 @@ async function generateChatWithWebLlm(
     : await CreateMLCEngine(selectedModelId, engineConfig, chatOptions);
 
   const completion = await engine.chat.completions.create({
-    stream: true,
+    ...getDefaultChatCompletionCreateParamsStreaming(),
     messages: messages as ChatCompletionMessageParam[],
   });
 
@@ -730,4 +720,15 @@ function canDownloadModels(): Promise<void> {
       });
     }
   });
+}
+
+function getDefaultChatCompletionCreateParamsStreaming() {
+  return {
+    stream: true,
+    max_tokens: 2048,
+    temperature: 0.5,
+    top_p: 1,
+    frequency_penalty: 0.5,
+    presence_penalty: 0.3,
+  } as const;
 }

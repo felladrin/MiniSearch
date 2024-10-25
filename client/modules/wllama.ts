@@ -78,7 +78,10 @@ const defaultModelConfig: Omit<
   contextSize: 2048,
   shouldIncludeUrlsOnPrompt: true,
   sampling: {
-    temp: 0.6,
+    temp: 0.5,
+    top_p: 1,
+    penalty_freq: 0.5,
+    penalty_present: 0.3,
     penalty_repeat: 1.176,
   },
 };
