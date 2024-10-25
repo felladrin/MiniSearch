@@ -25,6 +25,7 @@ import {
 } from "openai/resources/chat/completions.mjs";
 import gptTokenizer from "gpt-tokenizer";
 import { ChatOptions } from "@mlc-ai/web-llm";
+import { defaultSettings } from "./settings";
 
 export async function searchAndRespond() {
   if (getQuery() === "") return;
@@ -220,7 +221,7 @@ async function generateTextWithWebLlm() {
   };
 
   const chatOptions: ChatOptions = {
-    repetition_penalty: 1.176,
+    repetition_penalty: defaultSettings.inferenceRepeatPenalty,
   };
 
   const engine = Worker
@@ -542,7 +543,7 @@ async function generateChatWithWebLlm(
   };
 
   const chatOptions: ChatOptions = {
-    repetition_penalty: 1.176,
+    repetition_penalty: defaultSettings.inferenceRepeatPenalty,
   };
 
   const engine = Worker
@@ -726,9 +727,9 @@ function getDefaultChatCompletionCreateParamsStreaming() {
   return {
     stream: true,
     max_tokens: 2048,
-    temperature: 0.5,
-    top_p: 1,
-    frequency_penalty: 0.5,
-    presence_penalty: 0.3,
+    temperature: defaultSettings.inferenceTemperature,
+    top_p: defaultSettings.inferenceTopP,
+    frequency_penalty: defaultSettings.inferenceFrequencyPenalty,
+    presence_penalty: defaultSettings.inferencePresencePenalty,
   } as const;
 }

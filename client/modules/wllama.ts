@@ -16,6 +16,7 @@ import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllam
 import { Template } from "@huggingface/jinja";
 import { getSystemPrompt } from "./systemPrompt";
 import { addLogEntry } from "./logEntries";
+import { defaultSettings } from "./settings";
 
 export async function initializeWllama(
   modelUrl: string | string[],
@@ -78,11 +79,11 @@ const defaultModelConfig: Omit<
   contextSize: 2048,
   shouldIncludeUrlsOnPrompt: true,
   sampling: {
-    temp: 0.5,
-    top_p: 1,
-    penalty_freq: 0.5,
-    penalty_present: 0.3,
-    penalty_repeat: 1.176,
+    temp: defaultSettings.inferenceTemperature,
+    top_p: defaultSettings.inferenceTopP,
+    penalty_freq: defaultSettings.inferenceFrequencyPenalty,
+    penalty_present: defaultSettings.inferencePresencePenalty,
+    penalty_repeat: defaultSettings.inferenceRepeatPenalty,
   },
 };
 
