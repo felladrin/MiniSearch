@@ -11,12 +11,17 @@ export function statusEndpointServerHook<
   server.middlewares.use(async (request, response, next) => {
     if (!request.url.startsWith("/status")) return next();
 
+    const sessions = getVerifiedTokensAmount();
+    const searches = getSearchesSinceLastRestart();
+    const averageSearchesPerSession = searches / sessions || 0;
+
     const status = {
       uptime: prettyMilliseconds(new Date().getTime() - serverStartTime, {
         verbose: true,
       }),
-      sessions: getVerifiedTokensAmount(),
-      searches: getSearchesSinceLastRestart(),
+      sessions,
+      searches,
+      averageSearchesPerSession,
       build: {
         timestamp: new Date(
           server.config.define.VITE_BUILD_DATE_TIME,
