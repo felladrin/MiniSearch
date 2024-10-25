@@ -10,10 +10,12 @@ export default function WllamaModelSelect({
   onChange: (value: string) => void;
 }) {
   const [wllamaModelOptions] = useState<ComboboxItem[]>(
-    Object.entries(wllamaModels).map(([value, { label }]) => ({
-      label,
-      value,
-    })),
+    Object.entries(wllamaModels)
+      .sort(([, a], [, b]) => a.fileSizeInMegabytes - b.fileSizeInMegabytes)
+      .map(([value, { label, fileSizeInMegabytes }]) => ({
+        label: `${fileSizeInMegabytes} MB • ${label}`,
+        value,
+      })),
   );
 
   useEffect(() => {

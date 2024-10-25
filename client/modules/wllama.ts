@@ -51,6 +51,7 @@ export interface WllamaModel {
   url: string | string[];
   cacheType: "f16" | "q8_0" | "q4_0";
   contextSize: number;
+  fileSizeInMegabytes: number;
   sampling: SamplingConfig;
   shouldIncludeUrlsOnPrompt: boolean;
   buildPrompt: (
@@ -62,7 +63,10 @@ export interface WllamaModel {
   stopTokens?: number[];
 }
 
-const defaultModelConfig: Omit<WllamaModel, "label" | "url"> = {
+const defaultModelConfig: Omit<
+  WllamaModel,
+  "label" | "url" | "fileSizeInMegabytes"
+> = {
   buildPrompt: async (wllama, query, searchResults) => {
     return formatChat(wllama, [
       { id: 1, role: "user", content: getSystemPrompt(searchResults) },
@@ -82,87 +86,103 @@ const defaultModelConfig: Omit<WllamaModel, "label" | "url"> = {
 export const wllamaModels: Record<string, WllamaModel> = {
   "smollm-135m": {
     ...defaultModelConfig,
-    label: "145 MB • SmolLM 135M",
+    label: "SmolLM 135M",
     url: "https://huggingface.co/Felladrin/gguf-Q8_0-smollm-135M-instruct-v0.2/resolve/main/smollm-135m-instruct-add-basics-q8_0.gguf",
+    fileSizeInMegabytes: 145,
   },
   "smollm-360m": {
     ...defaultModelConfig,
-    label: "290 MB • SmolLM 360M",
+    label: "SmolLM 360M",
     url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-smollm-360M-instruct-add-basics/resolve/main/smollm-360m-instruct-add-basics-q5_k_m-imat-00001-of-00005.gguf",
+    fileSizeInMegabytes: 290,
   },
   "danube-3-500m": {
     ...defaultModelConfig,
-    label: "368 MB • Danube 3 500M",
+    label: "Danube 3 500M",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat-q5_k_m-imat-00001-of-00003.gguf",
+    fileSizeInMegabytes: 368,
   },
   "qwen-2.5-0.5b": {
     ...defaultModelConfig,
-    label: "420 MB • Qwen 2.5 0.5B",
+    label: "Qwen 2.5 0.5B",
     url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Qwen2.5-0.5B-Instruct/resolve/main/qwen2-00001-of-00003.gguf",
+    fileSizeInMegabytes: 420,
   },
   "llama-3.2-1b": {
     ...defaultModelConfig,
-    label: "975 MB • Llama 3.2 1B",
+    label: "Llama 3.2 1B",
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-1B-Instruct/resolve/main/model.shard-00001-of-00005.gguf",
+    fileSizeInMegabytes: 975,
   },
   "pints-1.5b": {
     ...defaultModelConfig,
-    label: "1.15 GB • Pints 1.5B",
+    label: "Pints 1.5B",
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K-1.5-Pints-2K-v0.1/resolve/main/model.shard-00001-of-00018.gguf",
+    fileSizeInMegabytes: 1150,
   },
   "arcee-lite": {
     ...defaultModelConfig,
-    label: "1.43 GB • Arcee Lite 1.5B",
+    label: "Arcee Lite 1.5B",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_l-imat-arcee-lite/resolve/main/arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
+    fileSizeInMegabytes: 1430,
   },
   "danube2-1.8b": {
     ...defaultModelConfig,
-    label: "1.3 GB • Danube 2 1.8B",
+    label: "Danube 2 1.8B",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1-00001-of-00021.gguf",
+    fileSizeInMegabytes: 1300,
   },
   "gemma-2-2b": {
     ...defaultModelConfig,
-    label: "1.92 GB • Gemma 2 2B",
+    label: "Gemma 2 2B",
     url: "https://huggingface.co/Felladrin/gguf-sharded-gemma-2-2b-it-abliterated/resolve/main/gemma-2-2b-it-abliterated-q5_k_m-imat-00001-of-00009.gguf",
+    fileSizeInMegabytes: 1920,
   },
   "llama-3.2-3b": {
     ...defaultModelConfig,
-    label: "2.42 GB • Llama 3.2 3B",
+    label: "Llama 3.2 3B",
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-3B-Instruct/resolve/main/model.shard-00001-of-00007.gguf",
+    fileSizeInMegabytes: 2420,
   },
   "phi-3.5-mini-3.8b": {
     ...defaultModelConfig,
-    label: "2.82 GB • Phi 3.5 Mini 3.8B",
+    label: "Phi 3.5 Mini 3.8B",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-phi-3.5-mini-instruct/resolve/main/phi-3-00001-of-00025.gguf",
+    fileSizeInMegabytes: 2820,
   },
   "magpielm-4b": {
     ...defaultModelConfig,
-    label: "3.23 GB • MagpieLM-4B",
+    label: "MagpieLM 4B",
     url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-MagpieLM-4B-Chat-v0.1/resolve/main/magpielm-4b-chat-v0-00001-of-00019.gguf",
+    fileSizeInMegabytes: 3230,
   },
   "nemotron-mini-4b": {
     ...defaultModelConfig,
-    label: "3.55 GB • Nemotron Mini 4B",
+    label: "Nemotron Mini 4B",
     url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Nemotron-Mini-4B-Instruct/resolve/main/nemotron-mini-4b-instruct-q5_k_m-imat-00001-of-00004.gguf",
+    fileSizeInMegabytes: 3550,
   },
   "yi-1.5-6b": {
     ...defaultModelConfig,
-    label: "3.67 GB • Yi 1.5 6B",
+    label: "Yi 1.5 6B",
     url: "https://huggingface.co/Felladrin/gguf-Q4_K_M-Yi-1.5-6B-Chat/resolve/main/yi-1-00001-of-00019.gguf",
+    fileSizeInMegabytes: 3670,
     stopStrings: ["<|im_end|>"],
     sampling: { temp: 0 },
   },
   "falcon-mamba-7b": {
     ...defaultModelConfig,
-    label: "3.51 GB • Falcon Mamba 7B",
+    label: "Falcon Mamba 7B",
     url: "https://huggingface.co/Felladrin/gguf-Q3_K_XL-falcon-mamba-7b/resolve/main/falcon-mamba-7b-Q3_K_XL.shard-00001-of-00013.gguf",
+    fileSizeInMegabytes: 3510,
     stopStrings: ["<|im_end|>"],
     sampling: { temp: 0 },
   },
   "olmoe-1b-7b": {
     ...defaultModelConfig,
-    label: "3.7 GB • OLMoE 1B 7B",
+    label: "OLMoE 1B 7B",
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q3_K_XL-OLMoE-1B-7B-0924-Instruct/resolve/main/OLMoE-1B-7B-0924-Instruct-Q3_K_XL.shard-00001-of-00050.gguf",
+    fileSizeInMegabytes: 3700,
   },
 };
 
