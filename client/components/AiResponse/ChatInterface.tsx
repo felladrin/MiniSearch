@@ -118,9 +118,7 @@ export default function ChatInterface({
                 }}
               >
                 <Suspense>
-                  <FormattedMarkdown>
-                    {`**${message.role === "user" ? "You" : "AI"}**: ${message.content}`}
-                  </FormattedMarkdown>
+                  <FormattedMarkdown>{message.content}</FormattedMarkdown>
                 </Suspense>
               </Paper>
             ))}
@@ -133,9 +131,7 @@ export default function ChatInterface({
                 style={{ alignSelf: "flex-start" }}
               >
                 <Suspense>
-                  <FormattedMarkdown>
-                    {`**AI**: ${streamedResponse}`}
-                  </FormattedMarkdown>
+                  <FormattedMarkdown>{streamedResponse}</FormattedMarkdown>
                 </Suspense>
               </Paper>
             )}
