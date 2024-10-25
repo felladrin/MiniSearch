@@ -32,7 +32,7 @@ There are two ways to get started with MiniSearch. Pick one that suits you best.
 docker run -p 7860:7860 ghcr.io/felladrin/minisearch:main
 ```
 
-**Option 2** - Build from source by cloning this repository and running:
+**Option 2** - Build from source by [downloading the repository files](https://github.com/felladrin/MiniSearch/archive/refs/heads/main.zip) and running:
 
 ```bash
 docker compose -f docker-compose.production.yml up --build
