@@ -137,6 +137,16 @@ export const wllamaModels: Record<string, WllamaModel> = {
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1-00001-of-00021.gguf",
     fileSizeInMegabytes: 1300,
   },
+  "granite-3.0-2b": {
+    ...defaultModelConfig,
+    label: "Granite 3.0 2B",
+    url: "https://huggingface.co/Felladrin/gguf-q5_k_m-granite-3.0-2b-instruct/resolve/main/granite-3-00001-of-00023.gguf",
+    fileSizeInMegabytes: 1870,
+    buildPrompt: async (_, query, searchResults) => {
+      return `<|start_of_role|>system<|end_of_role|>${getSystemPrompt(searchResults)}<|end_of_text|>
+<|start_of_role|>user<|end_of_role|>${query}<|end_of_text|>`;
+    },
+  },
   "gemma-2-2b": {
     ...defaultModelConfig,
     label: "Gemma 2 2B",
@@ -166,22 +176,6 @@ export const wllamaModels: Record<string, WllamaModel> = {
     label: "Nemotron Mini 4B",
     url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Nemotron-Mini-4B-Instruct/resolve/main/nemotron-mini-4b-instruct-q5_k_m-imat-00001-of-00004.gguf",
     fileSizeInMegabytes: 3550,
-  },
-  "yi-1.5-6b": {
-    ...defaultModelConfig,
-    label: "Yi 1.5 6B",
-    url: "https://huggingface.co/Felladrin/gguf-Q4_K_M-Yi-1.5-6B-Chat/resolve/main/yi-1-00001-of-00019.gguf",
-    fileSizeInMegabytes: 3670,
-    stopStrings: ["<|im_end|>"],
-    sampling: { temp: 0 },
-  },
-  "falcon-mamba-7b": {
-    ...defaultModelConfig,
-    label: "Falcon Mamba 7B",
-    url: "https://huggingface.co/Felladrin/gguf-Q3_K_XL-falcon-mamba-7b/resolve/main/falcon-mamba-7b-Q3_K_XL.shard-00001-of-00013.gguf",
-    fileSizeInMegabytes: 3510,
-    stopStrings: ["<|im_end|>"],
-    sampling: { temp: 0 },
   },
   "olmoe-1b-7b": {
     ...defaultModelConfig,
