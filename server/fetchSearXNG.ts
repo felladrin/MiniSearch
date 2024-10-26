@@ -9,7 +9,7 @@ const searxng = new SearxngService({
     lang: "auto",
     safesearch: 1,
     format: "json",
-    categories: ["web"],
+    categories: ["general", "images", "videos"],
   },
 });
 
