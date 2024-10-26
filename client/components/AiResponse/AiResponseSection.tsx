@@ -7,6 +7,7 @@ import {
   settingsPubSub,
   queryPubSub,
   textGenerationStatePubSub,
+  modelSizeInMegabytesPubSub,
 } from "../../modules/pubSub";
 
 const AiResponseContent = lazy(() => import("./AiResponseContent"));
@@ -25,6 +26,7 @@ export default function AiResponseSection() {
   );
   const [modelLoadingProgress] = usePubSub(modelLoadingProgressPubSub);
   const [settings] = usePubSub(settingsPubSub);
+  const [modelSizeInMegabytes] = usePubSub(modelSizeInMegabytesPubSub);
 
   return useMemo(
     () =>
@@ -62,6 +64,7 @@ export default function AiResponseSection() {
               <Suspense>
                 <LoadingModelContent
                   modelLoadingProgress={modelLoadingProgress}
+                  modelSizeInMegabytes={modelSizeInMegabytes}
                 />
               </Suspense>
             ))

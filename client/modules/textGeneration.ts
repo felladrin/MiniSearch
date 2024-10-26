@@ -12,6 +12,7 @@ import {
   getTextGenerationState,
   getSettings,
   listenToSettingsChanges,
+  updateModelSizeInMegabytes,
 } from "./pubSub";
 import { search } from "./search";
 import { addLogEntry } from "./logEntries";
@@ -192,14 +193,23 @@ async function generateTextWithInternalApi() {
 }
 
 async function generateTextWithWebLlm() {
-  const { CreateWebWorkerMLCEngine, CreateMLCEngine, hasModelInCache } =
-    await import("@mlc-ai/web-llm");
+  const {
+    CreateWebWorkerMLCEngine,
+    CreateMLCEngine,
+    hasModelInCache,
+    prebuiltAppConfig,
+  } = await import("@mlc-ai/web-llm");
 
   type InitProgressCallback = import("@mlc-ai/web-llm").InitProgressCallback;
   type MLCEngineConfig = import("@mlc-ai/web-llm").MLCEngineConfig;
   type ChatOptions = import("@mlc-ai/web-llm").ChatOptions;
 
   const selectedModelId = getSettings().webLlmModelId;
+
+  updateModelSizeInMegabytes(
+    prebuiltAppConfig.model_list.find((m) => m.model_id === selectedModelId)
+      ?.vram_required_MB || 0,
+  );
 
   addLogEntry(`Selected WebLLM model: ${selectedModelId}`);
 
@@ -284,6 +294,8 @@ async function generateTextWithWllama() {
   let loadingPercentage = 0;
 
   const model = wllamaModels[getSettings().wllamaModelId];
+
+  updateModelSizeInMegabytes(model.fileSizeInMegabytes);
 
   const wllama = await initializeWllama(model.url, {
     wllama: {
@@ -526,15 +538,19 @@ async function generateChatWithWebLlm(
   messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
 ) {
-  const { CreateWebWorkerMLCEngine, CreateMLCEngine } = await import(
-    "@mlc-ai/web-llm"
-  );
+  const { CreateWebWorkerMLCEngine, CreateMLCEngine, prebuiltAppConfig } =
+    await import("@mlc-ai/web-llm");
 
   type MLCEngineConfig = import("@mlc-ai/web-llm").MLCEngineConfig;
   type ChatCompletionMessageParam =
     import("@mlc-ai/web-llm").ChatCompletionMessageParam;
 
   const selectedModelId = getSettings().webLlmModelId;
+
+  updateModelSizeInMegabytes(
+    prebuiltAppConfig.model_list.find((m) => m.model_id === selectedModelId)
+      ?.vram_required_MB || 0,
+  );
 
   addLogEntry(`Selected WebLLM model for chat: ${selectedModelId}`);
 
@@ -594,6 +610,8 @@ async function generateChatWithWllama(
   const { initializeWllama, wllamaModels } = await import("./wllama");
 
   const model = wllamaModels[getSettings().wllamaModelId];
+
+  updateModelSizeInMegabytes(model.fileSizeInMegabytes);
 
   const wllama = await initializeWllama(model.url, {
     wllama: {
