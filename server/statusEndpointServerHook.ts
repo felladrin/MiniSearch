@@ -13,7 +13,7 @@ export function statusEndpointServerHook<
 
     const sessions = getVerifiedTokensAmount();
     const searches = getSearchesSinceLastRestart();
-    const averageSearchesPerSession = searches / sessions || 0;
+    const averageSearchesPerSession = (searches / sessions || 0).toFixed(1);
 
     const status = {
       uptime: prettyMilliseconds(new Date().getTime() - serverStartTime, {
