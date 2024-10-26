@@ -144,7 +144,8 @@ export const wllamaModels: Record<string, WllamaModel> = {
     fileSizeInMegabytes: 1870,
     buildPrompt: async (_, query, searchResults) => {
       return `<|start_of_role|>system<|end_of_role|>${getSystemPrompt(searchResults)}<|end_of_text|>
-<|start_of_role|>user<|end_of_role|>${query}<|end_of_text|>`;
+<|start_of_role|>user<|end_of_role|>${query}<|end_of_text|>
+<|start_of_role|>assistant<|end_of_role|>`;
     },
   },
   "gemma-2-2b": {
@@ -158,6 +159,17 @@ export const wllamaModels: Record<string, WllamaModel> = {
     label: "Llama 3.2 3B",
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-3B-Instruct/resolve/main/model.shard-00001-of-00007.gguf",
     fileSizeInMegabytes: 2420,
+  },
+  "granite-3.0-3b": {
+    ...defaultModelConfig,
+    label: "Granite 3.0 3B [800M]",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-granite-3.0-3b-a800m-instruct/resolve/main/model.shard-00001-of-00034.gguf",
+    fileSizeInMegabytes: 2450,
+    buildPrompt: async (_, query, searchResults) => {
+      return `<|start_of_role|>system<|end_of_role|>${getSystemPrompt(searchResults)}<|end_of_text|>
+<|start_of_role|>user<|end_of_role|>${query}<|end_of_text|>
+<|start_of_role|>assistant<|end_of_role|>`;
+    },
   },
   "phi-3.5-mini-3.8b": {
     ...defaultModelConfig,
@@ -179,7 +191,7 @@ export const wllamaModels: Record<string, WllamaModel> = {
   },
   "olmoe-1b-7b": {
     ...defaultModelConfig,
-    label: "OLMoE 1B 7B",
+    label: "OLMoE 7B [1B]",
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q3_K_XL-OLMoE-1B-7B-0924-Instruct/resolve/main/OLMoE-1B-7B-0924-Instruct-Q3_K_XL.shard-00001-of-00050.gguf",
     fileSizeInMegabytes: 3700,
   },
