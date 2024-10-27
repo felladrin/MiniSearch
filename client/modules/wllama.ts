@@ -113,6 +113,14 @@ export const wllamaModels: Record<string, WllamaModel> = {
     url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Qwen2.5-0.5B-Instruct/resolve/main/qwen2-00001-of-00003.gguf",
     fileSizeInMegabytes: 420,
   },
+  "granite-3.0-1b": {
+    ...defaultModelConfig,
+    label: "Granite 3.0 1B [400M]",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-q5_k_l-granite-3.0-1b-a400m-instruct/resolve/main/model.shard-00001-of-00019.gguf",
+    fileSizeInMegabytes: 969,
+    buildPrompt: async (_, query, searchResults) =>
+      buildGranitePrompt(query, searchResults),
+  },
   "llama-3.2-1b": {
     ...defaultModelConfig,
     label: "Llama 3.2 1B",
@@ -142,11 +150,8 @@ export const wllamaModels: Record<string, WllamaModel> = {
     label: "Granite 3.0 2B",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_m-granite-3.0-2b-instruct/resolve/main/granite-3-00001-of-00023.gguf",
     fileSizeInMegabytes: 1870,
-    buildPrompt: async (_, query, searchResults) => {
-      return `<|start_of_role|>system<|end_of_role|>${getSystemPrompt(searchResults)}<|end_of_text|>
-<|start_of_role|>user<|end_of_role|>${query}<|end_of_text|>
-<|start_of_role|>assistant<|end_of_role|>`;
-    },
+    buildPrompt: async (_, query, searchResults) =>
+      buildGranitePrompt(query, searchResults),
   },
   "gemma-2-2b": {
     ...defaultModelConfig,
@@ -165,11 +170,8 @@ export const wllamaModels: Record<string, WllamaModel> = {
     label: "Granite 3.0 3B [800M]",
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-granite-3.0-3b-a800m-instruct/resolve/main/model.shard-00001-of-00034.gguf",
     fileSizeInMegabytes: 2450,
-    buildPrompt: async (_, query, searchResults) => {
-      return `<|start_of_role|>system<|end_of_role|>${getSystemPrompt(searchResults)}<|end_of_text|>
-<|start_of_role|>user<|end_of_role|>${query}<|end_of_text|>
-<|start_of_role|>assistant<|end_of_role|>`;
-    },
+    buildPrompt: async (_, query, searchResults) =>
+      buildGranitePrompt(query, searchResults),
   },
   "phi-3.5-mini-3.8b": {
     ...defaultModelConfig,
@@ -196,6 +198,12 @@ export const wllamaModels: Record<string, WllamaModel> = {
     fileSizeInMegabytes: 3700,
   },
 };
+
+function buildGranitePrompt(query: string, searchResults: string) {
+  return `<|start_of_role|>system<|end_of_role|>${getSystemPrompt(searchResults)}<|end_of_text|>
+<|start_of_role|>user<|end_of_role|>${query}<|end_of_text|>
+<|start_of_role|>assistant<|end_of_role|>`;
+}
 
 export interface Message {
   id: number;
