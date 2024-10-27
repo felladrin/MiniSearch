@@ -127,6 +127,12 @@ export const wllamaModels: Record<string, WllamaModel> = {
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-1B-Instruct/resolve/main/model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 975,
   },
+  "pythia-1.4b": {
+    ...defaultModelConfig,
+    label: "Pythia 1.4B",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-pythia-1.4b-sft-full/resolve/main/pythia-1.4b-sft-full.Q5_K_M.shard-00001-of-00011.gguf",
+    fileSizeInMegabytes: 1060,
+  },
   "pints-1.5b": {
     ...defaultModelConfig,
     label: "Pints 1.5B",
