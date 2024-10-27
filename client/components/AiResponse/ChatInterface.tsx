@@ -16,14 +16,12 @@ import {
   Paper,
 } from "@mantine/core";
 import { IconSend } from "@tabler/icons-react";
-import {
-  ChatMessage,
-  generateChatResponse,
-} from "../../modules/textGeneration";
+import { generateChatResponse } from "../../modules/textGeneration";
 import { addLogEntry } from "../../modules/logEntries";
 import { usePubSub } from "create-pubsub/react";
 import { settingsPubSub } from "../../modules/pubSub";
 import { match } from "ts-pattern";
+import { ChatMessage } from "gpt-tokenizer/GptEncoding";
 
 const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
 
@@ -51,7 +49,10 @@ export default function ChatInterface({
   const handleSend = async () => {
     if (input.trim() === "" || isGenerating) return;
 
-    const newMessages = [...messages, { role: "user", content: input }];
+    const newMessages: ChatMessage[] = [
+      ...messages,
+      { role: "user", content: input },
+    ];
     setMessages(newMessages);
     setInput("");
     setIsGenerating(true);
