@@ -1,20 +1,12 @@
 import { PreviewServer, ViteDevServer } from "vite";
-import { RateLimiterMemory } from "rate-limiter-flexible";
-import { argon2Verify } from "hash-wasm";
 import { incrementSearchesSinceLastRestart } from "./searchesSinceLastRestart";
 import { rankSearchResults } from "./rankSearchResults";
-import { getSearchToken } from "./searchToken";
 import { fetchSearXNG } from "./fetchSearXNG";
-import { isVerifiedToken, addVerifiedToken } from "./verifiedTokens";
+import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit";
 
 export function searchEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
 >(server: T) {
-  const rateLimiter = new RateLimiterMemory({
-    points: 2,
-    duration: 10,
-  });
-
   server.middlewares.use(async (request, response, next) => {
     if (!request.url.startsWith("/search")) return next();
 
@@ -35,33 +27,11 @@ export function searchEndpointServerHook<
     }
 
     const token = searchParams.get("token");
+    const authResult = await verifyTokenAndRateLimit(token);
 
-    if (!isVerifiedToken(token)) {
-      let isValidToken = false;
-
-      try {
-        isValidToken = await argon2Verify({
-          password: getSearchToken(),
-          hash: token,
-        });
-      } catch (error) {
-        void error;
-      }
-
-      if (isValidToken) {
-        addVerifiedToken(token);
-      } else {
-        response.statusCode = 401;
-        response.end("Unauthorized.");
-        return;
-      }
-    }
-
-    try {
-      await rateLimiter.consume(token);
-    } catch {
-      response.statusCode = 429;
-      response.end("Too many requests.");
+    if (!authResult.isAuthorized) {
+      response.statusCode = authResult.statusCode!;
+      response.end(authResult.error);
       return;
     }
 

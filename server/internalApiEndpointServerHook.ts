@@ -1,15 +1,7 @@
 import { Connect, PreviewServer, ViteDevServer } from "vite";
 import OpenAI from "openai";
 import { Stream } from "openai/streaming.mjs";
-import { RateLimiterMemory } from "rate-limiter-flexible";
-import { argon2Verify } from "hash-wasm";
-import { getSearchToken } from "./searchToken";
-import { isVerifiedToken, addVerifiedToken } from "./verifiedTokens";
-
-const rateLimiter = new RateLimiterMemory({
-  points: 2,
-  duration: 10,
-});
+import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit";
 
 export function internalApiEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
@@ -24,38 +16,11 @@ export function internalApiEndpointServerHook<
         ? authHeader.slice(tokenPrefix.length)
         : null;
 
-    if (!token) {
-      response.statusCode = 401;
-      response.end("Missing or invalid Authorization header.");
-      return;
-    }
+    const authResult = await verifyTokenAndRateLimit(token);
 
-    if (!isVerifiedToken(token)) {
-      let isValidToken = false;
-
-      try {
-        isValidToken = await argon2Verify({
-          password: getSearchToken(),
-          hash: token,
-        });
-      } catch (error) {
-        void error;
-      }
-
-      if (isValidToken) {
-        addVerifiedToken(token);
-      } else {
-        response.statusCode = 401;
-        response.end("Unauthorized.");
-        return;
-      }
-    }
-
-    try {
-      await rateLimiter.consume(token);
-    } catch {
-      response.statusCode = 429;
-      response.end("Too many requests.");
+    if (!authResult.isAuthorized) {
+      response.statusCode = authResult.statusCode!;
+      response.end(authResult.error);
       return;
     }
 
