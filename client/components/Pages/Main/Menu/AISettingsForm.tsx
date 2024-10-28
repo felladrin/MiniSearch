@@ -80,6 +80,14 @@ export default function AISettingsForm() {
     form.setFieldValue("systemPrompt", defaultSettings.systemPrompt);
   };
 
+  const suggestedCpuThreads =
+    (navigator.hardwareConcurrency &&
+      Math.max(
+        defaultSettings.cpuThreads,
+        navigator.hardwareConcurrency - 2,
+      )) ??
+    defaultSettings.cpuThreads;
+
   return (
     <Stack gap="md">
       <Switch
@@ -190,7 +198,53 @@ export default function AISettingsForm() {
                     </Suspense>
                     <NumberInput
                       label="CPU threads to use"
-                      description="Number of threads to use for the AI model. Lower values will use less CPU, but may take longer to respond. A too-high value may cause the app to hang."
+                      description={
+                        <>
+                          <span>
+                            Number of threads to use for the AI model. Lower
+                            values will use less CPU but may take longer to
+                            respond. A value that is too high may cause the app
+                            to hang.
+                          </span>
+                          {suggestedCpuThreads > defaultSettings.cpuThreads && (
+                            <span>
+                              {" "}
+                              The default value is{" "}
+                              <Text
+                                component="span"
+                                size="xs"
+                                c="blue"
+                                style={{ cursor: "pointer" }}
+                                onClick={() =>
+                                  form.setFieldValue(
+                                    "cpuThreads",
+                                    defaultSettings.cpuThreads,
+                                  )
+                                }
+                              >
+                                {defaultSettings.cpuThreads}
+                              </Text>
+                              , but based on the number of logical processors in
+                              your CPU, the suggested value is{" "}
+                              <Text
+                                component="span"
+                                size="xs"
+                                c="blue"
+                                style={{ cursor: "pointer" }}
+                                onClick={() =>
+                                  form.setFieldValue(
+                                    "cpuThreads",
+                                    suggestedCpuThreads,
+                                  )
+                                }
+                              >
+                                {suggestedCpuThreads}
+                              </Text>
+                              .
+                            </span>
+                          )}
+                        </>
+                      }
                       min={1}
                       {...form.getInputProps("cpuThreads")}
                     />
