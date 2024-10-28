@@ -1,5 +1,7 @@
-import { ChatCompletionChunk } from "openai/resources/chat/completions.mjs";
-import { ChatCompletionChunk as WebLlmChatCompletionChunk } from "@mlc-ai/web-llm";
+import type { ChatCompletionChunk as WebLlmChatCompletionChunk } from "@mlc-ai/web-llm";
+import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
+import type { ChatCompletionChunk } from "openai/resources/chat/completions.mjs";
+import type { Stream } from "openai/streaming.mjs";
 import {
   getQuery,
   getSearchPromise,
@@ -11,8 +13,6 @@ import {
 } from "./pubSub";
 import { defaultSettings } from "./settings";
 import { getSystemPrompt } from "./systemPrompt";
-import { Stream } from "openai/streaming.mjs";
-import { ChatMessage } from "gpt-tokenizer/GptEncoding";
 
 export class ChatGenerationError extends Error {
   constructor(message: string) {
@@ -100,7 +100,9 @@ export async function handleStreamingResponse(
         options.abortController.abort();
       }
       throw new ChatGenerationError("Chat generation interrupted");
-    } else if (
+    }
+
+    if (
       options?.shouldUpdateGeneratingState &&
       getTextGenerationState() !== "generating"
     ) {

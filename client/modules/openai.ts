@@ -1,4 +1,4 @@
-import OpenAI, { ClientOptions } from "openai";
+import OpenAI, { type ClientOptions } from "openai";
 
 export function getOpenAiClient({
   baseURL,

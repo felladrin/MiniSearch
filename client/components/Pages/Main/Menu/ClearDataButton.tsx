@@ -1,4 +1,4 @@
-import { Stack, Button, Text } from "@mantine/core";
+import { Button, Stack, Text } from "@mantine/core";
 import { useState } from "react";
 import { addLogEntry } from "../../../../modules/logEntries";
 import { sleep } from "../../../../modules/sleep";

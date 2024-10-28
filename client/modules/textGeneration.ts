@@ -1,5 +1,5 @@
 import gptTokenizer from "gpt-tokenizer";
-import { ChatMessage } from "gpt-tokenizer/GptEncoding";
+import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import prettyMilliseconds from "pretty-ms";
 import { addLogEntry } from "./logEntries";
 import {
@@ -71,7 +71,7 @@ export async function searchAndRespond() {
         await generateTextWithWebLlm();
       } catch (error) {
         addLogEntry(`Skipping text generation with WebLLM: ${error}`);
-        addLogEntry(`Starting text generation with Wllama`);
+        addLogEntry("Starting text generation with Wllama");
         await generateTextWithWllama();
       }
     }

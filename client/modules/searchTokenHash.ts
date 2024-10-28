@@ -1,6 +1,6 @@
-import { argon2id, argon2Verify } from "hash-wasm";
-import { updateLastSearchTokenHash, getLastSearchTokenHash } from "./pubSub";
+import { argon2Verify, argon2id } from "hash-wasm";
 import { addLogEntry } from "./logEntries";
+import { getLastSearchTokenHash, updateLastSearchTokenHash } from "./pubSub";
 
 export async function getSearchTokenHash() {
   const password = VITE_SEARCH_TOKEN;

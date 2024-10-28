@@ -1,14 +1,14 @@
+import { Center, Container, Loader, Stack } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
+import { Suspense, useEffect } from "react";
+import { lazy } from "react";
+import { Pattern, match } from "ts-pattern";
+import { addLogEntry } from "../../../modules/logEntries";
 import {
   queryPubSub,
   searchStatePubSub,
   textGenerationStatePubSub,
 } from "../../../modules/pubSub";
-import { Center, Container, Loader, Stack } from "@mantine/core";
-import { Suspense, useEffect } from "react";
-import { addLogEntry } from "../../../modules/logEntries";
-import { lazy } from "react";
-import { match, Pattern } from "ts-pattern";
 
 const AiResponseSection = lazy(
   () => import("../../AiResponse/AiResponseSection"),

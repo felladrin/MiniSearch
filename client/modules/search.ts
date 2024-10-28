@@ -1,6 +1,6 @@
-import { getSearchTokenHash } from "./searchTokenHash";
 import { name } from "../../package.json";
 import { addLogEntry } from "./logEntries";
+import { getSearchTokenHash } from "./searchTokenHash";
 
 export type SearchResults = {
   textResults: [title: string, snippet: string, url: string][];
@@ -120,9 +120,9 @@ function cacheSearchWithIndexedDB(
         `Search cache hit, returning cached results containing ${cachedResult.results.textResults.length} texts and ${cachedResult.results.imageResults.length} images`,
       );
       return cachedResult.results;
-    } else {
-      addLogEntry("Search cache miss, fetching new results");
     }
+
+    addLogEntry("Search cache miss, fetching new results");
 
     const results = await fn(query, limit);
 

@@ -1,10 +1,10 @@
-import {
+import type {
   ChatCompletionMessageParam,
   ChatOptions,
   InitProgressCallback,
   MLCEngineConfig,
 } from "@mlc-ai/web-llm";
-import { ChatMessage } from "gpt-tokenizer/GptEncoding";
+import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,

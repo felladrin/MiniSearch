@@ -1,5 +1,5 @@
-import { getQuerySuggestions, updateQuerySuggestions } from "./pubSub";
 import { addLogEntry } from "./logEntries";
+import { getQuerySuggestions, updateQuerySuggestions } from "./pubSub";
 
 export async function getRandomQuerySuggestion() {
   if (getQuerySuggestions().length === 0) await refillQuerySuggestions(25);

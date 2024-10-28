@@ -1,25 +1,25 @@
+import {
+  Alert,
+  AspectRatio,
+  Divider,
+  Group,
+  Skeleton,
+  Space,
+  Stack,
+  em,
+} from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
+import { IconInfoCircle } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
+import { Suspense, lazy, useMemo } from "react";
+import { Pattern, match } from "ts-pattern";
 import {
   searchResultsPubSub,
   searchStatePubSub,
   settingsPubSub,
 } from "../../../modules/pubSub";
-import { match, Pattern } from "ts-pattern";
-import {
-  Divider,
-  Skeleton,
-  Alert,
-  Stack,
-  Group,
-  Space,
-  AspectRatio,
-  em,
-} from "@mantine/core";
-import { IconInfoCircle } from "@tabler/icons-react";
-import { lazy, Suspense, useMemo } from "react";
-import { Settings } from "../../../modules/settings";
-import { SearchResults } from "../../../modules/search";
-import { useMediaQuery } from "@mantine/hooks";
+import type { SearchResults } from "../../../modules/search";
+import type { Settings } from "../../../modules/settings";
 
 const ImageResultsList = lazy(() => import("./Graphical/ImageResultsList"));
 const SearchResultsList = lazy(() => import("./Textual/SearchResultsList"));
@@ -47,8 +47,11 @@ export default function SearchResultsSection() {
 
 function RunningSearchContent() {
   const hasSmallScreen = useMediaQuery(`(max-width: ${em(530)})`);
-
   const numberOfSquareSkeletons = hasSmallScreen ? 4 : 6;
+  const skeletonIds = Array.from(
+    { length: numberOfSquareSkeletons },
+    (_, i) => `skeleton-${i}`,
+  );
 
   return (
     <>
@@ -60,8 +63,8 @@ function RunningSearchContent() {
       />
       <Stack>
         <Group>
-          {[...Array(numberOfSquareSkeletons)].map((_, index) => (
-            <AspectRatio key={index} ratio={1} flex={1}>
+          {skeletonIds.map((id) => (
+            <AspectRatio key={id} ratio={1} flex={1}>
               <Skeleton />
             </AspectRatio>
           ))}

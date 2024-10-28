@@ -1,5 +1,5 @@
-import path from "node:path";
 import fs from "node:fs";
+import path from "node:path";
 import { downloadFile } from "@huggingface/hub";
 
 export async function downloadFileFromHuggingFaceRepository(

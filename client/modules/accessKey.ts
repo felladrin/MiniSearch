@@ -1,6 +1,6 @@
-import { addLogEntry } from "./logEntries";
 import { notifications } from "@mantine/notifications";
 import { argon2id } from "hash-wasm";
+import { addLogEntry } from "./logEntries";
 
 const ACCESS_KEY_STORAGE_KEY = "accessKeyHash";
 

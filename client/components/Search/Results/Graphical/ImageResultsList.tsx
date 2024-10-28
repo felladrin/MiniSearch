@@ -1,7 +1,7 @@
 import { Carousel } from "@mantine/carousel";
-import { SearchResults } from "../../../../modules/search";
-import { useState, useEffect } from "react";
-import { Button, Group, rem, Stack, Transition, Text } from "@mantine/core";
+import { Button, Group, Stack, Text, Transition, rem } from "@mantine/core";
+import { useEffect, useState } from "react";
+import type { SearchResults } from "../../../../modules/search";
 import "@mantine/carousel/styles.css";
 import Lightbox from "yet-another-react-lightbox";
 import Captions from "yet-another-react-lightbox/plugins/captions";
@@ -37,9 +37,9 @@ export default function ImageResultsList({
   return (
     <>
       <Carousel slideSize="0" slideGap="xs" align="start" dragFree loop>
-        {imageResults.map(([title, , thumbnailUrl], index) => (
+        {imageResults.map(([title, sourceUrl, thumbnailUrl], index) => (
           <Transition
-            key={index}
+            key={`${title}-${sourceUrl}-${thumbnailUrl}`}
             mounted={isMounted}
             transition="fade"
             timingFunction="ease"
@@ -52,6 +52,11 @@ export default function ImageResultsList({
                   alt={title}
                   src={thumbnailUrl}
                   onClick={() => handleImageClick(index)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleImageClick(index);
+                    }
+                  }}
                   style={imageStyle}
                 />
               </Carousel.Slide>

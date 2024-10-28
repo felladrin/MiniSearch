@@ -1,5 +1,5 @@
-import { ComboboxItem, Select } from "@mantine/core";
-import { useState, useEffect } from "react";
+import { type ComboboxItem, Select } from "@mantine/core";
+import { useEffect, useState } from "react";
 import { wllamaModels } from "../../modules/wllama";
 
 export default function WllamaModelSelect({
@@ -26,7 +26,7 @@ export default function WllamaModelSelect({
     if (!isCurrentModelValid && wllamaModelOptions.length > 0) {
       onChange(wllamaModelOptions[0].value);
     }
-  }, []);
+  }, [onChange, wllamaModelOptions, value]);
 
   return (
     <Select

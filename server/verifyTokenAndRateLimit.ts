@@ -1,7 +1,7 @@
 import { argon2Verify } from "hash-wasm";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { getSearchToken } from "./searchToken";
-import { isVerifiedToken, addVerifiedToken } from "./verifiedTokens";
+import { addVerifiedToken, isVerifiedToken } from "./verifiedTokens";
 
 const rateLimiter = new RateLimiterMemory({
   points: 2,

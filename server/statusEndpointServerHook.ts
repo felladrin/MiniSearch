@@ -1,7 +1,7 @@
-import { PreviewServer, ViteDevServer } from "vite";
+import prettyMilliseconds from "pretty-ms";
+import type { PreviewServer, ViteDevServer } from "vite";
 import { getSearchesSinceLastRestart } from "./searchesSinceLastRestart";
 import { getVerifiedTokensAmount } from "./verifiedTokens";
-import prettyMilliseconds from "pretty-ms";
 
 const serverStartTime = new Date().getTime();
 

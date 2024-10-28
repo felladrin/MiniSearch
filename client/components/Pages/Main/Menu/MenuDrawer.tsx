@@ -1,20 +1,20 @@
-import { lazy, Suspense } from "react";
 import {
-  Drawer,
   Accordion,
   ActionIcon,
+  Center,
+  Drawer,
+  type DrawerProps,
+  FocusTrap,
+  Group,
   HoverCard,
   Stack,
-  Group,
-  Center,
-  FocusTrap,
-  DrawerProps,
 } from "@mantine/core";
 import { IconBrandGithub } from "@tabler/icons-react";
-import { repository } from "../../../../../package.json";
 import prettyMilliseconds from "pretty-ms";
-import { getSemanticVersion } from "../../../../modules/stringFormatters";
+import { Suspense, lazy } from "react";
+import { repository } from "../../../../../package.json";
 import { addLogEntry } from "../../../../modules/logEntries";
+import { getSemanticVersion } from "../../../../modules/stringFormatters";
 
 const AISettingsForm = lazy(() => import("./AISettingsForm"));
 const ActionsForm = lazy(() => import("./ActionsForm"));

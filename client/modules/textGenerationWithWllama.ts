@@ -8,8 +8,8 @@ import {
   updateTextGenerationState,
 } from "./pubSub";
 import {
-  canStartResponding,
   ChatGenerationError,
+  canStartResponding,
   getFormattedSearchResults,
   updateResponseRateLimited,
 } from "./textGenerationUtilities";
@@ -107,10 +107,9 @@ async function generateWithWllama(
       if (shouldCheckCanRespond && getTextGenerationState() === "interrupted") {
         abortSignal();
         throw new ChatGenerationError("Chat generation interrupted");
-      } else if (
-        shouldCheckCanRespond &&
-        getTextGenerationState() !== "generating"
-      ) {
+      }
+
+      if (shouldCheckCanRespond && getTextGenerationState() !== "generating") {
         updateTextGenerationState("generating");
       }
 
@@ -133,16 +132,18 @@ function handleWllamaCompletion(
   abortSignal: () => void,
   onUpdate: (text: string) => void,
 ) {
+  let text = currentText;
+
   if (model.stopStrings) {
     for (const stopString of model.stopStrings) {
-      if (currentText.slice(-(stopString.length * 2)).includes(stopString)) {
+      if (text.slice(-(stopString.length * 2)).includes(stopString)) {
         abortSignal();
-        currentText = currentText.slice(0, -stopString.length);
+        text = text.slice(0, -stopString.length);
         break;
       }
     }
   }
 
-  onUpdate(currentText);
-  return currentText;
+  onUpdate(text);
+  return text;
 }

@@ -1,12 +1,12 @@
-import { Route, Switch } from "wouter";
 import { MantineProvider } from "@mantine/core";
+import { Route, Switch } from "wouter";
 import "@mantine/core/styles.css";
-import { lazy, useEffect, useState } from "react";
+import { Notifications } from "@mantine/notifications";
 import { usePubSub } from "create-pubsub/react";
+import { lazy, useEffect, useState } from "react";
+import { addLogEntry } from "../../modules/logEntries";
 import { settingsPubSub } from "../../modules/pubSub";
 import { defaultSettings } from "../../modules/settings";
-import { addLogEntry } from "../../modules/logEntries";
-import { Notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
 import { match } from "ts-pattern";
 import { verifyStoredAccessKey } from "../../modules/accessKey";
@@ -70,7 +70,7 @@ function useInitializeSettings() {
   useEffect(() => {
     setSettings({ ...defaultSettings, ...settings });
     addLogEntry("Settings initialized");
-  }, []);
+  }, [settings, setSettings]);
 
   return settings;
 }

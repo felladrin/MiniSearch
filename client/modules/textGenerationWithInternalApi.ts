@@ -9,8 +9,8 @@ import {
 import { getSearchTokenHash } from "./searchTokenHash";
 import { getSystemPrompt } from "./systemPrompt";
 import {
-  canStartResponding,
   ChatGenerationError,
+  canStartResponding,
   getDefaultChatCompletionCreateParamsStreaming,
   getFormattedSearchResults,
   updateResponseRateLimited,
@@ -32,9 +32,12 @@ export async function generateTextWithInternalApi() {
   const streamedMessage = await processStreamResponse(messages, (message) => {
     if (getTextGenerationState() === "interrupted") {
       throw new ChatGenerationError("Generation interrupted");
-    } else if (getTextGenerationState() !== "generating") {
+    }
+
+    if (getTextGenerationState() !== "generating") {
       updateTextGenerationState("generating");
     }
+
     updateResponseRateLimited(message);
   });
 

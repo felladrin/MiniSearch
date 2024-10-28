@@ -1,5 +1,5 @@
-import { PreviewServer, ViteDevServer } from "vite";
 import { argon2Verify } from "hash-wasm";
+import type { PreviewServer, ViteDevServer } from "vite";
 
 export function validateAccessKeyServerHook<
   T extends ViteDevServer | PreviewServer,
@@ -28,8 +28,8 @@ export function validateAccessKeyServerHook<
               isValid = true;
               break;
             }
-          } catch {
-            continue;
+          } catch (error) {
+            void error;
           }
         }
 
