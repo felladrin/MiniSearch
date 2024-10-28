@@ -1,22 +1,22 @@
+import { Button, Group, Stack, Textarea } from "@mantine/core";
+import { usePubSub } from "create-pubsub/react";
 import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
   useEffect,
   useRef,
   useState,
-  useCallback,
-  ChangeEvent,
-  KeyboardEvent,
-  ReactNode,
 } from "react";
-import { getRandomQuerySuggestion } from "../../../modules/querySuggestions";
+import { Pattern, match } from "ts-pattern";
 import { useLocation } from "wouter";
-import { searchAndRespond } from "../../../modules/textGeneration";
-import { match, Pattern } from "ts-pattern";
-import { Button, Group, Stack, Textarea } from "@mantine/core";
 import { addLogEntry } from "../../../modules/logEntries";
-import { sleepUntilIdle } from "../../../modules/sleep";
-import { settingsPubSub } from "../../../modules/pubSub";
-import { usePubSub } from "create-pubsub/react";
 import { postMessageToParentWindow } from "../../../modules/parentWindow";
+import { settingsPubSub } from "../../../modules/pubSub";
+import { getRandomQuerySuggestion } from "../../../modules/querySuggestions";
+import { sleepUntilIdle } from "../../../modules/sleep";
+import { searchAndRespond } from "../../../modules/textGeneration";
 
 export default function SearchForm({
   query,
@@ -83,7 +83,7 @@ export default function SearchForm({
     addLogEntry(
       `User submitted a search with ${queryToEncode.length} characters length`,
     );
-  }, [textAreaValue, suggestedQuery, updateQuery]);
+  }, [textAreaValue, suggestedQuery, updateQuery, navigate]);
 
   const handleSubmit = (event: { preventDefault: () => void }) => {
     event.preventDefault();

@@ -1,7 +1,7 @@
+import axios from "axios";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
-import { SearxngSearchResult, SearxngService } from "searxng";
-import axios from "axios";
+import { type SearxngSearchResult, SearxngService } from "searxng";
 
 const searxng = new SearxngService({
   baseURL: "http://127.0.0.1:8080",
@@ -87,9 +87,9 @@ export async function fetchSearXNG(query: string, limit?: number) {
               thumbnailUrl,
               result.iframe_src || result.url,
             ];
-          } else {
-            return [result.title, result.url, thumbnailUrl, result.img_src];
           }
+
+          return [result.title, result.url, thumbnailUrl, result.img_src];
         } catch {
           return null;
         }
@@ -111,7 +111,7 @@ export async function fetchSearXNG(query: string, limit?: number) {
         }),
     );
 
-    textualSearchResults.forEach((result) => {
+    for (const result of textualSearchResults) {
       const { hostname } = new URL(result.url);
 
       if (!uniqueHostnames.has(hostname) && result.content) {
@@ -126,7 +126,7 @@ export async function fetchSearXNG(query: string, limit?: number) {
           uniqueHostnames.add(hostname);
         }
       }
-    });
+    }
 
     if (limit && limit > 0) {
       textResults = textResults.slice(0, limit);

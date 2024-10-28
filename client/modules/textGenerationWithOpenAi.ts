@@ -1,5 +1,5 @@
-import { ChatMessage } from "gpt-tokenizer/GptEncoding";
-import { ChatCompletionMessageParam } from "openai/resources/chat/completions.mjs";
+import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions.mjs";
 import { getOpenAiClient } from "./openai";
 import { getSettings, updateTextGenerationState } from "./pubSub";
 import {

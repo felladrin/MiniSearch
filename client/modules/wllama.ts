@@ -1,22 +1,23 @@
+import { Template } from "@huggingface/jinja";
 import {
-  DownloadModelConfig,
+  type DownloadModelConfig,
+  type SamplingConfig,
   Wllama,
-  WllamaConfig,
-  SamplingConfig,
+  type WllamaConfig,
 } from "@wllama/wllama/esm";
-import CacheManager, {
+import type CacheManager from "@wllama/wllama/esm/cache-manager";
+import type {
   CacheEntry,
   CacheEntryMetadata,
 } from "@wllama/wllama/esm/cache-manager";
-import singleThreadWllamaJsUrl from "@wllama/wllama/esm/single-thread/wllama.js?url";
-import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
 import multiThreadWllamaJsUrl from "@wllama/wllama/esm/multi-thread/wllama.js?url";
 import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
 import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
-import { Template } from "@huggingface/jinja";
-import { getSystemPrompt } from "./systemPrompt";
+import singleThreadWllamaJsUrl from "@wllama/wllama/esm/single-thread/wllama.js?url";
+import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
 import { addLogEntry } from "./logEntries";
 import { defaultSettings } from "./settings";
+import { getSystemPrompt } from "./systemPrompt";
 
 export async function initializeWllama(
   modelUrl: string | string[],

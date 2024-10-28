@@ -1,4 +1,4 @@
-import { PreviewServer, ViteDevServer } from "vite";
+import type { PreviewServer, ViteDevServer } from "vite";
 
 export function crossOriginServerHook<T extends ViteDevServer | PreviewServer>(
   server: T,
@@ -20,9 +20,9 @@ export function crossOriginServerHook<T extends ViteDevServer | PreviewServer>(
       },
     ];
 
-    crossOriginIsolationHeaders.forEach(({ key, value }) => {
+    for (const { key, value } of crossOriginIsolationHeaders) {
       response.setHeader(key, value);
-    });
+    }
 
     next();
   });

@@ -1,26 +1,26 @@
-import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "../../../../modules/pubSub";
-import { isWebGPUAvailable } from "../../../../modules/webGpu";
-import { match, Pattern } from "ts-pattern";
 import {
+  type ComboboxData,
+  Group,
   NumberInput,
   Select,
+  Skeleton,
   Slider,
   Stack,
   Switch,
-  Textarea,
   Text,
   TextInput,
-  Group,
-  ComboboxData,
-  Skeleton,
+  Textarea,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { lazy, Suspense, useEffect, useState } from "react";
-import { defaultSettings, inferenceTypes } from "../../../../modules/settings";
-import { getOpenAiClient } from "../../../../modules/openai";
 import { IconInfoCircle } from "@tabler/icons-react";
+import { usePubSub } from "create-pubsub/react";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { Pattern, match } from "ts-pattern";
 import { addLogEntry } from "../../../../modules/logEntries";
+import { getOpenAiClient } from "../../../../modules/openai";
+import { settingsPubSub } from "../../../../modules/pubSub";
+import { defaultSettings, inferenceTypes } from "../../../../modules/settings";
+import { isWebGPUAvailable } from "../../../../modules/webGpu";
 
 const WebLlmModelSelect = lazy(
   () => import("../../../AiResponse/WebLlmModelSelect"),
@@ -71,6 +71,9 @@ export default function AISettingsForm() {
     form.values.inferenceType,
     settings.openAiApiBaseUrl,
     settings.openAiApiKey,
+    form.setFieldError,
+    form.setFieldValue,
+    form.values.openAiApiModel,
   ]);
 
   const isUsingCustomInstructions =
@@ -303,9 +306,9 @@ export default function AISettingsForm() {
                   </li>
                 </ul>
                 <span>
-                  The special tag <em>{`{{searchResults}}`}</em> will be
+                  The special tag <em>{"{{searchResults}}"}</em> will be
                   replaced with the search results, while{" "}
-                  <em>{`{{dateTime}}`}</em> will be replaced with the current
+                  <em>{"{{dateTime}}"}</em> will be replaced with the current
                   date and time.
                 </span>
                 {isUsingCustomInstructions && (

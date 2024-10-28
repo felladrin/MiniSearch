@@ -1,6 +1,6 @@
-import { readFileSync, existsSync, writeFileSync } from "node:fs";
-import temporaryDirectory from "temp-dir";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import temporaryDirectory from "temp-dir";
 
 function getSearchTokenFilePath() {
   return path.resolve(temporaryDirectory, "minisearch-token");

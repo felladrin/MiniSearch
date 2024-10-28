@@ -1,7 +1,7 @@
-import { ComboboxItem, Select } from "@mantine/core";
-import { useState, useEffect } from "react";
-import { isF16Supported } from "../../modules/webGpu";
+import { type ComboboxItem, Select } from "@mantine/core";
 import { prebuiltAppConfig } from "@mlc-ai/web-llm";
+import { useEffect, useState } from "react";
+import { isF16Supported } from "../../modules/webGpu";
 
 export default function WebLlmModelSelect({
   value,
@@ -32,7 +32,7 @@ export default function WebLlmModelSelect({
     if (!isCurrentModelValid && webGpuModels.length > 0) {
       onChange(webGpuModels[0].value);
     }
-  }, []);
+  }, [onChange, webGpuModels, value]);
 
   const handleChange = (value: string | null) => {
     if (value) onChange(value);

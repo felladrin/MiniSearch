@@ -1,7 +1,7 @@
-import { FormEvent, useState } from "react";
-import { TextInput, Button, Stack, Container, Title } from "@mantine/core";
-import { addLogEntry } from "../../modules/logEntries";
+import { Button, Container, Stack, TextInput, Title } from "@mantine/core";
+import { type FormEvent, useState } from "react";
 import { validateAccessKey } from "../../modules/accessKey";
+import { addLogEntry } from "../../modules/logEntries";
 
 export default function AccessPage({
   onAccessKeyValid,

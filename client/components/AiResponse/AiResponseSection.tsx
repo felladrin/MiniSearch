@@ -1,13 +1,13 @@
 import { usePubSub } from "create-pubsub/react";
-import { lazy, Suspense, useMemo } from "react";
-import { match, Pattern } from "ts-pattern";
+import { Suspense, lazy, useMemo } from "react";
+import { Pattern, match } from "ts-pattern";
 import {
   modelLoadingProgressPubSub,
+  modelSizeInMegabytesPubSub,
+  queryPubSub,
   responsePubSub,
   settingsPubSub,
-  queryPubSub,
   textGenerationStatePubSub,
-  modelSizeInMegabytesPubSub,
 } from "../../modules/pubSub";
 
 const AiResponseContent = lazy(() => import("./AiResponseContent"));
@@ -86,6 +86,7 @@ export default function AiResponseSection() {
       modelLoadingProgress,
       response,
       query,
+      modelSizeInMegabytes,
     ],
   );
 }

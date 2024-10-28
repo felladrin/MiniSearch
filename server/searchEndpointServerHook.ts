@@ -1,7 +1,7 @@
-import { PreviewServer, ViteDevServer } from "vite";
-import { incrementSearchesSinceLastRestart } from "./searchesSinceLastRestart";
-import { rankSearchResults } from "./rankSearchResults";
+import type { PreviewServer, ViteDevServer } from "vite";
 import { fetchSearXNG } from "./fetchSearXNG";
+import { rankSearchResults } from "./rankSearchResults";
+import { incrementSearchesSinceLastRestart } from "./searchesSinceLastRestart";
 import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit";
 
 export function searchEndpointServerHook<
@@ -30,7 +30,7 @@ export function searchEndpointServerHook<
     const authResult = await verifyTokenAndRateLimit(token);
 
     if (!authResult.isAuthorized) {
-      response.statusCode = authResult.statusCode!;
+      response.statusCode = authResult.statusCode;
       response.end(authResult.error);
       return;
     }

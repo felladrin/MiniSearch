@@ -1,5 +1,3 @@
-import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "../../../../modules/pubSub";
 import {
   Stack,
   Switch,
@@ -7,6 +5,8 @@ import {
   useMantineColorScheme,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
+import { usePubSub } from "create-pubsub/react";
+import { settingsPubSub } from "../../../../modules/pubSub";
 
 export default function InterfaceSettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);

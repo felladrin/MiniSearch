@@ -1,6 +1,6 @@
-import { Connect, PreviewServer, ViteDevServer } from "vite";
 import OpenAI from "openai";
-import { Stream } from "openai/streaming.mjs";
+import type { Stream } from "openai/streaming.mjs";
+import type { Connect, PreviewServer, ViteDevServer } from "vite";
 import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit";
 
 export function internalApiEndpointServerHook<
@@ -11,15 +11,14 @@ export function internalApiEndpointServerHook<
 
     const authHeader = request.headers.authorization;
     const tokenPrefix = "Bearer ";
-    const token =
-      authHeader && authHeader.startsWith(tokenPrefix)
-        ? authHeader.slice(tokenPrefix.length)
-        : null;
+    const token = authHeader?.startsWith(tokenPrefix)
+      ? authHeader.slice(tokenPrefix.length)
+      : null;
 
     const authResult = await verifyTokenAndRateLimit(token);
 
     if (!authResult.isAuthorized) {
-      response.statusCode = authResult.statusCode!;
+      response.statusCode = authResult.statusCode;
       response.end(authResult.error);
       return;
     }

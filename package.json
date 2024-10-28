@@ -16,8 +16,8 @@
     "start": "vite preview",
     "build": "vite build",
     "dev": "vite",
-    "lint": "prettier --check . && tsc && eslint --fix client && ts-prune && jscpd client server && dpdm --no-tree --no-progress --no-warning vite.config.ts client",
-    "format": "prettier --write .",
+    "lint": "biome check && tsc && ts-prune && jscpd client server && dpdm --no-tree --no-progress --no-warning vite.config.ts client",
+    "format": "biome check --write",
     "test": "glob -c 'tsx --test' '**/*.test.ts' --ignore='node_modules/**'"
   },
   "dependencies": {
@@ -47,7 +47,6 @@
     "postcss": "^8.4.45",
     "postcss-preset-mantine": "^1.17.0",
     "postcss-simple-vars": "^7.0.1",
-    "prettier": "^3.0.3",
     "pretty-ms": "^9.1.0",
     "rate-limiter-flexible": "^5.0.2",
     "react": "^18.2.0",
@@ -61,7 +60,7 @@
     "yet-another-react-lightbox": "^3.21.6"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
+    "@biomejs/biome": "1.9.4",
     "@types/html-to-text": "^9.0.4",
     "@types/node": "^20.12.7",
     "@types/react": "^18.2.15",
@@ -70,7 +69,6 @@
     "@vitejs/plugin-basic-ssl": "^1.1.0",
     "@vitejs/plugin-react": "^4.0.3",
     "dpdm-fast": "^1.0.6",
-    "eslint": "^9.0.0",
     "glob": "^11.0.0",
     "globals": "^15.0.0",
     "jscpd": "^4.0.5",
@@ -79,7 +77,6 @@
     "ts-prune": "^0.10.3",
     "tsx": "^4.11.0",
     "typescript": "^5.0.2",
-    "typescript-eslint": "^8.0.0",
     "vite": "^5.2.9"
   }
 }

@@ -1,17 +1,17 @@
-import { SearchResults } from "../../../../modules/search";
 import {
-  Tooltip,
+  Flex,
   Stack,
   Text,
-  Flex,
-  UnstyledButton,
+  Tooltip,
   Transition,
+  UnstyledButton,
   em,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
-import { getHostname } from "../../../../modules/stringFormatters";
-import { addLogEntry } from "../../../../modules/logEntries";
 import { useEffect, useState } from "react";
+import { addLogEntry } from "../../../../modules/logEntries";
+import type { SearchResults } from "../../../../modules/search";
+import { getHostname } from "../../../../modules/stringFormatters";
 
 export default function SearchResultsList({
   searchResults,

@@ -16,10 +16,11 @@ const FormattedMarkdown = ({ children }: { children: string }) => {
               <SyntaxHighlighter
                 {...rest}
                 ref={ref as never}
-                children={children?.toString().replace(/\n$/, "") ?? ""}
                 language={languageMatch[1]}
                 style={syntaxHighlighterStyle}
-              />
+              >
+                {children?.toString().replace(/\n$/, "") ?? ""}
+              </SyntaxHighlighter>
             ) : (
               <code {...rest} className={className}>
                 {children}

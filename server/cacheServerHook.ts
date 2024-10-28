@@ -1,5 +1,5 @@
-import { PreviewServer, ViteDevServer } from "vite";
-import { match, Pattern } from "ts-pattern";
+import { Pattern, match } from "ts-pattern";
+import type { PreviewServer, ViteDevServer } from "vite";
 
 export function cacheServerHook<T extends ViteDevServer | PreviewServer>(
   server: T,

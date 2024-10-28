@@ -17,8 +17,8 @@ import {
   IconHandStop,
   IconInfoCircle,
 } from "@tabler/icons-react";
-import { PublishFunction } from "create-pubsub";
-import { lazy, ReactNode, Suspense, useMemo, useState } from "react";
+import type { PublishFunction } from "create-pubsub";
+import { type ReactNode, Suspense, lazy, useMemo, useState } from "react";
 import { match } from "ts-pattern";
 
 const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));

@@ -1,5 +1,5 @@
-import { fileURLToPath } from "url";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { getLlama } from "node-llama-cpp";
 import { downloadFileFromHuggingFaceRepository } from "./downloadFileFromHuggingFaceRepository";
 

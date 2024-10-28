@@ -1,4 +1,4 @@
-import { Card, Stack, Skeleton, Text } from "@mantine/core";
+import { Card, Skeleton, Stack, Text } from "@mantine/core";
 import { match } from "ts-pattern";
 
 export default function PreparingContent({

@@ -1,16 +1,16 @@
 import {
-  Modal,
-  Table,
-  Pagination,
-  Button,
   Alert,
-  Group,
+  Button,
   Center,
+  Group,
+  Modal,
+  Pagination,
+  Table,
 } from "@mantine/core";
-import { usePubSub } from "create-pubsub/react";
-import { logEntriesPubSub } from "../../modules/logEntries";
-import { useCallback, useMemo, useState } from "react";
 import { IconInfoCircle } from "@tabler/icons-react";
+import { usePubSub } from "create-pubsub/react";
+import { useCallback, useMemo, useState } from "react";
+import { logEntriesPubSub } from "../../modules/logEntries";
 
 export default function LogsModal({
   opened,
@@ -31,7 +31,7 @@ export default function LogsModal({
         (page - 1) * logEntriesPerPage,
         page * logEntriesPerPage,
       ),
-    [logEntries, page, logEntriesPerPage],
+    [logEntries, page],
   );
 
   const downloadLogsAsJson = useCallback(() => {
@@ -84,7 +84,7 @@ export default function LogsModal({
         </Table.Thead>
         <Table.Tbody>
           {logEntriesFromCurrentPage.map((entry, index) => (
-            <Table.Tr key={index}>
+            <Table.Tr key={`${entry.timestamp}-${index}`}>
               <Table.Td>
                 {new Date(entry.timestamp).toLocaleTimeString()}
               </Table.Td>

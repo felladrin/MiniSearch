@@ -1,4 +1,4 @@
-import { Card, Progress, Text, Group, Stack } from "@mantine/core";
+import { Card, Group, Progress, Stack, Text } from "@mantine/core";
 
 export default function LoadingModelContent({
   modelLoadingProgress,

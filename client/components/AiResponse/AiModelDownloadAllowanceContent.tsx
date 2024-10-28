@@ -1,9 +1,9 @@
 import { Alert, Button, Group, Text } from "@mantine/core";
 import { IconCheck, IconInfoCircle, IconX } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "../../modules/pubSub";
 import { useState } from "react";
 import { addLogEntry } from "../../modules/logEntries";
+import { settingsPubSub } from "../../modules/pubSub";
 
 export default function AiModelDownloadAllowanceContent() {
   const [settings, setSettings] = usePubSub(settingsPubSub);

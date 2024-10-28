@@ -1,17 +1,17 @@
-import { defineConfig } from "vite";
-import viteReactPlugin from "@vitejs/plugin-react";
 import viteBasicSSLPlugin from "@vitejs/plugin-basic-ssl";
-import { statusEndpointServerHook } from "./server/statusEndpointServerHook";
-import { searchEndpointServerHook } from "./server/searchEndpointServerHook";
+import viteReactPlugin from "@vitejs/plugin-react";
+import dotenv from "dotenv";
+import getGitCommitHash from "helper-git-hash";
+import { visualizer } from "rollup-plugin-visualizer";
+import { defineConfig } from "vite";
+import { cacheServerHook } from "./server/cacheServerHook";
 import { compressionServerHook } from "./server/compressionServerHook";
 import { crossOriginServerHook } from "./server/crossOriginServerHook";
-import { cacheServerHook } from "./server/cacheServerHook";
-import { getSearchToken, regenerateSearchToken } from "./server/searchToken";
-import { visualizer } from "rollup-plugin-visualizer";
-import getGitCommitHash from "helper-git-hash";
-import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook";
 import { internalApiEndpointServerHook } from "./server/internalApiEndpointServerHook";
-import dotenv from "dotenv";
+import { searchEndpointServerHook } from "./server/searchEndpointServerHook";
+import { getSearchToken, regenerateSearchToken } from "./server/searchToken";
+import { statusEndpointServerHook } from "./server/statusEndpointServerHook";
+import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook";
 
 dotenv.config({ path: [".env", ".env.example"] });
 

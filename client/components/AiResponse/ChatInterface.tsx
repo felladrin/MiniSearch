@@ -1,27 +1,27 @@
 import {
-  useState,
-  useEffect,
-  lazy,
-  Suspense,
-  useRef,
-  KeyboardEvent,
-} from "react";
-import {
-  Card,
-  Text,
-  Textarea,
   Button,
-  Stack,
+  Card,
   Group,
   Paper,
+  Stack,
+  Text,
+  Textarea,
 } from "@mantine/core";
 import { IconSend } from "@tabler/icons-react";
-import { generateChatResponse } from "../../modules/textGeneration";
-import { addLogEntry } from "../../modules/logEntries";
 import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "../../modules/pubSub";
+import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
+import {
+  type KeyboardEvent,
+  Suspense,
+  lazy,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { match } from "ts-pattern";
-import { ChatMessage } from "gpt-tokenizer/GptEncoding";
+import { addLogEntry } from "../../modules/logEntries";
+import { settingsPubSub } from "../../modules/pubSub";
+import { generateChatResponse } from "../../modules/textGeneration";
 
 const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
 
@@ -108,7 +108,7 @@ export default function ChatInterface({
           <Stack gap="md">
             {messages.slice(2).map((message, index) => (
               <Paper
-                key={index}
+                key={`${message.role}-${index}`}
                 shadow="xs"
                 radius="xl"
                 p="sm"
