@@ -66,11 +66,17 @@ export function App() {
  */
 function useInitializeSettings() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
 
   useEffect(() => {
+    if (settingsInitialized) return;
+
     setSettings({ ...defaultSettings, ...settings });
+
+    setSettingsInitialized(true);
+
     addLogEntry("Settings initialized");
-  }, [settings, setSettings]);
+  }, [settings, setSettings, settingsInitialized]);
 
   return settings;
 }
