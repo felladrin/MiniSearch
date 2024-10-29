@@ -101,6 +101,7 @@ async function generateWithWllama(
   let streamedMessage = "";
 
   await wllama.createCompletion(prompt, {
+    nPredict: 2048,
     stopTokens: model.stopTokens,
     sampling: model.sampling,
     onNewToken: (_token, _piece, currentText, { abortSignal }) => {
