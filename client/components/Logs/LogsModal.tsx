@@ -49,18 +49,12 @@ export default function LogsModal({
 
   return (
     <Modal opened={opened} onClose={onClose} size="xl" title="Logs">
-      <Alert
-        variant="light"
-        color="blue"
-        title="Privacy Notice"
-        icon={<IconInfoCircle />}
-        mb="md"
-      >
+      <Alert variant="light" color="blue" icon={<IconInfoCircle />} mb="md">
         <Group justify="space-between" align="center">
           <span>
-            These logs are stored only in your browser for private use. They are
-            not sent automatically and exist for debugging purposes in case you
-            need to{" "}
+            This information is stored solely in your browser for personal use.
+            It isn't sent automatically and is retained for debugging purposes
+            should you need to{" "}
             <a
               href="https://github.com/felladrin/MiniSearch/issues/new?labels=bug&template=bug_report.yml"
               target="_blank"
