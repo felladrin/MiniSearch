@@ -1,11 +1,12 @@
 import { Button, Stack, Text } from "@mantine/core";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { addLogEntry } from "../../../../modules/logEntries";
-import { sleep } from "../../../../modules/sleep";
 
 export default function ClearDataButton() {
   const [isClearingData, setIsClearingData] = useState(false);
   const [hasClearedData, setHasClearedData] = useState(false);
+  const [, navigate] = useLocation();
 
   const handleClearDataButtonClick = async () => {
     const sureToDelete = self.confirm(
@@ -34,7 +35,7 @@ export default function ClearDataButton() {
 
     addLogEntry("All data cleared successfully");
 
-    await sleep(1000);
+    navigate("/", { replace: true });
 
     self.location.reload();
   };
