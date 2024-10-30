@@ -12,14 +12,17 @@ import {
 } from "@mantine/core";
 import {
   IconArrowsMaximize,
+  IconArrowsMinimize,
   IconCheck,
   IconCopy,
   IconHandStop,
   IconInfoCircle,
 } from "@tabler/icons-react";
 import type { PublishFunction } from "create-pubsub";
-import { type ReactNode, Suspense, lazy, useMemo, useState } from "react";
+import { usePubSub } from "create-pubsub/react";
+import { type ReactNode, Suspense, lazy, useMemo } from "react";
 import { match } from "ts-pattern";
+import { settingsPubSub } from "../../modules/pubSub";
 
 const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
 
@@ -41,12 +44,12 @@ export default function AiResponseContent({
     | "completed"
   >;
 }) {
-  const [isScrollAreaEnabled, setScrollAreaEnabled] = useState(true);
+  const [settings, setSettings] = usePubSub(settingsPubSub);
 
   const ConditionalScrollArea = useMemo(
     () =>
       ({ children }: { children: ReactNode }) => {
-        return isScrollAreaEnabled ? (
+        return settings.enableAiResponseScrolling ? (
           <ScrollArea.Autosize mah={300} type="auto" offsetScrollbars>
             {children}
           </ScrollArea.Autosize>
@@ -54,7 +57,7 @@ export default function AiResponseContent({
           <Box>{children}</Box>
         );
       },
-    [isScrollAreaEnabled],
+    [settings.enableAiResponseScrolling],
   );
 
   return (
@@ -89,14 +92,34 @@ export default function AiResponseContent({
                 </Tooltip>
               ))
               .otherwise(() => null)}
-            {isScrollAreaEnabled && (
+            {settings.enableAiResponseScrolling ? (
               <Tooltip label="Show full response without scroll bar">
                 <ActionIcon
-                  onClick={() => setScrollAreaEnabled(false)}
+                  onClick={() => {
+                    setSettings({
+                      ...settings,
+                      enableAiResponseScrolling: false,
+                    });
+                  }}
                   variant="subtle"
                   color="gray"
                 >
                   <IconArrowsMaximize size={16} />
+                </ActionIcon>
+              </Tooltip>
+            ) : (
+              <Tooltip label="Enable scroll bar">
+                <ActionIcon
+                  onClick={() => {
+                    setSettings({
+                      ...settings,
+                      enableAiResponseScrolling: true,
+                    });
+                  }}
+                  variant="subtle"
+                  color="gray"
+                >
+                  <IconArrowsMinimize size={16} />
                 </ActionIcon>
               </Tooltip>
             )}

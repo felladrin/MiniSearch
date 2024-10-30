@@ -30,6 +30,7 @@ Search results:
   openAiApiKey: "",
   openAiApiModel: "",
   enterToSubmit: true,
+  enableAiResponseScrolling: true,
   allowAiModelDownload: false,
 };
 
