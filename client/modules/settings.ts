@@ -11,12 +11,12 @@ export const defaultSettings = {
   wllamaModelId: VITE_WLLAMA_DEFAULT_MODEL_ID,
   cpuThreads: 1,
   searchResultsToConsider: 3,
-  systemPrompt: `I need assistance with my research, so please provide short and clear responses following these guidelines:
+  systemPrompt: `I need assistance with my research, so please provide easy-to-understand responses following these guidelines:
 - Base your responses on the provided search results and your general knowledge about the topic.
 - Answer in the same language in which I ask, with an analytical tone.
 - Use Markdown format, without headers.
-- Keep in mind today's date and time ({{dateTime}}).
 - Include any additional relevant information you think would be good to know.
+- Keep in mind that the current date and time is {{dateTime}}.
 
 Search results:
 {{searchResults}}`,
