@@ -16,42 +16,29 @@ const AccessPage = lazy(() => import("../Pages/AccessPage"));
 
 export function App() {
   useInitializeSettings();
+  const { hasValidatedAccessKey, isCheckingStoredKey, setValidatedAccessKey } =
+    useAccessKeyValidation();
 
-  const [hasValidatedAccessKey, setValidatedAccessKey] = useState(false);
-  const [isCheckingStoredKey, setCheckingStoredKey] = useState(true);
-
-  useEffect(() => {
-    async function checkStoredAccessKey() {
-      if (VITE_ACCESS_KEYS_ENABLED) {
-        const isValid = await verifyStoredAccessKey();
-        if (isValid) setValidatedAccessKey(true);
-      }
-      setCheckingStoredKey(false);
-    }
-
-    checkStoredAccessKey();
-  }, []);
-
-  if (isCheckingStoredKey) return null;
-
-  return (
-    <MantineProvider defaultColorScheme="dark">
-      <Notifications />
-      <Switch>
-        <Route path="/">
-          {match([VITE_ACCESS_KEYS_ENABLED, hasValidatedAccessKey])
-            .with([true, false], () => (
-              <AccessPage
-                onAccessKeyValid={() => setValidatedAccessKey(true)}
-              />
-            ))
-            .otherwise(() => (
-              <MainPage />
-            ))}
-        </Route>
-      </Switch>
-    </MantineProvider>
-  );
+  return match(isCheckingStoredKey)
+    .with(false, () => (
+      <MantineProvider defaultColorScheme="dark">
+        <Notifications />
+        <Switch>
+          <Route path="/">
+            {match([VITE_ACCESS_KEYS_ENABLED, hasValidatedAccessKey])
+              .with([true, false], () => (
+                <AccessPage
+                  onAccessKeyValid={() => setValidatedAccessKey(true)}
+                />
+              ))
+              .otherwise(() => (
+                <MainPage />
+              ))}
+          </Route>
+        </Switch>
+      </MantineProvider>
+    ))
+    .otherwise(() => null);
 }
 
 /**
@@ -79,4 +66,32 @@ function useInitializeSettings() {
   }, [settings, setSettings, settingsInitialized]);
 
   return settings;
+}
+
+/**
+ * A custom React hook that validates the stored access key on mount.
+ *
+ * @returns An object containing the validation state and loading state
+ */
+function useAccessKeyValidation() {
+  const [hasValidatedAccessKey, setValidatedAccessKey] = useState(false);
+  const [isCheckingStoredKey, setCheckingStoredKey] = useState(true);
+
+  useEffect(() => {
+    async function checkStoredAccessKey() {
+      if (VITE_ACCESS_KEYS_ENABLED) {
+        const isValid = await verifyStoredAccessKey();
+        if (isValid) setValidatedAccessKey(true);
+      }
+      setCheckingStoredKey(false);
+    }
+
+    checkStoredAccessKey();
+  }, []);
+
+  return {
+    hasValidatedAccessKey,
+    isCheckingStoredKey,
+    setValidatedAccessKey,
+  };
 }
