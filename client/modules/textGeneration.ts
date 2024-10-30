@@ -19,22 +19,6 @@ import {
   ChatGenerationError,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
-import {
-  generateChatWithInternalApi,
-  generateTextWithInternalApi,
-} from "./textGenerationWithInternalApi";
-import {
-  generateChatWithOpenAi,
-  generateTextWithOpenAi,
-} from "./textGenerationWithOpenAi";
-import {
-  generateChatWithWebLlm,
-  generateTextWithWebLlm,
-} from "./textGenerationWithWebLlm";
-import {
-  generateChatWithWllama,
-  generateTextWithWllama,
-} from "./textGenerationWithWllama";
 import { isWebGPUAvailable } from "./webGpu";
 
 export async function searchAndRespond() {
@@ -57,8 +41,14 @@ export async function searchAndRespond() {
   try {
     const settings = getSettings();
     if (settings.inferenceType === "openai") {
+      const { generateTextWithOpenAi } = await import(
+        "./textGenerationWithOpenAi"
+      );
       await generateTextWithOpenAi();
     } else if (settings.inferenceType === "internal") {
+      const { generateTextWithInternalApi } = await import(
+        "./textGenerationWithInternalApi"
+      );
       await generateTextWithInternalApi();
     } else {
       await canDownloadModels();
@@ -68,10 +58,16 @@ export async function searchAndRespond() {
 
         if (!settings.enableWebGpu) throw Error("WebGPU is disabled.");
 
+        const { generateTextWithWebLlm } = await import(
+          "./textGenerationWithWebLlm"
+        );
         await generateTextWithWebLlm();
       } catch (error) {
         addLogEntry(`Skipping text generation with WebLLM: ${error}`);
         addLogEntry("Starting text generation with Wllama");
+        const { generateTextWithWllama } = await import(
+          "./textGenerationWithWllama"
+        );
         await generateTextWithWllama();
       }
     }
@@ -126,13 +122,25 @@ export async function generateChatResponse(
     const lastMessages = lastMessagesReversed.reverse();
 
     if (settings.inferenceType === "openai") {
+      const { generateChatWithOpenAi } = await import(
+        "./textGenerationWithOpenAi"
+      );
       response = await generateChatWithOpenAi(lastMessages, onUpdate);
     } else if (settings.inferenceType === "internal") {
+      const { generateChatWithInternalApi } = await import(
+        "./textGenerationWithInternalApi"
+      );
       response = await generateChatWithInternalApi(lastMessages, onUpdate);
     } else {
       if (isWebGPUAvailable && settings.enableWebGpu) {
+        const { generateChatWithWebLlm } = await import(
+          "./textGenerationWithWebLlm"
+        );
         response = await generateChatWithWebLlm(lastMessages, onUpdate);
       } else {
+        const { generateChatWithWllama } = await import(
+          "./textGenerationWithWllama"
+        );
         response = await generateChatWithWllama(lastMessages, onUpdate);
       }
     }
