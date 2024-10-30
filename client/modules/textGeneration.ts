@@ -53,18 +53,13 @@ export async function searchAndRespond() {
     } else {
       await canDownloadModels();
       updateTextGenerationState("loadingModel");
-      try {
-        if (!isWebGPUAvailable) throw Error("WebGPU is not available.");
 
-        if (!settings.enableWebGpu) throw Error("WebGPU is disabled.");
-
+      if (isWebGPUAvailable && settings.enableWebGpu) {
         const { generateTextWithWebLlm } = await import(
           "./textGenerationWithWebLlm"
         );
         await generateTextWithWebLlm();
-      } catch (error) {
-        addLogEntry(`Skipping text generation with WebLLM: ${error}`);
-        addLogEntry("Starting text generation with Wllama");
+      } else {
         const { generateTextWithWllama } = await import(
           "./textGenerationWithWllama"
         );
@@ -72,12 +67,12 @@ export async function searchAndRespond() {
       }
     }
 
-    if (getTextGenerationState() !== "interrupted") {
-      updateTextGenerationState("completed");
-    }
+    updateTextGenerationState("completed");
   } catch (error) {
-    addLogEntry(`Error generating text: ${error}`);
-    updateTextGenerationState("failed");
+    if (getTextGenerationState() !== "interrupted") {
+      addLogEntry(`Error generating text: ${error}`);
+      updateTextGenerationState("failed");
+    }
   }
 
   addLogEntry(
