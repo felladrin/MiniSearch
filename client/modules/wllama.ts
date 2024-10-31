@@ -88,29 +88,29 @@ const defaultModelConfig: Omit<
 };
 
 export const wllamaModels: Record<string, WllamaModel> = {
-  "smollm-135m": {
+  "smollm2-135m": {
     ...defaultModelConfig,
-    label: "SmolLM 135M",
-    url: "https://huggingface.co/Felladrin/gguf-Q8_0-smollm-135M-instruct-v0.2/resolve/main/smollm-135m-instruct-add-basics-q8_0.gguf",
+    label: "SmolLM 2 135M",
+    url: "https://huggingface.co/Felladrin/gguf-Q8_0-SmolLM2-135M-Instruct/resolve/main/model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 145,
   },
-  "smollm-360m": {
+  "smollm2-360m": {
     ...defaultModelConfig,
-    label: "SmolLM 360M",
-    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-smollm-360M-instruct-add-basics/resolve/main/smollm-360m-instruct-add-basics-q5_k_m-imat-00001-of-00005.gguf",
-    fileSizeInMegabytes: 290,
-  },
-  "danube-3-500m": {
-    ...defaultModelConfig,
-    label: "Danube 3 500M",
-    url: "https://huggingface.co/Felladrin/gguf-q5_k_m-h2o-danube3-500m-chat/resolve/main/h2o-danube3-500m-chat-q5_k_m-imat-00001-of-00003.gguf",
-    fileSizeInMegabytes: 368,
+    label: "SmolLM 2 360M",
+    url: "https://huggingface.co/Felladrin/gguf-Q8_0-SmolLM2-360M-Instruct/resolve/main/model.shard-00001-of-00008.gguf",
+    fileSizeInMegabytes: 386,
   },
   "qwen-2.5-0.5b": {
     ...defaultModelConfig,
     label: "Qwen 2.5 0.5B",
-    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Qwen2.5-0.5B-Instruct/resolve/main/qwen2-00001-of-00003.gguf",
-    fileSizeInMegabytes: 420,
+    url: "https://huggingface.co/Felladrin/gguf-Q8_0-Qwen2.5-0.5B-Instruct/resolve/main/model.shard-00001-of-00004.gguf",
+    fileSizeInMegabytes: 531,
+  },
+  "danube-3-500m": {
+    ...defaultModelConfig,
+    label: "Danube 3 500M",
+    url: "https://huggingface.co/Felladrin/gguf-q8_0-h2o-danube3-500m-chat/resolve/main/model.shard-00001-of-00011.gguf",
+    fileSizeInMegabytes: 547,
   },
   "granite-3.0-1b": {
     ...defaultModelConfig,
@@ -137,6 +137,12 @@ export const wllamaModels: Record<string, WllamaModel> = {
     label: "Pints 1.5B",
     url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K-1.5-Pints-2K-v0.1/resolve/main/model.shard-00001-of-00018.gguf",
     fileSizeInMegabytes: 1150,
+  },
+  "smollm2-1.7b": {
+    ...defaultModelConfig,
+    label: "SmolLM 2 1.7B",
+    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-SmolLM2-1.7B-Instruct/resolve/main/model.shard-00001-of-00016.gguf",
+    fileSizeInMegabytes: 1230,
   },
   "arcee-lite": {
     ...defaultModelConfig,
