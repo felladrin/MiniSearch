@@ -13,13 +13,38 @@ export default function WebLlmModelSelect({
   const [webGpuModels] = useState<ComboboxItem[]>(() => {
     const suffix = isF16Supported ? "-q4f16_1-MLC" : "-q4f32_1-MLC";
 
+    const smallModels = ["SmolLM-135M", "SmolLM-360M"];
+
+    const isTooSmallModel = (
+      model: (typeof prebuiltAppConfig.model_list)[number],
+    ) => {
+      return smallModels.some((smallModel) =>
+        model.model_id.startsWith(smallModel),
+      );
+    };
+
+    const suffixForTooSmallModel = isF16Supported ? "-q0f16-MLC" : "-q0f32-MLC";
+
     const models = prebuiltAppConfig.model_list
-      .filter((model) => model.model_id.endsWith(suffix))
+      .filter((model) => {
+        return model.model_id.endsWith(
+          isTooSmallModel(model) ? suffixForTooSmallModel : suffix,
+        );
+      })
       .sort((a, b) => (a.vram_required_MB ?? 0) - (b.vram_required_MB ?? 0))
-      .map((model) => ({
-        label: `${Math.round(model.vram_required_MB ?? 0) || "N/A"} MB • ${model.model_id.replace(suffix, "")}`,
-        value: model.model_id,
-      }));
+      .map((model) => {
+        const modelSizeInMegabytes =
+          Math.round(model.vram_required_MB ?? 0) || "N/A";
+        const modelName = model.model_id.replace(
+          isTooSmallModel(model) ? suffixForTooSmallModel : suffix,
+          "",
+        );
+
+        return {
+          label: `${modelSizeInMegabytes} MB • ${modelName}`,
+          value: model.model_id,
+        };
+      });
 
     return models;
   });
