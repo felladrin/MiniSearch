@@ -16,7 +16,6 @@ import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllam
 import singleThreadWllamaJsUrl from "@wllama/wllama/esm/single-thread/wllama.js?url";
 import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
 import { addLogEntry } from "./logEntries";
-import { defaultSettings } from "./settings";
 import { getSystemPrompt } from "./systemPrompt";
 
 export async function initializeWllama(
