@@ -22,7 +22,7 @@ Search results:
 {{searchResults}}`,
   inferenceType: VITE_DEFAULT_INFERENCE_TYPE,
   inferenceTemperature: 0.5,
-  inferenceTopP: 1,
+  inferenceTopP: 1.0,
   inferenceFrequencyPenalty: 0.5,
   inferencePresencePenalty: 0.3,
   inferenceRepeatPenalty: 1.176,

@@ -16,6 +16,7 @@ import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllam
 import singleThreadWllamaJsUrl from "@wllama/wllama/esm/single-thread/wllama.js?url";
 import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
 import { addLogEntry } from "./logEntries";
+import { defaultSettings } from "./settings";
 import { getSystemPrompt } from "./systemPrompt";
 
 export async function initializeWllama(
@@ -79,11 +80,15 @@ const defaultModelConfig: Omit<
   contextSize: 2048,
   shouldIncludeUrlsOnPrompt: true,
   sampling: {
-    min_p: 0.02,
+    top_p: defaultSettings.inferenceTopP,
+    temp: defaultSettings.inferenceTemperature,
+    penalty_freq: defaultSettings.inferenceFrequencyPenalty,
+    penalty_present: defaultSettings.inferencePresencePenalty,
+    penalty_repeat: defaultSettings.inferenceRepeatPenalty,
     // @ts-expect-error Wllama still doesn't have the following properties defined, although they are supported by the llama.cpp.
-    sampling_seq: "mxd",
     xtc_probability: 0.5,
     dry_multiplier: 0.8,
+    sampling_seq: "ptxd",
   },
 };
 
