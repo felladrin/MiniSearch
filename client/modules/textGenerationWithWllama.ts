@@ -11,17 +11,12 @@ import {
   ChatGenerationError,
   canStartResponding,
   getFormattedSearchResults,
-  updateResponseRateLimited,
 } from "./textGenerationUtilities";
 
 export async function generateTextWithWllama() {
   if (!getSettings().enableAiResponse) return;
 
-  const response = await generateWithWllama(
-    getQuery(),
-    updateResponseRateLimited,
-    true,
-  );
+  const response = await generateWithWllama(getQuery(), updateResponse, true);
 
   updateResponse(response);
 }

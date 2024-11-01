@@ -1,4 +1,5 @@
 import { createPubSub } from "create-pubsub";
+import throttle from "throttleit";
 import { defaultSettings } from "./settings";
 
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
@@ -40,7 +41,7 @@ export const [, , getQuery] = queryPubSub;
 
 export const responsePubSub = createPubSub("");
 
-export const [updateResponse] = responsePubSub;
+export const updateResponse = throttle(responsePubSub[0], 1000 / 12);
 
 export const searchResultsPubSub = createPubSub<
   import("./search").SearchResults

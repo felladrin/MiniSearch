@@ -1,14 +1,17 @@
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions.mjs";
 import { getOpenAiClient } from "./openai";
-import { getSettings, updateTextGenerationState } from "./pubSub";
+import {
+  getSettings,
+  updateResponse,
+  updateTextGenerationState,
+} from "./pubSub";
 import {
   canStartResponding,
   getDefaultChatCompletionCreateParamsStreaming,
   getDefaultChatMessages,
   getFormattedSearchResults,
   handleStreamingResponse,
-  updateResponseRateLimited,
 } from "./textGenerationUtilities";
 
 export async function generateTextWithOpenAi() {
@@ -29,7 +32,7 @@ export async function generateTextWithOpenAi() {
     ) as ChatCompletionMessageParam[],
   });
 
-  await handleStreamingResponse(completion, updateResponseRateLimited, {
+  await handleStreamingResponse(completion, updateResponse, {
     abortController: completion.controller,
     shouldUpdateGeneratingState: true,
   });

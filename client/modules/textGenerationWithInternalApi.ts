@@ -13,7 +13,6 @@ import {
   canStartResponding,
   getDefaultChatCompletionCreateParamsStreaming,
   getFormattedSearchResults,
-  updateResponseRateLimited,
 } from "./textGenerationUtilities";
 
 export async function generateTextWithInternalApi() {
@@ -38,7 +37,7 @@ export async function generateTextWithInternalApi() {
       updateTextGenerationState("generating");
     }
 
-    updateResponseRateLimited(message);
+    updateResponse(message);
   });
 
   updateResponse(streamedMessage);

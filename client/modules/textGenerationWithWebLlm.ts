@@ -10,6 +10,7 @@ import {
   getSettings,
   updateModelLoadingProgress,
   updateModelSizeInMegabytes,
+  updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
 import { defaultSettings } from "./settings";
@@ -19,7 +20,6 @@ import {
   getDefaultChatMessages,
   getFormattedSearchResults,
   handleStreamingResponse,
-  updateResponseRateLimited,
 } from "./textGenerationUtilities";
 
 export async function generateTextWithWebLlm() {
@@ -36,7 +36,7 @@ export async function generateTextWithWebLlm() {
       ) as ChatCompletionMessageParam[],
     });
 
-    await handleStreamingResponse(completion, updateResponseRateLimited, {
+    await handleStreamingResponse(completion, updateResponse, {
       shouldUpdateGeneratingState: true,
     });
   }

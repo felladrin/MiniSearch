@@ -55,6 +55,7 @@
     "react-syntax-highlighter": "^15.5.0",
     "searxng": "^0.0.5",
     "temp-dir": "^3.0.0",
+    "throttleit": "^2.1.0",
     "ts-pattern": "^5.2.0",
     "wouter": "^3.3.0",
     "yet-another-react-lightbox": "^3.21.6"

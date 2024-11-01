@@ -8,7 +8,6 @@ import {
   getSearchResults,
   getSettings,
   getTextGenerationState,
-  updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
 import { defaultSettings } from "./settings";
@@ -49,20 +48,6 @@ export async function canStartResponding() {
     await getSearchPromise();
   }
 }
-
-export function updateResponseRateLimited(text: string) {
-  const currentTime = Date.now();
-
-  if (
-    currentTime - updateResponseRateLimited.lastUpdateTime >=
-    updateResponseRateLimited.updateInterval
-  ) {
-    updateResponse(text);
-    updateResponseRateLimited.lastUpdateTime = currentTime;
-  }
-}
-updateResponseRateLimited.lastUpdateTime = 0;
-updateResponseRateLimited.updateInterval = 1000 / 12;
 
 export function getDefaultChatCompletionCreateParamsStreaming() {
   return {
