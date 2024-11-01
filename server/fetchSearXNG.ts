@@ -36,7 +36,7 @@ export async function fetchSearXNG(query: string, limit?: number) {
       graphicalSearchResults = graphicalSearchResults.slice(0, limit);
     }
 
-    let textResults: [title: string, content: string, url: string][] = [];
+    const textResults: [title: string, content: string, url: string][] = [];
     const imageResults: [
       title: string,
       url: string,
@@ -126,10 +126,10 @@ export async function fetchSearXNG(query: string, limit?: number) {
           uniqueHostnames.add(hostname);
         }
       }
-    }
 
-    if (limit && limit > 0) {
-      textResults = textResults.slice(0, limit);
+      if (limit && limit > 0 && textResults.length >= limit) {
+        break;
+      }
     }
 
     return { textResults, imageResults };
