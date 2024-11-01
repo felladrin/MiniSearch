@@ -17,7 +17,7 @@ export async function fetchSearXNG(query: string, limit?: number) {
   try {
     const resultsResponse = await searxng.search(query);
 
-    let graphicalSearchResults: SearxngSearchResult[] = [];
+    const graphicalSearchResults: SearxngSearchResult[] = [];
     const textualSearchResults: SearxngSearchResult[] = [];
 
     const isVideosOrImagesCategory = (category: string): boolean => {
@@ -32,15 +32,11 @@ export async function fetchSearXNG(query: string, limit?: number) {
       }
     }
 
-    if (limit && limit > 0) {
-      graphicalSearchResults = graphicalSearchResults.slice(0, limit);
-    }
-
     const textResults: [title: string, content: string, url: string][] = [];
     const imageResults: [
       title: string,
       url: string,
-      thumbnailUrl: string,
+      thumbnailSource: string,
       sourceUrl: string,
     ][] = [];
 
@@ -58,58 +54,31 @@ export async function fetchSearXNG(query: string, limit?: number) {
       return processedSnippet;
     };
 
-    const imagePromises = graphicalSearchResults.map(async (result) => {
+    for (const result of graphicalSearchResults) {
       const thumbnailSource =
         result.category === "videos" ? result.thumbnail : result.thumbnail_src;
 
-      let thumbnailSourceIsValid = true;
-
       try {
         new URL(thumbnailSource);
-      } catch {
-        thumbnailSourceIsValid = false;
-      }
+        if (!uniqueSourceUrls.has(result.img_src)) {
+          imageResults.push([
+            result.title,
+            result.url,
+            thumbnailSource,
+            result.category === "videos"
+              ? result.iframe_src || result.url
+              : result.img_src,
+          ]);
+          uniqueSourceUrls.add(result.img_src);
 
-      if (thumbnailSourceIsValid) {
-        try {
-          const axiosResponse = await axios.get(thumbnailSource, {
-            responseType: "arraybuffer",
-          });
-
-          const contentType = axiosResponse.headers["content-type"];
-          const base64 = Buffer.from(axiosResponse.data).toString("base64");
-          const thumbnailUrl = `data:${contentType};base64,${base64}`;
-
-          if (result.category === "videos") {
-            return [
-              result.title,
-              result.url,
-              thumbnailUrl,
-              result.iframe_src || result.url,
-            ];
+          if (limit && limit > 0 && imageResults.length >= limit) {
+            break;
           }
-
-          return [result.title, result.url, thumbnailUrl, result.img_src];
-        } catch {
-          return null;
         }
+      } catch (error) {
+        void error;
       }
-
-      return null;
-    });
-
-    const resolvedImageResults = await Promise.all(imagePromises);
-    imageResults.push(
-      ...resolvedImageResults
-        .filter(
-          (result): result is [string, string, string, string] =>
-            result !== null && !uniqueSourceUrls.has(result[3]),
-        )
-        .map((result) => {
-          uniqueSourceUrls.add(result[3]);
-          return result;
-        }),
-    );
+    }
 
     for (const result of textualSearchResults) {
       const { hostname } = new URL(result.url);
