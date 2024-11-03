@@ -1,16 +1,16 @@
 import {
+  ActionIcon,
   Button,
   Card,
+  CopyButton,
   Group,
   Paper,
   Stack,
   Text,
   Textarea,
-  CopyButton,
-  ActionIcon,
   Tooltip,
 } from "@mantine/core";
-import { IconSend, IconCopy, IconCheck } from "@tabler/icons-react";
+import { IconCheck, IconCopy, IconSend } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
@@ -104,7 +104,10 @@ export default function ChatInterface({
   const getChatContent = () => {
     return messages
       .slice(2)
-      .map((msg, index) => `${index + 1}. ${msg.role?.toUpperCase()}\n\n${msg.content}`)
+      .map(
+        (msg, index) =>
+          `${index + 1}. ${msg.role?.toUpperCase()}\n\n${msg.content}`,
+      )
       .join("\n\n");
   };
 
