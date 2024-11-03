@@ -117,6 +117,12 @@ export const wllamaModels: Record<string, WllamaModel> = {
     url: "https://huggingface.co/Felladrin/gguf-q8_0-h2o-danube3-500m-chat/resolve/main/model.shard-00001-of-00011.gguf",
     fileSizeInMegabytes: 547,
   },
+  "amd-olmo-1b": {
+    ...defaultModelConfig,
+    label: "AMD OLMo 1B",
+    url: "https://huggingface.co/Felladrin/gguf-Q5_K_L-AMD-OLMo-1B-SFT-DPO/resolve/main/model.shard-00001-of-00009.gguf",
+    fileSizeInMegabytes: 872,
+  },
   "granite-3.0-1b": {
     ...defaultModelConfig,
     label: "Granite 3.0 1B [400M]",
@@ -188,6 +194,13 @@ export const wllamaModels: Record<string, WllamaModel> = {
     fileSizeInMegabytes: 2450,
     buildPrompt: async (_, query, searchResults) =>
       buildGranitePrompt(query, searchResults),
+  },
+  "minicpm3-4b": {
+    ...defaultModelConfig,
+    label: "MiniCPM 3 4B",
+    url: "https://huggingface.co/Felladrin/gguf-Q4_K_M-MiniCPM3-4B/resolve/main/model.shard-00001-of-00017.gguf",
+    fileSizeInMegabytes: 2470,
+    contextSize: 1920,
   },
   "phi-3.5-mini-3.8b": {
     ...defaultModelConfig,
