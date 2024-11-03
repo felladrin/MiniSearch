@@ -1,5 +1,4 @@
 import {
-  type ComboboxData,
   Group,
   NumberInput,
   Select,
@@ -31,7 +30,11 @@ const WllamaModelSelect = lazy(
 
 export default function AISettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
-  const [openAiModels, setOpenAiModels] = useState<ComboboxData>([]);
+  const [openAiModels, setOpenAiModels] = useState<{
+    label: string;
+    value: string;
+}[]>([]);
+  const [openAiApiModelError, setOpenAiApiModelError] = useState<string | undefined>(undefined);
 
   const form = useForm({
     initialValues: settings,
@@ -51,30 +54,44 @@ export default function AISettingsForm() {
           value: model.id,
         }));
         setOpenAiModels(models);
-        form.setFieldError("openAiApiModel", null);
-        if (!form.values.openAiApiModel) {
-          form.setFieldValue("openAiApiModel", models[0].value);
-        }
+        setOpenAiApiModelError(undefined);
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         addLogEntry(`Error fetching OpenAI models: ${errorMessage}`);
         setOpenAiModels([]);
-        form.setFieldError("openAiApiModel", errorMessage);
+        setOpenAiApiModelError(errorMessage);
       }
     }
 
-    if (form.values.inferenceType === "openai" && settings.openAiApiBaseUrl) {
+    if (settings.inferenceType === "openai" && settings.openAiApiBaseUrl) {
       fetchOpenAiModels();
     }
   }, [
-    form.values.inferenceType,
+    settings.inferenceType,
     settings.openAiApiBaseUrl,
     settings.openAiApiKey,
-    form.setFieldError,
-    form.setFieldValue,
-    form.values.openAiApiModel,
   ]);
+
+  useEffect(() => {
+    if (openAiApiModelError === form.errors.openAiApiModel) return;
+
+    form.setFieldError("openAiApiModel", openAiApiModelError);
+  }, [openAiApiModelError, form.setFieldError, form.errors.openAiApiModel]);
+
+  useEffect(() => {
+    if (openAiModels.length > 0) {
+      const hasNoModelSelected = !form.values.openAiApiModel;
+      const isModelInvalid = !openAiModels.find((model) => model.value === form.values.openAiApiModel);
+
+      if (hasNoModelSelected || isModelInvalid) {
+        form.setFieldValue("openAiApiModel", openAiModels[0].value);
+      }
+    }
+    else if (form.values.openAiApiModel) {
+      form.setFieldValue("openAiApiModel", "");
+    }
+  }, [openAiModels, form.setFieldValue, form.values.openAiApiModel]);
 
   const isUsingCustomInstructions =
     form.values.systemPrompt !== defaultSettings.systemPrompt;
@@ -160,6 +177,7 @@ export default function AISettingsForm() {
                 data={openAiModels}
                 description="Optional, as some API servers don't provide a model list."
                 allowDeselect={false}
+                disabled={openAiModels.length === 0}
                 searchable
               />
             </>
