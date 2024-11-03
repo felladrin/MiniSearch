@@ -17,12 +17,14 @@ import {
   IconCopy,
   IconHandStop,
   IconInfoCircle,
+  IconRefresh,
 } from "@tabler/icons-react";
 import type { PublishFunction } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
 import { type ReactNode, Suspense, lazy, useMemo } from "react";
 import { match } from "ts-pattern";
 import { settingsPubSub } from "../../modules/pubSub";
+import { searchAndRespond } from "../../modules/textGeneration";
 
 const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
 
@@ -91,7 +93,17 @@ export default function AiResponseContent({
                   </ActionIcon>
                 </Tooltip>
               ))
-              .otherwise(() => null)}
+              .otherwise(() => (
+                <Tooltip label="Regenerate response">
+                  <ActionIcon
+                    onClick={() => searchAndRespond()}
+                    variant="subtle"
+                    color="gray"
+                  >
+                    <IconRefresh size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              ))}
             {settings.enableAiResponseScrolling ? (
               <Tooltip label="Show full response without scroll bar">
                 <ActionIcon
