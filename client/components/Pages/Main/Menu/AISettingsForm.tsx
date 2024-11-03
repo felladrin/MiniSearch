@@ -30,11 +30,15 @@ const WllamaModelSelect = lazy(
 
 export default function AISettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
-  const [openAiModels, setOpenAiModels] = useState<{
-    label: string;
-    value: string;
-}[]>([]);
-  const [openAiApiModelError, setOpenAiApiModelError] = useState<string | undefined>(undefined);
+  const [openAiModels, setOpenAiModels] = useState<
+    {
+      label: string;
+      value: string;
+    }[]
+  >([]);
+  const [openAiApiModelError, setOpenAiApiModelError] = useState<
+    string | undefined
+  >(undefined);
 
   const form = useForm({
     initialValues: settings,
@@ -82,13 +86,14 @@ export default function AISettingsForm() {
   useEffect(() => {
     if (openAiModels.length > 0) {
       const hasNoModelSelected = !form.values.openAiApiModel;
-      const isModelInvalid = !openAiModels.find((model) => model.value === form.values.openAiApiModel);
+      const isModelInvalid = !openAiModels.find(
+        (model) => model.value === form.values.openAiApiModel,
+      );
 
       if (hasNoModelSelected || isModelInvalid) {
         form.setFieldValue("openAiApiModel", openAiModels[0].value);
       }
-    }
-    else if (form.values.openAiApiModel) {
+    } else if (form.values.openAiApiModel) {
       form.setFieldValue("openAiApiModel", "");
     }
   }, [openAiModels, form.setFieldValue, form.values.openAiApiModel]);
