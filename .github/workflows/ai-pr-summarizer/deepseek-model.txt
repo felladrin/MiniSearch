@@ -1,2 +1,1 @@
 deepseek-coder-v2:16b-lite-instruct-q5_K_M
-qwen2.5-coder:7b-instruct-q8_0

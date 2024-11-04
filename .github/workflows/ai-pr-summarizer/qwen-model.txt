@@ -1,0 +1,1 @@
+qwen2.5-coder:7b-instruct-q8_0

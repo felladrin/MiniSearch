@@ -22,7 +22,7 @@ jobs:
         with:
           llm-model: 'qwen2.5-coder:7b-instruct-q8_0'
           prompt-file: ./.github/workflows/ai-pr-summarizer/prompt.txt
-          models-file: ./.github/workflows/ai-pr-summarizer/models.txt
+          models-file: ./.github/workflows/ai-pr-summarizer/qwen-model.txt
           version-file: ./.github/workflows/ai-pr-summarizer/version.txt
           context-window: 16384
           upload-changes: false
@@ -33,7 +33,7 @@ jobs:
         with:
           llm-model: 'deepseek-coder-v2:16b-lite-instruct-q5_K_M'
           prompt-file: ./.github/workflows/ai-pr-summarizer/prompt.txt
-          models-file: ./.github/workflows/ai-pr-summarizer/models.txt
+          models-file: ./.github/workflows/ai-pr-summarizer/deepseek-model.txt
           version-file: ./.github/workflows/ai-pr-summarizer/version.txt
           context-window: 16384
           upload-changes: false
