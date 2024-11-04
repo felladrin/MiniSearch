@@ -9,6 +9,9 @@ jobs:
   ai-pr-summarizer:
     runs-on: ubuntu-latest
     name: AI PR Summarizer
+    permissions:
+      pull-requests: write
+      contents: read
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
