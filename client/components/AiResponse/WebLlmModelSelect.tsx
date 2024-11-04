@@ -12,8 +12,8 @@ export default function WebLlmModelSelect({
 }) {
   const [webGpuModels] = useState<ComboboxItem[]>(() => {
     const suffix = isF16Supported ? "-q4f16_1-MLC" : "-q4f32_1-MLC";
-
-    const smallModels = ["SmolLM-135M", "SmolLM-360M"];
+    
+    const smallModels = ["SmolLM2-135M", "SmolLM2-360M"];
 
     const isTooSmallModel = (
       model: (typeof prebuiltAppConfig.model_list)[number],
