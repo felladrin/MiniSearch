@@ -15,27 +15,16 @@ jobs:
       pull-requests: write
       contents: read
     steps:
-      # - name: Checkout Repository
-      #   uses: actions/checkout@v4
-      # - name: Summarize PR with AI (Qwen Coder)
-      #   uses: behrouz-rad/ai-pr-summarizer@v1
-      #   with:
-      #     llm-model: 'qwen2.5-coder:7b-instruct-q8_0'
-      #     prompt-file: ./.github/workflows/ai-pr-summarizer/prompt.txt
-      #     models-file: ./.github/workflows/ai-pr-summarizer/qwen-model.txt
-      #     version-file: ./.github/workflows/ai-pr-summarizer/version.txt
-      #     context-window: 16384
-      #     upload-changes: false
-      #     fail-on-error: false
-      #     token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Summarize PR with AI (DeepSeek Coder)
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Summarize PR with AI
         uses: behrouz-rad/ai-pr-summarizer@v1
         with:
-          llm-model: 'deepseek-coder-v2:16b-lite-instruct-q5_K_M'
+          llm-model: 'qwen2.5-coder:7b-instruct-q8_0'
           prompt-file: ./.github/workflows/ai-pr-summarizer/prompt.txt
-          models-file: ./.github/workflows/ai-pr-summarizer/deepseek-model.txt
-          version-file: ./.github/workflows/ai-pr-summarizer/version.txt
-          context-window: 6144
+          models-file: ./.github/workflows/ai-pr-summarizer/model.txt
+          version-file: ./.github/workflows/ai-pr-summarizer/ollama-version.txt
+          context-window: 16384
           upload-changes: false
           fail-on-error: false
           token: ${{ secrets.GITHUB_TOKEN }}
