@@ -35,7 +35,7 @@ jobs:
           prompt-file: ./.github/workflows/ai-pr-summarizer/prompt.txt
           models-file: ./.github/workflows/ai-pr-summarizer/deepseek-model.txt
           version-file: ./.github/workflows/ai-pr-summarizer/version.txt
-          context-window: 16384
+          context-window: 8192
           upload-changes: false
           fail-on-error: false
           token: ${{ secrets.GITHUB_TOKEN }}
