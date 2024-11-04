@@ -1,7 +1,29 @@
 name: On Pull Request To Main
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
     branches: ["main"]
 jobs:
   test-lint-ping:
     uses: ./.github/workflows/reusable-test-lint-ping.yml
+  ai-pr-summarizer:
+    needs: [test-lint-ping]
+    runs-on: ubuntu-latest
+    name: AI PR Summarizer
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Summarize PR with AI
+        uses: behrouz-rad/ai-pr-summarizer@v1
+        with:
+          llm-model: 'qwen2.5-coder:7b-instruct-q8_0'
+          prompt-file: ./.github/workflows/ai-pr-summarizer/prompt.txt
+          models-file: ./.github/workflows/ai-pr-summarizer/model.txt
+          version-file: ./.github/workflows/ai-pr-summarizer/ollama-version.txt
+          context-window: 16384
+          upload-changes: false
+          fail-on-error: false
+          token: ${{ secrets.GITHUB_TOKEN }}
