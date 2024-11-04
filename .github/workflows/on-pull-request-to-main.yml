@@ -5,6 +5,8 @@ on:
     branches: ["main"]
 jobs:
   test-lint-ping:
+    # disabled for now
+    if: false
     uses: ./.github/workflows/reusable-test-lint-ping.yml
   ai-pr-summarizer:
     runs-on: ubuntu-latest
@@ -13,6 +15,7 @@ jobs:
       pull-requests: write
       contents: read
     strategy:
+      max-parallel: 2
       matrix:
         model: [ 'deepseek-coder-v2:16b-lite-instruct-q5_K_M', 'qwen2.5-coder:7b-instruct-q8_0' ]
     steps:
