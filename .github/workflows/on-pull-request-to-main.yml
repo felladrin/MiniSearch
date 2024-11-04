@@ -1,7 +1,25 @@
 name: On Pull Request To Main
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
     branches: ["main"]
 jobs:
   test-lint-ping:
     uses: ./.github/workflows/reusable-test-lint-ping.yml
+  ai-pr-summarizer:
+    runs-on: ubuntu-latest
+    name: AI PR Summarizer
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Summarize PR with AI
+        uses: behrouz-rad/ai-pr-summarizer@v1
+        with:
+          llm-model: 'deepseek-coder-v2:16b-lite-instruct-q5_K_M'
+          prompt-file: ./.github/workflows/ai-pr-summarizer/prompt.txt
+          models-file: ./.github/workflows/ai-pr-summarizer/models.txt
+          version-file: ./.github/workflows/ai-pr-summarizer/version.txt
+          context-window: 4096
+          upload-changes: false
+          fail-on-error: false
+          token: ${{ secrets.GITHUB_TOKEN }}
