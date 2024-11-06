@@ -26,13 +26,13 @@ Live demo: https://felladrin-minisearch.hf.space
 
 Here are the easiest ways to get started with MiniSearch. Pick the one that suits you best.
 
-**Option 1** - Use [MiniSearch's Docker Image](https://github.com/felladrin/MiniSearch/pkgs/container/minisearch) directly in your terminal by running:
+**Option 1** - Use [MiniSearch's Docker Image](https://github.com/felladrin/MiniSearch/pkgs/container/minisearch) by running in your terminal:
 
 ```bash
 docker run -p 7860:7860 ghcr.io/felladrin/minisearch:main
 ```
 
-**Option 2** - Add MiniSearch's Docker Image to your existing Docker Compose file by adding the following:
+**Option 2** - Add MiniSearch's Docker Image to your existing Docker Compose file:
 
 ```yaml
 services:
