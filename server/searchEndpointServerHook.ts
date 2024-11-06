@@ -17,8 +17,13 @@ export function searchEndpointServerHook<
     );
 
     const limitParam = searchParams.get("limit");
-    const limit =
-      limitParam && Number(limitParam) > 0 ? Number(limitParam) : undefined;
+
+    let limit = 30;
+
+    if (limitParam && Number(limitParam) > 0) {
+      limit = Math.min(limit, Number(limitParam));
+    }
+
     const query = searchParams.get("q");
 
     if (!query) {
