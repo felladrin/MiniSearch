@@ -4,7 +4,6 @@ import {
   Badge,
   Box,
   Card,
-  CopyButton,
   Group,
   ScrollArea,
   Text,
@@ -13,8 +12,6 @@ import {
 import {
   IconArrowsMaximize,
   IconArrowsMinimize,
-  IconCheck,
-  IconCopy,
   IconHandStop,
   IconInfoCircle,
   IconRefresh,
@@ -25,6 +22,7 @@ import { type ReactNode, Suspense, lazy, useMemo } from "react";
 import { match } from "ts-pattern";
 import { settingsPubSub } from "../../modules/pubSub";
 import { searchAndRespond } from "../../modules/textGeneration";
+import { CopyIconButton } from "./CopyIconButton";
 
 const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
 
@@ -135,23 +133,7 @@ export default function AiResponseContent({
                 </ActionIcon>
               </Tooltip>
             )}
-            <CopyButton value={response} timeout={2000}>
-              {({ copied, copy }) => (
-                <Tooltip
-                  label={copied ? "Copied" : "Copy response"}
-                  withArrow
-                  position="right"
-                >
-                  <ActionIcon
-                    color={copied ? "teal" : "gray"}
-                    variant="subtle"
-                    onClick={copy}
-                  >
-                    {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
-                  </ActionIcon>
-                </Tooltip>
-              )}
-            </CopyButton>
+            <CopyIconButton value={response} tooltipLabel="Copy response" />
           </Group>
         </Group>
       </Card.Section>

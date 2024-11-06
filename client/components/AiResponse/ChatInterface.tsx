@@ -1,16 +1,13 @@
 import {
-  ActionIcon,
   Button,
   Card,
-  CopyButton,
   Group,
   Paper,
   Stack,
   Text,
   Textarea,
-  Tooltip,
 } from "@mantine/core";
-import { IconCheck, IconCopy, IconSend } from "@tabler/icons-react";
+import { IconSend } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
@@ -25,6 +22,7 @@ import { match } from "ts-pattern";
 import { addLogEntry } from "../../modules/logEntries";
 import { settingsPubSub } from "../../modules/pubSub";
 import { generateChatResponse } from "../../modules/textGeneration";
+import { CopyIconButton } from "./CopyIconButton";
 
 const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
 
@@ -117,23 +115,10 @@ export default function ChatInterface({
         <Group justify="space-between">
           <Text fw={500}>Follow-up questions</Text>
           {messages.length > 2 && (
-            <CopyButton value={getChatContent()} timeout={2000}>
-              {({ copied, copy }) => (
-                <Tooltip
-                  label={copied ? "Copied" : "Copy conversation"}
-                  withArrow
-                  position="right"
-                >
-                  <ActionIcon
-                    color={copied ? "teal" : "gray"}
-                    variant="subtle"
-                    onClick={copy}
-                  >
-                    {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
-                  </ActionIcon>
-                </Tooltip>
-              )}
-            </CopyButton>
+            <CopyIconButton
+              value={getChatContent()}
+              tooltipLabel="Copy conversation"
+            />
           )}
         </Group>
       </Card.Section>
