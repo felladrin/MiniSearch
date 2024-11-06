@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getLlama } from "node-llama-cpp";
@@ -11,7 +12,9 @@ export async function rankSearchResults(
 ) {
   const model = await loadModelPromise;
 
-  const embeddingContext = await model.createEmbeddingContext();
+  const embeddingContext = await model.createEmbeddingContext({
+    threads: Math.max(1, os.cpus().length - 2),
+  });
 
   const queryEmbedding = (
     await embeddingContext.getEmbeddingFor(query.toLocaleLowerCase())
