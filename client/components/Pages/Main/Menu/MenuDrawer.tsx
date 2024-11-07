@@ -17,8 +17,9 @@ import { addLogEntry } from "../../../../modules/logEntries";
 import { getSemanticVersion } from "../../../../modules/stringFormatters";
 
 const AISettingsForm = lazy(() => import("./AISettingsForm"));
-const ActionsForm = lazy(() => import("./ActionsForm"));
+const SearchSettingsForm = lazy(() => import("./SearchSettingsForm"));
 const InterfaceSettingsForm = lazy(() => import("./InterfaceSettingsForm"));
+const ActionsForm = lazy(() => import("./ActionsForm"));
 
 export default function MenuDrawer(drawerProps: DrawerProps) {
   const repoName = repository.url.split("/").pop();
@@ -76,6 +77,14 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
             <Accordion.Panel>
               <Suspense>
                 <AISettingsForm />
+              </Suspense>
+            </Accordion.Panel>
+          </Accordion.Item>
+          <Accordion.Item value="searchSettings">
+            <Accordion.Control>Search Settings</Accordion.Control>
+            <Accordion.Panel>
+              <Suspense>
+                <SearchSettingsForm />
               </Suspense>
             </Accordion.Panel>
           </Accordion.Item>
