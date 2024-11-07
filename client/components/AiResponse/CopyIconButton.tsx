@@ -6,7 +6,7 @@ interface CopyIconButtonProps {
   tooltipLabel?: string;
 }
 
-export function CopyIconButton({
+export default function CopyIconButton({
   value,
   tooltipLabel = "Copy",
 }: CopyIconButtonProps) {
