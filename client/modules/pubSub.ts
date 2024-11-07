@@ -1,6 +1,7 @@
 import { createPubSub } from "create-pubsub";
 import throttle from "throttleit";
 import { defaultSettings } from "./settings";
+import { addLogEntry } from "./logEntries";
 
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   const localStorageValue = localStorage.getItem(localStorageKey);
@@ -68,14 +69,22 @@ export const textGenerationStatePubSub = createPubSub<
   | "completed"
 >("idle");
 
-export const [updateTextGenerationState, , getTextGenerationState] =
+export const [updateTextGenerationState, listenToTextGenerationStateChanges, getTextGenerationState] =
   textGenerationStatePubSub;
+
+listenToTextGenerationStateChanges((textGenerationState) => {
+  addLogEntry(`Text generation state changed to '${textGenerationState}'`);
+});
 
 export const searchStatePubSub = createPubSub<
   "idle" | "running" | "failed" | "completed"
 >("idle");
 
-export const [updateSearchState] = searchStatePubSub;
+export const [updateSearchState, listenToSearchStateChanges] = searchStatePubSub;
+
+listenToSearchStateChanges((searchState) => {
+  addLogEntry(`Search state changed to '${searchState}'`);
+});
 
 export const modelLoadingProgressPubSub = createPubSub(0);
 
