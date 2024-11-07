@@ -22,9 +22,9 @@ import { match } from "ts-pattern";
 import { addLogEntry } from "../../modules/logEntries";
 import { settingsPubSub } from "../../modules/pubSub";
 import { generateChatResponse } from "../../modules/textGeneration";
-import { CopyIconButton } from "./CopyIconButton";
 
 const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
+const CopyIconButton = lazy(() => import("./CopyIconButton"));
 
 export default function ChatInterface({
   initialQuery,
@@ -115,10 +115,12 @@ export default function ChatInterface({
         <Group justify="space-between">
           <Text fw={500}>Follow-up questions</Text>
           {messages.length > 2 && (
-            <CopyIconButton
-              value={getChatContent()}
-              tooltipLabel="Copy conversation"
-            />
+            <Suspense>
+              <CopyIconButton
+                value={getChatContent()}
+                tooltipLabel="Copy conversation"
+              />
+            </Suspense>
           )}
         </Group>
       </Card.Section>

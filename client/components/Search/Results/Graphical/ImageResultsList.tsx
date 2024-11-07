@@ -17,8 +17,11 @@ export default function ImageResultsList({
 }) {
   const [isLightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [isMounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [canStartTransition, setCanStartTransition] = useState(false);
+
+  useEffect(() => {
+    setCanStartTransition(true);
+  }, []);
 
   const handleImageClick = (index: number) => {
     setLightboxIndex(index);
@@ -40,7 +43,7 @@ export default function ImageResultsList({
         {imageResults.map(([title, sourceUrl, thumbnailUrl], index) => (
           <Transition
             key={`${title}-${sourceUrl}-${thumbnailUrl}`}
-            mounted={isMounted}
+            mounted={canStartTransition}
             transition="fade"
             timingFunction="ease"
             enterDelay={index * 250}

@@ -22,9 +22,9 @@ import { type ReactNode, Suspense, lazy, useMemo } from "react";
 import { match } from "ts-pattern";
 import { settingsPubSub } from "../../modules/pubSub";
 import { searchAndRespond } from "../../modules/textGeneration";
-import { CopyIconButton } from "./CopyIconButton";
 
 const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
+const CopyIconButton = lazy(() => import("./CopyIconButton"));
 
 export default function AiResponseContent({
   textGenerationState,
@@ -133,7 +133,9 @@ export default function AiResponseContent({
                 </ActionIcon>
               </Tooltip>
             )}
-            <CopyIconButton value={response} tooltipLabel="Copy response" />
+            <Suspense>
+              <CopyIconButton value={response} tooltipLabel="Copy response" />
+            </Suspense>
           </Group>
         </Group>
       </Card.Section>

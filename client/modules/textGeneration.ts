@@ -36,8 +36,6 @@ export async function searchAndRespond() {
 
   const responseGenerationStartTime = new Date().getTime();
 
-  updateTextGenerationState("loadingModel");
-
   try {
     const settings = getSettings();
     if (settings.inferenceType === "openai") {

@@ -1,9 +1,8 @@
 import { Center, Container, Loader, Stack } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
-import { Suspense, useEffect } from "react";
+import { Suspense } from "react";
 import { lazy } from "react";
 import { Pattern, match } from "ts-pattern";
-import { addLogEntry } from "../../../modules/logEntries";
 import {
   queryPubSub,
   searchStatePubSub,
@@ -23,14 +22,6 @@ export default function MainPage() {
   const [query, updateQuery] = usePubSub(queryPubSub);
   const [searchState] = usePubSub(searchStatePubSub);
   const [textGenerationState] = usePubSub(textGenerationStatePubSub);
-
-  useEffect(() => {
-    addLogEntry(`Search state changed to '${searchState}'`);
-  }, [searchState]);
-
-  useEffect(() => {
-    addLogEntry(`Text generation state changed to '${textGenerationState}'`);
-  }, [textGenerationState]);
 
   return (
     <Container>

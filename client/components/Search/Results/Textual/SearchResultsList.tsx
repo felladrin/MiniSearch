@@ -21,16 +21,18 @@ export default function SearchResultsList({
   const shouldDisplayDomainBelowTitle = useMediaQuery(
     `(max-width: ${em(720)})`,
   );
-  const [isMounted, setMounted] = useState(false);
+  const [canStartTransition, setCanStartTransition] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setCanStartTransition(true);
+  }, []);
 
   return (
     <Stack gap={40}>
       {searchResults.map(([title, snippet, url], index) => (
         <Transition
           key={url}
-          mounted={isMounted}
+          mounted={canStartTransition}
           transition="fade"
           timingFunction="ease"
           enterDelay={index * 200}
