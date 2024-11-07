@@ -11,6 +11,7 @@ export const defaultSettings = {
   wllamaModelId: VITE_WLLAMA_DEFAULT_MODEL_ID,
   cpuThreads: 1,
   searchResultsToConsider: 3,
+  searchResultsLimit: 15,
   systemPrompt: `I need assistance with my research, so please provide easy-to-understand responses following these guidelines:
 - Base your responses on the provided search results and your general knowledge about the topic.
 - Answer in the same language in which I ask, with an analytical tone.

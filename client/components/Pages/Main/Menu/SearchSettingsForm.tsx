@@ -1,4 +1,4 @@
-import { Stack, Switch } from "@mantine/core";
+import { Slider, Stack, Switch, Text } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { usePubSub } from "create-pubsub/react";
 import { settingsPubSub } from "../../../../modules/pubSub";
@@ -12,6 +12,24 @@ export default function SearchSettingsForm() {
 
   return (
     <Stack gap="md">
+      <Stack gap="xs" mb="md">
+        <Text size="sm">Search Results Limit</Text>
+        <Text size="xs" c="dimmed">
+          Maximum number of search results to fetch. A higher value provides
+          more results but may increase search time.
+        </Text>
+        <Slider
+          {...form.getInputProps("searchResultsLimit")}
+          min={5}
+          max={30}
+          step={5}
+          marks={[5, 10, 15, 20, 25, 30].map((value) => ({
+            value,
+            label: value.toString(),
+          }))}
+        />
+      </Stack>
+
       <Switch
         {...form.getInputProps("enableImageSearch", {
           type: "checkbox",

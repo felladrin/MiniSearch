@@ -158,17 +158,18 @@ async function getKeywords(text: string, limit?: number) {
 async function startSearch(query: string) {
   updateSearchState("running");
 
-  const searchResultsLimit = 30;
-
   let searchResults = await search(
     query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query,
-    searchResultsLimit,
+    getSettings().searchResultsLimit,
   );
 
   if (searchResults.textResults.length === 0) {
     const queryKeywords = await getKeywords(query, 10);
 
-    searchResults = await search(queryKeywords.join(" "), searchResultsLimit);
+    searchResults = await search(
+      queryKeywords.join(" "),
+      getSettings().searchResultsLimit,
+    );
   }
 
   updateSearchState(
