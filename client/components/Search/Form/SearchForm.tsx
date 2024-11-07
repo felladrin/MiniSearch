@@ -34,17 +34,20 @@ export default function SearchForm({
   const [, navigate] = useLocation();
   const [settings] = usePubSub(settingsPubSub);
 
-  useEffect(() => {
-    sleepUntilIdle().then(() => {
-      searchAndRespond();
-    });
+  const handleMount = useCallback(async () => {
+    await sleepUntilIdle();
+    searchAndRespond();
+  }, []);
+
+  const handleInitialSuggestion = useCallback(async () => {
+    const suggestion = await getRandomQuerySuggestion();
+    setSuggestedQuery(suggestion);
   }, []);
 
   useEffect(() => {
-    getRandomQuerySuggestion().then((querySuggestion) => {
-      setSuggestedQuery(querySuggestion);
-    });
-  }, []);
+    handleMount();
+    handleInitialSuggestion();
+  }, [handleMount, handleInitialSuggestion]);
 
   const handleInputChange = async (event: ChangeEvent<HTMLTextAreaElement>) => {
     const text = event.target.value;
