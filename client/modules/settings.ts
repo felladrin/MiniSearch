@@ -44,6 +44,7 @@ export type Settings = typeof defaultSettings;
 export const inferenceTypes = [
   { value: "browser", label: "In the browser (Private)" },
   { value: "openai", label: "Remote server (API)" },
+  { value: "horde", label: "AI Horde (Pre-configured)" },
   ...(VITE_INTERNAL_API_ENABLED
     ? [{ value: "internal", label: VITE_INTERNAL_API_NAME }]
     : []),

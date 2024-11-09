@@ -48,6 +48,11 @@ export async function searchAndRespond() {
         "./textGenerationWithInternalApi"
       );
       await generateTextWithInternalApi();
+    } else if (settings.inferenceType === "horde") {
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await generateTextWithHorde();
     } else {
       await canDownloadModels();
       updateTextGenerationState("loadingModel");
@@ -124,6 +129,11 @@ export async function generateChatResponse(
         "./textGenerationWithInternalApi"
       );
       response = await generateChatWithInternalApi(lastMessages, onUpdate);
+    } else if (settings.inferenceType === "horde") {
+      const { generateChatWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      response = await generateChatWithHorde(lastMessages, onUpdate);
     } else {
       if (isWebGPUAvailable && settings.enableWebGpu) {
         const { generateChatWithWebLlm } = await import(
