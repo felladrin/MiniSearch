@@ -69,11 +69,10 @@ export const textGenerationStatePubSub = createPubSub<
   | "completed"
 >("idle");
 
-export const [
-  updateTextGenerationState,
-  listenToTextGenerationStateChanges,
-  getTextGenerationState,
-] = textGenerationStatePubSub;
+export const [updateTextGenerationState, , getTextGenerationState] =
+  textGenerationStatePubSub;
+
+const [, listenToTextGenerationStateChanges] = textGenerationStatePubSub;
 
 listenToTextGenerationStateChanges((textGenerationState) => {
   addLogEntry(`Text generation state changed to '${textGenerationState}'`);
@@ -83,8 +82,9 @@ export const searchStatePubSub = createPubSub<
   "idle" | "running" | "failed" | "completed"
 >("idle");
 
-export const [updateSearchState, listenToSearchStateChanges] =
-  searchStatePubSub;
+export const [updateSearchState] = searchStatePubSub;
+
+const [, listenToSearchStateChanges] = searchStatePubSub;
 
 listenToSearchStateChanges((searchState) => {
   addLogEntry(`Search state changed to '${searchState}'`);
