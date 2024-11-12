@@ -1,3 +1,1 @@
-Your task is to write a detailed code review of the following changes, focusing on the "what" and "why" rather than the "how".
-
-After that, suggest a commit message summarizing the changes in one sentence and using the present tense.
+Write a high-quality pull request review of these changes:
