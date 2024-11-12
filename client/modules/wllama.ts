@@ -117,6 +117,12 @@ export const wllamaModels: Record<string, WllamaModel> = {
     url: "https://huggingface.co/Felladrin/gguf-q8_0-h2o-danube3-500m-chat/resolve/main/model.shard-00001-of-00011.gguf",
     fileSizeInMegabytes: 547,
   },
+  "qwen-2.5-coder-0.5b": {
+    ...defaultModelConfig,
+    label: "Qwen 2.5 Coder 0.5B",
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Q8_0-Qwen2.5-Coder-0.5B-Instruct/resolve/main/model.shard-00001-of-00005.gguf",
+    fileSizeInMegabytes: 676,
+  },
   "amd-olmo-1b": {
     ...defaultModelConfig,
     label: "AMD OLMo 1B",
