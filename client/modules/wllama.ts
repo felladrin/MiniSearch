@@ -76,7 +76,7 @@ const defaultModelConfig: Omit<
       { id: 3, role: "user", content: query },
     ]);
   },
-  cacheType: "f16",
+  cacheType: "q8_0",
   contextSize: 2048,
   shouldIncludeUrlsOnPrompt: true,
   sampling: {
@@ -166,12 +166,6 @@ export const wllamaModels: Record<string, WllamaModel> = {
     label: "Arcee Lite 1.5B",
     url: "https://huggingface.co/Felladrin/gguf-q5_k_l-imat-arcee-lite/resolve/main/arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
     fileSizeInMegabytes: 1430,
-  },
-  "danube2-1.8b": {
-    ...defaultModelConfig,
-    label: "Danube 2 1.8B",
-    url: "https://huggingface.co/Felladrin/gguf-q5_k_m-h2o-danube2-1.8b-chat/resolve/main/h2o-danube2-1-00001-of-00021.gguf",
-    fileSizeInMegabytes: 1300,
   },
   "granite-3.0-2b": {
     ...defaultModelConfig,
