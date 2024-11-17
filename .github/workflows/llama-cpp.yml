@@ -1,0 +1,110 @@
+name: Review Pull Request with LlamaCPP
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  llama-cpp:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    name: LlamaCPP
+    permissions:
+      pull-requests: write
+      contents: read
+    timeout-minutes: 30
+    env:
+      LLAMA_CPP_COMMIT: 772703c8fffdd83d2e28f60119e83525f1189412
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Fetch branches and output the diff in this step
+        run: |
+          git fetch origin main:main
+          git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-branch
+          mkdir -p /tmp/llama_review
+          git diff main..pr-branch > /tmp/llama_review/diff.txt
+
+      - name: Write prompt to file
+        id: build_prompt
+        env:
+          LLAMA_CPP_PROMPT: |
+            <|im_start|>system
+            You are a senior software engineer working ${{ github.event.repository.name }}, which has the following description: "${{ github.event.repository.description }}"<|im_end|>
+            <|im_start|>user
+            The current pull request is titled "${{ github.event.pull_request.title }}" and is in branch "${{ github.event.pull_request.head.ref }}".
+
+            Please write a high-quality pull request review of the following changes:
+            \`\`\`diff
+            {{diffContent}}
+            \`\`\`<|im_end|>
+            <|im_start|>assistant
+        run: |
+          DIFF_CONTENT=$(cat /tmp/llama_review/diff.txt)
+          echo "${{ env.LLAMA_CPP_PROMPT }}" | awk -v r="$DIFF_CONTENT" '{gsub(/{{diffContent}}/,r)}1' > /tmp/llama_review/prompt.txt
+
+      - name: Cache LlamaCPP
+        id: cache_llama_cpp
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/llama.cpp/
+          key: llama-cpp-${{ runner.os }}-${{ env.LLAMA_CPP_COMMIT }}
+
+      - name: Clone and build LlamaCPP
+        if: steps.cache_llama_cpp.outputs.cache-hit != 'true'
+        env:
+          LLAMA_CURL: "ON"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev
+          git clone https://github.com/ggerganov/llama.cpp.git
+          cd llama.cpp
+          git checkout ${{ env.LLAMA_CPP_COMMIT }}
+          make -j llama-cli
+          mkdir -p ~/.cache/llama.cpp/
+          cp llama-cli ~/.cache/llama.cpp/
+
+      - name: Copy LlamaCPP to /usr/local/bin/
+        run: cp ~/.cache/llama.cpp/llama-cli /usr/local/bin/
+
+      - name: Run LlamaCPP
+        run: |
+          PROMPT=$(cat /tmp/llama_review/prompt.txt)
+          llama-cli \
+            --hf-repo "unsloth/Qwen2.5-Coder-3B-Instruct-GGUF" \
+            --hf-file Qwen2.5-Coder-3B-Instruct-Q8_0.gguf \
+            -p "$PROMPT" \
+            --ctx-size 32768 \
+            -n -1 \
+            --temp 0.5 \
+            --top-p 1.0 \
+            --frequency-penalty 0.5 \
+            --presence-penalty 0.3 \
+            --repeat-penalty 1.176 \
+            --no-display-prompt > /tmp/llama_review/response.txt
+
+      - name: Show Response
+        run: cat /tmp/llama_review/response.txt
+
+      - name: Find Comment
+        uses: peter-evans/find-comment@v3
+        id: find_comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "[end of text]"
+
+      - name: Post or Update PR Review
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: /tmp/llama_review/response.txt
+          edit-mode: replace
