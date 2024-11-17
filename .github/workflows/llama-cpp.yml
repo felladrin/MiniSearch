@@ -38,10 +38,9 @@ jobs:
           LLAMA_CPP_PROMPT: |
             <|im_start|>system
             You are a senior software engineer working ${{ github.event.repository.name }}, which has the following description: "${{ github.event.repository.description }}"<|im_end|>
+            You are currently reviewing a pull request titled "${{ github.event.pull_request.title }}", from the branch "${{ github.event.pull_request.head.ref }}".
             <|im_start|>user
-            The current pull request is titled "${{ github.event.pull_request.title }}" and is in branch "${{ github.event.pull_request.head.ref }}".
-
-            Your task is to write a high-quality pull request review of the following changes:
+            Write a high-quality pull request review of the following changes:
             \`\`\`diff
             {{diffContent}}
             \`\`\`<|im_end|>
