@@ -41,11 +41,12 @@ jobs:
             <|im_start|>user
             The current pull request is titled "${{ github.event.pull_request.title }}" and is in branch "${{ github.event.pull_request.head.ref }}".
 
-            Please write a high-quality pull request review of the following changes:
+            Your task is to write a high-quality pull request review of the following changes:
             \`\`\`diff
             {{diffContent}}
             \`\`\`<|im_end|>
             <|im_start|>assistant
+            ### Pull Request Review
         run: |
           DIFF_CONTENT=$(cat /tmp/llama_review/diff.txt)
           echo "${{ env.LLAMA_CPP_PROMPT }}" | awk -v r="$DIFF_CONTENT" '{gsub(/{{diffContent}}/,r)}1' > /tmp/llama_review/prompt.txt
