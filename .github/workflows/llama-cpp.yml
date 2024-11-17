@@ -83,11 +83,10 @@ jobs:
             -p "$PROMPT" \
             --ctx-size 32768 \
             -n -1 \
-            --temp 0.5 \
-            --top-p 1.0 \
-            --frequency-penalty 0.5 \
-            --presence-penalty 0.3 \
-            --repeat-penalty 1.176 \
+            --temp 0.7 \
+            --top-p 0.9 \
+            --min-p 0.1 \
+            --top-k 0 \
             --no-display-prompt > /tmp/llama_review/response.txt
 
       - name: Show Response
