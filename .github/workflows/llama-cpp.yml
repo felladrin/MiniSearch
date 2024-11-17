@@ -37,15 +37,15 @@ jobs:
         env:
           LLAMA_CPP_PROMPT: |
             <|im_start|>system
-            You are a senior software engineer working ${{ github.event.repository.name }}, which has the following description: "${{ github.event.repository.description }}"<|im_end|>
+            You are a senior software engineer working ${{ github.event.repository.name }}, which has the following description: "${{ github.event.repository.description }}".
+            You are currently reviewing a pull request titled "${{ github.event.pull_request.title }}", from the branch "${{ github.event.pull_request.head.ref }}".<|im_end|>
             <|im_start|>user
-            The current pull request is titled "${{ github.event.pull_request.title }}" and is in branch "${{ github.event.pull_request.head.ref }}".
-
-            Please write a high-quality pull request review of the following changes:
+            Write a high-quality review of the following changes:
             \`\`\`diff
             {{diffContent}}
             \`\`\`<|im_end|>
             <|im_start|>assistant
+            ### Pull Request Review
         run: |
           DIFF_CONTENT=$(cat /tmp/llama_review/diff.txt)
           echo "${{ env.LLAMA_CPP_PROMPT }}" | awk -v r="$DIFF_CONTENT" '{gsub(/{{diffContent}}/,r)}1' > /tmp/llama_review/prompt.txt
@@ -101,7 +101,7 @@ jobs:
           body-includes: "[end of text]"
 
       - name: Post or Update PR Review
-        uses: peter-evans/create-or-update-comment@v3
+        uses: peter-evans/create-or-update-comment@v4
         with:
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
