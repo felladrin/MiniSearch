@@ -20,7 +20,7 @@ jobs:
       contents: read
     timeout-minutes: 30
     env:
-      LLAMA_CPP_COMMIT: 772703c8fffdd83d2e28f60119e83525f1189412
+      LLAMA_CPP_COMMIT: 42ae10bbcd7b56f29a302c86796542a6dadf46c9
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -43,10 +43,11 @@ jobs:
             Write a high-quality review of the following changes:
             \`\`\`diff
             {{diffContent}}
-            \`\`\`<|im_end|>
+            \`\`\`
+            <|im_end|>
             <|im_start|>assistant
             ### Pull Request Review
-            
+
             #### Summary
         run: |
           DIFF_CONTENT=$(cat /tmp/llama_review/diff.txt)
@@ -61,35 +62,36 @@ jobs:
 
       - name: Clone and build LlamaCPP
         if: steps.cache_llama_cpp.outputs.cache-hit != 'true'
-        env:
-          LLAMA_CURL: "ON"
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
           git clone https://github.com/ggerganov/llama.cpp.git
           cd llama.cpp
           git checkout ${{ env.LLAMA_CPP_COMMIT }}
-          make -j llama-cli
+          make -j llama-speculative
           mkdir -p ~/.cache/llama.cpp/
-          cp llama-cli ~/.cache/llama.cpp/
+          cp llama-speculative ~/.cache/llama.cpp/
+          curl -L -o ~/.cache/llama.cpp/Qwen2.5-Coder-3B-Instruct-Q8_0.gguf https://huggingface.co/unsloth/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-3B-Instruct-Q8_0.gguf
+          curl -L -o ~/.cache/llama.cpp/Qwen2.5-Coder-0.5B-Instruct-Q8_0.gguf https://huggingface.co/unsloth/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-0.5B-Instruct-Q8_0.gguf
 
       - name: Copy LlamaCPP to /usr/local/bin/
-        run: cp ~/.cache/llama.cpp/llama-cli /usr/local/bin/
+        run: cp ~/.cache/llama.cpp/llama-speculative /usr/local/bin/
 
       - name: Run LlamaCPP
         run: |
           PROMPT=$(cat /tmp/llama_review/prompt.txt)
-          llama-cli \
-            --hf-repo "unsloth/Qwen2.5-Coder-3B-Instruct-GGUF" \
-            --hf-file Qwen2.5-Coder-3B-Instruct-Q8_0.gguf \
+          llama-speculative \
             -p "$PROMPT" \
+            -e \
             --ctx-size 32768 \
+            -m ~/.cache/llama.cpp/Qwen2.5-Coder-3B-Instruct-Q8_0.gguf \
+            -md ~/.cache/llama.cpp/Qwen2.5-Coder-0.5B-Instruct-Q8_0.gguf \
+            --draft 16 \
+            -np 1 \
+            -t -1 \
             -n -1 \
             --temp 0.7 \
-            --top-p 0.9 \
-            --min-p 0.1 \
-            --top-k 0 \
-            --no-display-prompt > /tmp/llama_review/response.txt
+            --top-k 1 | \
+          awk '/^<\|im_start\|>assistant/{p=NR+1}p&&NR>p{print}' | \
+          sed '/<|im_end|>/,$d' > /tmp/llama_review/response.txt
 
       - name: Show Response
         run: cat /tmp/llama_review/response.txt
@@ -100,7 +102,7 @@ jobs:
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: "github-actions[bot]"
-          body-includes: "[end of text]"
+          body-includes: "#### Summary"
 
       - name: Post or Update PR Review
         uses: peter-evans/create-or-update-comment@v4
