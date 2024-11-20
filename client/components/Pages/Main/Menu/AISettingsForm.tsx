@@ -93,8 +93,6 @@ export default function AISettingsForm() {
       if (hasNoModelSelected || isModelInvalid) {
         form.setFieldValue("openAiApiModel", openAiModels[0].value);
       }
-    } else if (form.values.openAiApiModel) {
-      form.setFieldValue("openAiApiModel", "");
     }
   }, [openAiModels, form.setFieldValue, form.values.openAiApiModel]);
 
