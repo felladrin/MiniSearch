@@ -20,7 +20,7 @@ jobs:
       contents: read
     timeout-minutes: 30
     env:
-      LLAMA_CPP_COMMIT: 772703c8fffdd83d2e28f60119e83525f1189412
+      LLAMA_CPP_COMMIT: 42ae10bbcd7b56f29a302c86796542a6dadf46c9
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -34,23 +34,25 @@ jobs:
 
       - name: Write prompt to file
         id: build_prompt
-        env:
-          LLAMA_CPP_PROMPT: |
-            <|im_start|>system
-            You are a senior software engineer working ${{ github.event.repository.name }}, which has the following description: "${{ github.event.repository.description }}".
-            You are currently reviewing a pull request titled "${{ github.event.pull_request.title }}", from the branch "${{ github.event.pull_request.head.ref }}".<|im_end|>
-            <|im_start|>user
-            Write a high-quality review of the following changes:
-            \`\`\`diff
-            {{diffContent}}
-            \`\`\`<|im_end|>
-            <|im_start|>assistant
-            ### Pull Request Review
-            
-            #### Summary
         run: |
+          PR_TITLE=$(echo "${{ github.event.pull_request.title }}" | sed 's/[()]/\\&/g')
           DIFF_CONTENT=$(cat /tmp/llama_review/diff.txt)
-          echo "${{ env.LLAMA_CPP_PROMPT }}" | awk -v r="$DIFF_CONTENT" '{gsub(/{{diffContent}}/,r)}1' > /tmp/llama_review/prompt.txt
+          echo "<|im_start|>system
+          You are a senior software engineer working ${{ github.event.repository.name }}, which has the following description: \"${{ github.event.repository.description }}\".
+          You are currently reviewing a pull request titled \"$PR_TITLE\", from the branch \"${{ github.event.pull_request.head.ref }}\".<|im_end|>
+          <|im_start|>user
+          Write a high-quality review of the following changes:
+          \`\`\`diff
+          $DIFF_CONTENT
+          \`\`\`
+          <|im_end|>
+          <|im_start|>assistant
+          ### Pull Request Review
+
+          #### Summary" > /tmp/llama_review/prompt.txt
+
+      - name: Show Prompt
+        run: cat /tmp/llama_review/prompt.txt
 
       - name: Cache LlamaCPP
         id: cache_llama_cpp
@@ -61,17 +63,14 @@ jobs:
 
       - name: Clone and build LlamaCPP
         if: steps.cache_llama_cpp.outputs.cache-hit != 'true'
-        env:
-          LLAMA_CURL: "ON"
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev
           git clone https://github.com/ggerganov/llama.cpp.git
           cd llama.cpp
           git checkout ${{ env.LLAMA_CPP_COMMIT }}
           make -j llama-cli
           mkdir -p ~/.cache/llama.cpp/
           cp llama-cli ~/.cache/llama.cpp/
+          curl -L -o ~/.cache/llama.cpp/Qwen2.5-Coder-3B-Instruct-Q8_0.gguf https://huggingface.co/unsloth/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-3B-Instruct-Q8_0.gguf
 
       - name: Copy LlamaCPP to /usr/local/bin/
         run: cp ~/.cache/llama.cpp/llama-cli /usr/local/bin/
@@ -80,10 +79,12 @@ jobs:
         run: |
           PROMPT=$(cat /tmp/llama_review/prompt.txt)
           llama-cli \
-            --hf-repo "unsloth/Qwen2.5-Coder-3B-Instruct-GGUF" \
-            --hf-file Qwen2.5-Coder-3B-Instruct-Q8_0.gguf \
+            -m ~/.cache/llama.cpp/Qwen2.5-Coder-3B-Instruct-Q8_0.gguf \
             -p "$PROMPT" \
+            -e \
             --ctx-size 32768 \
+            -np 1 \
+            -t -1 \
             -n -1 \
             --temp 0.7 \
             --top-p 0.9 \
