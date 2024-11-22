@@ -83,18 +83,6 @@ listenToTextGenerationStateChanges((textGenerationState) => {
   addLogEntry(`Text generation state changed to '${textGenerationState}'`);
 });
 
-export const searchStatePubSub = createPubSub<
-  "idle" | "running" | "failed" | "completed"
->("idle");
-
-export const [updateSearchState] = searchStatePubSub;
-
-const [, listenToSearchStateChanges] = searchStatePubSub;
-
-listenToSearchStateChanges((searchState) => {
-  addLogEntry(`Search state changed to '${searchState}'`);
-});
-
 export const modelLoadingProgressPubSub = createPubSub(0);
 
 export const [updateModelLoadingProgress] = modelLoadingProgressPubSub;
@@ -119,11 +107,19 @@ export const [
   getTextSearchState,
 ] = textSearchStatePubSub;
 
+subscribeToTextSearchState((textSearchState) => {
+  addLogEntry(`Text search state changed to '${textSearchState}'`);
+});
+
 export const [
   updateImageSearchState,
   subscribeToImageSearchState,
   getImageSearchState,
 ] = imageSearchStatePubSub;
+
+subscribeToImageSearchState((imageSearchState) => {
+  addLogEntry(`Image search state changed to '${imageSearchState}'`);
+});
 
 export const textSearchResultsPubSub = createPubSub<TextSearchResults>([]);
 export const imageSearchResultsPubSub = createPubSub<ImageSearchResults>([]);

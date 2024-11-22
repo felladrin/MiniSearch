@@ -4,9 +4,10 @@ import { Suspense } from "react";
 import { lazy } from "react";
 import { Pattern, match } from "ts-pattern";
 import {
+  imageSearchStatePubSub,
   queryPubSub,
-  searchStatePubSub,
   textGenerationStatePubSub,
+  textSearchStatePubSub,
 } from "../../../modules/pubSub";
 
 const AiResponseSection = lazy(
@@ -20,7 +21,8 @@ const SearchForm = lazy(() => import("../../Search/Form/SearchForm"));
 
 export default function MainPage() {
   const [query, updateQuery] = usePubSub(queryPubSub);
-  const [searchState] = usePubSub(searchStatePubSub);
+  const [textSearchState] = usePubSub(textSearchStatePubSub);
+  const [imageSearchState] = usePubSub(imageSearchStatePubSub);
   const [textGenerationState] = usePubSub(textGenerationStatePubSub);
 
   return (
@@ -52,12 +54,16 @@ export default function MainPage() {
             </Suspense>
           ))
           .otherwise(() => null)}
-        {match(searchState)
-          .with(Pattern.not("idle"), () => (
-            <Suspense>
-              <SearchResultsSection />
-            </Suspense>
-          ))
+        {match([textSearchState, imageSearchState])
+          .with(
+            [Pattern.not("idle"), Pattern.any],
+            [Pattern.any, Pattern.not("idle")],
+            () => (
+              <Suspense>
+                <SearchResultsSection />
+              </Suspense>
+            ),
+          )
           .otherwise(() => null)}
       </Stack>
     </Container>

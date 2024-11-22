@@ -7,13 +7,19 @@ import {
   getSettings,
   getTextGenerationState,
   listenToSettingsChanges,
+  updateImageSearchState,
   updateResponse,
   updateSearchPromise,
   updateSearchResults,
-  updateSearchState,
   updateTextGenerationState,
+  updateTextSearchState,
 } from "./pubSub";
-import { type ImageSearchResult, searchImages, searchText } from "./search";
+import {
+  type ImageSearchResults,
+  type TextSearchResults,
+  searchImages,
+  searchText,
+} from "./search";
 import { getSystemPrompt } from "./systemPrompt";
 import {
   ChatGenerationError,
@@ -30,7 +36,7 @@ export async function searchAndRespond() {
 
   updateSearchResults({ textResults: [], imageResults: [] });
 
-  updateSearchPromise(startSearch(getQuery()));
+  updateSearchPromise(startTextSearch(getQuery()));
 
   if (!getSettings().enableAiResponse) return;
 
@@ -165,57 +171,77 @@ async function getKeywords(text: string, limit?: number) {
     .slice(0, limit);
 }
 
-async function startSearch(query: string) {
-  updateSearchState("running");
+async function startTextSearch(query: string) {
+  const results = {
+    textResults: [] as TextSearchResults,
+    imageResults: [] as ImageSearchResults,
+  };
 
   const searchQuery =
     query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query;
 
-  try {
-    let textResults = await searchText(
-      searchQuery,
-      getSettings().searchResultsLimit,
-    );
+  if (getSettings().enableImageSearch) {
+    updateImageSearchState("running");
+  }
 
-    if (textResults.length === 0) {
-      const queryKeywords = await getKeywords(query, 10);
-      const keywordResults = await searchText(
-        queryKeywords.join(" "),
-        getSettings().searchResultsLimit,
-      );
-      textResults = keywordResults;
-    }
+  if (getSettings().enableTextSearch) {
+    updateTextSearchState("running");
 
-    const results = {
-      textResults,
-      imageResults: [] as ImageSearchResult[],
-    };
-
-    updateSearchState(
-      results.textResults.length === 0 ? "failed" : "completed",
-    );
-    updateSearchResults(results);
-
-    const deferImageSearch = async () => {
-      const imageResults = await searchImages(
+    try {
+      let textResults = await searchText(
         searchQuery,
         getSettings().searchResultsLimit,
       );
-      results.imageResults = imageResults;
+
+      if (textResults.length === 0) {
+        const queryKeywords = await getKeywords(query, 10);
+        const keywordResults = await searchText(
+          queryKeywords.join(" "),
+          getSettings().searchResultsLimit,
+        );
+        textResults = keywordResults;
+      }
+
+      results.textResults = textResults;
+
+      updateTextSearchState(
+        results.textResults.length === 0 ? "failed" : "completed",
+      );
       updateSearchResults(results);
-    };
+    } catch (error) {
+      addLogEntry(
+        `Search failed: ${error instanceof Error ? error.message : error}`,
+      );
+      updateTextSearchState("failed");
+    }
+  }
 
-    deferImageSearch();
+  if (getSettings().enableImageSearch) {
+    startImageSearch(searchQuery, results);
+  }
 
-    return results;
+  return results;
+}
+
+async function startImageSearch(
+  searchQuery: string,
+  results: { textResults: TextSearchResults; imageResults: ImageSearchResults },
+) {
+  try {
+    const imageResults = await searchImages(
+      searchQuery,
+      getSettings().searchResultsLimit,
+    );
+    results.imageResults = imageResults;
+    updateImageSearchState(
+      results.imageResults.length === 0 ? "failed" : "completed",
+    );
+    updateSearchResults(results);
   } catch (error) {
     addLogEntry(
-      `Search failed: ${error instanceof Error ? error.message : error}`,
+      `Image search failed: ${error instanceof Error ? error.message : error}`,
     );
-    updateSearchState("failed");
-    const emptyResults = { textResults: [], imageResults: [] };
-    updateSearchResults(emptyResults);
-    return emptyResults;
+    updateImageSearchState("failed");
   }
 }
 
