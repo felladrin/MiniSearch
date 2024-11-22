@@ -13,7 +13,6 @@ import {
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
-import { defaultSettings } from "./settings";
 import {
   canStartResponding,
   getDefaultChatCompletionCreateParamsStreaming,
@@ -101,7 +100,6 @@ async function initializeWebLlmEngine() {
   };
 
   const chatOptions: ChatOptions = {
-    repetition_penalty: defaultSettings.inferenceRepeatPenalty,
     context_window_size: 2048,
     sliding_window_size: -1,
     attention_sink_size: -1,

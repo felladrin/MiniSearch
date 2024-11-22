@@ -84,11 +84,8 @@ const defaultModelConfig: Omit<
     temp: defaultSettings.inferenceTemperature,
     penalty_freq: defaultSettings.inferenceFrequencyPenalty,
     penalty_present: defaultSettings.inferencePresencePenalty,
-    penalty_repeat: defaultSettings.inferenceRepeatPenalty,
-    // @ts-expect-error Wllama still doesn't have the following properties defined, although they are supported by the llama.cpp.
-    xtc_probability: 0.5,
-    dry_multiplier: 0.8,
-    sampling_seq: "ptxd",
+    min_p: 1 - defaultSettings.inferenceTopP,
+    top_k: 0,
   },
 };
 
@@ -229,7 +226,9 @@ export const wllamaModels: Record<string, WllamaModel> = {
 };
 
 function buildGranitePrompt(query: string, searchResults: string) {
-  return `<|start_of_role|>system<|end_of_role|>${getSystemPrompt(searchResults)}<|end_of_text|>
+  return `<|start_of_role|>system<|end_of_role|>${getSystemPrompt(
+    searchResults,
+  )}<|end_of_text|>
 <|start_of_role|>user<|end_of_role|>${query}<|end_of_text|>
 <|start_of_role|>assistant<|end_of_role|>`;
 }
