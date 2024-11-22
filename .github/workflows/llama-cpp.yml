@@ -48,8 +48,7 @@ jobs:
           <|im_end|>
           <|im_start|>assistant
           ### Pull Request Review
-
-          #### Summary" > /tmp/llama_review/prompt.txt
+          " > /tmp/llama_review/prompt.txt
 
       - name: Show Prompt
         run: cat /tmp/llama_review/prompt.txt
@@ -86,7 +85,7 @@ jobs:
             -np 1 \
             -t -1 \
             -n -1 \
-            --temp 0.7 \
+            --temp 0.5 \
             --top-p 0.9 \
             --min-p 0.1 \
             --top-k 0 \
