@@ -1,15 +1,29 @@
 import { name } from "../../package.json";
 import { addLogEntry } from "./logEntries";
+import {
+  updateImageSearchResults,
+  updateImageSearchState,
+  updateTextSearchResults,
+  updateTextSearchState,
+} from "./pubSub";
 import { getSearchTokenHash } from "./searchTokenHash";
 
+export type TextSearchResult = [title: string, snippet: string, url: string];
+export type ImageSearchResult = [
+  title: string,
+  url: string,
+  thumbnailUrl: string,
+  sourceUrl: string,
+];
+
+export type TextSearchResults = TextSearchResult[];
+export type ImageSearchResults = ImageSearchResult[];
+
+export type SearchState = "idle" | "running" | "failed" | "completed";
+
 export type SearchResults = {
-  textResults: [title: string, snippet: string, url: string][];
-  imageResults: [
-    title: string,
-    url: string,
-    thumbnailUrl: string,
-    sourceUrl: string,
-  ][];
+  textResults: TextSearchResult[];
+  imageResults: ImageSearchResult[];
 };
 
 /**
@@ -31,26 +45,54 @@ export type SearchResults = {
  * If IndexedDB is not available, the function falls back to using the original
  * search function without caching.
  */
-function cacheSearchWithIndexedDB(
-  fn: (query: string, limit?: number) => Promise<SearchResults>,
-): (query: string, limit?: number) => Promise<SearchResults> {
-  const storeName = "searches";
+function cacheSearchWithIndexedDB<
+  T extends ImageSearchResults | TextSearchResults,
+>(
+  fn: (query: string, limit?: number) => Promise<T>,
+  storeName: string,
+): (query: string, limit?: number) => Promise<T> {
+  const databaseVersion = 2;
   const timeToLive = 15 * 60 * 1000;
 
   async function openDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(name, 1);
+      let request = indexedDB.open(name, databaseVersion);
+
       request.onerror = () => reject(request.error);
+
       request.onsuccess = () => {
         const db = request.result;
-        cleanExpiredCache(db);
-        resolve(db);
+        if (
+          !db.objectStoreNames.contains("textSearches") ||
+          !db.objectStoreNames.contains("imageSearches")
+        ) {
+          db.close();
+          request = indexedDB.open(name, databaseVersion);
+          request.onupgradeneeded = createStores;
+          request.onsuccess = () => {
+            const upgradedDb = request.result;
+            cleanExpiredCache(upgradedDb);
+            resolve(upgradedDb);
+          };
+          request.onerror = () => reject(request.error);
+        } else {
+          cleanExpiredCache(db);
+          resolve(db);
+        }
       };
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        db.createObjectStore(storeName);
-      };
+
+      request.onupgradeneeded = createStores;
     });
+  }
+
+  function createStores(event: IDBVersionChangeEvent): void {
+    const db = (event.target as IDBOpenDBRequest).result;
+    if (!db.objectStoreNames.contains("textSearches")) {
+      db.createObjectStore("textSearches");
+    }
+    if (!db.objectStoreNames.contains("imageSearches")) {
+      db.createObjectStore("imageSearches");
+    }
   }
 
   async function cleanExpiredCache(db: IDBDatabase): Promise<void> {
@@ -95,8 +137,7 @@ function cacheSearchWithIndexedDB(
 
   const dbPromise = openDB();
 
-  return async (query: string, limit?: number): Promise<SearchResults> => {
-    addLogEntry("Starting new search");
+  return async (query: string, limit?: number): Promise<T> => {
     if (!indexedDB) return fn(query, limit);
 
     const db = await dbPromise;
@@ -105,7 +146,7 @@ function cacheSearchWithIndexedDB(
     const key = hashQuery(query);
     const cachedResult = await new Promise<
       | {
-          results: SearchResults;
+          results: T;
           timestamp: number;
         }
       | undefined
@@ -117,8 +158,15 @@ function cacheSearchWithIndexedDB(
 
     if (cachedResult && Date.now() - cachedResult.timestamp < timeToLive) {
       addLogEntry(
-        `Search cache hit, returning cached results containing ${cachedResult.results.textResults.length} texts and ${cachedResult.results.imageResults.length} images`,
+        `Search cache hit, returning cached results containing ${cachedResult.results.length} items`,
       );
+      if (storeName === "textSearches") {
+        updateTextSearchResults(cachedResult.results as TextSearchResults);
+        updateTextSearchState("completed");
+      } else if (storeName === "imageSearches") {
+        updateImageSearchResults(cachedResult.results as ImageSearchResults);
+        updateImageSearchState("completed");
+      }
       return cachedResult.results;
     }
 
@@ -130,30 +178,68 @@ function cacheSearchWithIndexedDB(
     const writeStore = writeTransaction.objectStore(storeName);
     writeStore.put({ results, timestamp: Date.now() }, key);
 
-    addLogEntry(
-      `Search completed with ${results.textResults.length} text results and ${results.imageResults.length} image results`,
-    );
+    addLogEntry(`Search completed with ${results.length} items`);
 
     return results;
   };
 }
 
-export const search = cacheSearchWithIndexedDB(
-  async (query: string, limit?: number): Promise<SearchResults> => {
-    const searchUrl = new URL("/search", self.location.origin);
-
+export const searchText = cacheSearchWithIndexedDB<TextSearchResults>(
+  async (query: string, limit?: number): Promise<TextSearchResults> => {
+    const searchUrl = new URL("/search/text", self.location.origin);
     searchUrl.searchParams.set("q", query);
-
     searchUrl.searchParams.set("token", await getSearchTokenHash());
+    if (limit) searchUrl.searchParams.set("limit", limit.toString());
 
-    if (limit && limit > 0) {
-      searchUrl.searchParams.set("limit", limit.toString());
+    try {
+      updateTextSearchState("running");
+      const response = await fetch(searchUrl.toString());
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const results = await response.json();
+      updateTextSearchResults(results);
+      updateTextSearchState("completed");
+      return results;
+    } catch (error) {
+      addLogEntry(
+        `Text search failed: ${error instanceof Error ? error.message : error}`,
+      );
+      updateTextSearchState("failed");
+      return [];
     }
-
-    const response = await fetch(searchUrl.toString());
-
-    return response.ok
-      ? response.json()
-      : { textResults: [], imageResults: [] };
   },
+  "textSearches",
+);
+
+export const searchImages = cacheSearchWithIndexedDB<ImageSearchResults>(
+  async (query: string, limit?: number): Promise<ImageSearchResults> => {
+    const searchUrl = new URL("/search/images", self.location.origin);
+    searchUrl.searchParams.set("q", query);
+    searchUrl.searchParams.set("token", await getSearchTokenHash());
+    if (limit) searchUrl.searchParams.set("limit", limit.toString());
+
+    try {
+      updateImageSearchState("running");
+      const response = await fetch(searchUrl.toString());
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const results = await response.json();
+      updateImageSearchResults(results);
+      updateImageSearchState("completed");
+      return results;
+    } catch (error) {
+      addLogEntry(
+        `Image search failed: ${error instanceof Error ? error.message : error}`,
+      );
+      updateImageSearchState("failed");
+      return [];
+    }
+  },
+  "imageSearches",
 );

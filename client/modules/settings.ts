@@ -32,10 +32,13 @@ Search results:
   enterToSubmit: true,
   enableAiResponseScrolling: true,
   allowAiModelDownload: false,
+  enableTextSearch: true,
 };
 
 addLogEntry(
-  `Number of logical processors in CPU: ${navigator.hardwareConcurrency ?? "unknown"}`,
+  `Number of logical processors in CPU: ${
+    navigator.hardwareConcurrency ?? "unknown"
+  }`,
 );
 
 export type Settings = typeof defaultSettings;

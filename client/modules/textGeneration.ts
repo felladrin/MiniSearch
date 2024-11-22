@@ -7,13 +7,19 @@ import {
   getSettings,
   getTextGenerationState,
   listenToSettingsChanges,
+  updateImageSearchState,
   updateResponse,
   updateSearchPromise,
   updateSearchResults,
-  updateSearchState,
   updateTextGenerationState,
+  updateTextSearchState,
 } from "./pubSub";
-import { search } from "./search";
+import {
+  type ImageSearchResults,
+  type TextSearchResults,
+  searchImages,
+  searchText,
+} from "./search";
 import { getSystemPrompt } from "./systemPrompt";
 import {
   ChatGenerationError,
@@ -30,7 +36,7 @@ export async function searchAndRespond() {
 
   updateSearchResults({ textResults: [], imageResults: [] });
 
-  updateSearchPromise(startSearch(getQuery()));
+  updateSearchPromise(startTextSearch(getQuery()));
 
   if (!getSettings().enableAiResponse) return;
 
@@ -165,30 +171,78 @@ async function getKeywords(text: string, limit?: number) {
     .slice(0, limit);
 }
 
-async function startSearch(query: string) {
-  updateSearchState("running");
+async function startTextSearch(query: string) {
+  const results = {
+    textResults: [] as TextSearchResults,
+    imageResults: [] as ImageSearchResults,
+  };
 
-  let searchResults = await search(
-    query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query,
-    getSettings().searchResultsLimit,
-  );
+  const searchQuery =
+    query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query;
 
-  if (searchResults.textResults.length === 0) {
-    const queryKeywords = await getKeywords(query, 10);
-
-    searchResults = await search(
-      queryKeywords.join(" "),
-      getSettings().searchResultsLimit,
-    );
+  if (getSettings().enableImageSearch) {
+    updateImageSearchState("running");
   }
 
-  updateSearchState(
-    searchResults.textResults.length === 0 ? "failed" : "completed",
-  );
+  if (getSettings().enableTextSearch) {
+    updateTextSearchState("running");
 
-  updateSearchResults(searchResults);
+    try {
+      let textResults = await searchText(
+        searchQuery,
+        getSettings().searchResultsLimit,
+      );
 
-  return searchResults;
+      if (textResults.length === 0) {
+        const queryKeywords = await getKeywords(query, 10);
+        const keywordResults = await searchText(
+          queryKeywords.join(" "),
+          getSettings().searchResultsLimit,
+        );
+        textResults = keywordResults;
+      }
+
+      results.textResults = textResults;
+
+      updateTextSearchState(
+        results.textResults.length === 0 ? "failed" : "completed",
+      );
+      updateSearchResults(results);
+    } catch (error) {
+      addLogEntry(
+        `Search failed: ${error instanceof Error ? error.message : error}`,
+      );
+      updateTextSearchState("failed");
+    }
+  }
+
+  if (getSettings().enableImageSearch) {
+    startImageSearch(searchQuery, results);
+  }
+
+  return results;
+}
+
+async function startImageSearch(
+  searchQuery: string,
+  results: { textResults: TextSearchResults; imageResults: ImageSearchResults },
+) {
+  try {
+    const imageResults = await searchImages(
+      searchQuery,
+      getSettings().searchResultsLimit,
+    );
+    results.imageResults = imageResults;
+    updateImageSearchState(
+      results.imageResults.length === 0 ? "failed" : "completed",
+    );
+    updateSearchResults(results);
+  } catch (error) {
+    addLogEntry(
+      `Image search failed: ${error instanceof Error ? error.message : error}`,
+    );
+    updateImageSearchState("failed");
+  }
 }
 
 function canDownloadModels(): Promise<void> {

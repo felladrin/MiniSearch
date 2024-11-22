@@ -10,13 +10,13 @@ import {
 import { useMediaQuery } from "@mantine/hooks";
 import { useEffect, useState } from "react";
 import { addLogEntry } from "../../../../modules/logEntries";
-import type { SearchResults } from "../../../../modules/search";
+import type { TextSearchResult } from "../../../../modules/search";
 import { getHostname } from "../../../../modules/stringFormatters";
 
 export default function SearchResultsList({
   searchResults,
 }: {
-  searchResults: SearchResults["textResults"];
+  searchResults: TextSearchResult[];
 }) {
   const shouldDisplayDomainBelowTitle = useMediaQuery(
     `(max-width: ${em(720)})`,

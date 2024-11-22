@@ -5,101 +5,100 @@ import { rankSearchResults } from "./rankSearchResults";
 import { incrementSearchesSinceLastRestart } from "./searchesSinceLastRestart";
 import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit";
 
+type TextResult = [title: string, content: string, url: string];
+type ImageResult = [
+  title: string,
+  url: string,
+  thumbnailSource: string,
+  sourceUrl: string,
+];
+
 export function searchEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
 >(server: T) {
   server.middlewares.use(async (request, response, next) => {
-    if (!request.url.startsWith("/search")) return next();
+    if (!request.url?.startsWith("/search/")) return next();
 
-    const { searchParams } = new URL(
-      request.url,
-      `http://${request.headers.host}`,
-    );
-
-    const limitParam = searchParams.get("limit");
-
-    let limit = 30;
-
-    if (limitParam && Number(limitParam) > 0) {
-      limit = Math.min(limit, Number(limitParam));
-    }
-
-    const query = searchParams.get("q");
+    const url = new URL(request.url, `http://${request.headers.host}`);
+    const query = url.searchParams.get("q");
+    const token = url.searchParams.get("token");
+    const limit = Number(url.searchParams.get("limit")) || 30;
 
     if (!query) {
       response.statusCode = 400;
-      response.end("Missing the query parameter.");
+      response.end(JSON.stringify({ error: "Missing query parameter" }));
       return;
     }
 
-    const token = searchParams.get("token");
-    const authResult = await verifyTokenAndRateLimit(token);
-
-    if (!authResult.isAuthorized) {
-      response.statusCode = authResult.statusCode;
-      response.end(authResult.error);
+    const { isAuthorized, statusCode, error } =
+      await verifyTokenAndRateLimit(token);
+    if (!isAuthorized && statusCode && error) {
+      response.statusCode = statusCode;
+      response.end(JSON.stringify({ error }));
       return;
     }
-
-    const { textResults, imageResults } = await fetchSearXNG(query, limit);
 
     incrementSearchesSinceLastRestart();
 
-    if (textResults.length === 0 && imageResults.length === 0) {
-      response.setHeader("Content-Type", "application/json");
-      response.end(JSON.stringify({ textResults: [], imageResults: [] }));
-      return;
-    }
-
     try {
-      const rankedTextResults = await rankSearchResults(query, textResults);
+      const isTextSearch = request.url?.startsWith("/search/text");
+      const searchType = isTextSearch ? "text" : "images";
+      const searxResults = await fetchSearXNG(query, searchType, limit);
 
-      const rankedImageResults = await rankSearchResults(
-        query,
-        imageResults.map(([title, url, , sourceUrl]) => [
-          title.slice(0, 100),
-          sourceUrl.slice(0, 100),
-          url.slice(0, 100),
-        ]),
-      );
+      if (isTextSearch) {
+        const results = searxResults as TextResult[];
+        const rankedResults = await rankSearchResults(query, results);
 
-      const processedImageResults = await Promise.all(
-        imageResults
-          .filter((_, index) =>
-            rankedImageResults.some(
-              ([title]) => title === imageResults[index][0],
-            ),
-          )
-          .map(async ([title, url, thumbnailSource, sourceUrl]) => {
-            try {
-              const axiosResponse = await axios.get(thumbnailSource, {
-                responseType: "arraybuffer",
-              });
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify(rankedResults));
+      } else {
+        const results = searxResults as ImageResult[];
+        const rankedResults = await rankSearchResults(
+          query,
+          results.map(
+            ([title, url, , sourceUrl]) =>
+              [
+                title.slice(0, 100),
+                sourceUrl.slice(0, 100),
+                url.slice(0, 100),
+              ] as TextResult,
+          ),
+        );
 
-              const contentType = axiosResponse.headers["content-type"];
-              const base64 = Buffer.from(axiosResponse.data).toString("base64");
-              const thumbnailUrl = `data:${contentType};base64,${base64}`;
+        const processedResults = await Promise.all(
+          results
+            .filter((_, index) =>
+              rankedResults.some(([title]) => title === results[index][0]),
+            )
+            .map(async ([title, url, thumbnailSource, sourceUrl]) => {
+              try {
+                const axiosResponse = await axios.get(thumbnailSource, {
+                  responseType: "arraybuffer",
+                });
 
-              return [title, url, thumbnailUrl, sourceUrl];
-            } catch {
-              return null;
-            }
-          }),
-      );
+                const contentType = axiosResponse.headers["content-type"];
+                const base64 = Buffer.from(axiosResponse.data).toString(
+                  "base64",
+                );
+                const thumbnailUrl = `data:${contentType};base64,${base64}`;
 
-      response.setHeader("Content-Type", "application/json");
-      response.end(
-        JSON.stringify({
-          textResults: rankedTextResults,
-          imageResults: processedImageResults.filter(Boolean),
-        }),
-      );
+                return [title, url, thumbnailUrl, sourceUrl] as ImageResult;
+              } catch {
+                return null;
+              }
+            }),
+        );
+
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify(processedResults));
+      }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error(`Error ranking search results: ${errorMessage}`);
-      response.setHeader("Content-Type", "application/json");
-      response.end(JSON.stringify({ textResults, imageResults: [] }));
+      console.error(
+        "Error processing search:",
+        error instanceof Error ? error.message : error,
+      );
+      response.statusCode = 500;
+      response.end(JSON.stringify({ error: "Internal server error" }));
     }
   });
 }
