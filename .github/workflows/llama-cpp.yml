@@ -18,7 +18,7 @@ jobs:
     permissions:
       pull-requests: write
       contents: read
-    timeout-minutes: 30
+    timeout-minutes: 120
     env:
       LLAMA_CPP_COMMIT: 42ae10bbcd7b56f29a302c86796542a6dadf46c9
     steps:
@@ -47,7 +47,6 @@ jobs:
           \`\`\`
           <|im_end|>
           <|im_start|>assistant
-          ### Pull Request Review
           " > /tmp/llama_review/prompt.txt
 
       - name: Show Prompt
@@ -69,7 +68,7 @@ jobs:
           make -j llama-cli
           mkdir -p ~/.cache/llama.cpp/
           cp llama-cli ~/.cache/llama.cpp/
-          curl -L -o ~/.cache/llama.cpp/Qwen2.5-Coder-3B-Instruct-Q8_0.gguf https://huggingface.co/unsloth/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-3B-Instruct-Q8_0.gguf
+          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/unsloth/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-7B-Instruct-Q5_K_M.gguf
 
       - name: Copy LlamaCPP to /usr/local/bin/
         run: cp ~/.cache/llama.cpp/llama-cli /usr/local/bin/
@@ -78,7 +77,7 @@ jobs:
         run: |
           PROMPT=$(cat /tmp/llama_review/prompt.txt)
           llama-cli \
-            -m ~/.cache/llama.cpp/Qwen2.5-Coder-3B-Instruct-Q8_0.gguf \
+            -m ~/.cache/llama.cpp/model.gguf \
             -p "$PROMPT" \
             -e \
             --ctx-size 32768 \
