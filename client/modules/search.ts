@@ -51,27 +51,48 @@ function cacheSearchWithIndexedDB<
   fn: (query: string, limit?: number) => Promise<T>,
   storeName: string,
 ): (query: string, limit?: number) => Promise<T> {
+  const databaseVersion = 2;
   const timeToLive = 15 * 60 * 1000;
 
   async function openDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(name, 1);
+      let request = indexedDB.open(name, databaseVersion);
+
       request.onerror = () => reject(request.error);
+
       request.onsuccess = () => {
         const db = request.result;
-        cleanExpiredCache(db);
-        resolve(db);
-      };
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        if (!db.objectStoreNames.contains("textSearches")) {
-          db.createObjectStore("textSearches");
+        if (
+          !db.objectStoreNames.contains("textSearches") ||
+          !db.objectStoreNames.contains("imageSearches")
+        ) {
+          db.close();
+          request = indexedDB.open(name, databaseVersion);
+          request.onupgradeneeded = createStores;
+          request.onsuccess = () => {
+            const upgradedDb = request.result;
+            cleanExpiredCache(upgradedDb);
+            resolve(upgradedDb);
+          };
+          request.onerror = () => reject(request.error);
+        } else {
+          cleanExpiredCache(db);
+          resolve(db);
         }
-        if (!db.objectStoreNames.contains("imageSearches")) {
-          db.createObjectStore("imageSearches");
-        }
       };
+
+      request.onupgradeneeded = createStores;
     });
+  }
+
+  function createStores(event: IDBVersionChangeEvent): void {
+    const db = (event.target as IDBOpenDBRequest).result;
+    if (!db.objectStoreNames.contains("textSearches")) {
+      db.createObjectStore("textSearches");
+    }
+    if (!db.objectStoreNames.contains("imageSearches")) {
+      db.createObjectStore("imageSearches");
+    }
   }
 
   async function cleanExpiredCache(db: IDBDatabase): Promise<void> {
@@ -117,7 +138,6 @@ function cacheSearchWithIndexedDB<
   const dbPromise = openDB();
 
   return async (query: string, limit?: number): Promise<T> => {
-    addLogEntry(`Starting new ${storeName} search`);
     if (!indexedDB) return fn(query, limit);
 
     const db = await dbPromise;
