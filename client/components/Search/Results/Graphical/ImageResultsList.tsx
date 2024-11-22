@@ -1,7 +1,7 @@
 import { Carousel } from "@mantine/carousel";
 import { Button, Group, Stack, Text, Transition, rem } from "@mantine/core";
 import { useEffect, useState } from "react";
-import type { SearchResults } from "../../../../modules/search";
+import type { ImageSearchResult } from "../../../../modules/search";
 import "@mantine/carousel/styles.css";
 import Lightbox from "yet-another-react-lightbox";
 import Captions from "yet-another-react-lightbox/plugins/captions";
@@ -13,7 +13,7 @@ import { getHostname } from "../../../../modules/stringFormatters";
 export default function ImageResultsList({
   imageResults,
 }: {
-  imageResults: SearchResults["imageResults"];
+  imageResults: ImageSearchResult[];
 }) {
   const [isLightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);

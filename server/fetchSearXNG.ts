@@ -8,49 +8,50 @@ const searxng = new SearxngService({
     lang: "auto",
     safesearch: 1,
     format: "json",
-    categories: ["general", "images", "videos"],
   },
 });
 
-export async function fetchSearXNG(query: string, limit = 30) {
+export { processTextualResult, processGraphicalResult };
+
+type SearchType = "text" | "images";
+
+export async function fetchSearXNG(
+  query: string,
+  searchType: SearchType,
+  limit = 30,
+) {
   try {
-    const resultsResponse = await searxng.search(query);
+    if (searchType === "text") {
+      const resultsResponse = await searxng.search(query, {
+        categories: ["general"],
+      });
 
-    const [graphicalResults, textualResults] = await Promise.all([
-      Promise.all(
-        resultsResponse.results
-          .filter(
-            (result) =>
-              result.category === "images" || result.category === "videos",
-          )
-          .slice(0, limit)
-          .map(processGraphicalResult),
-      ),
-      Promise.all(
-        resultsResponse.results
-          .filter(
-            (result) =>
-              result.category !== "images" && result.category !== "videos",
-          )
-          .slice(0, limit)
-          .map(processTextualResult),
-      ),
-    ]);
+      const textualResults = await Promise.all(
+        resultsResponse.results.slice(0, limit).map(processTextualResult),
+      );
 
-    return {
-      textResults: textualResults.filter(
+      return textualResults.filter(
         (result): result is NonNullable<typeof result> => result !== null,
-      ),
-      imageResults: graphicalResults.filter(
-        (result): result is NonNullable<typeof result> => result !== null,
-      ),
-    };
+      );
+    }
+
+    const resultsResponse = await searxng.search(query, {
+      categories: ["images", "videos"],
+    });
+
+    const graphicalResults = await Promise.all(
+      resultsResponse.results.slice(0, limit).map(processGraphicalResult),
+    );
+
+    return graphicalResults.filter(
+      (result): result is NonNullable<typeof result> => result !== null,
+    );
   } catch (error) {
     console.error(
       "Error fetching search results:",
       error instanceof Error ? error.message : error,
     );
-    return { textResults: [], imageResults: [] };
+    return [];
   }
 }
 

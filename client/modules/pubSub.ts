@@ -1,6 +1,11 @@
 import { createPubSub } from "create-pubsub";
 import throttle from "throttleit";
 import { addLogEntry } from "./logEntries";
+import type {
+  ImageSearchResults,
+  SearchState,
+  TextSearchResults,
+} from "./search";
 import { defaultSettings } from "./settings";
 
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
@@ -104,3 +109,33 @@ export const [, listenToSettingsChanges, getSettings] = settingsPubSub;
 export const modelSizeInMegabytesPubSub = createPubSub(0);
 
 export const [updateModelSizeInMegabytes] = modelSizeInMegabytesPubSub;
+
+export const textSearchStatePubSub = createPubSub<SearchState>("idle");
+export const imageSearchStatePubSub = createPubSub<SearchState>("idle");
+
+export const [
+  updateTextSearchState,
+  subscribeToTextSearchState,
+  getTextSearchState,
+] = textSearchStatePubSub;
+
+export const [
+  updateImageSearchState,
+  subscribeToImageSearchState,
+  getImageSearchState,
+] = imageSearchStatePubSub;
+
+export const textSearchResultsPubSub = createPubSub<TextSearchResults>([]);
+export const imageSearchResultsPubSub = createPubSub<ImageSearchResults>([]);
+
+export const [
+  updateTextSearchResults,
+  subscribeToTextSearchResults,
+  getTextSearchResults,
+] = textSearchResultsPubSub;
+
+export const [
+  updateImageSearchResults,
+  subscribeToImageSearchResults,
+  getImageSearchResults,
+] = imageSearchResultsPubSub;

@@ -31,6 +31,15 @@ export default function SearchSettingsForm() {
       </Stack>
 
       <Switch
+        {...form.getInputProps("enableTextSearch", {
+          type: "checkbox",
+        })}
+        label="Text Search"
+        labelPosition="left"
+        description="Enable or disable text search results. When enabled, relevant web pages will be displayed in the search results."
+      />
+
+      <Switch
         {...form.getInputProps("enableImageSearch", {
           type: "checkbox",
         })}

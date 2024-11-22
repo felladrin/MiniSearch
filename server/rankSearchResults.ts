@@ -39,9 +39,15 @@ export async function rankSearchResults(
 
   const scoreThreshold = highestScore / 2;
 
-  const [firstResult, ...nextResults] = searchResults
+  const filteredResults = searchResults
     .map((result, index) => ({ result, score: scores[index] }))
     .filter(({ score }) => score > scoreThreshold);
+
+  if (filteredResults.length === 0) {
+    return [];
+  }
+
+  const [firstResult, ...nextResults] = filteredResults;
 
   const nextTopResultsCount = 5;
 

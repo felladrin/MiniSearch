@@ -13,7 +13,7 @@ import {
   updateSearchState,
   updateTextGenerationState,
 } from "./pubSub";
-import { search } from "./search";
+import { type ImageSearchResult, searchImages, searchText } from "./search";
 import { getSystemPrompt } from "./systemPrompt";
 import {
   ChatGenerationError,
@@ -168,27 +168,55 @@ async function getKeywords(text: string, limit?: number) {
 async function startSearch(query: string) {
   updateSearchState("running");
 
-  let searchResults = await search(
-    query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query,
-    getSettings().searchResultsLimit,
-  );
+  const searchQuery =
+    query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query;
 
-  if (searchResults.textResults.length === 0) {
-    const queryKeywords = await getKeywords(query, 10);
-
-    searchResults = await search(
-      queryKeywords.join(" "),
+  try {
+    let textResults = await searchText(
+      searchQuery,
       getSettings().searchResultsLimit,
     );
+
+    if (textResults.length === 0) {
+      const queryKeywords = await getKeywords(query, 10);
+      const keywordResults = await searchText(
+        queryKeywords.join(" "),
+        getSettings().searchResultsLimit,
+      );
+      textResults = keywordResults;
+    }
+
+    const results = {
+      textResults,
+      imageResults: [] as ImageSearchResult[],
+    };
+
+    updateSearchState(
+      results.textResults.length === 0 ? "failed" : "completed",
+    );
+    updateSearchResults(results);
+
+    const deferImageSearch = async () => {
+      const imageResults = await searchImages(
+        searchQuery,
+        getSettings().searchResultsLimit,
+      );
+      results.imageResults = imageResults;
+      updateSearchResults(results);
+    };
+
+    deferImageSearch();
+
+    return results;
+  } catch (error) {
+    addLogEntry(
+      `Search failed: ${error instanceof Error ? error.message : error}`,
+    );
+    updateSearchState("failed");
+    const emptyResults = { textResults: [], imageResults: [] };
+    updateSearchResults(emptyResults);
+    return emptyResults;
   }
-
-  updateSearchState(
-    searchResults.textResults.length === 0 ? "failed" : "completed",
-  );
-
-  updateSearchResults(searchResults);
-
-  return searchResults;
 }
 
 function canDownloadModels(): Promise<void> {
