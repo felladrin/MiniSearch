@@ -4,7 +4,7 @@ import { getSearchToken } from "./searchToken";
 import { addVerifiedToken, isVerifiedToken } from "./verifiedTokens";
 
 const rateLimiter = new RateLimiterMemory({
-  points: 2,
+  points: 10,
   duration: 10,
 });
 
