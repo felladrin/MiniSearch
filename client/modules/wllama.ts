@@ -54,7 +54,7 @@ export interface WllamaModel {
   cacheType: "f16" | "q8_0" | "q4_0";
   contextSize: number;
   fileSizeInMegabytes: number;
-  sampling: () => SamplingConfig;
+  getSampling: () => SamplingConfig;
   shouldIncludeUrlsOnPrompt: boolean;
   buildPrompt: (
     wllama: Wllama,
@@ -79,7 +79,7 @@ const defaultModelConfig: Omit<
   cacheType: "q8_0",
   contextSize: 2048,
   shouldIncludeUrlsOnPrompt: true,
-  sampling: () => {
+  getSampling: () => {
     const settings = getSettings();
     return {
       top_p: settings.inferenceTopP,
