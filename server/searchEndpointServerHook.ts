@@ -65,29 +65,35 @@ export function searchEndpointServerHook<
           ),
         );
 
-        const processedResults = await Promise.all(
-          results
-            .filter((_, index) =>
-              rankedResults.some(([title]) => title === results[index][0]),
-            )
-            .map(async ([title, url, thumbnailSource, sourceUrl]) => {
-              try {
-                const axiosResponse = await axios.get(thumbnailSource, {
-                  responseType: "arraybuffer",
-                });
+        const processedResults = (
+          await Promise.all(
+            results
+              .filter((_, index) =>
+                rankedResults.some(([title]) => title === results[index][0]),
+              )
+              .map(async ([title, url, thumbnailSource, sourceUrl]) => {
+                try {
+                  const axiosResponse = await axios.get(thumbnailSource, {
+                    responseType: "arraybuffer",
+                  });
 
-                const contentType = axiosResponse.headers["content-type"];
-                const base64 = Buffer.from(axiosResponse.data).toString(
-                  "base64",
-                );
-                const thumbnailUrl = `data:${contentType};base64,${base64}`;
+                  const contentType = axiosResponse.headers["content-type"];
+                  const base64 = Buffer.from(axiosResponse.data).toString(
+                    "base64",
+                  );
 
-                return [title, url, thumbnailUrl, sourceUrl] as ImageResult;
-              } catch {
-                return null;
-              }
-            }),
-        );
+                  return [
+                    title,
+                    url,
+                    `data:${contentType};base64,${base64}`,
+                    sourceUrl,
+                  ] as ImageResult;
+                } catch {
+                  return null;
+                }
+              }),
+          )
+        ).filter((result): result is ImageResult => result !== null);
 
         response.setHeader("Content-Type", "application/json");
         response.end(JSON.stringify(processedResults));
