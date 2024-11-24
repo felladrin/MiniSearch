@@ -14,17 +14,13 @@ import {
   updateTextGenerationState,
   updateTextSearchState,
 } from "./pubSub";
-import {
-  type ImageSearchResults,
-  type TextSearchResults,
-  searchImages,
-  searchText,
-} from "./search";
+import { searchImages, searchText } from "./search";
 import { getSystemPrompt } from "./systemPrompt";
 import {
   ChatGenerationError,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
+import type { ImageSearchResults, TextSearchResults } from "./types";
 import { isWebGPUAvailable } from "./webGpu";
 
 export async function searchAndRespond() {

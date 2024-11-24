@@ -1,12 +1,14 @@
 import { createPubSub } from "create-pubsub";
 import throttle from "throttleit";
 import { addLogEntry } from "./logEntries";
+import { defaultSettings } from "./settings";
 import type {
   ImageSearchResults,
+  SearchResults,
   SearchState,
+  TextGenerationState,
   TextSearchResults,
-} from "./search";
-import { defaultSettings } from "./settings";
+} from "./types";
 
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   const localStorageValue = localStorage.getItem(localStorageKey);
@@ -49,9 +51,7 @@ export const responsePubSub = createPubSub("");
 
 export const updateResponse = throttle(responsePubSub[0], 1000 / 12);
 
-export const searchResultsPubSub = createPubSub<
-  import("./search").SearchResults
->({
+export const searchResultsPubSub = createPubSub<SearchResults>({
   textResults: [],
   imageResults: [],
 });
@@ -59,20 +59,11 @@ export const searchResultsPubSub = createPubSub<
 export const [updateSearchResults, , getSearchResults] = searchResultsPubSub;
 
 export const [updateSearchPromise, , getSearchPromise] = createPubSub<
-  Promise<import("./search").SearchResults>
+  Promise<SearchResults>
 >(Promise.resolve({ textResults: [], imageResults: [] }));
 
-export const textGenerationStatePubSub = createPubSub<
-  | "idle"
-  | "awaitingModelDownloadAllowance"
-  | "loadingModel"
-  | "awaitingSearchResults"
-  | "preparingToGenerate"
-  | "generating"
-  | "interrupted"
-  | "failed"
-  | "completed"
->("idle");
+export const textGenerationStatePubSub =
+  createPubSub<TextGenerationState>("idle");
 
 export const [updateTextGenerationState, , getTextGenerationState] =
   textGenerationStatePubSub;

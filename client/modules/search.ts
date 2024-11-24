@@ -7,24 +7,7 @@ import {
   updateTextSearchState,
 } from "./pubSub";
 import { getSearchTokenHash } from "./searchTokenHash";
-
-export type TextSearchResult = [title: string, snippet: string, url: string];
-export type ImageSearchResult = [
-  title: string,
-  url: string,
-  thumbnailUrl: string,
-  sourceUrl: string,
-];
-
-export type TextSearchResults = TextSearchResult[];
-export type ImageSearchResults = ImageSearchResult[];
-
-export type SearchState = "idle" | "running" | "failed" | "completed";
-
-export type SearchResults = {
-  textResults: TextSearchResult[];
-  imageResults: ImageSearchResult[];
-};
+import type { ImageSearchResults, TextSearchResults } from "./types";
 
 /**
  * Creates a cached version of a search function using IndexedDB for storage.
