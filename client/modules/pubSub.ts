@@ -51,7 +51,7 @@ export const responsePubSub = createPubSub("");
 
 export const updateResponse = throttle(responsePubSub[0], 1000 / 12);
 
-export const searchResultsPubSub = createPubSub<SearchResults>({
+const searchResultsPubSub = createPubSub<SearchResults>({
   textResults: [],
   imageResults: [],
 });
@@ -92,21 +92,17 @@ export const [updateModelSizeInMegabytes] = modelSizeInMegabytesPubSub;
 export const textSearchStatePubSub = createPubSub<SearchState>("idle");
 export const imageSearchStatePubSub = createPubSub<SearchState>("idle");
 
-export const [
-  updateTextSearchState,
-  subscribeToTextSearchState,
-  getTextSearchState,
-] = textSearchStatePubSub;
+export const [updateTextSearchState] = textSearchStatePubSub;
+
+const [, subscribeToTextSearchState] = textSearchStatePubSub;
 
 subscribeToTextSearchState((textSearchState) => {
   addLogEntry(`Text search state changed to '${textSearchState}'`);
 });
 
-export const [
-  updateImageSearchState,
-  subscribeToImageSearchState,
-  getImageSearchState,
-] = imageSearchStatePubSub;
+export const [updateImageSearchState] = imageSearchStatePubSub;
+
+const [, subscribeToImageSearchState] = imageSearchStatePubSub;
 
 subscribeToImageSearchState((imageSearchState) => {
   addLogEntry(`Image search state changed to '${imageSearchState}'`);
@@ -115,14 +111,6 @@ subscribeToImageSearchState((imageSearchState) => {
 export const textSearchResultsPubSub = createPubSub<TextSearchResults>([]);
 export const imageSearchResultsPubSub = createPubSub<ImageSearchResults>([]);
 
-export const [
-  updateTextSearchResults,
-  subscribeToTextSearchResults,
-  getTextSearchResults,
-] = textSearchResultsPubSub;
+export const [updateTextSearchResults] = textSearchResultsPubSub;
 
-export const [
-  updateImageSearchResults,
-  subscribeToImageSearchResults,
-  getImageSearchResults,
-] = imageSearchResultsPubSub;
+export const [updateImageSearchResults] = imageSearchResultsPubSub;
