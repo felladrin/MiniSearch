@@ -16,7 +16,7 @@ import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllam
 import singleThreadWllamaJsUrl from "@wllama/wllama/esm/single-thread/wllama.js?url";
 import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
 import { addLogEntry } from "./logEntries";
-import { defaultSettings } from "./settings";
+import { getSettings } from "./pubSub";
 import { getSystemPrompt } from "./systemPrompt";
 
 export async function initializeWllama(
@@ -54,7 +54,7 @@ export interface WllamaModel {
   cacheType: "f16" | "q8_0" | "q4_0";
   contextSize: number;
   fileSizeInMegabytes: number;
-  sampling: SamplingConfig;
+  getSampling: () => SamplingConfig;
   shouldIncludeUrlsOnPrompt: boolean;
   buildPrompt: (
     wllama: Wllama,
@@ -79,13 +79,16 @@ const defaultModelConfig: Omit<
   cacheType: "q8_0",
   contextSize: 2048,
   shouldIncludeUrlsOnPrompt: true,
-  sampling: {
-    top_p: defaultSettings.inferenceTopP,
-    temp: defaultSettings.inferenceTemperature,
-    penalty_freq: defaultSettings.inferenceFrequencyPenalty,
-    penalty_present: defaultSettings.inferencePresencePenalty,
-    min_p: 1 - defaultSettings.inferenceTopP,
-    top_k: 0,
+  getSampling: () => {
+    const settings = getSettings();
+    return {
+      top_p: settings.inferenceTopP,
+      temp: settings.inferenceTemperature,
+      penalty_freq: settings.inferenceFrequencyPenalty,
+      penalty_present: settings.inferencePresencePenalty,
+      min_p: 1 - settings.inferenceTopP,
+      top_k: 0,
+    };
   },
 };
 

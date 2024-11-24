@@ -359,6 +359,87 @@ export default function AISettingsForm() {
             maxRows={10}
             {...form.getInputProps("systemPrompt")}
           />
+
+          <Stack gap="xs" mb="md">
+            <Text size="sm">Temperature</Text>
+            <Text size="xs" c="dimmed">
+              Controls randomness in responses. Lower values make responses more
+              focused and deterministic, while higher values make them more
+              creative and diverse. Defaults to{" "}
+              {defaultSettings.inferenceTemperature}.
+            </Text>
+            <Slider
+              {...form.getInputProps("inferenceTemperature")}
+              min={0}
+              max={2}
+              step={0.01}
+              marks={[
+                { value: 0, label: "0" },
+                { value: 1, label: "1" },
+                { value: 2, label: "2" },
+              ]}
+            />
+          </Stack>
+
+          <Stack gap="xs" mb="md">
+            <Text size="sm">Top P</Text>
+            <Text size="xs" c="dimmed">
+              Controls diversity by limiting cumulative probability of tokens.
+              Lower values make responses more focused, while higher values
+              allow more variety. Defaults to {defaultSettings.inferenceTopP}.
+            </Text>
+            <Slider
+              {...form.getInputProps("inferenceTopP")}
+              min={0}
+              max={1}
+              step={0.01}
+              marks={Array.from({ length: 3 }, (_, index) => ({
+                value: index / 2,
+                label: (index / 2).toString(),
+              }))}
+            />
+          </Stack>
+
+          <Stack gap="xs" mb="md">
+            <Text size="sm">Frequency Penalty</Text>
+            <Text size="xs" c="dimmed">
+              Reduces repetition by penalizing tokens based on their frequency.
+              Higher values decrease the likelihood of repeating the same
+              information. Defaults to{" "}
+              {defaultSettings.inferenceFrequencyPenalty}.
+            </Text>
+            <Slider
+              {...form.getInputProps("inferenceFrequencyPenalty")}
+              min={-2.0}
+              max={2.0}
+              step={0.01}
+              marks={[
+                { value: -2.0, label: "-2.0" },
+                { value: 0.0, label: "0" },
+                { value: 2.0, label: "2.0" },
+              ]}
+            />
+          </Stack>
+
+          <Stack gap="xs" mb="md">
+            <Text size="sm">Presence Penalty</Text>
+            <Text size="xs" c="dimmed">
+              Encourages new topics by penalizing tokens that have appeared.
+              Higher values increase the model's likelihood to talk about new
+              topics. Defaults to {defaultSettings.inferencePresencePenalty}.
+            </Text>
+            <Slider
+              {...form.getInputProps("inferencePresencePenalty")}
+              min={-2.0}
+              max={2.0}
+              step={0.01}
+              marks={[
+                { value: -2.0, label: "-2.0" },
+                { value: 0.0, label: "0" },
+                { value: 2.0, label: "2.0" },
+              ]}
+            />
+          </Stack>
         </>
       )}
     </Stack>

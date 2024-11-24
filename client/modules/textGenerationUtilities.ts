@@ -10,7 +10,6 @@ import {
   getTextGenerationState,
   updateTextGenerationState,
 } from "./pubSub";
-import { defaultSettings } from "./settings";
 import { getSystemPrompt } from "./systemPrompt";
 
 export class ChatGenerationError extends Error {
@@ -50,13 +49,14 @@ export async function canStartResponding() {
 }
 
 export function getDefaultChatCompletionCreateParamsStreaming() {
+  const settings = getSettings();
   return {
     stream: true,
     max_tokens: 2048,
-    temperature: defaultSettings.inferenceTemperature,
-    top_p: defaultSettings.inferenceTopP,
-    frequency_penalty: defaultSettings.inferenceFrequencyPenalty,
-    presence_penalty: defaultSettings.inferencePresencePenalty,
+    temperature: settings.inferenceTemperature,
+    top_p: settings.inferenceTopP,
+    frequency_penalty: settings.inferenceFrequencyPenalty,
+    presence_penalty: settings.inferencePresencePenalty,
   } as const;
 }
 

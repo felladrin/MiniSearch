@@ -98,7 +98,7 @@ async function generateWithWllama(
   await wllama.createCompletion(prompt, {
     nPredict: 2048,
     stopTokens: model.stopTokens,
-    sampling: model.sampling,
+    sampling: model.getSampling(),
     onNewToken: (_token, _piece, currentText, { abortSignal }) => {
       if (shouldCheckCanRespond && getTextGenerationState() === "interrupted") {
         abortSignal();
