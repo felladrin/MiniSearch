@@ -167,22 +167,32 @@ function cacheSearchWithIndexedDB<
   };
 }
 
+async function performSearch<T>(
+  endpoint: "text" | "images",
+  query: string,
+  limit?: number,
+): Promise<T> {
+  const searchUrl = new URL(`/search/${endpoint}`, self.location.origin);
+  searchUrl.searchParams.set("q", query);
+  searchUrl.searchParams.set("token", await getSearchTokenHash());
+  if (limit) searchUrl.searchParams.set("limit", limit.toString());
+
+  const response = await fetch(searchUrl.toString());
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+}
+
 export const searchText = cacheSearchWithIndexedDB<TextSearchResults>(
   async (query: string, limit?: number): Promise<TextSearchResults> => {
-    const searchUrl = new URL("/search/text", self.location.origin);
-    searchUrl.searchParams.set("q", query);
-    searchUrl.searchParams.set("token", await getSearchTokenHash());
-    if (limit) searchUrl.searchParams.set("limit", limit.toString());
-
     try {
       updateTextSearchState("running");
-      const response = await fetch(searchUrl.toString());
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const results = await response.json();
+      const results = await performSearch<TextSearchResults>(
+        "text",
+        query,
+        limit,
+      );
       updateTextSearchResults(results);
       updateTextSearchState("completed");
       return results;
@@ -199,20 +209,13 @@ export const searchText = cacheSearchWithIndexedDB<TextSearchResults>(
 
 export const searchImages = cacheSearchWithIndexedDB<ImageSearchResults>(
   async (query: string, limit?: number): Promise<ImageSearchResults> => {
-    const searchUrl = new URL("/search/images", self.location.origin);
-    searchUrl.searchParams.set("q", query);
-    searchUrl.searchParams.set("token", await getSearchTokenHash());
-    if (limit) searchUrl.searchParams.set("limit", limit.toString());
-
     try {
       updateImageSearchState("running");
-      const response = await fetch(searchUrl.toString());
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const results = await response.json();
+      const results = await performSearch<ImageSearchResults>(
+        "images",
+        query,
+        limit,
+      );
       updateImageSearchResults(results);
       updateImageSearchState("completed");
       return results;
