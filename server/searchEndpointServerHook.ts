@@ -2,7 +2,10 @@ import axios from "axios";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { fetchSearXNG } from "./fetchSearXNG";
 import { rankSearchResults } from "./rankSearchResults";
-import { incrementSearchesSinceLastRestart } from "./searchesSinceLastRestart";
+import {
+  incrementGraphicalSearchesSinceLastRestart,
+  incrementTextualSearchesSinceLastRestart,
+} from "./searchesSinceLastRestart";
 import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit";
 
 type TextResult = [title: string, content: string, url: string];
@@ -38,21 +41,21 @@ export function searchEndpointServerHook<
       return;
     }
 
-    incrementSearchesSinceLastRestart();
-
     try {
       const isTextSearch = request.url?.startsWith("/search/text");
       const searchType = isTextSearch ? "text" : "images";
-      const searxResults = await fetchSearXNG(query, searchType, limit);
+      const searxngResults = await fetchSearXNG(query, searchType, limit);
 
       if (isTextSearch) {
-        const results = searxResults as TextResult[];
+        const results = searxngResults as TextResult[];
         const rankedResults = await rankSearchResults(query, results);
+
+        incrementTextualSearchesSinceLastRestart();
 
         response.setHeader("Content-Type", "application/json");
         response.end(JSON.stringify(rankedResults));
       } else {
-        const results = searxResults as ImageResult[];
+        const results = searxngResults as ImageResult[];
         const rankedResults = await rankSearchResults(
           query,
           results.map(
@@ -64,7 +67,6 @@ export function searchEndpointServerHook<
               ] as TextResult,
           ),
         );
-
         const processedResults = (
           await Promise.all(
             results
@@ -94,6 +96,8 @@ export function searchEndpointServerHook<
               }),
           )
         ).filter((result): result is ImageResult => result !== null);
+
+        incrementGraphicalSearchesSinceLastRestart();
 
         response.setHeader("Content-Type", "application/json");
         response.end(JSON.stringify(processedResults));

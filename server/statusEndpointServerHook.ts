@@ -1,6 +1,9 @@
 import prettyMilliseconds from "pretty-ms";
 import type { PreviewServer, ViteDevServer } from "vite";
-import { getSearchesSinceLastRestart } from "./searchesSinceLastRestart";
+import {
+  getGraphicalSearchesSinceLastRestart,
+  getTextualSearchesSinceLastRestart,
+} from "./searchesSinceLastRestart";
 import { getVerifiedTokensAmount } from "./verifiedTokens";
 
 const serverStartTime = new Date().getTime();
@@ -12,16 +15,24 @@ export function statusEndpointServerHook<
     if (!request.url.startsWith("/status")) return next();
 
     const sessions = getVerifiedTokensAmount();
-    const searches = getSearchesSinceLastRestart();
-    const averageSearchesPerSession = (searches / sessions || 0).toFixed(1);
+    const textualSearches = getTextualSearchesSinceLastRestart();
+    const graphicalSearches = getGraphicalSearchesSinceLastRestart();
+    const averageTextualSearchesPerSession = (
+      textualSearches / sessions || 0
+    ).toFixed(1);
+    const averageGraphicalSearchesPerSession = (
+      graphicalSearches / sessions || 0
+    ).toFixed(1);
 
     const status = {
       uptime: prettyMilliseconds(new Date().getTime() - serverStartTime, {
         verbose: true,
       }),
       sessions,
-      searches,
-      averageSearchesPerSession,
+      textualSearches,
+      graphicalSearches,
+      averageTextualSearchesPerSession,
+      averageGraphicalSearchesPerSession,
       build: {
         timestamp: new Date(
           server.config.define.VITE_BUILD_DATE_TIME,

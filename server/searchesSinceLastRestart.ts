@@ -1,9 +1,18 @@
-let searchesSinceLastRestart = 0;
+let textualSearchesSinceLastRestart = 0;
+let graphicalSearchesSinceLastRestart = 0;
 
-export function getSearchesSinceLastRestart() {
-  return searchesSinceLastRestart;
+export function getTextualSearchesSinceLastRestart() {
+  return textualSearchesSinceLastRestart;
 }
 
-export function incrementSearchesSinceLastRestart() {
-  searchesSinceLastRestart++;
+export function incrementTextualSearchesSinceLastRestart() {
+  textualSearchesSinceLastRestart++;
+}
+
+export function getGraphicalSearchesSinceLastRestart() {
+  return graphicalSearchesSinceLastRestart;
+}
+
+export function incrementGraphicalSearchesSinceLastRestart() {
+  graphicalSearchesSinceLastRestart++;
 }
