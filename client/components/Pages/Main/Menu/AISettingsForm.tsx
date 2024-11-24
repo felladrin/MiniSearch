@@ -28,6 +28,12 @@ const WllamaModelSelect = lazy(
   () => import("../../../AiResponse/WllamaModelSelect"),
 );
 
+const penaltySliderMarks = [
+  { value: -2.0, label: "-2.0" },
+  { value: 0.0, label: "0" },
+  { value: 2.0, label: "2.0" },
+];
+
 export default function AISettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
   const [openAiModels, setOpenAiModels] = useState<
@@ -413,11 +419,7 @@ export default function AISettingsForm() {
               min={-2.0}
               max={2.0}
               step={0.01}
-              marks={[
-                { value: -2.0, label: "-2.0" },
-                { value: 0.0, label: "0" },
-                { value: 2.0, label: "2.0" },
-              ]}
+              marks={penaltySliderMarks}
             />
           </Stack>
 
@@ -433,11 +435,7 @@ export default function AISettingsForm() {
               min={-2.0}
               max={2.0}
               step={0.01}
-              marks={[
-                { value: -2.0, label: "-2.0" },
-                { value: 0.0, label: "0" },
-                { value: 2.0, label: "2.0" },
-              ]}
+              marks={penaltySliderMarks}
             />
           </Stack>
         </>
