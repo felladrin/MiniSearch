@@ -15,10 +15,11 @@ import {
   IconHandStop,
   IconInfoCircle,
   IconRefresh,
+  IconVolume2,
 } from "@tabler/icons-react";
 import type { PublishFunction } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
-import { type ReactNode, Suspense, lazy, useMemo } from "react";
+import { type ReactNode, Suspense, lazy, useMemo, useState } from "react";
 import { match } from "ts-pattern";
 import { settingsPubSub } from "../../modules/pubSub";
 import { searchAndRespond } from "../../modules/textGeneration";
@@ -45,6 +46,7 @@ export default function AiResponseContent({
   >;
 }) {
   const [settings, setSettings] = usePubSub(settingsPubSub);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const ConditionalScrollArea = useMemo(
     () =>
@@ -59,6 +61,22 @@ export default function AiResponseContent({
       },
     [settings.enableAiResponseScrolling],
   );
+
+  function speakResponse(text: string) {
+    if (isSpeaking) {
+      self.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const cleanText = text.replace(/[#*`_~\[\]]/g, "");
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+
+    utterance.onend = () => setIsSpeaking(false);
+
+    setIsSpeaking(true);
+    self.speechSynthesis.speak(utterance);
+  }
 
   return (
     <Card withBorder shadow="sm" radius="md">
@@ -102,6 +120,17 @@ export default function AiResponseContent({
                   </ActionIcon>
                 </Tooltip>
               ))}
+            <Tooltip
+              label={isSpeaking ? "Stop speaking" : "Listen to response"}
+            >
+              <ActionIcon
+                onClick={() => speakResponse(response)}
+                variant="subtle"
+                color={isSpeaking ? "blue" : "gray"}
+              >
+                <IconVolume2 size={16} />
+              </ActionIcon>
+            </Tooltip>
             {settings.enableAiResponseScrolling ? (
               <Tooltip label="Show full response without scroll bar">
                 <ActionIcon
