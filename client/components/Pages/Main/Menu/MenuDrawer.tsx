@@ -20,6 +20,7 @@ const AISettingsForm = lazy(() => import("./AISettingsForm"));
 const SearchSettingsForm = lazy(() => import("./SearchSettingsForm"));
 const InterfaceSettingsForm = lazy(() => import("./InterfaceSettingsForm"));
 const ActionsForm = lazy(() => import("./ActionsForm"));
+const VoiceSettingsForm = lazy(() => import("./VoiceSettingsForm"));
 
 export default function MenuDrawer(drawerProps: DrawerProps) {
   const repoName = repository.url.split("/").pop();
@@ -93,6 +94,14 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
             <Accordion.Panel>
               <Suspense>
                 <InterfaceSettingsForm />
+              </Suspense>
+            </Accordion.Panel>
+          </Accordion.Item>
+          <Accordion.Item value="voiceSettings">
+            <Accordion.Control>Voice Settings</Accordion.Control>
+            <Accordion.Panel>
+              <Suspense>
+                <VoiceSettingsForm />
               </Suspense>
             </Accordion.Panel>
           </Accordion.Item>

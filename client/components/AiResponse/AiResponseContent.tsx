@@ -72,6 +72,19 @@ export default function AiResponseContent({
     const cleanText = text.replace(/[#*`_~\[\]]/g, "");
     const utterance = new SpeechSynthesisUtterance(cleanText);
 
+    const voices = self.speechSynthesis.getVoices();
+
+    if (voices.length > 0 && settings.selectedVoiceId) {
+      const voice = voices.find(
+        (voice) => voice.voiceURI === settings.selectedVoiceId,
+      );
+
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang;
+      }
+    }
+
     utterance.onend = () => setIsSpeaking(false);
 
     setIsSpeaking(true);

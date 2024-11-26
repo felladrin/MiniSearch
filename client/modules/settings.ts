@@ -33,6 +33,7 @@ Search results:
   enableAiResponseScrolling: true,
   allowAiModelDownload: false,
   enableTextSearch: true,
+  selectedVoiceId: "",
 };
 
 addLogEntry(
