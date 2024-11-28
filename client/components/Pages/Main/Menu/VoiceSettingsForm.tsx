@@ -29,7 +29,10 @@ export default function VoiceSettingsForm() {
   useEffect(() => {
     const updateVoices = () => {
       const availableVoices = self.speechSynthesis.getVoices();
-      const voiceOptions = availableVoices
+      const uniqueVoices = Array.from(
+        new Map(availableVoices.map(voice => [voice.voiceURI, voice])).values()
+      );
+      const voiceOptions = uniqueVoices
         .sort((a, b) => a.lang.localeCompare(b.lang))
         .map((voice) => ({
           value: voice.voiceURI,
