@@ -30,7 +30,9 @@ export default function VoiceSettingsForm() {
     const updateVoices = () => {
       const availableVoices = self.speechSynthesis.getVoices();
       const uniqueVoices = Array.from(
-        new Map(availableVoices.map(voice => [voice.voiceURI, voice])).values()
+        new Map(
+          availableVoices.map((voice) => [voice.voiceURI, voice]),
+        ).values(),
       );
       const voiceOptions = uniqueVoices
         .sort((a, b) => a.lang.localeCompare(b.lang))
