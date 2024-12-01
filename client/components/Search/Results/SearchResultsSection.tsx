@@ -27,16 +27,6 @@ const LoadingFallback = () => (
 
 export default function SearchResultsSection() {
   const [settings] = usePubSub(settingsPubSub);
-  const hasEnabledSearchTypes =
-    settings.enableImageSearch || settings.enableTextSearch;
-
-  if (!hasEnabledSearchTypes) {
-    return (
-      <Alert color="yellow" title="No Search Types Enabled">
-        Please enable at least one search type in settings to see results.
-      </Alert>
-    );
-  }
 
   const renderSearchResults = (
     Component: React.LazyExoticComponent<React.ComponentType>,
