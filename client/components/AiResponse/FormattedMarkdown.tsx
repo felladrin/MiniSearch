@@ -1,4 +1,5 @@
 import { Box, TypographyStylesProvider, useMantineTheme } from "@mantine/core";
+import React from "react";
 import Markdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import syntaxHighlighterStyle from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
@@ -28,6 +29,15 @@ const FormattedMarkdown: React.FC<FormattedMarkdownProps> = ({
         <Markdown
           remarkPlugins={[remarkGfm]}
           components={{
+            li(props) {
+              const children = React.Children.map(props.children, (child) => {
+                const containsParagraphTag =
+                  React.isValidElement(child) && child.type === "p";
+                return containsParagraphTag ? child.props.children : child;
+              });
+
+              return <li>{children}</li>;
+            },
             pre(props) {
               return <>{props.children}</>;
             },
