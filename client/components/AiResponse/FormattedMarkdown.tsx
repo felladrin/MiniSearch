@@ -28,6 +28,9 @@ const FormattedMarkdown: React.FC<FormattedMarkdownProps> = ({
         <Markdown
           remarkPlugins={[remarkGfm]}
           components={{
+            pre(props) {
+              return <>{props.children}</>;
+            },
             code(props) {
               const { children, className, node, ref, ...rest } = props;
               void node;
@@ -59,10 +62,6 @@ const FormattedMarkdown: React.FC<FormattedMarkdownProps> = ({
                       ref={ref as never}
                       language={languageMatch[1]}
                       style={syntaxHighlighterStyle}
-                      customStyle={{
-                        padding: `${theme.spacing.md}px`,
-                        borderRadius: theme.radius.sm,
-                      }}
                     >
                       {codeContent}
                     </SyntaxHighlighter>
@@ -83,42 +82,6 @@ const FormattedMarkdown: React.FC<FormattedMarkdownProps> = ({
                 >
                   {children}
                 </code>
-              );
-            },
-            // Add custom styling for tables
-            table(props) {
-              return (
-                <table
-                  {...props}
-                  style={{
-                    borderCollapse: "collapse",
-                    width: "100%",
-                    marginBottom: theme.spacing.md,
-                  }}
-                />
-              );
-            },
-            th(props) {
-              return (
-                <th
-                  {...props}
-                  style={{
-                    borderBottom: `2px solid ${theme.colors.gray[7]}`,
-                    padding: theme.spacing.sm,
-                    textAlign: "left",
-                  }}
-                />
-              );
-            },
-            td(props) {
-              return (
-                <td
-                  {...props}
-                  style={{
-                    borderBottom: `1px solid ${theme.colors.gray[7]}`,
-                    padding: theme.spacing.sm,
-                  }}
-                />
               );
             },
           }}
