@@ -51,7 +51,7 @@ export async function initializeWllama(
 export interface WllamaModel {
   label: string;
   url: string | string[];
-  cacheType: "f16" | "q8_0" | "q4_0";
+  cacheType: "f32" | "f16" | "q8_0" | "q5_1" | "q5_0" | "q4_1" | "q4_0";
   contextSize: number;
   fileSizeInMegabytes: number;
   getSampling: () => SamplingConfig;
@@ -76,7 +76,7 @@ const defaultModelConfig: Omit<
       { id: 3, role: "user", content: query },
     ]);
   },
-  cacheType: "q8_0",
+  cacheType: "q5_1",
   contextSize: 2048,
   shouldIncludeUrlsOnPrompt: true,
   getSampling: () => {
