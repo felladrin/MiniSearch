@@ -47,9 +47,10 @@ async function initializeWllamaInstance(
 
   updateModelSizeInMegabytes(model.fileSizeInMegabytes);
 
-  const wllama = await initializeWllama(model.url, {
+  const wllama = await initializeWllama(model.hfRepoId, model.hfFilePath, {
     wllama: {
       suppressNativeLog: true,
+      allowOffline: true,
     },
     model: {
       n_threads: getSettings().cpuThreads,
@@ -57,7 +58,6 @@ async function initializeWllamaInstance(
       cache_type_k: model.cacheType as LoadModelConfig["cache_type_k"],
       cache_type_v: model.cacheType as LoadModelConfig["cache_type_v"],
       embeddings: false,
-      allowOffline: true,
       progressCallback,
     },
   });
@@ -98,7 +98,7 @@ async function generateWithWllama(
   let streamedMessage = "";
 
   await wllama.createCompletion(prompt, {
-    nPredict: 2048,
+    nPredict: -2,
     stopTokens: model.stopTokens,
     sampling: model.getSampling(),
     onNewToken: (_token, _piece, currentText, { abortSignal }) => {
