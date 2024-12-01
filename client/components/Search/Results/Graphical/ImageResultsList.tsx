@@ -54,6 +54,7 @@ export default function ImageResultsList({
                 <img
                   alt={title}
                   src={thumbnailUrl}
+                  loading="lazy"
                   onClick={() => handleImageClick(index)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -74,6 +75,7 @@ export default function ImageResultsList({
         index={lightboxIndex}
         slides={imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
           src: thumbnailUrl,
+          alt: title,
           description: (
             <Stack align="center" gap="md">
               {title && (
