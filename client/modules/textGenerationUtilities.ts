@@ -12,6 +12,8 @@ import {
 } from "./pubSub";
 import { getSystemPrompt } from "./systemPrompt";
 
+export const defaultContextSize = 4096;
+
 export class ChatGenerationError extends Error {
   constructor(message: string) {
     super(message);
@@ -52,7 +54,7 @@ export function getDefaultChatCompletionCreateParamsStreaming() {
   const settings = getSettings();
   return {
     stream: true,
-    max_tokens: 2048,
+    max_tokens: defaultContextSize / 2,
     temperature: settings.inferenceTemperature,
     top_p: settings.inferenceTopP,
     frequency_penalty: settings.inferenceFrequencyPenalty,

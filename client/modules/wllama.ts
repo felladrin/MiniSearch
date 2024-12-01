@@ -16,6 +16,7 @@ import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.w
 import { addLogEntry } from "./logEntries";
 import { getSettings } from "./pubSub";
 import { getSystemPrompt } from "./systemPrompt";
+import { defaultContextSize } from "./textGenerationUtilities";
 
 export async function initializeWllama(
   hfRepoId: string,
@@ -48,7 +49,8 @@ export interface WllamaModel {
   label: string;
   hfRepoId: string;
   hfFilePath: string;
-  cacheType: "f32" | "f16" | "q8_0" | "q5_1" | "q5_0" | "q4_1" | "q4_0";
+  cacheTypeK: "f32" | "f16" | "q8_0" | "q5_1" | "q5_0" | "q4_1" | "q4_0";
+  cacheTypeV: "f32" | "f16" | "q8_0" | "q5_1" | "q5_0" | "q4_1" | "q4_0";
   contextSize: number;
   fileSizeInMegabytes: number;
   getSampling: () => SamplingConfig;
@@ -73,8 +75,9 @@ const defaultModelConfig: Omit<
       { id: 3, role: "user", content: query },
     ]);
   },
-  cacheType: "q5_1",
-  contextSize: 2048,
+  cacheTypeK: "q4_0",
+  cacheTypeV: "q8_0",
+  contextSize: defaultContextSize,
   shouldIncludeUrlsOnPrompt: true,
   getSampling: () => {
     const settings = getSettings();
@@ -222,6 +225,7 @@ export const wllamaModels: Record<string, WllamaModel> = {
     hfRepoId: "Felladrin/gguf-q5_k_m-phi-3.5-mini-instruct",
     hfFilePath: "phi-3-00001-of-00025.gguf",
     fileSizeInMegabytes: 2820,
+    contextSize: 3584,
   },
   "magpielm-4b": {
     ...defaultModelConfig,
@@ -243,6 +247,7 @@ export const wllamaModels: Record<string, WllamaModel> = {
     hfRepoId: "Felladrin/gguf-sharded-Q3_K_XL-OLMoE-1B-7B-0924-Instruct",
     hfFilePath: "OLMoE-1B-7B-0924-Instruct-Q3_K_XL.shard-00001-of-00050.gguf",
     fileSizeInMegabytes: 3700,
+    contextSize: 3584,
   },
 };
 
