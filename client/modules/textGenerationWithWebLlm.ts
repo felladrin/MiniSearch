@@ -15,6 +15,7 @@ import {
 } from "./pubSub";
 import {
   canStartResponding,
+  defaultContextSize,
   getDefaultChatCompletionCreateParamsStreaming,
   getDefaultChatMessages,
   getFormattedSearchResults,
@@ -100,7 +101,7 @@ async function initializeWebLlmEngine() {
   };
 
   const chatOptions: ChatOptions = {
-    context_window_size: 2048,
+    context_window_size: defaultContextSize,
     sliding_window_size: -1,
     attention_sink_size: -1,
   };

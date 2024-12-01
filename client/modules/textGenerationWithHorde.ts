@@ -9,6 +9,7 @@ import {
 import {
   ChatGenerationError,
   canStartResponding,
+  defaultContextSize,
   getDefaultChatMessages,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
@@ -38,8 +39,8 @@ async function startGeneration(messages: ChatMessage[]) {
     body: JSON.stringify({
       prompt: formatPrompt(messages),
       params: {
-        max_context_length: 2048,
-        max_length: 512,
+        max_context_length: defaultContextSize,
+        max_length: defaultContextSize / 2,
       },
     }),
   });

@@ -11,6 +11,7 @@ import {
 import {
   ChatGenerationError,
   canStartResponding,
+  defaultContextSize,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
 
@@ -54,8 +55,8 @@ async function initializeWllamaInstance(
     model: {
       n_threads: getSettings().cpuThreads,
       n_ctx: model.contextSize,
-      cache_type_k: model.cacheType as LoadModelConfig["cache_type_k"],
-      cache_type_v: model.cacheType as LoadModelConfig["cache_type_v"],
+      cache_type_k: model.cacheTypeK as LoadModelConfig["cache_type_k"],
+      cache_type_v: model.cacheTypeV as LoadModelConfig["cache_type_v"],
       embeddings: false,
       allowOffline: true,
       progressCallback,
@@ -98,7 +99,7 @@ async function generateWithWllama(
   let streamedMessage = "";
 
   await wllama.createCompletion(prompt, {
-    nPredict: 2048,
+    nPredict: defaultContextSize / 2,
     stopTokens: model.stopTokens,
     sampling: model.getSampling(),
     onNewToken: (_token, _piece, currentText, { abortSignal }) => {

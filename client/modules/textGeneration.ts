@@ -18,6 +18,7 @@ import { searchImages, searchText } from "./search";
 import { getSystemPrompt } from "./systemPrompt";
 import {
   ChatGenerationError,
+  defaultContextSize,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
 import type { ImageSearchResults, TextSearchResults } from "./types";
@@ -113,7 +114,7 @@ export async function generateChatResponse(
       const newTotalTokens =
         totalTokens + gptTokenizer.encode(message.content).length;
 
-      if (newTotalTokens > 1280) break;
+      if (newTotalTokens > defaultContextSize * 0.6) break;
 
       totalTokens = newTotalTokens;
       lastMessagesReversed.push(message);
