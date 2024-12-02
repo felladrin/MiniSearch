@@ -117,8 +117,8 @@ export const wllamaModels: Record<string, WllamaModel> = {
   "danube-3-500m": {
     ...defaultModelConfig,
     label: "Danube 3 500M",
-    url: "https://huggingface.co/Felladrin/gguf-q8_0-h2o-danube3-500m-chat/resolve/main/model.shard-00001-of-00011.gguf",
-    fileSizeInMegabytes: 547,
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-h2o-danube3-500m-chat/resolve/main/model.shard-00001-of-00008.gguf",
+    fileSizeInMegabytes: 399,
   },
   "amd-olmo-1b": {
     ...defaultModelConfig,
@@ -197,7 +197,7 @@ export const wllamaModels: Record<string, WllamaModel> = {
     label: "MiniCPM 3 4B",
     url: "https://huggingface.co/Felladrin/gguf-Q4_K_M-MiniCPM3-4B/resolve/main/model.shard-00001-of-00017.gguf",
     fileSizeInMegabytes: 2470,
-    contextSize: 1920,
+    contextSize: 2496,
   },
   "phi-3.5-mini-3.8b": {
     ...defaultModelConfig,
