@@ -111,20 +111,14 @@ export const wllamaModels: Record<string, WllamaModel> = {
   "qwen-2.5-0.5b": {
     ...defaultModelConfig,
     label: "Qwen 2.5 0.5B",
-    url: "https://huggingface.co/Felladrin/gguf-Q8_0-Qwen2.5-0.5B-Instruct/resolve/main/model.shard-00001-of-00004.gguf",
-    fileSizeInMegabytes: 531,
+    url: "https://huggingface.co/Felladrin/gguf-sharded-Q4_K_S-Qwen2.5-0.5B-Instruct/resolve/main/model.shard-00001-of-00003.gguf",
+    fileSizeInMegabytes: 386,
   },
   "danube-3-500m": {
     ...defaultModelConfig,
     label: "Danube 3 500M",
     url: "https://huggingface.co/Felladrin/gguf-q8_0-h2o-danube3-500m-chat/resolve/main/model.shard-00001-of-00011.gguf",
     fileSizeInMegabytes: 547,
-  },
-  "qwen-2.5-coder-0.5b": {
-    ...defaultModelConfig,
-    label: "Qwen 2.5 Coder 0.5B",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Q8_0-Qwen2.5-Coder-0.5B-Instruct/resolve/main/model.shard-00001-of-00005.gguf",
-    fileSizeInMegabytes: 676,
   },
   "amd-olmo-1b": {
     ...defaultModelConfig,
