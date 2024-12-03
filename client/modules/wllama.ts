@@ -5,12 +5,7 @@ import {
   Wllama,
   type WllamaConfig,
 } from "@wllama/wllama/esm";
-import type CacheManager from "@wllama/wllama/esm/cache-manager";
-import type {
-  CacheEntry,
-  CacheEntryMetadata,
-  DownloadOptions,
-} from "@wllama/wllama/esm/cache-manager";
+import type { DownloadOptions } from "@wllama/wllama/esm/cache-manager";
 import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
 import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
 import { addLogEntry } from "./logEntries";
@@ -35,8 +30,6 @@ export async function initializeWllama(
     },
     config?.wllama,
   );
-
-  wllama.cacheManager = new CustomCacheManager("wllama-cache");
 
   await wllama.loadModelFromHF(hfRepoId, hfFilePath, config?.model);
 
@@ -275,134 +268,3 @@ export const formatChat = async (wllama: Wllama, messages: Message[]) => {
     add_generation_prompt: true,
   });
 };
-
-class CustomCacheManager implements CacheManager {
-  private readonly cacheName: string;
-
-  constructor(cacheName: string) {
-    this.cacheName = cacheName;
-  }
-
-  async getNameFromURL(url: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(url);
-    const hashBuffer = await crypto.subtle.digest("SHA-1", data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-    const fileName = url.split("/").pop() || "default";
-    return `${hashHex}_${fileName}`;
-  }
-
-  async write(
-    name: string,
-    stream: ReadableStream,
-    metadata: CacheEntryMetadata,
-  ): Promise<void> {
-    const cache = await caches.open(this.cacheName);
-    const response = new Response(stream, {
-      headers: { "X-Metadata": JSON.stringify(metadata) },
-    });
-    await cache.put(name, response);
-  }
-
-  async open(name: string): Promise<Blob | null> {
-    const cache = await caches.open(this.cacheName);
-    const response = await cache.match(name);
-    if (!response?.body) return null;
-    return new Response(response.body).blob();
-  }
-
-  async getSize(name: string): Promise<number> {
-    const cache = await caches.open(this.cacheName);
-    const response = await cache.match(name);
-    if (!response) return -1;
-    return (
-      Number(response.headers.get("Content-Length")) ||
-      (await response.blob()).size
-    );
-  }
-
-  async getMetadata(name: string): Promise<CacheEntryMetadata | null> {
-    const cache = await caches.open(this.cacheName);
-    const response = await cache.match(name);
-    if (!response) return null;
-    const metadata = response.headers.get("X-Metadata");
-    return metadata ? JSON.parse(metadata) : null;
-  }
-
-  async list(): Promise<CacheEntry[]> {
-    const cache = await caches.open(this.cacheName);
-    const keys = await cache.keys();
-    return Promise.all(
-      keys.map(async (request) => {
-        const response = await cache.match(request);
-        if (!response) throw new Error(`No response for ${request.url}`);
-        const metadata = await this.getMetadata(request.url);
-        const size = await this.getSize(request.url);
-        return {
-          name: request.url,
-          size,
-          metadata: metadata ?? { etag: "", originalSize: 0, originalURL: "" },
-        };
-      }),
-    );
-  }
-
-  async clear(): Promise<void> {
-    await caches.delete(this.cacheName);
-  }
-
-  async delete(nameOrURL: string): Promise<void> {
-    const cache = await caches.open(this.cacheName);
-    const success = await cache.delete(nameOrURL);
-    if (!success) {
-      throw new Error(`Failed to delete cache entry for ${nameOrURL}`);
-    }
-  }
-
-  async deleteMany(predicate: (e: CacheEntry) => boolean): Promise<void> {
-    const entries = await this.list();
-    const cache = await caches.open(this.cacheName);
-    const deletionPromises = entries
-      .filter(predicate)
-      .map((entry) => cache.delete(entry.name));
-    await Promise.all(deletionPromises);
-  }
-
-  async writeMetadata(
-    name: string,
-    metadata: CacheEntryMetadata,
-  ): Promise<void> {
-    const cache = await caches.open(this.cacheName);
-    const response = await cache.match(name);
-    if (!response) {
-      throw new Error(`Cache entry for ${name} not found`);
-    }
-
-    const newResponse = new Response(response.body, {
-      headers: {
-        ...response.headers,
-        "X-Metadata": JSON.stringify(metadata),
-      },
-    });
-
-    await cache.put(name, newResponse);
-  }
-
-  async download(url: string, options?: DownloadOptions): Promise<void> {
-    const response = await fetch(url, options);
-    if (!response.ok)
-      throw new Error(`Failed to download: ${response.statusText}`);
-    const name = await this.getNameFromURL(url);
-    const metadata = {
-      etag: response.headers.get("etag") || "",
-      originalSize: Number(response.headers.get("content-length")) || 0,
-      originalURL: url,
-    };
-    if (response.body) {
-      await this.write(name, response.body, metadata);
-    }
-  }
-}
