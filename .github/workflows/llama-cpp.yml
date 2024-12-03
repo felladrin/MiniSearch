@@ -25,6 +25,15 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Process PR description
+        id: process_pr
+        run: |
+          PR_BODY='${{ github.event.pull_request.body }}'
+          PROCESSED_BODY=$(echo "$PR_BODY" | sed -E 's/\[(.*?)\]\(.*?\)/\1/g')
+          echo "processed_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$PROCESSED_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Fetch branches and output the diff in this step
         run: |
           git fetch origin main:main
@@ -97,10 +106,14 @@ jobs:
 
           Your goal is to help improve code quality while maintaining a collaborative and positive review process that encourages learning and growth.<|im_end|>
           <|im_start|>user
-          Here is the diff of the changes in the pull request for you to review:
-          \`\`\`diff
+          This is the description of the pull request:
+          ```markdown
+          ${{ steps.process_pr.outputs.processed_body }}
+          ```
+          And here is the diff of the changes, for you to review:
+          ```diff
           $DIFF_CONTENT
-          \`\`\`
+          ```
           <|im_end|>
           <|im_start|>assistant
           ### Overall Summary
