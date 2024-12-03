@@ -1,6 +1,6 @@
 import { Template } from "@huggingface/jinja";
 import {
-  type DownloadModelConfig,
+  type LoadModelConfig,
   type SamplingConfig,
   Wllama,
   type WllamaConfig,
@@ -9,11 +9,9 @@ import type CacheManager from "@wllama/wllama/esm/cache-manager";
 import type {
   CacheEntry,
   CacheEntryMetadata,
+  DownloadOptions,
 } from "@wllama/wllama/esm/cache-manager";
-import multiThreadWllamaJsUrl from "@wllama/wllama/esm/multi-thread/wllama.js?url";
 import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
-import multiThreadWllamaWorkerMjsUrl from "@wllama/wllama/esm/multi-thread/wllama.worker.mjs?url";
-import singleThreadWllamaJsUrl from "@wllama/wllama/esm/single-thread/wllama.js?url";
 import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
 import { addLogEntry } from "./logEntries";
 import { getSettings } from "./pubSub";
@@ -21,28 +19,26 @@ import { getSystemPrompt } from "./systemPrompt";
 import { defaultContextSize } from "./textGenerationUtilities";
 
 export async function initializeWllama(
-  modelUrl: string | string[],
+  hfRepoId: string,
+  hfFilePath: string,
   config?: {
     wllama?: WllamaConfig;
-    model?: DownloadModelConfig;
+    model?: LoadModelConfig & DownloadOptions;
   },
 ) {
   addLogEntry("Initializing Wllama");
 
   const wllama = new Wllama(
     {
-      "single-thread/wllama.js": singleThreadWllamaJsUrl,
       "single-thread/wllama.wasm": singleThreadWllamaWasmUrl,
-      "multi-thread/wllama.js": multiThreadWllamaJsUrl,
       "multi-thread/wllama.wasm": multiThreadWllamaWasmUrl,
-      "multi-thread/wllama.worker.mjs": multiThreadWllamaWorkerMjsUrl,
     },
     config?.wllama,
   );
 
   wllama.cacheManager = new CustomCacheManager("wllama-cache");
 
-  await wllama.loadModelFromUrl(modelUrl, config?.model);
+  await wllama.loadModelFromHF(hfRepoId, hfFilePath, config?.model);
 
   addLogEntry("Wllama initialized successfully");
 
@@ -51,7 +47,8 @@ export async function initializeWllama(
 
 export interface WllamaModel {
   label: string;
-  url: string | string[];
+  hfRepoId: string;
+  hfFilePath: string;
   cacheTypeK: "f32" | "f16" | "q8_0" | "q5_1" | "q5_0" | "q4_1" | "q4_0";
   cacheTypeV: "f32" | "f16" | "q8_0" | "q5_1" | "q5_0" | "q4_1" | "q4_0";
   contextSize: number;
@@ -69,7 +66,7 @@ export interface WllamaModel {
 
 const defaultModelConfig: Omit<
   WllamaModel,
-  "label" | "url" | "fileSizeInMegabytes"
+  "label" | "fileSizeInMegabytes" | "hfRepoId" | "hfFilePath"
 > = {
   buildPrompt: async (wllama, query, searchResults) => {
     return formatChat(wllama, [
@@ -99,37 +96,43 @@ export const wllamaModels: Record<string, WllamaModel> = {
   "smollm2-135m": {
     ...defaultModelConfig,
     label: "SmolLM 2 135M",
-    url: "https://huggingface.co/Felladrin/gguf-Q8_0-SmolLM2-135M-Instruct/resolve/main/model.shard-00001-of-00005.gguf",
+    hfRepoId: "Felladrin/gguf-Q8_0-SmolLM2-135M-Instruct",
+    hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 145,
   },
   "smollm2-360m": {
     ...defaultModelConfig,
     label: "SmolLM 2 360M",
-    url: "https://huggingface.co/Felladrin/gguf-Q8_0-SmolLM2-360M-Instruct/resolve/main/model.shard-00001-of-00008.gguf",
+    hfRepoId: "Felladrin/gguf-Q8_0-SmolLM2-360M-Instruct",
+    hfFilePath: "model.shard-00001-of-00008.gguf",
     fileSizeInMegabytes: 386,
   },
   "qwen-2.5-0.5b": {
     ...defaultModelConfig,
     label: "Qwen 2.5 0.5B",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Q4_K_S-Qwen2.5-0.5B-Instruct/resolve/main/model.shard-00001-of-00003.gguf",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Qwen2.5-0.5B-Instruct",
+    hfFilePath: "model.shard-00001-of-00003.gguf",
     fileSizeInMegabytes: 386,
   },
   "danube-3-500m": {
     ...defaultModelConfig,
     label: "Danube 3 500M",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-h2o-danube3-500m-chat/resolve/main/model.shard-00001-of-00008.gguf",
-    fileSizeInMegabytes: 399,
+    hfRepoId: "Felladrin/gguf-sharded-Q5_K_L-h2o-danube3-500m-chat",
+    hfFilePath: "model.shard-00001-of-00008.gguf",
+    fileSizeInMegabytes: 547,
   },
   "amd-olmo-1b": {
     ...defaultModelConfig,
     label: "AMD OLMo 1B",
-    url: "https://huggingface.co/Felladrin/gguf-Q5_K_L-AMD-OLMo-1B-SFT-DPO/resolve/main/model.shard-00001-of-00009.gguf",
+    hfRepoId: "Felladrin/gguf-Q5_K_L-AMD-OLMo-1B-SFT-DPO",
+    hfFilePath: "model.shard-00001-of-00009.gguf",
     fileSizeInMegabytes: 872,
   },
   "granite-3.0-1b": {
     ...defaultModelConfig,
     label: "Granite 3.0 1B [400M]",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-q5_k_l-granite-3.0-1b-a400m-instruct/resolve/main/model.shard-00001-of-00019.gguf",
+    hfRepoId: "Felladrin/gguf-sharded-q5_k_l-granite-3.0-1b-a400m-instruct",
+    hfFilePath: "model.shard-00001-of-00019.gguf",
     fileSizeInMegabytes: 969,
     buildPrompt: async (_, query, searchResults) =>
       buildGranitePrompt(query, searchResults),
@@ -137,37 +140,43 @@ export const wllamaModels: Record<string, WllamaModel> = {
   "llama-3.2-1b": {
     ...defaultModelConfig,
     label: "Llama 3.2 1B",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-1B-Instruct/resolve/main/model.shard-00001-of-00005.gguf",
+    hfRepoId: "Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-1B-Instruct",
+    hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 975,
   },
   "pythia-1.4b": {
     ...defaultModelConfig,
     label: "Pythia 1.4B",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-pythia-1.4b-sft-full/resolve/main/pythia-1.4b-sft-full.Q5_K_M.shard-00001-of-00011.gguf",
+    hfRepoId: "Felladrin/gguf-sharded-pythia-1.4b-sft-full",
+    hfFilePath: "pythia-1.4b-sft-full.Q5_K_M.shard-00001-of-00011.gguf",
     fileSizeInMegabytes: 1060,
   },
   "pints-1.5b": {
     ...defaultModelConfig,
     label: "Pints 1.5B",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K-1.5-Pints-2K-v0.1/resolve/main/model.shard-00001-of-00018.gguf",
+    hfRepoId: "Felladrin/gguf-sharded-Q5_K-1.5-Pints-2K-v0.1",
+    hfFilePath: "model.shard-00001-of-00018.gguf",
     fileSizeInMegabytes: 1150,
   },
   "smollm2-1.7b": {
     ...defaultModelConfig,
     label: "SmolLM 2 1.7B",
-    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-SmolLM2-1.7B-Instruct/resolve/main/model.shard-00001-of-00016.gguf",
+    hfRepoId: "Felladrin/gguf-Q5_K_M-SmolLM2-1.7B-Instruct",
+    hfFilePath: "model.shard-00001-of-00016.gguf",
     fileSizeInMegabytes: 1230,
   },
   "arcee-lite": {
     ...defaultModelConfig,
     label: "Arcee Lite 1.5B",
-    url: "https://huggingface.co/Felladrin/gguf-q5_k_l-imat-arcee-lite/resolve/main/arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
+    hfRepoId: "Felladrin/gguf-q5_k_l-imat-arcee-lite",
+    hfFilePath: "arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
     fileSizeInMegabytes: 1430,
   },
   "granite-3.0-2b": {
     ...defaultModelConfig,
     label: "Granite 3.0 2B",
-    url: "https://huggingface.co/Felladrin/gguf-q5_k_m-granite-3.0-2b-instruct/resolve/main/granite-3-00001-of-00023.gguf",
+    hfRepoId: "Felladrin/gguf-q5_k_m-granite-3.0-2b-instruct",
+    hfFilePath: "granite-3-00001-of-00023.gguf",
     fileSizeInMegabytes: 1870,
     buildPrompt: async (_, query, searchResults) =>
       buildGranitePrompt(query, searchResults),
@@ -175,19 +184,22 @@ export const wllamaModels: Record<string, WllamaModel> = {
   "gemma-2-2b": {
     ...defaultModelConfig,
     label: "Gemma 2 2B",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-gemma-2-2b-it-abliterated/resolve/main/gemma-2-2b-it-abliterated-q5_k_m-imat-00001-of-00009.gguf",
+    hfRepoId: "Felladrin/gguf-sharded-gemma-2-2b-it-abliterated",
+    hfFilePath: "gemma-2-2b-it-abliterated-q5_k_m-imat-00001-of-00009.gguf",
     fileSizeInMegabytes: 1920,
   },
   "llama-3.2-3b": {
     ...defaultModelConfig,
     label: "Llama 3.2 3B",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-3B-Instruct/resolve/main/model.shard-00001-of-00007.gguf",
+    hfRepoId: "Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-3B-Instruct",
+    hfFilePath: "model.shard-00001-of-00007.gguf",
     fileSizeInMegabytes: 2420,
   },
   "granite-3.0-3b": {
     ...defaultModelConfig,
     label: "Granite 3.0 3B [800M]",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Q5_K_L-granite-3.0-3b-a800m-instruct/resolve/main/model.shard-00001-of-00034.gguf",
+    hfRepoId: "Felladrin/gguf-sharded-Q5_K_L-granite-3.0-3b-a800m-instruct",
+    hfFilePath: "model.shard-00001-of-00034.gguf",
     fileSizeInMegabytes: 2450,
     buildPrompt: async (_, query, searchResults) =>
       buildGranitePrompt(query, searchResults),
@@ -195,33 +207,38 @@ export const wllamaModels: Record<string, WllamaModel> = {
   "minicpm3-4b": {
     ...defaultModelConfig,
     label: "MiniCPM 3 4B",
-    url: "https://huggingface.co/Felladrin/gguf-Q4_K_M-MiniCPM3-4B/resolve/main/model.shard-00001-of-00017.gguf",
+    hfRepoId: "Felladrin/gguf-Q4_K_M-MiniCPM3-4B",
+    hfFilePath: "model.shard-00001-of-00017.gguf",
     fileSizeInMegabytes: 2470,
     contextSize: 2496,
   },
   "phi-3.5-mini-3.8b": {
     ...defaultModelConfig,
     label: "Phi 3.5 Mini 3.8B",
-    url: "https://huggingface.co/Felladrin/gguf-q5_k_m-phi-3.5-mini-instruct/resolve/main/phi-3-00001-of-00025.gguf",
+    hfRepoId: "Felladrin/gguf-q5_k_m-phi-3.5-mini-instruct",
+    hfFilePath: "phi-3-00001-of-00025.gguf",
     fileSizeInMegabytes: 2820,
     contextSize: 3584,
   },
   "magpielm-4b": {
     ...defaultModelConfig,
     label: "MagpieLM 4B",
-    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-MagpieLM-4B-Chat-v0.1/resolve/main/magpielm-4b-chat-v0-00001-of-00019.gguf",
+    hfRepoId: "Felladrin/gguf-Q5_K_M-MagpieLM-4B-Chat-v0.1",
+    hfFilePath: "magpielm-4b-chat-v0-00001-of-00019.gguf",
     fileSizeInMegabytes: 3230,
   },
   "nemotron-mini-4b": {
     ...defaultModelConfig,
     label: "Nemotron Mini 4B",
-    url: "https://huggingface.co/Felladrin/gguf-Q5_K_M-Nemotron-Mini-4B-Instruct/resolve/main/nemotron-mini-4b-instruct-q5_k_m-imat-00001-of-00004.gguf",
+    hfRepoId: "Felladrin/gguf-Q5_K_M-Nemotron-Mini-4B-Instruct",
+    hfFilePath: "nemotron-mini-4b-instruct-q5_k_m-imat-00001-of-00004.gguf",
     fileSizeInMegabytes: 3550,
   },
   "olmoe-1b-7b": {
     ...defaultModelConfig,
     label: "OLMoE 7B [1B]",
-    url: "https://huggingface.co/Felladrin/gguf-sharded-Q3_K_XL-OLMoE-1B-7B-0924-Instruct/resolve/main/OLMoE-1B-7B-0924-Instruct-Q3_K_XL.shard-00001-of-00050.gguf",
+    hfRepoId: "Felladrin/gguf-sharded-Q3_K_XL-OLMoE-1B-7B-0924-Instruct",
+    hfFilePath: "OLMoE-1B-7B-0924-Instruct-Q3_K_XL.shard-00001-of-00050.gguf",
     fileSizeInMegabytes: 3700,
     contextSize: 3584,
   },
@@ -290,10 +307,11 @@ class CustomCacheManager implements CacheManager {
     await cache.put(name, response);
   }
 
-  async open(name: string): Promise<ReadableStream | null> {
+  async open(name: string): Promise<Blob | null> {
     const cache = await caches.open(this.cacheName);
     const response = await cache.match(name);
-    return response?.body ?? null;
+    if (!response?.body) return null;
+    return new Response(response.body).blob();
   }
 
   async getSize(name: string): Promise<number> {
@@ -371,5 +389,20 @@ class CustomCacheManager implements CacheManager {
     });
 
     await cache.put(name, newResponse);
+  }
+
+  async download(url: string, options?: DownloadOptions): Promise<void> {
+    const response = await fetch(url, options);
+    if (!response.ok)
+      throw new Error(`Failed to download: ${response.statusText}`);
+    const name = await this.getNameFromURL(url);
+    const metadata = {
+      etag: response.headers.get("etag") || "",
+      originalSize: Number(response.headers.get("content-length")) || 0,
+      originalURL: url,
+    };
+    if (response.body) {
+      await this.write(name, response.body, metadata);
+    }
   }
 }

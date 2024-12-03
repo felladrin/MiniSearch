@@ -30,7 +30,7 @@
     "@mantine/notifications": "^7.12.2",
     "@mlc-ai/web-llm": "0.2.77",
     "@tabler/icons-react": "^3.16.0",
-    "@wllama/wllama": "^1.16.4",
+    "@wllama/wllama": "^2.0.1",
     "country-flag-icons": "^1.5.13",
     "create-pubsub": "^1.6.3",
     "dotenv": "^16.4.5",

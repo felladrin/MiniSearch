@@ -48,9 +48,10 @@ async function initializeWllamaInstance(
 
   updateModelSizeInMegabytes(model.fileSizeInMegabytes);
 
-  const wllama = await initializeWllama(model.url, {
+  const wllama = await initializeWllama(model.hfRepoId, model.hfFilePath, {
     wllama: {
       suppressNativeLog: true,
+      allowOffline: true,
     },
     model: {
       n_threads: getSettings().cpuThreads,
@@ -58,7 +59,6 @@ async function initializeWllamaInstance(
       cache_type_k: model.cacheTypeK as LoadModelConfig["cache_type_k"],
       cache_type_v: model.cacheTypeV as LoadModelConfig["cache_type_v"],
       embeddings: false,
-      allowOffline: true,
       progressCallback,
     },
   });
