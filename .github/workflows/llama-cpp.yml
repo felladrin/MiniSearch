@@ -25,20 +25,23 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Create temporary directory
+        run: mkdir -p /tmp/llama_review
+
       - name: Process PR description
         id: process_pr
         run: |
-          PR_BODY='${{ github.event.pull_request.body }}'
-          PROCESSED_BODY=$(echo "$PR_BODY" | sed -E 's/\[(.*?)\]\(.*?\)/\1/g')
-          echo "processed_body<<EOF" >> $GITHUB_OUTPUT
-          echo "$PROCESSED_BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          PR_BODY_ESCAPED=$(cat << 'EOF'
+          ${{ github.event.pull_request.body }}
+          EOF
+          )
+          PROCESSED_BODY=$(echo "$PR_BODY_ESCAPED" | sed -E 's/\[(.*?)\]\(.*?\)/\1/g')
+          echo "$PROCESSED_BODY" > /tmp/llama_review/processed_body.txt
 
       - name: Fetch branches and output the diff in this step
         run: |
           git fetch origin main:main
           git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-branch
-          mkdir -p /tmp/llama_review
           git diff main..pr-branch > /tmp/llama_review/diff.txt
 
       - name: Write prompt to file
@@ -46,6 +49,7 @@ jobs:
         run: |
           PR_TITLE=$(echo "${{ github.event.pull_request.title }}" | sed 's/[()]/\\&/g')
           DIFF_CONTENT=$(cat /tmp/llama_review/diff.txt)
+          PROCESSED_BODY=$(cat /tmp/llama_review/processed_body.txt)
           echo "<|im_start|>system
           You are an experienced Pull Request (PR) Reviewer with extensive knowledge of software development best practices. Your role is to review code changes and provide constructive, actionable feedback.
           You are working on ${{ github.event.repository.name }} repository, which has the following description: \"${{ github.event.repository.description }}\".
@@ -108,7 +112,7 @@ jobs:
           <|im_start|>user
           This is the description of the pull request:
           ```markdown
-          ${{ steps.process_pr.outputs.processed_body }}
+          $PROCESSED_BODY
           ```
           And here is the diff of the changes, for you to review:
           ```diff
