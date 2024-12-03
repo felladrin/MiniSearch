@@ -1,4 +1,3 @@
-import type { LoadModelConfig } from "@wllama/wllama/esm";
 import {
   getQuery,
   getSettings,
@@ -56,8 +55,8 @@ async function initializeWllamaInstance(
     model: {
       n_threads: getSettings().cpuThreads,
       n_ctx: model.contextSize,
-      cache_type_k: model.cacheTypeK as LoadModelConfig["cache_type_k"],
-      cache_type_v: model.cacheTypeV as LoadModelConfig["cache_type_v"],
+      cache_type_k: model.cacheTypeK,
+      cache_type_v: model.cacheTypeV,
       embeddings: false,
       progressCallback,
     },

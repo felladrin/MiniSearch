@@ -49,8 +49,8 @@ export interface WllamaModel {
   label: string;
   hfRepoId: string;
   hfFilePath: string;
-  cacheTypeK: "f32" | "f16" | "q8_0" | "q5_1" | "q5_0" | "q4_1" | "q4_0";
-  cacheTypeV: "f32" | "f16" | "q8_0" | "q5_1" | "q5_0" | "q4_1" | "q4_0";
+  cacheTypeK: LoadModelConfig["cache_type_k"];
+  cacheTypeV: LoadModelConfig["cache_type_v"];
   contextSize: number;
   fileSizeInMegabytes: number;
   getSampling: () => SamplingConfig;
