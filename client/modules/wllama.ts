@@ -13,6 +13,16 @@ import { getSettings } from "./pubSub";
 import { getSystemPrompt } from "./systemPrompt";
 import { defaultContextSize } from "./textGenerationUtilities";
 
+async function createWllamaInstance(config?: { wllama?: WllamaConfig }) {
+  return new Wllama(
+    {
+      "single-thread/wllama.wasm": singleThreadWllamaWasmUrl,
+      "multi-thread/wllama.wasm": multiThreadWllamaWasmUrl,
+    },
+    config?.wllama,
+  );
+}
+
 export async function initializeWllama(
   hfRepoId: string,
   hfFilePath: string,
@@ -23,17 +33,23 @@ export async function initializeWllama(
 ) {
   addLogEntry("Initializing Wllama");
 
-  const wllama = new Wllama(
-    {
-      "single-thread/wllama.wasm": singleThreadWllamaWasmUrl,
-      "multi-thread/wllama.wasm": multiThreadWllamaWasmUrl,
-    },
-    config?.wllama,
-  );
+  const wllama = await createWllamaInstance(config);
 
   await wllama.loadModelFromHF(hfRepoId, hfFilePath, config?.model);
 
   addLogEntry("Wllama initialized successfully");
+
+  return wllama;
+}
+
+export async function clearWllamaCache() {
+  addLogEntry("Clearing Wllama cache");
+
+  const wllama = await createWllamaInstance();
+
+  await wllama.cacheManager.clear();
+
+  addLogEntry("Wllama cache cleared successfully");
 
   return wllama;
 }

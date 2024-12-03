@@ -29,6 +29,10 @@ export default function ClearDataButton() {
       if (databaseInfo.name) self.indexedDB.deleteDatabase(databaseInfo.name);
     }
 
+    const { clearWllamaCache } = await import("../../../../modules/wllama");
+
+    await clearWllamaCache();
+
     setIsClearingData(false);
 
     setHasClearedData(true);
