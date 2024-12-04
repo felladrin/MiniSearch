@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { Pattern, match } from "ts-pattern";
 import { useLocation } from "wouter";
 import { addLogEntry } from "../../../modules/logEntries";
 import { postMessageToParentWindow } from "../../../modules/parentWindow";
@@ -67,9 +66,8 @@ export default function SearchForm({
   };
 
   const startSearching = useCallback(() => {
-    const queryToEncode = match(textAreaValue.trim())
-      .with(Pattern.string.minLength(1), () => textAreaValue)
-      .otherwise(() => suggestedQuery);
+    const queryToEncode =
+      textAreaValue.trim().length >= 1 ? textAreaValue : suggestedQuery;
 
     setTextAreaValue(queryToEncode);
 
@@ -94,13 +92,12 @@ export default function SearchForm({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    match([event, settings.enterToSubmit])
-      .with(
-        [{ code: "Enter", shiftKey: false }, true],
-        [{ code: "Enter", shiftKey: true }, false],
-        () => handleSubmit(event),
-      )
-      .otherwise(() => undefined);
+    if (
+      (event.code === "Enter" && !event.shiftKey && settings.enterToSubmit) ||
+      (event.code === "Enter" && event.shiftKey && !settings.enterToSubmit)
+    ) {
+      handleSubmit(event);
+    }
   };
 
   return (
@@ -118,17 +115,15 @@ export default function SearchForm({
           autoFocus
         />
         <Group gap="xs">
-          {match(textAreaValue)
-            .with(Pattern.string.minLength(1), () => (
-              <Button
-                size="xs"
-                onClick={handleClearButtonClick}
-                variant="default"
-              >
-                Clear
-              </Button>
-            ))
-            .otherwise(() => null)}
+          {textAreaValue.length >= 1 ? (
+            <Button
+              size="xs"
+              onClick={handleClearButtonClick}
+              variant="default"
+            >
+              Clear
+            </Button>
+          ) : null}
           <Button size="xs" type="submit" variant="default" flex={1}>
             Search
           </Button>

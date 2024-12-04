@@ -8,7 +8,6 @@ import { addLogEntry } from "../../modules/logEntries";
 import { settingsPubSub } from "../../modules/pubSub";
 import { defaultSettings } from "../../modules/settings";
 import "@mantine/notifications/styles.css";
-import { match } from "ts-pattern";
 import { verifyStoredAccessKey } from "../../modules/accessKey";
 
 const MainPage = lazy(() => import("../Pages/Main/MainPage"));
@@ -19,26 +18,24 @@ export function App() {
   const { hasValidatedAccessKey, isCheckingStoredKey, setValidatedAccessKey } =
     useAccessKeyValidation();
 
-  return match(isCheckingStoredKey)
-    .with(false, () => (
-      <MantineProvider defaultColorScheme="dark">
-        <Notifications />
-        <Switch>
-          <Route path="/">
-            {match([VITE_ACCESS_KEYS_ENABLED, hasValidatedAccessKey])
-              .with([true, false], () => (
-                <AccessPage
-                  onAccessKeyValid={() => setValidatedAccessKey(true)}
-                />
-              ))
-              .otherwise(() => (
-                <MainPage />
-              ))}
-          </Route>
-        </Switch>
-      </MantineProvider>
-    ))
-    .otherwise(() => null);
+  if (isCheckingStoredKey) {
+    return null;
+  }
+
+  return (
+    <MantineProvider defaultColorScheme="dark">
+      <Notifications />
+      <Switch>
+        <Route path="/">
+          {VITE_ACCESS_KEYS_ENABLED && !hasValidatedAccessKey ? (
+            <AccessPage onAccessKeyValid={() => setValidatedAccessKey(true)} />
+          ) : (
+            <MainPage />
+          )}
+        </Route>
+      </Switch>
+    </MantineProvider>
+  );
 }
 
 /**

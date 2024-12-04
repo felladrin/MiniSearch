@@ -18,7 +18,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { match } from "ts-pattern";
 import { addLogEntry } from "../../modules/logEntries";
 import { settingsPubSub } from "../../modules/pubSub";
 import { generateChatResponse } from "../../modules/textGeneration";
@@ -87,16 +86,13 @@ export default function ChatInterface({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    match([event, settings.enterToSubmit])
-      .with([{ code: "Enter", shiftKey: false }, true], () => {
-        event.preventDefault();
-        handleSend();
-      })
-      .with([{ code: "Enter", shiftKey: true }, false], () => {
-        event.preventDefault();
-        handleSend();
-      })
-      .otherwise(() => undefined);
+    if (
+      (event.code === "Enter" && !event.shiftKey && settings.enterToSubmit) ||
+      (event.code === "Enter" && event.shiftKey && !settings.enterToSubmit)
+    ) {
+      event.preventDefault();
+      handleSend();
+    }
   };
 
   const getChatContent = () => {

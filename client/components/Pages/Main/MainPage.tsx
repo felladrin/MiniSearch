@@ -2,7 +2,6 @@ import { Center, Container, Loader, Stack } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import { Suspense } from "react";
 import { lazy } from "react";
-import { Pattern, match } from "ts-pattern";
 import {
   imageSearchStatePubSub,
   queryPubSub,
@@ -30,9 +29,7 @@ export default function MainPage() {
       <Stack
         py="md"
         mih="100vh"
-        justify={match(query)
-          .with(Pattern.string.length(0), () => "center")
-          .otherwise(() => undefined)}
+        justify={query.length === 0 ? "center" : undefined}
       >
         <Suspense
           fallback={
@@ -47,24 +44,16 @@ export default function MainPage() {
             additionalButtons={<MenuButton />}
           />
         </Suspense>
-        {match(textGenerationState)
-          .with(Pattern.not("idle"), () => (
-            <Suspense>
-              <AiResponseSection />
-            </Suspense>
-          ))
-          .otherwise(() => null)}
-        {match([textSearchState, imageSearchState])
-          .with(
-            [Pattern.not("idle"), Pattern.any],
-            [Pattern.any, Pattern.not("idle")],
-            () => (
-              <Suspense>
-                <SearchResultsSection />
-              </Suspense>
-            ),
-          )
-          .otherwise(() => null)}
+        {textGenerationState !== "idle" && (
+          <Suspense>
+            <AiResponseSection />
+          </Suspense>
+        )}
+        {(textSearchState !== "idle" || imageSearchState !== "idle") && (
+          <Suspense>
+            <SearchResultsSection />
+          </Suspense>
+        )}
       </Stack>
     </Container>
   );

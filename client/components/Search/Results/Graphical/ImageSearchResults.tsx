@@ -2,7 +2,6 @@ import { Alert } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import { Suspense, lazy } from "react";
-import { match } from "ts-pattern";
 import {
   imageSearchResultsPubSub,
   imageSearchStatePubSub,
@@ -17,37 +16,47 @@ export default function ImageSearchResults() {
   const [searchState] = usePubSub(imageSearchStatePubSub);
   const [results] = usePubSub(imageSearchResultsPubSub);
 
-  return match(searchState)
-    .with("running", () => (
+  if (searchState === "running") {
+    return (
       <Suspense>
         <ImageResultsLoadingState />
       </Suspense>
-    ))
-    .with("completed", () =>
-      results.length > 0 ? (
+    );
+  }
+
+  if (searchState === "completed") {
+    if (results.length > 0) {
+      return (
         <Suspense>
           <ImageResultsList imageResults={results} />
         </Suspense>
-      ) : (
-        <Alert
-          variant="light"
-          color="yellow"
-          title="No images found"
-          icon={<IconInfoCircle />}
-        >
-          No image results found for your search query.
-        </Alert>
-      ),
-    )
-    .with("failed", () => (
+      );
+    }
+
+    return (
       <Alert
         variant="light"
-        color="red"
-        title="Search failed"
+        color="yellow"
+        title="No image results found"
         icon={<IconInfoCircle />}
       >
-        Failed to fetch image results. Please try again.
+        Could not find any images matching your search query.
       </Alert>
-    ))
-    .otherwise(() => null);
+    );
+  }
+
+  if (searchState === "failed") {
+    return (
+      <Alert
+        variant="light"
+        color="yellow"
+        title="Failed to search for images"
+        icon={<IconInfoCircle />}
+      >
+        Could not search for images.
+      </Alert>
+    );
+  }
+
+  return null;
 }

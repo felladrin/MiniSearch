@@ -14,7 +14,6 @@ import { useForm } from "@mantine/form";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import { Suspense, lazy, useEffect, useState } from "react";
-import { Pattern, match } from "ts-pattern";
 import { addLogEntry } from "../../../../modules/logEntries";
 import { getOpenAiClient } from "../../../../modules/openai";
 import { settingsPubSub } from "../../../../modules/pubSub";
@@ -205,82 +204,79 @@ export default function AISettingsForm() {
                 />
               )}
 
-              {match([isWebGPUAvailable, form.values.enableWebGpu])
-                .with([true, true], () => (
+              {isWebGPUAvailable && form.values.enableWebGpu ? (
+                <Suspense fallback={<Skeleton height={50} />}>
+                  <WebLlmModelSelect
+                    value={form.values.webLlmModelId}
+                    onChange={(value) =>
+                      form.setFieldValue("webLlmModelId", value)
+                    }
+                  />
+                </Suspense>
+              ) : (
+                <>
                   <Suspense fallback={<Skeleton height={50} />}>
-                    <WebLlmModelSelect
-                      value={form.values.webLlmModelId}
+                    <WllamaModelSelect
+                      value={form.values.wllamaModelId}
                       onChange={(value) =>
-                        form.setFieldValue("webLlmModelId", value)
+                        form.setFieldValue("wllamaModelId", value)
                       }
                     />
                   </Suspense>
-                ))
-                .with([false, Pattern.any], [Pattern.any, false], () => (
-                  <>
-                    <Suspense fallback={<Skeleton height={50} />}>
-                      <WllamaModelSelect
-                        value={form.values.wllamaModelId}
-                        onChange={(value) =>
-                          form.setFieldValue("wllamaModelId", value)
-                        }
-                      />
-                    </Suspense>
-                    <NumberInput
-                      label="CPU threads to use"
-                      description={
-                        <>
+                  <NumberInput
+                    label="CPU threads to use"
+                    description={
+                      <>
+                        <span>
+                          Number of threads to use for the AI model. Lower
+                          values will use less CPU but may take longer to
+                          respond. A value that is too high may cause the app to
+                          hang.
+                        </span>
+                        {suggestedCpuThreads > defaultSettings.cpuThreads && (
                           <span>
-                            Number of threads to use for the AI model. Lower
-                            values will use less CPU but may take longer to
-                            respond. A value that is too high may cause the app
-                            to hang.
+                            {" "}
+                            The default value is{" "}
+                            <Text
+                              component="span"
+                              size="xs"
+                              c="blue"
+                              style={{ cursor: "pointer" }}
+                              onClick={() =>
+                                form.setFieldValue(
+                                  "cpuThreads",
+                                  defaultSettings.cpuThreads,
+                                )
+                              }
+                            >
+                              {defaultSettings.cpuThreads}
+                            </Text>
+                            , but based on the number of logical processors in
+                            your CPU, the suggested value is{" "}
+                            <Text
+                              component="span"
+                              size="xs"
+                              c="blue"
+                              style={{ cursor: "pointer" }}
+                              onClick={() =>
+                                form.setFieldValue(
+                                  "cpuThreads",
+                                  suggestedCpuThreads,
+                                )
+                              }
+                            >
+                              {suggestedCpuThreads}
+                            </Text>
+                            .
                           </span>
-                          {suggestedCpuThreads > defaultSettings.cpuThreads && (
-                            <span>
-                              {" "}
-                              The default value is{" "}
-                              <Text
-                                component="span"
-                                size="xs"
-                                c="blue"
-                                style={{ cursor: "pointer" }}
-                                onClick={() =>
-                                  form.setFieldValue(
-                                    "cpuThreads",
-                                    defaultSettings.cpuThreads,
-                                  )
-                                }
-                              >
-                                {defaultSettings.cpuThreads}
-                              </Text>
-                              , but based on the number of logical processors in
-                              your CPU, the suggested value is{" "}
-                              <Text
-                                component="span"
-                                size="xs"
-                                c="blue"
-                                style={{ cursor: "pointer" }}
-                                onClick={() =>
-                                  form.setFieldValue(
-                                    "cpuThreads",
-                                    suggestedCpuThreads,
-                                  )
-                                }
-                              >
-                                {suggestedCpuThreads}
-                              </Text>
-                              .
-                            </span>
-                          )}
-                        </>
-                      }
-                      min={1}
-                      {...form.getInputProps("cpuThreads")}
-                    />
-                  </>
-                ))
-                .otherwise(() => null)}
+                        )}
+                      </>
+                    }
+                    min={1}
+                    {...form.getInputProps("cpuThreads")}
+                  />
+                </>
+              )}
             </>
           )}
 
