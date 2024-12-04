@@ -159,8 +159,10 @@ jobs:
             -np 1 \
             -t -1 \
             -n -1 \
-            --temp 0 \
-            --top-k 1 \
+            --temp 0.5 \
+            --top-p 0.9 \
+            --min-p 0.1 \
+            --top-k 0 \
             --cache-type-k q8_0 \
             --cache-type-v q8_0 \
             --flash-attn \
