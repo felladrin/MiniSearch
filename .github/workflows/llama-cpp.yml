@@ -111,13 +111,14 @@ jobs:
           Your goal is to help improve code quality while maintaining a collaborative and positive review process that encourages learning and growth.<|im_end|>
           <|im_start|>user
           This is the description of the pull request:
-          ```markdown
+          \`\`\`markdown
           $PROCESSED_BODY
-          ```
+          \`\`\`
+
           And here is the diff of the changes, for you to review:
-          ```diff
+          \`\`\`diff
           $DIFF_CONTENT
-          ```
+          \`\`\`
           <|im_end|>
           <|im_start|>assistant
           ### Overall Summary
@@ -142,7 +143,7 @@ jobs:
           make -j llama-cli
           mkdir -p ~/.cache/llama.cpp/
           cp llama-cli ~/.cache/llama.cpp/
-          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/unsloth/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-7B-Instruct-Q5_K_M.gguf
+          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/bartowski/Qwen2.5-Coder-14B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-14B-Instruct-Q5_K_M.gguf
 
       - name: Copy LlamaCPP to /usr/local/bin/
         run: cp ~/.cache/llama.cpp/llama-cli /usr/local/bin/
@@ -162,6 +163,9 @@ jobs:
             --top-p 0.9 \
             --min-p 0.1 \
             --top-k 0 \
+            --cache-type-k q8_0 \
+            --cache-type-v q8_0 \
+            --flash-attn \
             --no-display-prompt > /tmp/llama_review/response.txt
 
       - name: Show Response
