@@ -1,6 +1,5 @@
 import { usePubSub } from "create-pubsub/react";
 import { Suspense, lazy, useMemo } from "react";
-import { Pattern, match } from "ts-pattern";
 import {
   modelLoadingProgressPubSub,
   modelSizeInMegabytesPubSub,
@@ -28,65 +27,79 @@ export default function AiResponseSection() {
   const [settings] = usePubSub(settingsPubSub);
   const [modelSizeInMegabytes] = usePubSub(modelSizeInMegabytesPubSub);
 
-  return useMemo(
-    () =>
-      match([settings.enableAiResponse, textGenerationState])
-        .with([true, Pattern.not("idle").select()], (textGenerationState) =>
-          match(textGenerationState)
-            .with(
-              Pattern.union("generating", "interrupted", "completed", "failed"),
-              (textGenerationState) => (
-                <>
-                  <Suspense>
-                    <AiResponseContent
-                      textGenerationState={textGenerationState}
-                      response={response}
-                      setTextGenerationState={setTextGenerationState}
-                    />
-                  </Suspense>
-                  {textGenerationState === "completed" && (
-                    <Suspense>
-                      <ChatInterface
-                        initialQuery={query}
-                        initialResponse={response}
-                      />
-                    </Suspense>
-                  )}
-                </>
-              ),
-            )
-            .with("awaitingModelDownloadAllowance", () => (
-              <Suspense>
-                <AiModelDownloadAllowanceContent />
-              </Suspense>
-            ))
-            .with("loadingModel", () => (
-              <Suspense>
-                <LoadingModelContent
-                  modelLoadingProgress={modelLoadingProgress}
-                  modelSizeInMegabytes={modelSizeInMegabytes}
-                />
-              </Suspense>
-            ))
-            .with(
-              Pattern.union("awaitingSearchResults", "preparingToGenerate"),
-              (textGenerationState) => (
-                <Suspense>
-                  <PreparingContent textGenerationState={textGenerationState} />
-                </Suspense>
-              ),
-            )
-            .exhaustive(),
-        )
-        .otherwise(() => null),
-    [
-      settings,
-      textGenerationState,
-      setTextGenerationState,
-      modelLoadingProgress,
-      response,
-      query,
-      modelSizeInMegabytes,
-    ],
-  );
+  return useMemo(() => {
+    if (!settings.enableAiResponse || textGenerationState === "idle") {
+      return null;
+    }
+
+    const generatingStates = [
+      "generating",
+      "interrupted",
+      "completed",
+      "failed",
+    ];
+    if (generatingStates.includes(textGenerationState)) {
+      return (
+        <>
+          <Suspense>
+            <AiResponseContent
+              textGenerationState={textGenerationState}
+              response={response}
+              setTextGenerationState={setTextGenerationState}
+            />
+          </Suspense>
+          {textGenerationState === "completed" && (
+            <Suspense>
+              <ChatInterface initialQuery={query} initialResponse={response} />
+            </Suspense>
+          )}
+        </>
+      );
+    }
+
+    if (textGenerationState === "loadingModel") {
+      return (
+        <Suspense>
+          <LoadingModelContent
+            modelLoadingProgress={modelLoadingProgress}
+            modelSizeInMegabytes={modelSizeInMegabytes}
+          />
+        </Suspense>
+      );
+    }
+
+    if (textGenerationState === "preparingToGenerate") {
+      return (
+        <Suspense>
+          <PreparingContent textGenerationState={textGenerationState} />
+        </Suspense>
+      );
+    }
+
+    if (textGenerationState === "awaitingSearchResults") {
+      return (
+        <Suspense>
+          <PreparingContent textGenerationState={textGenerationState} />
+        </Suspense>
+      );
+    }
+
+    if (textGenerationState === "awaitingModelDownloadAllowance") {
+      return (
+        <Suspense>
+          <AiModelDownloadAllowanceContent />
+        </Suspense>
+      );
+    }
+
+    return null;
+  }, [
+    settings.enableAiResponse,
+    textGenerationState,
+    response,
+    query,
+    modelLoadingProgress,
+    modelSizeInMegabytes,
+    setTextGenerationState,
+  ]);
 }

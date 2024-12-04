@@ -20,7 +20,6 @@ import {
 import type { PublishFunction } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
 import { type ReactNode, Suspense, lazy, useMemo, useState } from "react";
-import { match } from "ts-pattern";
 import { settingsPubSub } from "../../modules/pubSub";
 import { searchAndRespond } from "../../modules/textGeneration";
 
@@ -97,42 +96,38 @@ export default function AiResponseContent({
         <Group justify="space-between">
           <Group gap="xs" align="center">
             <Text fw={500}>
-              {match(textGenerationState)
-                .with("generating", () => "Generating AI Response...")
-                .otherwise(() => "AI Response")}
+              {textGenerationState === "generating"
+                ? "Generating AI Response..."
+                : "AI Response"}
             </Text>
-            {match(textGenerationState)
-              .with("interrupted", () => (
-                <Badge variant="light" color="yellow" size="xs">
-                  Interrupted
-                </Badge>
-              ))
-              .otherwise(() => null)}
+            {textGenerationState === "interrupted" && (
+              <Badge variant="light" color="yellow" size="xs">
+                Interrupted
+              </Badge>
+            )}
           </Group>
           <Group gap="xs" align="center">
-            {match(textGenerationState)
-              .with("generating", () => (
-                <Tooltip label="Interrupt generation">
-                  <ActionIcon
-                    onClick={() => setTextGenerationState("interrupted")}
-                    variant="subtle"
-                    color="gray"
-                  >
-                    <IconHandStop size={16} />
-                  </ActionIcon>
-                </Tooltip>
-              ))
-              .otherwise(() => (
-                <Tooltip label="Regenerate response">
-                  <ActionIcon
-                    onClick={() => searchAndRespond()}
-                    variant="subtle"
-                    color="gray"
-                  >
-                    <IconRefresh size={16} />
-                  </ActionIcon>
-                </Tooltip>
-              ))}
+            {textGenerationState === "generating" ? (
+              <Tooltip label="Interrupt generation">
+                <ActionIcon
+                  onClick={() => setTextGenerationState("interrupted")}
+                  variant="subtle"
+                  color="gray"
+                >
+                  <IconHandStop size={16} />
+                </ActionIcon>
+              </Tooltip>
+            ) : (
+              <Tooltip label="Regenerate response">
+                <ActionIcon
+                  onClick={() => searchAndRespond()}
+                  variant="subtle"
+                  color="gray"
+                >
+                  <IconRefresh size={16} />
+                </ActionIcon>
+              </Tooltip>
+            )}
             <Tooltip
               label={isSpeaking ? "Stop speaking" : "Listen to response"}
             >
@@ -187,19 +182,17 @@ export default function AiResponseContent({
             <FormattedMarkdown>{response}</FormattedMarkdown>
           </Suspense>
         </ConditionalScrollArea>
-        {match(textGenerationState)
-          .with("failed", () => (
-            <Alert
-              variant="light"
-              color="yellow"
-              title="Failed to generate response"
-              icon={<IconInfoCircle />}
-            >
-              Could not generate response. It's possible that your browser or
-              your system is out of memory.
-            </Alert>
-          ))
-          .otherwise(() => null)}
+        {textGenerationState === "failed" && (
+          <Alert
+            variant="light"
+            color="yellow"
+            title="Failed to generate response"
+            icon={<IconInfoCircle />}
+          >
+            Could not generate response. It's possible that your browser or your
+            system is out of memory.
+          </Alert>
+        )}
       </Card.Section>
     </Card>
   );

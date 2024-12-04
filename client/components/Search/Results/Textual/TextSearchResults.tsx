@@ -2,7 +2,6 @@ import { Alert } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import { Suspense, lazy } from "react";
-import { match } from "ts-pattern";
 import {
   textSearchResultsPubSub,
   textSearchStatePubSub,
@@ -15,29 +14,37 @@ export default function TextSearchResults() {
   const [searchState] = usePubSub(textSearchStatePubSub);
   const [results] = usePubSub(textSearchResultsPubSub);
 
-  return match(searchState)
-    .with("running", () => (
+  if (searchState === "running") {
+    return (
       <Suspense>
         <TextResultsLoadingState />
       </Suspense>
-    ))
-    .with("completed", () =>
-      results.length > 0 ? (
+    );
+  }
+
+  if (searchState === "completed") {
+    if (results.length > 0) {
+      return (
         <Suspense>
           <SearchResultsList searchResults={results} />
         </Suspense>
-      ) : (
-        <Alert
-          variant="light"
-          color="yellow"
-          title="No results found"
-          icon={<IconInfoCircle />}
-        >
-          No text results found for your search query.
-        </Alert>
-      ),
-    )
-    .with("failed", () => (
+      );
+    }
+
+    return (
+      <Alert
+        variant="light"
+        color="yellow"
+        title="No results found"
+        icon={<IconInfoCircle />}
+      >
+        No text results found for your search query.
+      </Alert>
+    );
+  }
+
+  if (searchState === "failed") {
+    return (
       <Alert
         variant="light"
         color="red"
@@ -46,6 +53,8 @@ export default function TextSearchResults() {
       >
         Failed to fetch text results. Please try again.
       </Alert>
-    ))
-    .otherwise(() => null);
+    );
+  }
+
+  return null;
 }
