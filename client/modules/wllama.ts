@@ -174,6 +174,13 @@ export const wllamaModels: Record<string, WllamaModel> = {
     hfFilePath: "model.shard-00001-of-00016.gguf",
     fileSizeInMegabytes: 1230,
   },
+  "internlm-2.5-1.8b": {
+    ...defaultModelConfig,
+    label: "InternLM 2.5 1.8B",
+    hfRepoId: "Felladrin/gguf-sharded-q5_k_m-internlm2_5-1_8b-chat",
+    hfFilePath: "model.shard-00001-of-00009.gguf",
+    fileSizeInMegabytes: 1360,
+  },
   "arcee-lite": {
     ...defaultModelConfig,
     label: "Arcee Lite 1.5B",
