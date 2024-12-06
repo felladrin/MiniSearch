@@ -26,6 +26,7 @@ interface HordeStatusResponse {
 }
 
 const aiHordeApiBaseUrl = "https://aihorde.net/api/v2";
+const aiHordeMaxResponseLengthInTokens = 512;
 const clientAgent = repository.url.split("/").pop() ?? "";
 
 async function startGeneration(messages: ChatMessage[]) {
@@ -40,7 +41,7 @@ async function startGeneration(messages: ChatMessage[]) {
       prompt: formatPrompt(messages),
       params: {
         max_context_length: defaultContextSize,
-        max_length: defaultContextSize / 2,
+        max_length: aiHordeMaxResponseLengthInTokens,
       },
     }),
   });
