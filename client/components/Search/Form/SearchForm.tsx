@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { useLocation } from "wouter";
+import { handleEnterKeyDown } from "../../../modules/keyboard";
 import { addLogEntry } from "../../../modules/logEntries";
 import { postMessageToParentWindow } from "../../../modules/parentWindow";
 import { settingsPubSub } from "../../../modules/pubSub";
@@ -92,12 +93,7 @@ export default function SearchForm({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (
-      (event.code === "Enter" && !event.shiftKey && settings.enterToSubmit) ||
-      (event.code === "Enter" && event.shiftKey && !settings.enterToSubmit)
-    ) {
-      handleSubmit(event);
-    }
+    handleEnterKeyDown(event, settings, () => handleSubmit(event));
   };
 
   return (

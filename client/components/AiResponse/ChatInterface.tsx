@@ -18,6 +18,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { handleEnterKeyDown } from "../../modules/keyboard";
 import { addLogEntry } from "../../modules/logEntries";
 import { settingsPubSub } from "../../modules/pubSub";
 import { generateChatResponse } from "../../modules/textGeneration";
@@ -86,13 +87,7 @@ export default function ChatInterface({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (
-      (event.code === "Enter" && !event.shiftKey && settings.enterToSubmit) ||
-      (event.code === "Enter" && event.shiftKey && !settings.enterToSubmit)
-    ) {
-      event.preventDefault();
-      handleSend();
-    }
+    handleEnterKeyDown(event, settings, handleSend);
   };
 
   const getChatContent = () => {
