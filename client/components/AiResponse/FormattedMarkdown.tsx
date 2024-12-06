@@ -32,7 +32,8 @@ const FormattedMarkdown: React.FC<FormattedMarkdownProps> = ({
             li(props) {
               const children = React.Children.map(props.children, (child) => {
                 const containsParagraphTag =
-                  React.isValidElement(child) && child.type === "p";
+                  React.isValidElement<HTMLElement>(child) &&
+                  child.type === "p";
                 return containsParagraphTag ? child.props.children : child;
               });
 
