@@ -50,7 +50,6 @@ jobs:
           PR_TITLE=$(echo "${{ github.event.pull_request.title }}" | sed 's/[()]/\\&/g')
           DIFF_CONTENT=$(cat /tmp/llama_review/diff.txt)
           PROCESSED_BODY=$(cat /tmp/llama_review/processed_body.txt)
-          echo -e '### Review\n\n' > /tmp/llama_review/prompt.txt
           echo "<|im_start|>system
           You are an experienced developer reviewing a Pull Request. You focus only on what matters and provide concise, actionable feedback.
 
@@ -104,7 +103,7 @@ jobs:
           <|im_end|>
           <|im_start|>assistant
           ### Overall Summary
-          " >> /tmp/llama_review/prompt.txt
+          " > /tmp/llama_review/prompt.txt
 
       - name: Show Prompt
         run: cat /tmp/llama_review/prompt.txt
@@ -133,10 +132,10 @@ jobs:
       - name: Run LlamaCPP
         run: |
           PROMPT=$(cat /tmp/llama_review/prompt.txt)
+          echo -e '### Review\n\n' > /tmp/llama_review/response.txt
           llama-cli \
             -m ~/.cache/llama.cpp/model.gguf \
             -p "$PROMPT" \
-            -e \
             --ctx-size 32768 \
             -np 1 \
             -t -1 \
@@ -148,7 +147,10 @@ jobs:
             --cache-type-k q8_0 \
             --cache-type-v q8_0 \
             --flash-attn \
-            --no-display-prompt > /tmp/llama_review/response.txt
+            --no-display-prompt >> /tmp/llama_review/response.txt
+
+      - name: Remove [end of text] from response
+        run: sed -i 's/\[end of text\]//g' /tmp/llama_review/response.txt
 
       - name: Show Response
         run: cat /tmp/llama_review/response.txt
