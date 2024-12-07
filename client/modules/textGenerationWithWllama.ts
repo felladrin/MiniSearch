@@ -89,36 +89,42 @@ async function generateWithWllama(
     updateTextGenerationState("preparingToGenerate");
   }
 
-  const prompt = await model.buildPrompt(
-    wllama,
-    input,
-    getFormattedSearchResults(model.shouldIncludeUrlsOnPrompt),
-  );
-
   let streamedMessage = "";
 
-  await wllama.createCompletion(prompt, {
-    nPredict: defaultContextSize / 2,
-    stopTokens: model.stopTokens,
-    sampling: model.getSampling(),
-    onNewToken: (_token, _piece, currentText, { abortSignal }) => {
-      if (shouldCheckCanRespond && getTextGenerationState() === "interrupted") {
-        abortSignal();
-        throw new ChatGenerationError("Chat generation interrupted");
-      }
+  await wllama.createChatCompletion(
+    model.getMessages(
+      input,
+      getFormattedSearchResults(model.shouldIncludeUrlsOnPrompt),
+    ),
+    {
+      nPredict: defaultContextSize / 2,
+      stopTokens: model.stopTokens,
+      sampling: model.getSampling(),
+      onNewToken: (_token, _piece, currentText, { abortSignal }) => {
+        if (
+          shouldCheckCanRespond &&
+          getTextGenerationState() === "interrupted"
+        ) {
+          abortSignal();
+          throw new ChatGenerationError("Chat generation interrupted");
+        }
 
-      if (shouldCheckCanRespond && getTextGenerationState() !== "generating") {
-        updateTextGenerationState("generating");
-      }
+        if (
+          shouldCheckCanRespond &&
+          getTextGenerationState() !== "generating"
+        ) {
+          updateTextGenerationState("generating");
+        }
 
-      streamedMessage = handleWllamaCompletion(
-        model,
-        currentText,
-        abortSignal,
-        onUpdate,
-      );
+        streamedMessage = handleWllamaCompletion(
+          model,
+          currentText,
+          abortSignal,
+          onUpdate,
+        );
+      },
     },
-  });
+  );
 
   await wllama.exit();
   return streamedMessage;

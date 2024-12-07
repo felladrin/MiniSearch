@@ -1,8 +1,8 @@
-import { Template } from "@huggingface/jinja";
 import {
   type LoadModelConfig,
   type SamplingConfig,
   Wllama,
+  type WllamaChatMessage,
   type WllamaConfig,
 } from "@wllama/wllama/esm";
 import type { DownloadOptions } from "@wllama/wllama/esm/cache-manager";
@@ -64,11 +64,7 @@ export interface WllamaModel {
   fileSizeInMegabytes: number;
   getSampling: () => SamplingConfig;
   shouldIncludeUrlsOnPrompt: boolean;
-  buildPrompt: (
-    wllama: Wllama,
-    query: string,
-    searchResults: string,
-  ) => Promise<string>;
+  getMessages: (query: string, searchResults: string) => WllamaChatMessage[];
   stopStrings?: string[];
   stopTokens?: number[];
 }
@@ -77,12 +73,12 @@ const defaultModelConfig: Omit<
   WllamaModel,
   "label" | "fileSizeInMegabytes" | "hfRepoId" | "hfFilePath"
 > = {
-  buildPrompt: async (wllama, query, searchResults) => {
-    return formatChat(wllama, [
-      { id: 1, role: "user", content: getSystemPrompt(searchResults) },
-      { id: 2, role: "assistant", content: "Ok!" },
-      { id: 3, role: "user", content: query },
-    ]);
+  getMessages: (query, searchResults) => {
+    return [
+      { role: "user", content: getSystemPrompt(searchResults) },
+      { role: "assistant", content: "Ok!" },
+      { role: "user", content: query },
+    ];
   },
   cacheTypeK: "q4_0",
   cacheTypeV: "q8_0",
@@ -143,8 +139,6 @@ export const wllamaModels: Record<string, WllamaModel> = {
     hfRepoId: "Felladrin/gguf-sharded-q5_k_l-granite-3.0-1b-a400m-instruct",
     hfFilePath: "model.shard-00001-of-00019.gguf",
     fileSizeInMegabytes: 969,
-    buildPrompt: async (_, query, searchResults) =>
-      buildGranitePrompt(query, searchResults),
   },
   "llama-3.2-1b": {
     ...defaultModelConfig,
@@ -194,8 +188,6 @@ export const wllamaModels: Record<string, WllamaModel> = {
     hfRepoId: "Felladrin/gguf-q5_k_m-granite-3.0-2b-instruct",
     hfFilePath: "granite-3-00001-of-00023.gguf",
     fileSizeInMegabytes: 1870,
-    buildPrompt: async (_, query, searchResults) =>
-      buildGranitePrompt(query, searchResults),
   },
   "gemma-2-2b": {
     ...defaultModelConfig,
@@ -217,8 +209,6 @@ export const wllamaModels: Record<string, WllamaModel> = {
     hfRepoId: "Felladrin/gguf-sharded-Q5_K_L-granite-3.0-3b-a800m-instruct",
     hfFilePath: "model.shard-00001-of-00034.gguf",
     fileSizeInMegabytes: 2450,
-    buildPrompt: async (_, query, searchResults) =>
-      buildGranitePrompt(query, searchResults),
   },
   "minicpm3-4b": {
     ...defaultModelConfig,
@@ -258,36 +248,4 @@ export const wllamaModels: Record<string, WllamaModel> = {
     fileSizeInMegabytes: 3700,
     contextSize: 3584,
   },
-};
-
-function buildGranitePrompt(query: string, searchResults: string) {
-  return `<|start_of_role|>system<|end_of_role|>${getSystemPrompt(
-    searchResults,
-  )}<|end_of_text|>
-<|start_of_role|>user<|end_of_role|>${query}<|end_of_text|>
-<|start_of_role|>assistant<|end_of_role|>`;
-}
-
-export interface Message {
-  id: number;
-  content: string;
-  role: "system" | "user" | "assistant";
-}
-
-export const formatChat = async (wllama: Wllama, messages: Message[]) => {
-  const defaultChatTemplate =
-    "{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}";
-
-  const template = new Template(
-    wllama.getChatTemplate() ?? defaultChatTemplate,
-  );
-
-  const textDecoder = new TextDecoder();
-
-  return template.render({
-    messages,
-    bos_token: textDecoder.decode(await wllama.detokenize([wllama.getBOS()])),
-    eos_token: textDecoder.decode(await wllama.detokenize([wllama.getEOS()])),
-    add_generation_prompt: true,
-  });
 };

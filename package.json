@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "@huggingface/hub": "^1.0.0",
-    "@huggingface/jinja": "^0.3.0",
     "@mantine/carousel": "^7.12.2",
     "@mantine/core": "^7.12.2",
     "@mantine/form": "^7.12.2",
