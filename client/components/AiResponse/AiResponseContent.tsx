@@ -19,7 +19,7 @@ import {
 } from "@tabler/icons-react";
 import type { PublishFunction } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
-import { type ReactNode, Suspense, lazy, useMemo, useState } from "react";
+import { type ReactNode, Suspense, lazy, useState } from "react";
 import { settingsPubSub } from "../../modules/pubSub";
 import { searchAndRespond } from "../../modules/textGeneration";
 
@@ -46,20 +46,6 @@ export default function AiResponseContent({
 }) {
   const [settings, setSettings] = usePubSub(settingsPubSub);
   const [isSpeaking, setIsSpeaking] = useState(false);
-
-  const ConditionalScrollArea = useMemo(
-    () =>
-      ({ children }: { children: ReactNode }) => {
-        return settings.enableAiResponseScrolling ? (
-          <ScrollArea.Autosize mah={300} type="auto" offsetScrollbars>
-            {children}
-          </ScrollArea.Autosize>
-        ) : (
-          <Box>{children}</Box>
-        );
-      },
-    [settings.enableAiResponseScrolling],
-  );
 
   function speakResponse(text: string) {
     if (isSpeaking) {
@@ -196,4 +182,18 @@ export default function AiResponseContent({
       </Card.Section>
     </Card>
   );
+}
+
+function ConditionalScrollArea({ children }: { children: ReactNode }) {
+  const [settings] = usePubSub(settingsPubSub);
+
+  if (settings.enableAiResponseScrolling) {
+    return (
+      <ScrollArea.Autosize mah={300} type="auto" offsetScrollbars>
+        {children}
+      </ScrollArea.Autosize>
+    );
+  }
+
+  return <Box>{children}</Box>;
 }
