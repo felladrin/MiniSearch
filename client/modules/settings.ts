@@ -15,9 +15,10 @@ export const defaultSettings = {
   systemPrompt: `I need assistance with my research, so please provide easy-to-understand responses following these guidelines:
 - Base your responses on the provided search results and your general knowledge about the topic.
 - Answer in the same language in which I ask, with an analytical tone.
-- Use Markdown format, without headers.
 - Include any additional relevant information you think would be good to know.
 - Keep in mind that the current date and time is {{dateTime}}.
+- Use Markdown format, without headers.
+- Use inline citations for any information that is not common knowledge. Place the citation immediately after the fact or quote it supports. Markdown citation format: [[1](https://example.com)], where the number increments for each unique source. Only use URLs that are explicitly provided in the context.
 
 Search results:
 {{searchResults}}`,
