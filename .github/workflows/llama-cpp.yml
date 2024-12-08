@@ -50,7 +50,7 @@ jobs:
           PR_TITLE=$(echo "${{ github.event.pull_request.title }}" | sed 's/[()]/\\&/g')
           DIFF_CONTENT=$(cat /tmp/llama_review/diff.txt)
           PROCESSED_BODY=$(cat /tmp/llama_review/processed_body.txt)
-          echo "<|im_start|>system
+          echo "<|system|>
           You are an experienced developer reviewing a Pull Request. You focus only on what matters and provide concise, actionable feedback.
 
           Review Context:
@@ -89,8 +89,8 @@ jobs:
           ### Positive Notes
           - Brief note on exceptional solutions
 
-          Remember: Less is more. If the code is good and working, just say so, with a short message.<|im_end|>
-          <|im_start|>user
+          Remember: Less is more. If the code is good and working, just say so, with a short message.<|end|>
+          <|user|>
           This is the description of the pull request:
           \`\`\`markdown
           $PROCESSED_BODY
@@ -100,8 +100,8 @@ jobs:
           \`\`\`diff
           $DIFF_CONTENT
           \`\`\`
-          <|im_end|>
-          <|im_start|>assistant
+          <|end|>
+          <|assistant|>
           ### Overall Summary
           " > /tmp/llama_review/prompt.txt
 
@@ -124,7 +124,7 @@ jobs:
           make -j llama-cli
           mkdir -p ~/.cache/llama.cpp/
           cp llama-cli ~/.cache/llama.cpp/
-          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-fp16.gguf
+          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/bartowski/Phi-3.1-mini-128k-instruct-GGUF/resolve/main/Phi-3.1-mini-128k-instruct-IQ4_XS.gguf
 
       - name: Copy LlamaCPP to /usr/local/bin/
         run: cp ~/.cache/llama.cpp/llama-cli /usr/local/bin/
