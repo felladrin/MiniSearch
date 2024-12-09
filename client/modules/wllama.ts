@@ -212,6 +212,14 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "granite-3-00001-of-00023.gguf",
     fileSizeInMegabytes: 1870,
   },
+  "exaone-3.5-2.4b": {
+    ...createDefaultModelConfig(),
+    label: "EXAONE 3.5 2.4B",
+    hfRepoId: "Felladrin/gguf-sharded-Q5_K_M-EXAONE-3.5-2.4B-Instruct",
+    hfFilePath: "model.shard-00001-of-00009.gguf",
+    fileSizeInMegabytes: 1910,
+    cacheTypeV: "f16",
+  },
   "gemma-2-2b": {
     ...createDefaultModelConfig(),
     label: "Gemma 2 2B",
