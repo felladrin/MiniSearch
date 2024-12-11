@@ -134,12 +134,10 @@ jobs:
           PROMPT=$(cat /tmp/llama_review/prompt.txt)
           echo -e '### Review\n\n' > /tmp/llama_review/response.txt
           llama-cli \
-            -m ~/.cache/llama.cpp/model.gguf \
-            -p "$PROMPT" \
+            --model ~/.cache/llama.cpp/model.gguf \
+            --prompt "$PROMPT" \
             --ctx-size 32768 \
-            -np 1 \
-            -t -1 \
-            -n -1 \
+            --predict -1 \
             --temp 0.5 \
             --top-p 0.9 \
             --min-p 0.1 \
