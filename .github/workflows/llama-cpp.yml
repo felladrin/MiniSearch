@@ -111,6 +111,9 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@master
 
+      - name: Install llama.cpp
+        run: brew install llama.cpp
+
       - name: Cache llama.cpp
         id: cache_llama_cpp
         uses: actions/cache@v4
@@ -121,7 +124,6 @@ jobs:
       - name: Clone and build llama.cpp
         if: steps.cache_llama_cpp.outputs.cache-hit != 'true'
         run: |
-          brew install llama.cpp
           mkdir -p ~/.cache/llama.cpp/
           curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/bartowski/${{ env.HF_MODEL_NAME }}/resolve/main/Qwen2.5.1-Coder-7B-Instruct-IQ4_XS.gguf
           curl -L -o ~/.cache/llama.cpp/model-draft.gguf https://huggingface.co/bartowski/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-0.5B-Instruct-Q8_0.gguf
