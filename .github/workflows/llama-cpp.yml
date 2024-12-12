@@ -108,6 +108,9 @@ jobs:
       - name: Show Prompt
         run: cat /tmp/llama_review/prompt.txt
 
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
       - name: Cache llama.cpp
         id: cache_llama_cpp
         uses: actions/cache@v4
