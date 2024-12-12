@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 120
     env:
       LLAMA_CPP_COMMIT: 484d2f31aed34ff9f096e3961125762e81d9b7d6
-      HF_MODEL_NAME: Hermes-3-Llama-3.2-3B-GGUF
+      HF_MODEL_NAME: Qwen2.5.1-Coder-7B-Instruct-GGUF
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -123,22 +123,24 @@ jobs:
           cd llama.cpp
           git checkout ${{ env.LLAMA_CPP_COMMIT }}
           cmake -B build
-          cmake --build build --config Release -j --target llama-cli
+          cmake --build build --config Release -j --target llama-server
           mkdir -p ~/.cache/llama.cpp/
-          cp ./build/bin/llama-cli ~/.cache/llama.cpp/
-          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/NousResearch/${{ env.HF_MODEL_NAME }}/resolve/main/Hermes-3-Llama-3.2-3B.Q5_K_M.gguf
+          cp ./build/bin/llama-server ~/.cache/llama.cpp/
+          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/bartowski/${{ env.HF_MODEL_NAME }}/resolve/main/Qwen2.5.1-Coder-7B-Instruct-IQ4_XS.gguf
+          curl -L -o ~/.cache/llama.cpp/model-draft.gguf https://huggingface.co/bartowski/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-0.5B-Instruct-Q8_0.gguf
 
       - name: Copy llama.cpp to /usr/local/bin/
-        run: cp ~/.cache/llama.cpp/llama-cli /usr/local/bin/
+        run: cp ~/.cache/llama.cpp/llama-server /usr/local/bin/
 
       - name: Run llama.cpp
         run: |
           PROMPT=$(cat /tmp/llama_review/prompt.txt)
           echo -e '### Review\n\n' > /tmp/llama_review/response.txt
-          llama-cli \
+          llama-server \
             --model ~/.cache/llama.cpp/model.gguf \
             --prompt "$PROMPT" \
             --ctx-size 32768 \
+            --batch-size 4096 \
             --threads -1 \
             --predict -1 \
             --temp 0.5 \
@@ -148,10 +150,38 @@ jobs:
             --cache-type-k q8_0 \
             --cache-type-v q8_0 \
             --flash-attn \
-            --no-display-prompt >> /tmp/llama_review/response.txt
+            --model-draft ~/.cache/llama.cpp/model-draft.gguf \
+            --draft-min 12 \
+            --draft-max 24 \
+            --draft-p-min 0.6 \
+            --port 11434 &
 
-      - name: Remove [end of text] from response
-        run: sed -i 's/\[end of text\]//g' /tmp/llama_review/response.txt
+      - name: Wait for llama-server to be ready
+        run: |
+          sudo apt-get update && sudo apt-get install -y netcat-openbsd
+
+          timeout=30
+
+          until nc -z localhost 11434 || [ $timeout -eq 0 ]; do
+            echo "Waiting for port 11434 to be available... ($timeout seconds left)"
+            sleep 1
+            ((timeout--))
+          done
+
+          if [ $timeout -eq 0 ]; then
+            echo "Timeout waiting for llama-server to start"
+            exit 1
+          fi
+
+          echo "llama-server is ready!"
+
+      - name: cURL llama-server to get the completion for the prompt
+        run: |
+          curl \
+          --request POST \
+          --url http://localhost:11434/completion \
+          --header "Content-Type: application/json" \
+          --data "{\"prompt\": \"$PROMPT\"}"
 
       - name: Show Response
         run: cat /tmp/llama_review/response.txt
