@@ -145,23 +145,6 @@ jobs:
             --no-mmap \
             --port 11434 &
 
-      - name: Wait for llama-server to be ready
-        run: |
-          timeout=30
-
-          until nc -z localhost 11434 || [ $timeout -eq 0 ]; do
-            echo "Waiting for port 11434 to be available... ($timeout seconds left)"
-            sleep 1
-            ((timeout--))
-          done
-
-          if [ $timeout -eq 0 ]; then
-            echo "Timeout waiting for llama-server to start"
-            exit 1
-          fi
-
-          echo "llama-server is ready!"
-
       - name: cURL llama-server to get the completion and timings
         run: |
           DATA=$(jq -n --arg prompt "$(cat /tmp/llama_review/prompt.txt)" '{"prompt": $prompt}')
