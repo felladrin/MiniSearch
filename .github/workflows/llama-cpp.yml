@@ -126,7 +126,6 @@ jobs:
         run: |
           mkdir -p ~/.cache/llama.cpp/
           curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/bartowski/${{ env.HF_MODEL_NAME }}/resolve/main/Qwen2.5.1-Coder-7B-Instruct-IQ4_XS.gguf
-          curl -L -o ~/.cache/llama.cpp/model-draft.gguf https://huggingface.co/bartowski/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-0.5B-Instruct-Q8_0.gguf
 
       - name: Run llama.cpp
         run: |
@@ -143,10 +142,6 @@ jobs:
             --cache-type-k q8_0 \
             --cache-type-v q8_0 \
             --flash-attn \
-            --model-draft ~/.cache/llama.cpp/model-draft.gguf \
-            --draft-min 12 \
-            --draft-max 24 \
-            --draft-p-min 0.6 \
             --no-mmap \
             --port 11434 &
 
@@ -178,10 +173,10 @@ jobs:
             --url http://localhost:11434/completion \
             --header "Content-Type: application/json" \
             --data "$DATA" > /tmp/llama_review/full_response.json
-          
+
           # Extract and append content to response.txt
           jq -r '.content' /tmp/llama_review/full_response.json >> /tmp/llama_review/response.txt
-          
+
           # Pretty print the timings information
           echo "=== Performance Metrics ==="
           jq -r '.timings | to_entries | .[] | "\(.key): \(.value)"' /tmp/llama_review/full_response.json
