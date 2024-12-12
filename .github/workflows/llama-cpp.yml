@@ -20,8 +20,7 @@ jobs:
       contents: read
     timeout-minutes: 120
     env:
-      LLAMA_CPP_COMMIT: 484d2f31aed34ff9f096e3961125762e81d9b7d6
-      HF_MODEL_NAME: Hermes-3-Llama-3.2-3B-GGUF
+      HF_MODEL_NAME: Qwen2.5.1-Coder-7B-Instruct-GGUF
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -55,7 +54,8 @@ jobs:
           You are an experienced developer reviewing a Pull Request. You focus only on what matters and provide concise, actionable feedback.
 
           Review Context:
-          Repository: \"${{ github.event.repository.name }}\"
+          Repository Name: \"${{ github.event.repository.name }}\"
+          Repository Description: \"${{ github.event.repository.description }}\"
           Branch: \"${{ github.event.pull_request.head.ref }}\"
           PR Title: \"$PR_TITLE\"
 
@@ -79,18 +79,8 @@ jobs:
             - Working code that could be marginally improved
             - Things that are just personal preference
 
-          Format your response as the following, only including the sections that are relevant to the Pull Request:
-
-          ### Blocking Issues
-          - [File:Line] Issue description + suggested fix
-
-          ### Important Feedback
-          - [File:Line] Issue description + suggested fix
-
-          ### Positive Notes
-          - Brief note on exceptional solutions
-
-          Remember: Less is more. If the code is good and working, just say so, with a short message.<|im_end|>
+          Remember:
+          Less is more. If the code is good and working, just say so, with a short message.<|im_end|>
           <|im_start|>user
           This is the description of the pull request:
           \`\`\`markdown
@@ -109,35 +99,31 @@ jobs:
       - name: Show Prompt
         run: cat /tmp/llama_review/prompt.txt
 
-      - name: Cache llama.cpp
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Install and cache Homebrew tools
+        uses: tecolicom/actions-use-homebrew-tools@v1
+        with:
+          tools: llama.cpp
+
+      - name: Cache the LLM
         id: cache_llama_cpp
         uses: actions/cache@v4
         with:
           path: ~/.cache/llama.cpp/
-          key: llama-cpp-${{ env.LLAMA_CPP_COMMIT }}-${{ env.HF_MODEL_NAME }}
+          key: llama-cpp-${{ env.HF_MODEL_NAME }}
 
-      - name: Clone and build llama.cpp
+      - name: Download and cache the LLM
         if: steps.cache_llama_cpp.outputs.cache-hit != 'true'
         run: |
-          git clone https://github.com/ggerganov/llama.cpp.git
-          cd llama.cpp
-          git checkout ${{ env.LLAMA_CPP_COMMIT }}
-          cmake -B build
-          cmake --build build --config Release -j --target llama-cli
           mkdir -p ~/.cache/llama.cpp/
-          cp ./build/bin/llama-cli ~/.cache/llama.cpp/
-          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/NousResearch/${{ env.HF_MODEL_NAME }}/resolve/main/Hermes-3-Llama-3.2-3B.Q5_K_M.gguf
-
-      - name: Copy llama.cpp to /usr/local/bin/
-        run: cp ~/.cache/llama.cpp/llama-cli /usr/local/bin/
+          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/bartowski/${{ env.HF_MODEL_NAME }}/resolve/main/Qwen2.5.1-Coder-7B-Instruct-IQ4_XS.gguf
 
       - name: Run llama.cpp
         run: |
-          PROMPT=$(cat /tmp/llama_review/prompt.txt)
-          echo -e '### Review\n\n' > /tmp/llama_review/response.txt
-          llama-cli \
+          llama-server \
             --model ~/.cache/llama.cpp/model.gguf \
-            --prompt "$PROMPT" \
             --ctx-size 32768 \
             --threads -1 \
             --predict -1 \
@@ -148,10 +134,26 @@ jobs:
             --cache-type-k q8_0 \
             --cache-type-v q8_0 \
             --flash-attn \
-            --no-display-prompt >> /tmp/llama_review/response.txt
+            --port 11434 &
 
-      - name: Remove [end of text] from response
-        run: sed -i 's/\[end of text\]//g' /tmp/llama_review/response.txt
+      - name: cURL llama-server to get the completion and timings
+        run: |
+          DATA=$(jq -n --arg prompt "$(cat /tmp/llama_review/prompt.txt)" '{"prompt": $prompt}')
+          echo -e '### Review\n\n' > /tmp/llama_review/response.txt
+          # Save the full response to a temporary file
+          curl \
+            --silent \
+            --request POST \
+            --url http://localhost:11434/completion \
+            --header "Content-Type: application/json" \
+            --data "$DATA" > /tmp/llama_review/full_response.json
+
+          # Extract and append content to response.txt
+          jq -r '.content' /tmp/llama_review/full_response.json >> /tmp/llama_review/response.txt
+
+          # Pretty print the timings information
+          echo "=== Performance Metrics ==="
+          jq -r '.timings | to_entries | .[] | "\(.key): \(.value)"' /tmp/llama_review/full_response.json
 
       - name: Show Response
         run: cat /tmp/llama_review/response.txt
