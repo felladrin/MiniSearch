@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 120
     env:
       LLAMA_CPP_COMMIT: 484d2f31aed34ff9f096e3961125762e81d9b7d6
-      HF_MODEL_NAME: Qwen2.5-Coder-1.5B-Instruct-GGUF
+      HF_MODEL_NAME: Hermes-3-Llama-3.2-3B-GGUF
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -126,7 +126,7 @@ jobs:
           cmake --build build --config Release -j --target llama-cli
           mkdir -p ~/.cache/llama.cpp/
           cp ./build/bin/llama-cli ~/.cache/llama.cpp/
-          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/Qwen/${{ env.HF_MODEL_NAME }}/resolve/main/qwen2.5-coder-1.5b-instruct-q8_0.gguf
+          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/NousResearch/${{ env.HF_MODEL_NAME }}/resolve/main/Hermes-3-Llama-3.2-3B.Q5_K_M.gguf
 
       - name: Copy llama.cpp to /usr/local/bin/
         run: cp ~/.cache/llama.cpp/llama-cli /usr/local/bin/
