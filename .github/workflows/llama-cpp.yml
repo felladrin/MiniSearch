@@ -167,15 +167,24 @@ jobs:
 
           echo "llama-server is ready!"
 
-      - name: cURL llama-server to get the completion for the prompt
+      - name: cURL llama-server to get the completion and timings
         run: |
-          PROMPT=$(jq -n --arg prompt "$(cat /tmp/llama_review/prompt.txt)" '{"prompt": $prompt}')
+          DATA=$(jq -n --arg prompt "$(cat /tmp/llama_review/prompt.txt)" '{"prompt": $prompt}')
           echo -e '### Review\n\n' > /tmp/llama_review/response.txt
+          # Save the full response to a temporary file
           curl \
-          --request POST \
-          --url http://localhost:11434/completion \
-          --header "Content-Type: application/json" \
-          --data "$PROMPT" >> /tmp/llama_review/response.txt
+            --silent \
+            --request POST \
+            --url http://localhost:11434/completion \
+            --header "Content-Type: application/json" \
+            --data "$DATA" > /tmp/llama_review/full_response.json
+          
+          # Extract and append content to response.txt
+          jq -r '.content' /tmp/llama_review/full_response.json >> /tmp/llama_review/response.txt
+          
+          # Pretty print the timings information
+          echo "=== Performance Metrics ==="
+          jq -r '.timings | to_entries | .[] | "\(.key): \(.value)"' /tmp/llama_review/full_response.json
 
       - name: Show Response
         run: cat /tmp/llama_review/response.txt
