@@ -54,7 +54,8 @@ jobs:
           You are an experienced developer reviewing a Pull Request. You focus only on what matters and provide concise, actionable feedback.
 
           Review Context:
-          Repository: \"${{ github.event.repository.name }}\"
+          Repository Name: \"${{ github.event.repository.name }}\"
+          Repository Description: \"${{ github.event.repository.description }}\"
           Branch: \"${{ github.event.pull_request.head.ref }}\"
           PR Title: \"$PR_TITLE\"
 
@@ -78,18 +79,8 @@ jobs:
             - Working code that could be marginally improved
             - Things that are just personal preference
 
-          Format your response as the following, only including the sections that are relevant to the Pull Request:
-
-          ### Blocking Issues
-          - [File:Line] Issue description + suggested fix
-
-          ### Important Feedback
-          - [File:Line] Issue description + suggested fix
-
-          ### Positive Notes
-          - Brief note on exceptional solutions
-
-          Remember: Less is more. If the code is good and working, just say so, with a short message.<|im_end|>
+          Remember:
+          Less is more. If the code is good and working, just say so, with a short message.<|im_end|>
           <|im_start|>user
           This is the description of the pull request:
           \`\`\`markdown
@@ -114,14 +105,14 @@ jobs:
       - name: Install llama.cpp
         run: brew install llama.cpp
 
-      - name: Cache llama.cpp
+      - name: Cache the LLM
         id: cache_llama_cpp
         uses: actions/cache@v4
         with:
           path: ~/.cache/llama.cpp/
           key: llama-cpp-${{ env.HF_MODEL_NAME }}
 
-      - name: Clone and build llama.cpp
+      - name: Download and cache the LLM
         if: steps.cache_llama_cpp.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/.cache/llama.cpp/
@@ -132,7 +123,6 @@ jobs:
           llama-server \
             --model ~/.cache/llama.cpp/model.gguf \
             --ctx-size 32768 \
-            --batch-size 4096 \
             --threads -1 \
             --predict -1 \
             --temp 0.5 \
@@ -142,7 +132,6 @@ jobs:
             --cache-type-k q8_0 \
             --cache-type-v q8_0 \
             --flash-attn \
-            --no-mmap \
             --port 11434 &
 
       - name: cURL llama-server to get the completion and timings
