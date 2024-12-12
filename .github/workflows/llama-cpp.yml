@@ -102,7 +102,19 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@master
 
+      - name: Cache llama.cpp installation
+        id: cache-llama-cpp
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/Homebrew
+            /usr/local/Cellar/llama.cpp
+          key: ${{ runner.os }}-brew-llama-cpp-${{ hashFiles('.github/workflows/llama-cpp.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-brew-llama-cpp-
+
       - name: Install llama.cpp
+        if: steps.cache-llama-cpp.outputs.cache-hit != 'true'
         run: brew install llama.cpp
 
       - name: Cache the LLM
