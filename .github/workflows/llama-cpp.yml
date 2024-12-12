@@ -151,12 +151,11 @@ jobs:
             --draft-min 12 \
             --draft-max 24 \
             --draft-p-min 0.6 \
-            --no-mmap \
             --port 11434 &
 
       - name: Wait for llama-server to be ready
         run: |
-          timeout=120
+          timeout=30
 
           until nc -z localhost 11434 || [ $timeout -eq 0 ]; do
             echo "Waiting for port 11434 to be available... ($timeout seconds left)"
