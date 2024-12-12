@@ -99,6 +99,9 @@ jobs:
       - name: Show Prompt
         run: cat /tmp/llama_review/prompt.txt
 
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
       - name: Install and cache Homebrew tools
         uses: tecolicom/actions-use-homebrew-tools@v1
         with:
