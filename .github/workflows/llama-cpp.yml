@@ -167,13 +167,13 @@ jobs:
 
       - name: cURL llama-server to get the completion for the prompt
         run: |
-          PROMPT=$(cat /tmp/llama_review/prompt.txt)
+          PROMPT=$(jq -n --arg prompt "$(cat /tmp/llama_review/prompt.txt)" '{"prompt": $prompt}')
           echo -e '### Review\n\n' > /tmp/llama_review/response.txt
           curl \
           --request POST \
           --url http://localhost:11434/completion \
           --header "Content-Type: application/json" \
-          --data "{\"prompt\": \"$PROMPT\"}" >> /tmp/llama_review/response.txt
+          --data "$PROMPT" >> /tmp/llama_review/response.txt
 
       - name: Show Response
         run: cat /tmp/llama_review/response.txt
