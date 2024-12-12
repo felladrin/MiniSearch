@@ -1,4 +1,4 @@
-name: Review Pull Request with LlamaCPP
+name: Review Pull Request with llama.cpp
 
 on:
   pull_request:
@@ -14,13 +14,14 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
     continue-on-error: true
     runs-on: ubuntu-latest
-    name: LlamaCPP
+    name: llama.cpp
     permissions:
       pull-requests: write
       contents: read
     timeout-minutes: 120
     env:
-      LLAMA_CPP_COMMIT: 42ae10bbcd7b56f29a302c86796542a6dadf46c9
+      LLAMA_CPP_COMMIT: 484d2f31aed34ff9f096e3961125762e81d9b7d6
+      HF_MODEL_NAME: Qwen2.5-Coder-1.5B-Instruct-GGUF
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -50,7 +51,7 @@ jobs:
           PR_TITLE=$(echo "${{ github.event.pull_request.title }}" | sed 's/[()]/\\&/g')
           DIFF_CONTENT=$(cat /tmp/llama_review/diff.txt)
           PROCESSED_BODY=$(cat /tmp/llama_review/processed_body.txt)
-          echo "<|system|>
+          echo "<|im_start|>system
           You are an experienced developer reviewing a Pull Request. You focus only on what matters and provide concise, actionable feedback.
 
           Review Context:
@@ -89,8 +90,8 @@ jobs:
           ### Positive Notes
           - Brief note on exceptional solutions
 
-          Remember: Less is more. If the code is good and working, just say so, with a short message.<|end|>
-          <|user|>
+          Remember: Less is more. If the code is good and working, just say so, with a short message.<|im_end|>
+          <|im_start|>user
           This is the description of the pull request:
           \`\`\`markdown
           $PROCESSED_BODY
@@ -100,36 +101,37 @@ jobs:
           \`\`\`diff
           $DIFF_CONTENT
           \`\`\`
-          <|end|>
-          <|assistant|>
+          <|im_end|>
+          <|im_start|>assistant
           ### Overall Summary
           " > /tmp/llama_review/prompt.txt
 
       - name: Show Prompt
         run: cat /tmp/llama_review/prompt.txt
 
-      - name: Cache LlamaCPP
+      - name: Cache llama.cpp
         id: cache_llama_cpp
         uses: actions/cache@v4
         with:
           path: ~/.cache/llama.cpp/
-          key: llama-cpp-${{ runner.os }}-${{ env.LLAMA_CPP_COMMIT }}
+          key: llama-cpp-${{ env.LLAMA_CPP_COMMIT }}-${{ env.HF_MODEL_NAME }}
 
-      - name: Clone and build LlamaCPP
+      - name: Clone and build llama.cpp
         if: steps.cache_llama_cpp.outputs.cache-hit != 'true'
         run: |
           git clone https://github.com/ggerganov/llama.cpp.git
           cd llama.cpp
           git checkout ${{ env.LLAMA_CPP_COMMIT }}
-          make -j llama-cli
+          cmake -B build
+          cmake --build build --config Release -j --target llama-cli
           mkdir -p ~/.cache/llama.cpp/
-          cp llama-cli ~/.cache/llama.cpp/
-          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/bartowski/Phi-3.1-mini-128k-instruct-GGUF/resolve/main/Phi-3.1-mini-128k-instruct-IQ4_XS.gguf
+          cp ./build/bin/llama-cli ~/.cache/llama.cpp/
+          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/Qwen/${{ env.HF_MODEL_NAME }}/resolve/main/qwen2.5-coder-1.5b-instruct-q8_0.gguf
 
-      - name: Copy LlamaCPP to /usr/local/bin/
+      - name: Copy llama.cpp to /usr/local/bin/
         run: cp ~/.cache/llama.cpp/llama-cli /usr/local/bin/
 
-      - name: Run LlamaCPP
+      - name: Run llama.cpp
         run: |
           PROMPT=$(cat /tmp/llama_review/prompt.txt)
           echo -e '### Review\n\n' > /tmp/llama_review/response.txt
@@ -137,6 +139,7 @@ jobs:
             --model ~/.cache/llama.cpp/model.gguf \
             --prompt "$PROMPT" \
             --ctx-size 32768 \
+            --threads -1 \
             --predict -1 \
             --temp 0.5 \
             --top-p 0.9 \
