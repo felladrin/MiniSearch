@@ -40,7 +40,7 @@ Search results:
 addLogEntry(
   `Number of logical processors in CPU: ${
     navigator.hardwareConcurrency ?? "unknown"
-  }`
+  }`,
 );
 
 export const inferenceTypes = [
