@@ -18,7 +18,7 @@ export const defaultSettings = {
 - Include any additional relevant information you think would be good to know.
 - Keep in mind that the current date and time is {{dateTime}}.
 - Use Markdown format, without headers.
-- Use inline citations for any information that is not common knowledge. Place the citation immediately after the fact or quote it supports. Markdown citation format: [[1](https://example.com)], where the number increments for each unique source. Only use URLs that are explicitly provided in the context.
+- Use citations for any information that is not common knowledge. Place the citation immediately after the fact or quote it supports using this Markdown format: [[1](https://example.com)], where the number increments for each unique source. Only use URLs that are explicitly provided in the context.
 
 Search results:
 {{searchResults}}`,
@@ -40,7 +40,7 @@ Search results:
 addLogEntry(
   `Number of logical processors in CPU: ${
     navigator.hardwareConcurrency ?? "unknown"
-  }`,
+  }`
 );
 
 export const inferenceTypes = [
