@@ -41,9 +41,7 @@ export default function AISettingsForm() {
       value: string;
     }[]
   >([]);
-  const [openAiApiModelError, setOpenAiApiModelError] = useState<
-    string | undefined
-  >(undefined);
+  const [useTextInput, setUseTextInput] = useState(false);
 
   const form = useForm({
     initialValues: settings,
@@ -63,13 +61,13 @@ export default function AISettingsForm() {
           value: model.id,
         }));
         setOpenAiModels(models);
-        setOpenAiApiModelError(undefined);
+        setUseTextInput(false);
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         addLogEntry(`Error fetching OpenAI models: ${errorMessage}`);
         setOpenAiModels([]);
-        setOpenAiApiModelError(errorMessage);
+        setUseTextInput(true);
       }
     }
 
@@ -81,12 +79,6 @@ export default function AISettingsForm() {
     settings.openAiApiBaseUrl,
     settings.openAiApiKey,
   ]);
-
-  useEffect(() => {
-    if (openAiApiModelError === form.errors.openAiApiModel) return;
-
-    form.setFieldError("openAiApiModel", openAiApiModelError);
-  }, [openAiApiModelError, form.setFieldError, form.errors.openAiApiModel]);
 
   useEffect(() => {
     if (openAiModels.length > 0) {
@@ -171,15 +163,23 @@ export default function AISettingsForm() {
                 type="password"
                 description="Optional, as local API servers usually do not require it."
               />
-              <Select
-                {...form.getInputProps("openAiApiModel")}
-                label="API Model"
-                data={openAiModels}
-                description="Optional, as some API servers don't provide a model list."
-                allowDeselect={false}
-                disabled={openAiModels.length === 0}
-                searchable
-              />
+              {useTextInput ? (
+                <TextInput
+                  {...form.getInputProps("openAiApiModel")}
+                  label="API Model"
+                  description="Enter the model identifier"
+                />
+              ) : (
+                <Select
+                  {...form.getInputProps("openAiApiModel")}
+                  label="API Model"
+                  data={openAiModels}
+                  description="Optional, as some API servers don't provide a model list."
+                  allowDeselect={false}
+                  disabled={openAiModels.length === 0}
+                  searchable
+                />
+              )}
             </>
           )}
 
