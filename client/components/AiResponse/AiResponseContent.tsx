@@ -20,6 +20,7 @@ import {
 import type { PublishFunction } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
 import { type ReactNode, Suspense, lazy, useMemo, useState } from "react";
+import { addLogEntry } from "../../modules/logEntries";
 import { settingsPubSub } from "../../modules/pubSub";
 import { searchAndRespond } from "../../modules/textGeneration";
 
@@ -83,6 +84,11 @@ export default function AiResponseContent({
         utterance.lang = voice.lang;
       }
     }
+
+    utterance.onerror = () => {
+      addLogEntry("Failed to speak response");
+      setIsSpeaking(false);
+    };
 
     utterance.onend = () => setIsSpeaking(false);
 
