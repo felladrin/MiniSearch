@@ -183,6 +183,15 @@ export default function AISettingsForm() {
             </>
           )}
 
+          {form.values.inferenceType === "horde" && (
+            <TextInput
+              label="API Key"
+              description="By default, it's set to '0000000000', for anonymous access. However, anonymous accounts have the lowest priority when there's too many concurrent requests."
+              type="password"
+              {...form.getInputProps("hordeApiKey")}
+            />
+          )}
+
           {form.values.inferenceType === "browser" && (
             <>
               {isWebGPUAvailable && (

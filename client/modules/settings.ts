@@ -30,6 +30,7 @@ Search results:
   openAiApiBaseUrl: "",
   openAiApiKey: "",
   openAiApiModel: "",
+  hordeApiKey: "0000000000",
   enterToSubmit: true,
   enableAiResponseScrolling: true,
   allowAiModelDownload: false,

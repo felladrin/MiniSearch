@@ -2,6 +2,7 @@ import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import { repository } from "../../package.json";
 import { addLogEntry } from "./logEntries";
 import {
+  getSettings,
   getTextGenerationState,
   updateResponse,
   updateTextGenerationState,
@@ -33,7 +34,7 @@ async function startGeneration(messages: ChatMessage[]) {
   const response = await fetch(`${aiHordeApiBaseUrl}/generate/text/async`, {
     method: "POST",
     headers: {
-      apikey: "0000000000",
+      apikey: getSettings().hordeApiKey || "0000000000",
       "client-agent": clientAgent,
       "content-type": "application/json",
     },
