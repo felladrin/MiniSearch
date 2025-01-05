@@ -27,14 +27,20 @@ interface HordeStatusResponse {
 }
 
 const aiHordeApiBaseUrl = "https://aihorde.net/api/v2";
-const aiHordeMaxResponseLengthInTokens = 512;
-const clientAgent = repository.url.split("/").pop() ?? "";
+const aiHordeDefaultApiKey = "0000000000";
+const aiHordeApiKey = getSettings().hordeApiKey || aiHordeDefaultApiKey;
+const aiHordeMaxResponseLengthInTokens =
+  aiHordeApiKey === aiHordeDefaultApiKey ? 512 : 1024;
+const clientAgent = repository.url.split("/").pop() ?? "unknown:0:unknown";
+const userMarker = "**USER**:";
+const assistantMarker = "**ASSISTANT**:";
 
 async function startGeneration(messages: ChatMessage[]) {
+  const settings = getSettings();
   const response = await fetch(`${aiHordeApiBaseUrl}/generate/text/async`, {
     method: "POST",
     headers: {
-      apikey: getSettings().hordeApiKey || "0000000000",
+      apikey: aiHordeApiKey,
       "client-agent": clientAgent,
       "content-type": "application/json",
     },
@@ -43,7 +49,18 @@ async function startGeneration(messages: ChatMessage[]) {
       params: {
         max_context_length: defaultContextSize,
         max_length: aiHordeMaxResponseLengthInTokens,
+        singleline: false,
+        temperature: settings.inferenceTemperature,
+        top_p: settings.inferenceTopP,
+        min_p: 1 - settings.inferenceTopP,
+        top_k: 0,
+        rep_pen: 1,
+        stop_sequence: [userMarker, assistantMarker],
       },
+      trusted_workers: false,
+      validated_backends: false,
+      slow_workers: false,
+      extra_slow_workers: false,
     }),
   });
 
@@ -88,7 +105,7 @@ async function handleGenerationStatus(
             `AI Horde completed the generation using the model "${status.generations[0].model}"`,
           );
         }
-        onUpdate(lastText.split("<|im_end|>")[0]);
+        onUpdate(lastText.split(userMarker)[0]);
       }
 
       if (!status.done && !status.faulted) {
@@ -109,7 +126,7 @@ async function handleGenerationStatus(
       throw new Error("No text generated");
     }
 
-    return generatedText.split("<|im_end|>")[0];
+    return generatedText.split(userMarker)[0];
   } catch (error) {
     if (error instanceof ChatGenerationError) {
       throw error;
@@ -147,6 +164,6 @@ async function executeHordeGeneration(
 
 function formatPrompt(messages: ChatMessage[]): string {
   return `${messages
-    .map((msg) => `<|im_start|>${msg.role}\n${msg.content}<|im_end|>`)
-    .join("\n")}\n<|im_start|>assistant\n`;
+    .map((msg) => `**${msg.role?.toUpperCase()}**:\n${msg.content}`)
+    .join("\n\n")}\n\n${assistantMarker}\n`;
 }
