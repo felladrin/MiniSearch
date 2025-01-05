@@ -31,6 +31,7 @@ Search results:
   openAiApiKey: "",
   openAiApiModel: "",
   hordeApiKey: "0000000000",
+  hordeModel: "",
   enterToSubmit: true,
   enableAiResponseScrolling: true,
   allowAiModelDownload: false,
