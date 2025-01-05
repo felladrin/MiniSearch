@@ -26,6 +26,16 @@ interface HordeStatusResponse {
   faulted?: boolean;
 }
 
+interface HordeModelInfo {
+  performance: number;
+  queued: number;
+  jobs: number;
+  eta: number;
+  type: string;
+  name: string;
+  count: number;
+}
+
 const aiHordeApiBaseUrl = "https://aihorde.net/api/v2";
 const aiHordeDefaultApiKey = "0000000000";
 const aiHordeApiKey = getSettings().hordeApiKey || aiHordeDefaultApiKey;
@@ -61,6 +71,7 @@ async function startGeneration(messages: ChatMessage[]) {
       validated_backends: false,
       slow_workers: false,
       extra_slow_workers: false,
+      models: settings.hordeModel ? [settings.hordeModel] : undefined,
     }),
   });
 
@@ -133,6 +144,25 @@ async function handleGenerationStatus(
     }
     throw new Error(`Error while checking generation status: ${error}`);
   }
+}
+
+export async function fetchHordeModels(): Promise<HordeModelInfo[]> {
+  const response = await fetch(
+    `${aiHordeApiBaseUrl}/status/models?type=text&model_state=all`,
+    {
+      method: "GET",
+      headers: {
+        "client-agent": clientAgent,
+        accept: "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch AI Horde models");
+  }
+
+  return response.json();
 }
 
 export async function generateTextWithHorde() {

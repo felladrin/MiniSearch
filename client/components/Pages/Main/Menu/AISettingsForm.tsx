@@ -18,6 +18,7 @@ import { addLogEntry } from "../../../../modules/logEntries";
 import { getOpenAiClient } from "../../../../modules/openai";
 import { settingsPubSub } from "../../../../modules/pubSub";
 import { defaultSettings, inferenceTypes } from "../../../../modules/settings";
+import { fetchHordeModels } from "../../../../modules/textGenerationWithHorde";
 import { isWebGPUAvailable } from "../../../../modules/webGpu";
 
 const WebLlmModelSelect = lazy(
@@ -36,6 +37,12 @@ const penaltySliderMarks = [
 export default function AISettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
   const [openAiModels, setOpenAiModels] = useState<
+    {
+      label: string;
+      value: string;
+    }[]
+  >([]);
+  const [hordeModels, setHordeModels] = useState<
     {
       label: string;
       value: string;
@@ -79,6 +86,28 @@ export default function AISettingsForm() {
     settings.openAiApiBaseUrl,
     settings.openAiApiKey,
   ]);
+
+  useEffect(() => {
+    async function fetchAvailableHordeModels() {
+      try {
+        const models = await fetchHordeModels();
+        const formattedModels = models.map((model) => ({
+          label: model.name,
+          value: model.name,
+        }));
+        setHordeModels(formattedModels);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        addLogEntry(`Error fetching AI Horde models: ${errorMessage}`);
+        setHordeModels([]);
+      }
+    }
+
+    if (settings.inferenceType === "horde") {
+      fetchAvailableHordeModels();
+    }
+  }, [settings.inferenceType]);
 
   useEffect(() => {
     if (openAiModels.length > 0) {
@@ -184,12 +213,23 @@ export default function AISettingsForm() {
           )}
 
           {form.values.inferenceType === "horde" && (
-            <TextInput
-              label="API Key"
-              description="By default, it's set to '0000000000', for anonymous access. However, anonymous accounts have the lowest priority when there's too many concurrent requests."
-              type="password"
-              {...form.getInputProps("hordeApiKey")}
-            />
+            <>
+              <TextInput
+                label="API Key"
+                description="By default, it's set to '0000000000', for anonymous access. However, anonymous accounts have the lowest priority when there's too many concurrent requests."
+                type="password"
+                {...form.getInputProps("hordeApiKey")}
+              />
+              <Select
+                label="Model"
+                description="Optional. When not selected, AI Horde will automatically choose an available model."
+                placeholder="Auto-selected"
+                data={hordeModels}
+                {...form.getInputProps("hordeModel")}
+                searchable
+                clearable
+              />
+            </>
           )}
 
           {form.values.inferenceType === "browser" && (
