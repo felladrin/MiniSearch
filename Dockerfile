@@ -1,5 +1,5 @@
 # Use the SearXNG image as the base
-FROM searxng/searxng:2025.1.3-a060c0985
+FROM searxng/searxng:2025.1.5-96c32549b
 
 # Set the default port to 7860 if not provided
 ENV PORT=7860
