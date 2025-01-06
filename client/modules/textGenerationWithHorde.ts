@@ -38,15 +38,15 @@ interface HordeModelInfo {
 
 const aiHordeApiBaseUrl = "https://aihorde.net/api/v2";
 const aiHordeDefaultApiKey = "0000000000";
-const aiHordeApiKey = getSettings().hordeApiKey || aiHordeDefaultApiKey;
-const aiHordeMaxResponseLengthInTokens =
-  aiHordeApiKey === aiHordeDefaultApiKey ? 512 : 1024;
 const clientAgent = repository.url.split("/").pop() ?? "unknown:0:unknown";
 const userMarker = "**USER**:";
 const assistantMarker = "**ASSISTANT**:";
 
 async function startGeneration(messages: ChatMessage[]) {
   const settings = getSettings();
+  const aiHordeApiKey = settings.hordeApiKey || aiHordeDefaultApiKey;
+  const aiHordeMaxResponseLengthInTokens =
+    aiHordeApiKey === aiHordeDefaultApiKey ? 512 : 1024;
   const response = await fetch(`${aiHordeApiBaseUrl}/generate/text/async`, {
     method: "POST",
     headers: {
