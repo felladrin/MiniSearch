@@ -37,10 +37,11 @@ interface HordeModelInfo {
 }
 
 const aiHordeApiBaseUrl = "https://aihorde.net/api/v2";
-const aiHordeDefaultApiKey = "0000000000";
 const clientAgent = repository.url.split("/").pop() ?? "unknown:0:unknown";
 const userMarker = "**USER**:";
 const assistantMarker = "**ASSISTANT**:";
+
+export const aiHordeDefaultApiKey = "0000000000";
 
 async function startGeneration(messages: ChatMessage[]) {
   const settings = getSettings();

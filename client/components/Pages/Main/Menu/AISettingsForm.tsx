@@ -18,7 +18,10 @@ import { addLogEntry } from "../../../../modules/logEntries";
 import { getOpenAiClient } from "../../../../modules/openai";
 import { settingsPubSub } from "../../../../modules/pubSub";
 import { defaultSettings, inferenceTypes } from "../../../../modules/settings";
-import { fetchHordeModels } from "../../../../modules/textGenerationWithHorde";
+import {
+  aiHordeDefaultApiKey,
+  fetchHordeModels,
+} from "../../../../modules/textGenerationWithHorde";
 import { isWebGPUAvailable } from "../../../../modules/webGpu";
 
 const WebLlmModelSelect = lazy(
@@ -220,15 +223,18 @@ export default function AISettingsForm() {
                 type="password"
                 {...form.getInputProps("hordeApiKey")}
               />
-              <Select
-                label="Model"
-                description="Optional. When not selected, AI Horde will automatically choose an available model."
-                placeholder="Auto-selected"
-                data={hordeModels}
-                {...form.getInputProps("hordeModel")}
-                searchable
-                clearable
-              />
+              {form.values.hordeApiKey.length > 0 &&
+                form.values.hordeApiKey !== aiHordeDefaultApiKey && (
+                  <Select
+                    label="Model"
+                    description="Optional. When not selected, AI Horde will automatically choose an available model."
+                    placeholder="Auto-selected"
+                    data={hordeModels}
+                    {...form.getInputProps("hordeModel")}
+                    searchable
+                    clearable
+                  />
+                )}
             </>
           )}
 
