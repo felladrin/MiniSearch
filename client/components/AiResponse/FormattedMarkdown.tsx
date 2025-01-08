@@ -30,14 +30,18 @@ const FormattedMarkdown: React.FC<FormattedMarkdownProps> = ({
           remarkPlugins={[remarkGfm]}
           components={{
             li(props) {
-              const children = React.Children.map(props.children, (child) => {
-                const containsParagraphTag =
-                  React.isValidElement<HTMLElement>(child) &&
-                  child.type === "p";
-                return containsParagraphTag ? child.props.children : child;
-              });
-
-              return <li>{children}</li>;
+              const { children } = props;
+              const processedChildren = React.Children.map(
+                children,
+                (child) => {
+                  if (React.isValidElement(child) && child.type === "p") {
+                    return (child.props as { children: React.ReactNode })
+                      .children;
+                  }
+                  return child;
+                },
+              );
+              return <li>{processedChildren}</li>;
             },
             pre(props) {
               return <>{props.children}</>;
