@@ -1,5 +1,5 @@
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
-import { repository } from "../../package.json";
+import { appName, appRepository, appVersion } from "./appInfo";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
@@ -37,7 +37,7 @@ interface HordeModelInfo {
 }
 
 const aiHordeApiBaseUrl = "https://aihorde.net/api/v2";
-const aiHordeClientAgent = repository.url.split("/").pop() ?? "unknown:0:unknown";
+const aiHordeClientAgent = `${appName}:${appVersion}:${appRepository}`;
 const userMarker = "**USER**:";
 const assistantMarker = "**ASSISTANT**:";
 

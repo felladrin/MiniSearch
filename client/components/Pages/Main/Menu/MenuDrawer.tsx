@@ -13,8 +13,8 @@ import { IconBrandGithub } from "@tabler/icons-react";
 import prettyMilliseconds from "pretty-ms";
 import { Suspense, lazy } from "react";
 import { repository } from "../../../../../package.json";
+import { appName, appVersion } from "../../../../modules/appInfo";
 import { addLogEntry } from "../../../../modules/logEntries";
-import { getSemanticVersion } from "../../../../modules/stringFormatters";
 
 const AISettingsForm = lazy(() => import("./AISettingsForm"));
 const SearchSettingsForm = lazy(() => import("./SearchSettingsForm"));
@@ -23,8 +23,6 @@ const ActionsForm = lazy(() => import("./ActionsForm"));
 const VoiceSettingsForm = lazy(() => import("./VoiceSettingsForm"));
 
 export default function MenuDrawer(drawerProps: DrawerProps) {
-  const repoName = repository.url.split("/").pop();
-
   return (
     <Drawer
       {...drawerProps}
@@ -44,14 +42,12 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
           </ActionIcon>
           <HoverCard shadow="md" withArrow>
             <HoverCard.Target>
-              <Center>{repoName}</Center>
+              <Center>{appName}</Center>
             </HoverCard.Target>
             <HoverCard.Dropdown>
               <Stack gap="xs">
-                <Center>{repoName}</Center>
-                <Center>
-                  {`v${getSemanticVersion(VITE_BUILD_DATE_TIME)}+${VITE_COMMIT_SHORT_HASH}`}
-                </Center>
+                <Center>{appName}</Center>
+                <Center>{`v${appVersion}`}</Center>
                 <Center>
                   Released{" "}
                   {prettyMilliseconds(
