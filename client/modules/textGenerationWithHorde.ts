@@ -37,7 +37,7 @@ interface HordeModelInfo {
 }
 
 const aiHordeApiBaseUrl = "https://aihorde.net/api/v2";
-const clientAgent = repository.url.split("/").pop() ?? "unknown:0:unknown";
+const aiHordeClientAgent = repository.url.split("/").pop() ?? "unknown:0:unknown";
 const userMarker = "**USER**:";
 const assistantMarker = "**ASSISTANT**:";
 
@@ -52,7 +52,7 @@ async function startGeneration(messages: ChatMessage[]) {
     method: "POST",
     headers: {
       apikey: aiHordeApiKey,
-      "client-agent": clientAgent,
+      "client-agent": aiHordeClientAgent,
       "content-type": "application/json",
     },
     body: JSON.stringify({
@@ -68,10 +68,6 @@ async function startGeneration(messages: ChatMessage[]) {
         rep_pen: 1,
         stop_sequence: [userMarker, assistantMarker],
       },
-      trusted_workers: false,
-      validated_backends: false,
-      slow_workers: false,
-      extra_slow_workers: false,
       models: settings.hordeModel ? [settings.hordeModel] : undefined,
     }),
   });
@@ -99,7 +95,7 @@ async function handleGenerationStatus(
         {
           method: "GET",
           headers: {
-            "client-agent": clientAgent,
+            "client-agent": aiHordeClientAgent,
             "content-type": "application/json",
           },
         },
@@ -153,7 +149,7 @@ export async function fetchHordeModels(): Promise<HordeModelInfo[]> {
     {
       method: "GET",
       headers: {
-        "client-agent": clientAgent,
+        "client-agent": aiHordeClientAgent,
         accept: "application/json",
       },
     },
