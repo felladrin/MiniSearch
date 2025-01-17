@@ -165,13 +165,10 @@ export async function fetchHordeModels(): Promise<HordeModelInfo[]> {
 export async function generateTextWithHorde() {
   await canStartResponding();
   updateTextGenerationState("preparingToGenerate");
-
   const messages = getDefaultChatMessages(getFormattedSearchResults(true));
-  const generatedText = await executeHordeGeneration(messages, (text) => {
-    updateResponse(text);
+  await executeHordeGeneration(messages, (text) => {
+    streamTextInChunks(text, updateResponse);
   });
-
-  updateResponse(generatedText);
 }
 
 export async function generateChatWithHorde(
@@ -193,4 +190,32 @@ function formatPrompt(messages: ChatMessage[]): string {
   return `${messages
     .map((msg) => `**${msg.role?.toUpperCase()}**:\n${msg.content}`)
     .join("\n\n")}\n\n${assistantMarker}\n`;
+}
+
+/**
+ * Streams text in small chunks with a delay between each chunk for a smooth reading experience.
+ * @param text The text to stream
+ * @param updateCallback Function to call with each chunk of text
+ * @param chunkSize Number of words per chunk (default: 3)
+ * @param delayMs Delay between chunks in milliseconds (default: 50)
+ */
+function streamTextInChunks(
+  text: string,
+  updateCallback: (text: string) => void,
+  chunkSize = 3,
+  delayMs = 60,
+): void {
+  const words = text.split(" ");
+  let accumulatedText = "";
+  let i = 0;
+
+  const intervalId = setInterval(() => {
+    const chunk = words.slice(i, i + chunkSize).join(" ");
+    accumulatedText += `${chunk} `;
+    updateCallback(accumulatedText.trim());
+    i += chunkSize;
+    if (i >= words.length) {
+      clearInterval(intervalId);
+    }
+  }, delayMs);
 }
