@@ -71,7 +71,9 @@ export default function AISettingsForm() {
           value: model.id,
         }));
         setOpenAiModels(models);
-        setUseTextInput(false);
+        const hasNoModelsDefined =
+          !Array.isArray(models) || models.length === 0;
+        setUseTextInput(hasNoModelsDefined);
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
