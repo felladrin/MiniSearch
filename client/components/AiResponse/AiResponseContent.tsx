@@ -69,8 +69,13 @@ export default function AiResponseContent({
       return;
     }
 
-    const cleanText = text.replace(/[#*`_~\[\]]/g, "");
-    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const prepareTextForSpeech = (textToClean: string) => {
+      const withoutLinks = textToClean.replace(/\[([^\]]+)\]\([^)]+\)/g, "");
+      const withoutMarkdown = withoutLinks.replace(/[#*`_~\[\]]/g, "");
+      return withoutMarkdown;
+    };
+
+    const utterance = new SpeechSynthesisUtterance(prepareTextForSpeech(text));
 
     const voices = self.speechSynthesis.getVoices();
 
