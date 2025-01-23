@@ -54,6 +54,7 @@
     "react-error-boundary": "^5.0.0",
     "react-markdown": "^9.0.1",
     "react-syntax-highlighter": "^15.5.0",
+    "rehype-external-links": "^3.0.0",
     "remark-gfm": "^4.0.0",
     "searxng": "^0.0.5",
     "temp-dir": "^3.0.0",

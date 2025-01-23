@@ -3,6 +3,7 @@ import React from "react";
 import Markdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import syntaxHighlighterStyle from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
+import rehypeExternalLinks from "rehype-external-links";
 import remarkGfm from "remark-gfm";
 import CopyIconButton from "./CopyIconButton";
 
@@ -28,6 +29,12 @@ const FormattedMarkdown: React.FC<FormattedMarkdownProps> = ({
       <Box className={className}>
         <Markdown
           remarkPlugins={[remarkGfm]}
+          rehypePlugins={[
+            [
+              rehypeExternalLinks,
+              { target: "_blank", rel: ["nofollow", "noopener", "noreferrer"] },
+            ],
+          ]}
           components={{
             li(props) {
               const { children } = props;
