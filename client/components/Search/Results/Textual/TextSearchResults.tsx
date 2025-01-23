@@ -51,7 +51,7 @@ export default function TextSearchResults() {
         title="Search failed"
         icon={<IconInfoCircle />}
       >
-        Failed to fetch text results. Please try again.
+        Failed to fetch text results. Please try refreshing the page.
       </Alert>
     );
   }

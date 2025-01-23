@@ -200,8 +200,7 @@ export default function AiResponseContent({
             title="Failed to generate response"
             icon={<IconInfoCircle />}
           >
-            Could not generate response. It's possible that your browser or your
-            system is out of memory.
+            Could not generate response. Please try refreshing the page.
           </Alert>
         )}
       </Card.Section>

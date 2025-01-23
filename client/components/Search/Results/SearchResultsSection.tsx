@@ -11,7 +11,7 @@ const ErrorFallback = ({ error }: { error: Error }) => (
   <Alert color="red" title="Error loading search results">
     <Text size="sm">{error.message}</Text>
     <Text size="xs" c="dimmed">
-      Please try again later or contact support if the issue persists.
+      Please try refreshing the page.
     </Text>
   </Alert>
 );
