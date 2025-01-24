@@ -59,6 +59,10 @@ export default defineConfig(({ command }) => {
     preview: {
       host: process.env.HOST,
       port: process.env.PORT ? Number(process.env.PORT) : undefined,
+      allowedHosts:
+        process.env.ALLOWED_HOSTS && process.env.ALLOWED_HOSTS.length > 0
+          ? process.env.ALLOWED_HOSTS.split(",")
+          : true,
     },
     build: {
       target: "esnext",
