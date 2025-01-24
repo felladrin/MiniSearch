@@ -16,6 +16,18 @@ RUN apk add --update \
   cmake \
   ccache
 
+# Build llama.cpp server.
+RUN cd /tmp && \
+  git clone https://github.com/ggerganov/llama.cpp.git --depth=1 && \
+  cd llama.cpp && \
+  cmake -B build -DGGML_NATIVE=OFF && \
+  cmake --build build --config Release -j --target llama-server && \
+  mv build/bin/llama-server /usr/local/bin/ && \
+  find build -type f \( -name "libllama.so" -o -name "libggml.so" -o -name "libggml-base.so" -o -name "libggml-cpu.so" \) -exec mv {} /usr/local/lib/ \; && \
+  ldconfig /usr/local/lib && \
+  cd .. && \
+  rm -rf llama.cpp
+
 # Set the SearXNG settings folder path
 ARG SEARXNG_SETTINGS_FOLDER=/etc/searxng
 
