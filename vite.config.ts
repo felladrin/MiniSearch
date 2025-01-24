@@ -8,6 +8,7 @@ import { cacheServerHook } from "./server/cacheServerHook";
 import { compressionServerHook } from "./server/compressionServerHook";
 import { crossOriginServerHook } from "./server/crossOriginServerHook";
 import { internalApiEndpointServerHook } from "./server/internalApiEndpointServerHook";
+import { rerankerServiceHook } from "./server/rerankerServiceHook";
 import { searchEndpointServerHook } from "./server/searchEndpointServerHook";
 import { getSearchToken, regenerateSearchToken } from "./server/searchToken";
 import { statusEndpointServerHook } from "./server/statusEndpointServerHook";
@@ -104,6 +105,11 @@ export default defineConfig(({ command }) => {
         name: "configure-server-internal-api-endpoint",
         configureServer: internalApiEndpointServerHook,
         configurePreviewServer: internalApiEndpointServerHook,
+      },
+      {
+        name: "configure-server-reranker-service",
+        configureServer: rerankerServiceHook,
+        configurePreviewServer: rerankerServiceHook,
       },
       visualizer({
         filename: "vite-build-stats.html",

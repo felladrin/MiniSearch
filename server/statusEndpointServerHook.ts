@@ -1,5 +1,6 @@
 import prettyMilliseconds from "pretty-ms";
 import type { PreviewServer, ViteDevServer } from "vite";
+import { getRerankerStatus } from "./rerankerService";
 import {
   getGraphicalSearchesSinceLastRestart,
   getTextualSearchesSinceLastRestart,
@@ -23,6 +24,9 @@ export function statusEndpointServerHook<
     const averageGraphicalSearchesPerSession = (
       graphicalSearches / sessions || 0
     ).toFixed(1);
+    const rerankerServiceStatus = (await getRerankerStatus())
+      ? "healthy"
+      : "unhealthy";
 
     const status = {
       uptime: prettyMilliseconds(new Date().getTime() - serverStartTime, {
@@ -33,6 +37,7 @@ export function statusEndpointServerHook<
       graphicalSearches,
       averageTextualSearchesPerSession,
       averageGraphicalSearchesPerSession,
+      rerankerServiceStatus,
       build: {
         timestamp: new Date(
           server.config.define.VITE_BUILD_DATE_TIME,
