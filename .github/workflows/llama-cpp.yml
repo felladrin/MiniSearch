@@ -134,6 +134,7 @@ jobs:
             --cache-type-k q8_0 \
             --cache-type-v q8_0 \
             --flash-attn \
+            --no-warmup \
             --port 11434 &
 
       - name: cURL llama-server to get the completion and timings
