@@ -40,9 +40,7 @@ export async function startRerankerService() {
   await ensureModelExists(modelPath);
   printMessage("Starting service...");
 
-  const contextSize = 8192;
-  const threads = Math.min(Math.max(1, os.cpus().length - 2), 16);
-  const batchSize = Math.ceil(contextSize / threads);
+  const contextSize = 2048;
 
   const serverProcess = spawn(
     "llama-server",
@@ -51,12 +49,10 @@ export async function startRerankerService() {
       modelPath,
       "--ctx-size",
       contextSize.toString(),
-      "--parallel",
-      threads.toString(),
       "--batch-size",
-      batchSize.toString(),
+      contextSize.toString(),
       "--ubatch-size",
-      batchSize.toString(),
+      contextSize.toString(),
       "--flash-attn",
       "--host",
       SERVER_HOST,
@@ -64,6 +60,7 @@ export async function startRerankerService() {
       SERVER_PORT.toString(),
       "--log-verbosity",
       VERBOSE_MODE ? "1" : "0",
+      "--no-warmup",
       "--reranking",
       "--pooling",
       "rank",
