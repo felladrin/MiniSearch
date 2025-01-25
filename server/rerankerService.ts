@@ -60,6 +60,8 @@ export async function startRerankerService() {
       SERVER_PORT.toString(),
       "--log-verbosity",
       VERBOSE_MODE ? "1" : "0",
+      "--threads", "1",
+      "--parallel", "1",
       "--no-warmup",
       "--reranking",
       "--pooling",
