@@ -1,5 +1,4 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import debug from "debug";
@@ -12,8 +11,8 @@ debug.enable(fileName);
 const SERVER_HOST = "127.0.0.1";
 const SERVER_PORT = 8012;
 const VERBOSE_MODE = false;
-const MODEL_HF_REPO = "Felladrin/gguf-Q8_0-bge-reranker-v2-m3";
-const MODEL_HF_FILE = "bge-reranker-v2-m3-q8_0.gguf";
+const MODEL_HF_REPO = "Felladrin/gguf-jina-reranker-v1-tiny-en";
+const MODEL_HF_FILE = "jina-reranker-v1-tiny-en-Q8_0.gguf";
 
 let isReady = false;
 
@@ -60,8 +59,10 @@ export async function startRerankerService() {
       SERVER_PORT.toString(),
       "--log-verbosity",
       VERBOSE_MODE ? "1" : "0",
-      "--threads", "1",
-      "--parallel", "1",
+      "--threads",
+      "1",
+      "--parallel",
+      "1",
       "--no-warmup",
       "--reranking",
       "--pooling",
