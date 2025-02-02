@@ -23,8 +23,8 @@ export const defaultSettings = {
 Search results:
 {{searchResults}}`,
   inferenceType: VITE_DEFAULT_INFERENCE_TYPE,
-  inferenceTemperature: 0.5,
-  inferenceTopP: 0.9,
+  inferenceTemperature: 0.7,
+  inferenceTopP: 0.5,
   inferenceFrequencyPenalty: 0.3,
   inferencePresencePenalty: 0.1,
   openAiApiBaseUrl: "",

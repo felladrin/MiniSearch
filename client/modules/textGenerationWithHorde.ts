@@ -63,7 +63,7 @@ async function startGeneration(messages: ChatMessage[]) {
         singleline: false,
         temperature: settings.inferenceTemperature,
         top_p: settings.inferenceTopP,
-        min_p: 1 - settings.inferenceTopP,
+        min_p: 0.05,
         top_k: 0,
         rep_pen: 1,
         stop_sequence: [userMarker, assistantMarker],

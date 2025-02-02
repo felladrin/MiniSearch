@@ -114,8 +114,9 @@ const createDefaultModelConfig = (): Omit<
       temp: settings.inferenceTemperature,
       penalty_freq: settings.inferenceFrequencyPenalty,
       penalty_present: settings.inferencePresencePenalty,
-      min_p: 1 - settings.inferenceTopP,
+      min_p: 0.05,
       top_k: 0,
+      typical_p: 0.2,
     };
   },
 });
@@ -131,9 +132,9 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
   "smollm2-360m": {
     ...createDefaultModelConfig(),
     label: "SmolLM 2 360M",
-    hfRepoId: "Felladrin/gguf-Q8_0-SmolLM2-360M-Instruct",
-    hfFilePath: "model.shard-00001-of-00008.gguf",
-    fileSizeInMegabytes: 386,
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-SmolLM2-360M-Instruct",
+    hfFilePath: "model.shard-00001-of-00005.gguf",
+    fileSizeInMegabytes: 260,
   },
   "qwen-2.5-0.5b": {
     ...createDefaultModelConfig(),
@@ -277,6 +278,6 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q3_K_XL-OLMoE-1B-7B-0924-Instruct",
     hfFilePath: "OLMoE-1B-7B-0924-Instruct-Q3_K_XL.shard-00001-of-00050.gguf",
     fileSizeInMegabytes: 3700,
-    contextSize: 3584,
+    contextSize: 3456,
   },
 };
