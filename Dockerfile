@@ -1,4 +1,23 @@
-# Use the SearXNG image as the base
+# Build llama.cpp in a separate stage
+FROM alpine:3.19 as llama-builder
+
+# Install build dependencies
+RUN apk add --update \
+  build-base \
+  cmake \
+  ccache \
+  git
+
+# Build llama.cpp server and collect libraries
+RUN cd /tmp && \
+  git clone https://github.com/ggerganov/llama.cpp.git --depth=1 && \
+  cd llama.cpp && \
+  cmake -B build -DGGML_NATIVE=OFF && \
+  cmake --build build --config Release -j --target llama-server && \
+  mkdir -p /usr/local/lib/llama && \
+  find build -type f \( -name "libllama.so" -o -name "libggml.so" -o -name "libggml-base.so" -o -name "libggml-cpu.so" \) -exec cp {} /usr/local/lib/llama/ \;
+
+# Use the SearXNG image as the base for final image
 FROM searxng/searxng:2025.1.31-6324a9752
 
 # Set the default port to 7860 if not provided
@@ -12,21 +31,12 @@ RUN apk add --update \
   nodejs \
   npm \
   git \
-  build-base \
-  cmake \
-  ccache
+  build-base
 
-# Build llama.cpp server.
-RUN cd /tmp && \
-  git clone https://github.com/ggerganov/llama.cpp.git --depth=1 && \
-  cd llama.cpp && \
-  cmake -B build -DGGML_NATIVE=OFF && \
-  cmake --build build --config Release -j --target llama-server && \
-  mv build/bin/llama-server /usr/local/bin/ && \
-  find build -type f \( -name "libllama.so" -o -name "libggml.so" -o -name "libggml-base.so" -o -name "libggml-cpu.so" \) -exec mv {} /usr/local/lib/ \; && \
-  ldconfig /usr/local/lib && \
-  cd .. && \
-  rm -rf llama.cpp
+# Copy llama.cpp artifacts from builder
+COPY --from=llama-builder /tmp/llama.cpp/build/bin/llama-server /usr/local/bin/
+COPY --from=llama-builder /usr/local/lib/llama/* /usr/local/lib/
+RUN ldconfig /usr/local/lib
 
 # Set the SearXNG settings folder path
 ARG SEARXNG_SETTINGS_FOLDER=/etc/searxng
