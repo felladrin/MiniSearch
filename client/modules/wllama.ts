@@ -125,9 +125,9 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
   "smollm2-135m": {
     ...createDefaultModelConfig(),
     label: "SmolLM 2 135M",
-    hfRepoId: "Felladrin/gguf-Q8_0-SmolLM2-135M-Instruct",
-    hfFilePath: "model.shard-00001-of-00005.gguf",
-    fileSizeInMegabytes: 145,
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-SmolLM2-135M-Instruct",
+    hfFilePath: "model.shard-00001-of-00004.gguf",
+    fileSizeInMegabytes: 102,
   },
   "smollm2-360m": {
     ...createDefaultModelConfig(),
@@ -177,6 +177,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-pythia-1.4b-sft-full",
     hfFilePath: "model.shard-00001-of-00010.gguf",
     fileSizeInMegabytes: 833,
+    contextSize: 2048,
   },
   "pints-1.5b": {
     ...createDefaultModelConfig(),
@@ -184,6 +185,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-1.5-Pints-16K-v0.1",
     hfFilePath: "model.shard-00001-of-00018.gguf",
     fileSizeInMegabytes: 905,
+  },
+  "stablelm-2-zephyr-1.6b": {
+    ...createDefaultModelConfig(),
+    label: "StableLM 2 Zephyr 1.6B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-stablelm-2-zephyr-1.6b",
+    hfFilePath: "model.shard-00001-of-00006.gguf",
+    fileSizeInMegabytes: 989,
   },
   "smollm2-1.7b": {
     ...createDefaultModelConfig(),
@@ -199,12 +207,12 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00008.gguf",
     fileSizeInMegabytes: 1120,
   },
-  "arcee-lite": {
+  "deepseek-r1-distill-qwen-1.5b": {
     ...createDefaultModelConfig(),
-    label: "Arcee Lite 1.5B",
-    hfRepoId: "Felladrin/gguf-q5_k_l-imat-arcee-lite",
-    hfFilePath: "arcee-lite-Q5_K_L.shard-00001-of-00006.gguf",
-    fileSizeInMegabytes: 1430,
+    label: "DeepSeek R1 Distill Qwen 1.5B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-DeepSeek-R1-Distill-Qwen-1.5B",
+    hfFilePath: "model.shard-00001-of-00006.gguf",
+    fileSizeInMegabytes: 1070,
   },
   "granite-3.1-2b": {
     ...createDefaultModelConfig(),
@@ -216,9 +224,9 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
   "exaone-3.5-2.4b": {
     ...createDefaultModelConfig(),
     label: "EXAONE 3.5 2.4B",
-    hfRepoId: "Felladrin/gguf-sharded-Q5_K_M-EXAONE-3.5-2.4B-Instruct",
-    hfFilePath: "model.shard-00001-of-00009.gguf",
-    fileSizeInMegabytes: 1910,
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-EXAONE-3.5-2.4B-Instruct",
+    hfFilePath: "model.shard-00001-of-00008.gguf",
+    fileSizeInMegabytes: 1580,
     cacheTypeV: "f16",
   },
   "falcon-3-3b": {
@@ -245,9 +253,9 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
   "llama-3.2-3b": {
     ...createDefaultModelConfig(),
     label: "Llama 3.2 3B",
-    hfRepoId: "Felladrin/gguf-sharded-Q5_K_L-Llama-3.2-3B-Instruct",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Llama-3.2-3B-Instruct",
     hfFilePath: "model.shard-00001-of-00007.gguf",
-    fileSizeInMegabytes: 2420,
+    fileSizeInMegabytes: 1930,
   },
   "granite-3.1-3b": {
     ...createDefaultModelConfig(),
@@ -274,23 +282,16 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
   "magpielm-4b": {
     ...createDefaultModelConfig(),
     label: "MagpieLM 4B",
-    hfRepoId: "Felladrin/gguf-Q5_K_M-MagpieLM-4B-Chat-v0.1",
-    hfFilePath: "magpielm-4b-chat-v0-00001-of-00019.gguf",
-    fileSizeInMegabytes: 3230,
-  },
-  "nemotron-mini-4b": {
-    ...createDefaultModelConfig(),
-    label: "Nemotron Mini 4B",
-    hfRepoId: "Felladrin/gguf-Q5_K_M-Nemotron-Mini-4B-Instruct",
-    hfFilePath: "nemotron-mini-4b-instruct-q5_k_m-imat-00001-of-00004.gguf",
-    fileSizeInMegabytes: 3550,
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-MagpieLM-4B-Chat-v0.1",
+    hfFilePath: "model.shard-00001-of-00009.gguf",
+    fileSizeInMegabytes: 2660,
   },
   "olmoe-1b-7b": {
     ...createDefaultModelConfig(),
     label: "OLMoE 7B [1B]",
-    hfRepoId: "Felladrin/gguf-sharded-Q3_K_XL-OLMoE-1B-7B-0924-Instruct",
-    hfFilePath: "OLMoE-1B-7B-0924-Instruct-Q3_K_XL.shard-00001-of-00050.gguf",
-    fileSizeInMegabytes: 3700,
-    contextSize: 3456,
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-OLMoE-1B-7B-0924-Instruct",
+    hfFilePath: "model.shard-00001-of-00050.gguf",
+    fileSizeInMegabytes: 3960,
+    contextSize: 1344,
   },
 };
