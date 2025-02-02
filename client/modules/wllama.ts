@@ -143,26 +143,19 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00003.gguf",
     fileSizeInMegabytes: 386,
   },
-  "danube-3-500m": {
-    ...createDefaultModelConfig(),
-    label: "Danube 3 500M",
-    hfRepoId: "Felladrin/gguf-sharded-Q5_K_L-h2o-danube3-500m-chat",
-    hfFilePath: "model.shard-00001-of-00008.gguf",
-    fileSizeInMegabytes: 547,
-  },
   "amd-olmo-1b": {
     ...createDefaultModelConfig(),
     label: "AMD OLMo 1B",
-    hfRepoId: "Felladrin/gguf-Q5_K_L-AMD-OLMo-1B-SFT-DPO",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-AMD-OLMo-1B-SFT-DPO",
     hfFilePath: "model.shard-00001-of-00009.gguf",
-    fileSizeInMegabytes: 872,
+    fileSizeInMegabytes: 697,
   },
-  "granite-3.0-1b": {
+  "granite-3.1-1b": {
     ...createDefaultModelConfig(),
-    label: "Granite 3.0 1B [400M]",
-    hfRepoId: "Felladrin/gguf-sharded-q5_k_l-granite-3.0-1b-a400m-instruct",
-    hfFilePath: "model.shard-00001-of-00019.gguf",
-    fileSizeInMegabytes: 969,
+    label: "Granite 3.1 1B [400M]",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-3.1-1b-a400m-instruct",
+    hfFilePath: "model.shard-00001-of-00020.gguf",
+    fileSizeInMegabytes: 775,
   },
   "llama-3.2-1b": {
     ...createDefaultModelConfig(),
@@ -245,10 +238,10 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
   "minicpm3-4b": {
     ...createDefaultModelConfig(),
     label: "MiniCPM 3 4B",
-    hfRepoId: "Felladrin/gguf-Q4_K_M-MiniCPM3-4B",
-    hfFilePath: "model.shard-00001-of-00017.gguf",
-    fileSizeInMegabytes: 2470,
-    contextSize: 2496,
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-MiniCPM3-4B",
+    hfFilePath: "model.shard-00001-of-00016.gguf",
+    fileSizeInMegabytes: 2360,
+    contextSize: 2688,
   },
   "phi-3.5-mini-3.8b": {
     ...createDefaultModelConfig(),

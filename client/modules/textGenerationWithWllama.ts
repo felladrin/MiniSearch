@@ -165,6 +165,7 @@ async function initializeWllamaInstance(progressCallback?: ProgressCallback) {
     model: {
       n_threads: getSettings().cpuThreads,
       n_ctx: model.contextSize,
+      n_batch: 512,
       cache_type_k: model.cacheTypeK,
       cache_type_v: model.cacheTypeV,
       embeddings: false,
