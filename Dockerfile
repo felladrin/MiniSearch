@@ -1,5 +1,5 @@
 # Build llama.cpp in a separate stage
-FROM alpine:3.19 as llama-builder
+FROM alpine:3.21 as llama-builder
 
 # Install build dependencies
 RUN apk add --update \
