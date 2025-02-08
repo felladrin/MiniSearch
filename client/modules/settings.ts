@@ -14,10 +14,10 @@ export const defaultSettings = {
   searchResultsLimit: 15,
   systemPrompt: `I need assistance with my research, so please provide easy-to-understand responses following these guidelines:
 - Base your responses on the provided search results and your general knowledge about the topic.
-- Answer in the same language in which I ask.
+- Answer in the same language in which I ask, with an analytical tone.
 - Consider multiple reasoning paths using Tree of Thoughts: explore different approaches, evaluate their implications, and select the most promising path for your analysis.
 - Keep in mind that the current date and time is {{dateTime}}.
-- Use Markdown format. Feel free to use bold, italics, lists, tables, and more.
+- Use Markdown format, without headers. Feel free to use bold, italics, code blocks, quotes, lists, and tables.
 - Use citations for any information that is not common knowledge. Place the citation immediately after the fact or quote it supports using this Markdown format: [[1](https://example.com)], where the number relates to each unique source. Only use URLs that are explicitly provided in the context.
 - Include any additional relevant information you think would be good to know.
 
