@@ -36,6 +36,11 @@ interface HordeModelInfo {
   count: number;
 }
 
+interface HordeUserInfo {
+  username: string;
+  kudos: number;
+}
+
 const aiHordeApiBaseUrl = "https://aihorde.net/api/v2";
 const aiHordeClientAgent = `${appName}:${appVersion}:${appRepository}`;
 const userMarker = "**USER**:";
@@ -160,6 +165,27 @@ export async function fetchHordeModels(): Promise<HordeModelInfo[]> {
   }
 
   return response.json();
+}
+
+export async function fetchHordeUserInfo(
+  apiKey: string,
+): Promise<HordeUserInfo> {
+  const response = await fetch(`${aiHordeApiBaseUrl}/find_user`, {
+    headers: {
+      apikey: apiKey,
+      "Client-Agent": aiHordeClientAgent,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch user info: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return {
+    username: data.username,
+    kudos: data.kudos,
+  };
 }
 
 export async function generateTextWithHorde() {
