@@ -1,4 +1,4 @@
-name: Review Pull Request with llama.cpp
+name: Review Pull Request with AI
 
 on:
   pull_request:
@@ -10,23 +10,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  llama-cpp:
+  ai-review:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
     continue-on-error: true
     runs-on: ubuntu-latest
-    name: llama.cpp
+    name: AI Review
     permissions:
       pull-requests: write
       contents: read
-    timeout-minutes: 120
+    timeout-minutes: 30
     env:
-      HF_MODEL_NAME: gguf-Qwen2.5.1-Coder-7B-Instruct
+      OPENROUTER_MODEL: deepseek/deepseek-chat
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Create temporary directory
-        run: mkdir -p /tmp/llama_review
+        run: mkdir -p /tmp/pr_review
 
       - name: Process PR description
         id: process_pr
@@ -36,22 +36,24 @@ jobs:
           EOF
           )
           PROCESSED_BODY=$(echo "$PR_BODY_ESCAPED" | sed -E 's/\[(.*?)\]\(.*?\)/\1/g')
-          echo "$PROCESSED_BODY" > /tmp/llama_review/processed_body.txt
+          echo "$PROCESSED_BODY" > /tmp/pr_review/processed_body.txt
 
-      - name: Fetch branches and output the diff in this step
+      - name: Fetch branches and output the diff
         run: |
           git fetch origin main:main
           git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-branch
-          git diff main..pr-branch > /tmp/llama_review/diff.txt
+          git diff main..pr-branch > /tmp/pr_review/diff.txt
 
-      - name: Write prompt to file
-        id: build_prompt
+      - name: Prepare review request
+        id: prepare_request
         run: |
           PR_TITLE=$(echo "${{ github.event.pull_request.title }}" | sed 's/[()]/\\&/g')
-          DIFF_CONTENT=$(cat /tmp/llama_review/diff.txt)
-          PROCESSED_BODY=$(cat /tmp/llama_review/processed_body.txt)
-          echo "<|im_start|>system
-          You are an experienced developer reviewing a Pull Request. You focus only on what matters and provide concise, actionable feedback.
+          DIFF_CONTENT=$(cat /tmp/pr_review/diff.txt)
+          PROCESSED_BODY=$(cat /tmp/pr_review/processed_body.txt)
+
+          jq -n \
+            --arg model "$OPENROUTER_MODEL" \
+            --arg system "You are an experienced developer reviewing a Pull Request. You focus only on what matters and provide concise, actionable feedback.
 
           Review Context:
           Repository Name: \"${{ github.event.repository.name }}\"
@@ -80,9 +82,8 @@ jobs:
             - Things that are just personal preference
 
           Remember:
-          Less is more. If the code is good and working, just say so, with a short message.<|im_end|>
-          <|im_start|>user
-          This is the description of the pull request:
+          Less is more. If the code is good and working, just say so, with a short message." \
+            --arg user "This is the description of the pull request:
           \`\`\`markdown
           $PROCESSED_BODY
           \`\`\`
@@ -90,75 +91,26 @@ jobs:
           And here is the diff of the changes, for you to review:
           \`\`\`diff
           $DIFF_CONTENT
-          \`\`\`
-          <|im_end|>
-          <|im_start|>assistant
-          ### Overall Summary\n\n
-          " > /tmp/llama_review/prompt.txt
+          \`\`\`" \
+            '{
+              "model": $model,
+              "messages": [
+                {"role": "system", "content": $system},
+                {"role": "user", "content": $user}
+              ]
+            }' > /tmp/pr_review/request.json
 
-      - name: Show Prompt
-        run: cat /tmp/llama_review/prompt.txt
-
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
-
-      - name: Install and cache Homebrew tools
-        uses: tecolicom/actions-use-homebrew-tools@v1
-        with:
-          tools: llama.cpp
-
-      - name: Cache the LLM
-        id: cache_llama_cpp
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/llama.cpp/
-          key: llama-cpp-${{ env.HF_MODEL_NAME }}
-
-      - name: Download and cache the LLM
-        if: steps.cache_llama_cpp.outputs.cache-hit != 'true'
+      - name: Get AI Review
+        id: ai_review
         run: |
-          mkdir -p ~/.cache/llama.cpp/
-          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/Felladrin/${{ env.HF_MODEL_NAME }}/resolve/main/Qwen2.5.1-Coder-7B-Instruct-Q4_K_S.gguf
+          RESPONSE=$(curl -s https://openrouter.ai/api/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.OPENROUTER_API_KEY }}" \
+            -d @/tmp/pr_review/request.json)
 
-      - name: Run llama.cpp
-        run: |
-          llama-server \
-            --model ~/.cache/llama.cpp/model.gguf \
-            --ctx-size 32768 \
-            --threads -1 \
-            --predict -1 \
-            --temp 0.7 \
-            --top-p 0.5 \
-            --min-p 0.05 \
-            --top-k 0 \
-            --cache-type-k q8_0 \
-            --cache-type-v q8_0 \
-            --flash-attn \
-            --jinja \
-            --no-warmup \
-            --port 11434 &
-
-      - name: cURL llama-server to get the completion and timings
-        run: |
-          DATA=$(jq -n --arg prompt "$(cat /tmp/llama_review/prompt.txt)" '{"prompt": $prompt}')
-          echo -e '### Review\n\n' > /tmp/llama_review/response.txt
-          # Save the full response to a temporary file
-          curl \
-            --silent \
-            --request POST \
-            --url http://localhost:11434/completion \
-            --header "Content-Type: application/json" \
-            --data "$DATA" > /tmp/llama_review/full_response.json
-
-          # Extract and append content to response.txt
-          jq -r '.content' /tmp/llama_review/full_response.json >> /tmp/llama_review/response.txt
-
-          # Pretty print the timings information
-          echo "=== Performance Metrics ==="
-          jq -r '.timings | to_entries | .[] | "\(.key): \(.value)"' /tmp/llama_review/full_response.json
-
-      - name: Show Response
-        run: cat /tmp/llama_review/response.txt
+          echo "### Review" > /tmp/pr_review/response.txt
+          echo "" >> /tmp/pr_review/response.txt
+          echo "$RESPONSE" | jq -r '.choices[0].message.content' >> /tmp/pr_review/response.txt
 
       - name: Find Comment
         uses: peter-evans/find-comment@v3
@@ -173,5 +125,5 @@ jobs:
         with:
           comment-id: ${{ steps.find_comment.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}
-          body-path: /tmp/llama_review/response.txt
+          body-path: /tmp/pr_review/response.txt
           edit-mode: replace
