@@ -18,16 +18,14 @@ interface WllamaInitConfig {
   model?: LoadModelConfig & DownloadOptions;
 }
 
-async function createWllamaInstance(config?: {
-  wllama?: WllamaConfig;
-}): Promise<Wllama> {
+async function createWllamaInstance(config?: WllamaConfig): Promise<Wllama> {
   try {
     return new Wllama(
       {
         "single-thread/wllama.wasm": singleThreadWllamaWasmUrl,
         "multi-thread/wllama.wasm": multiThreadWllamaWasmUrl,
       },
-      config?.wllama,
+      config,
     );
   } catch (error) {
     addLogEntry(
@@ -47,9 +45,39 @@ export async function initializeWllama(
   addLogEntry("Initializing Wllama");
 
   try {
-    const wllama = await createWllamaInstance(config);
+    const wllama = await createWllamaInstance(config?.wllama);
+
+    await wllama.loadModelFromHF(hfRepoId, hfFilePath, {
+      ...config?.model,
+      n_threads: 1,
+    });
+
+    const randomDigitOrLetter = Math.random().toString(36).charAt(2);
+
+    const warmupResponse = await wllama.createChatCompletion(
+      [
+        {
+          role: "user",
+          content: randomDigitOrLetter,
+        },
+      ],
+      {
+        nPredict: 1,
+      },
+    );
+
+    const hasWarmupSucceeded = warmupResponse.length > 0;
+
+    addLogEntry(
+      `Wllama warmup ${hasWarmupSucceeded ? "succeeded" : "failed"}.`,
+    );
+
+    await wllama.exit();
+
     await wllama.loadModelFromHF(hfRepoId, hfFilePath, config?.model);
+
     addLogEntry("Wllama initialized successfully");
+
     return wllama;
   } catch (error) {
     addLogEntry(
