@@ -20,7 +20,7 @@ jobs:
       contents: read
     timeout-minutes: 120
     env:
-      HF_MODEL_NAME: Qwen2.5.1-Coder-7B-Instruct-GGUF
+      HF_MODEL_NAME: gguf-Qwen2.5.1-Coder-7B-Instruct
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -94,8 +94,8 @@ jobs:
           <|im_end|>
           <|im_start|>assistant
           ### Overall Summary
-          
-          " > /tmp/llama_review/prompt.txt
+
+          This PR" > /tmp/llama_review/prompt.txt
 
       - name: Show Prompt
         run: cat /tmp/llama_review/prompt.txt
@@ -119,7 +119,7 @@ jobs:
         if: steps.cache_llama_cpp.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/.cache/llama.cpp/
-          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/bartowski/${{ env.HF_MODEL_NAME }}/resolve/main/Qwen2.5.1-Coder-7B-Instruct-IQ4_XS.gguf
+          curl -L -o ~/.cache/llama.cpp/model.gguf https://huggingface.co/Felladrin/${{ env.HF_MODEL_NAME }}/resolve/main/Qwen2.5.1-Coder-7B-Instruct-Q4_K_S.gguf
 
       - name: Run llama.cpp
         run: |
@@ -128,9 +128,9 @@ jobs:
             --ctx-size 32768 \
             --threads -1 \
             --predict -1 \
-            --temp 0.5 \
-            --top-p 0.9 \
-            --min-p 0.1 \
+            --temp 0.7 \
+            --top-p 0.5 \
+            --min-p 0.05 \
             --top-k 0 \
             --cache-type-k q8_0 \
             --cache-type-v q8_0 \
