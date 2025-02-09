@@ -31,7 +31,7 @@
     "@mantine/notifications": "^7.12.2",
     "@mlc-ai/web-llm": "0.2.78",
     "@tabler/icons-react": "^3.16.0",
-    "@wllama/wllama": "^2.0.1",
+    "@wllama/wllama": "^2.2.0",
     "ai": "^4.1.26",
     "country-flag-icons": "^1.5.13",
     "create-pubsub": "^1.6.3",

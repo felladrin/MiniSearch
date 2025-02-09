@@ -103,8 +103,8 @@ const createDefaultModelConfig = (): Omit<
     { role: "assistant", content: "Ok!" },
     { role: "user", content: query },
   ],
-  cacheTypeK: "q4_0",
-  cacheTypeV: "q8_0",
+  cacheTypeK: "f16",
+  cacheTypeV: "f16",
   contextSize: defaultContextSize,
   shouldIncludeUrlsOnPrompt: true,
   getSampling: () => {
@@ -164,13 +164,6 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00004.gguf",
     fileSizeInMegabytes: 776,
   },
-  "falcon-3-1b": {
-    ...createDefaultModelConfig(),
-    label: "Falcon 3 1B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Falcon3-1B-Instruct",
-    hfFilePath: "model.shard-00001-of-00005.gguf",
-    fileSizeInMegabytes: 1020,
-  },
   "pythia-1.4b": {
     ...createDefaultModelConfig(),
     label: "Pythia 1.4B",
@@ -200,12 +193,12 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00012.gguf",
     fileSizeInMegabytes: 999,
   },
-  "internlm-2.5-1.8b": {
+  "falcon-3-1b": {
     ...createDefaultModelConfig(),
-    label: "InternLM 2.5 1.8B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-internlm2_5-1_8b-chat",
-    hfFilePath: "model.shard-00001-of-00008.gguf",
-    fileSizeInMegabytes: 1120,
+    label: "Falcon 3 1B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Falcon3-1B-Instruct",
+    hfFilePath: "model.shard-00001-of-00005.gguf",
+    fileSizeInMegabytes: 1020,
   },
   "deepseek-r1-distill-qwen-1.5b": {
     ...createDefaultModelConfig(),
@@ -213,6 +206,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-DeepSeek-R1-Distill-Qwen-1.5B",
     hfFilePath: "model.shard-00001-of-00006.gguf",
     fileSizeInMegabytes: 1070,
+  },
+  "internlm-2.5-1.8b": {
+    ...createDefaultModelConfig(),
+    label: "InternLM 2.5 1.8B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-internlm2_5-1_8b-chat",
+    hfFilePath: "model.shard-00001-of-00008.gguf",
+    fileSizeInMegabytes: 1120,
   },
   "granite-3.1-2b": {
     ...createDefaultModelConfig(),
@@ -227,14 +227,6 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-EXAONE-3.5-2.4B-Instruct",
     hfFilePath: "model.shard-00001-of-00008.gguf",
     fileSizeInMegabytes: 1580,
-    cacheTypeV: "f16",
-  },
-  "falcon-3-3b": {
-    ...createDefaultModelConfig(),
-    label: "Falcon 3 3B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Falcon3-3B-Instruct",
-    hfFilePath: "model.shard-00001-of-00006.gguf",
-    fileSizeInMegabytes: 1930,
   },
   "gemma-2-2b": {
     ...createDefaultModelConfig(),
@@ -243,12 +235,19 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00004.gguf",
     fileSizeInMegabytes: 1640,
   },
-  "smallthinker-3b": {
+  "granite-3.1-3b": {
     ...createDefaultModelConfig(),
-    label: "SmallThinker 3B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-SmallThinker-3B-Preview",
-    hfFilePath: "model.shard-00001-of-00008.gguf",
-    fileSizeInMegabytes: 2010,
+    label: "Granite 3.1 3B [800M]",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-3.1-3b-a800m-instruct",
+    hfFilePath: "model.shard-00001-of-00033.gguf",
+    fileSizeInMegabytes: 1900,
+  },
+  "falcon-3-3b": {
+    ...createDefaultModelConfig(),
+    label: "Falcon 3 3B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Falcon3-3B-Instruct",
+    hfFilePath: "model.shard-00001-of-00006.gguf",
+    fileSizeInMegabytes: 1930,
   },
   "llama-3.2-3b": {
     ...createDefaultModelConfig(),
@@ -257,20 +256,12 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00007.gguf",
     fileSizeInMegabytes: 1930,
   },
-  "granite-3.1-3b": {
+  "smallthinker-3b": {
     ...createDefaultModelConfig(),
-    label: "Granite 3.1 3B [800M]",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-3.1-3b-a800m-instruct",
-    hfFilePath: "model.shard-00001-of-00033.gguf",
-    fileSizeInMegabytes: 1900,
-  },
-  "minicpm3-4b": {
-    ...createDefaultModelConfig(),
-    label: "MiniCPM 3 4B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-MiniCPM3-4B",
-    hfFilePath: "model.shard-00001-of-00016.gguf",
-    fileSizeInMegabytes: 2360,
-    contextSize: 2688,
+    label: "SmallThinker 3B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-SmallThinker-3B-Preview",
+    hfFilePath: "model.shard-00001-of-00008.gguf",
+    fileSizeInMegabytes: 2010,
   },
   "phi-3.5-mini-3.8b": {
     ...createDefaultModelConfig(),
@@ -279,12 +270,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00034.gguf",
     fileSizeInMegabytes: 2190,
   },
-  "magpielm-4b": {
+  "minicpm3-4b": {
     ...createDefaultModelConfig(),
-    label: "MagpieLM 4B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-MagpieLM-4B-Chat-v0.1",
-    hfFilePath: "model.shard-00001-of-00009.gguf",
-    fileSizeInMegabytes: 2660,
+    label: "MiniCPM 3 4B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-MiniCPM3-4B",
+    hfFilePath: "model.shard-00001-of-00016.gguf",
+    fileSizeInMegabytes: 2360,
+    contextSize: 2048,
   },
   "olmoe-1b-7b": {
     ...createDefaultModelConfig(),
@@ -293,5 +285,6 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00050.gguf",
     fileSizeInMegabytes: 3960,
     contextSize: 1344,
+    cacheTypeK: "q4_0",
   },
 };
