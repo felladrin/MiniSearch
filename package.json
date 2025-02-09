@@ -17,7 +17,7 @@
     "build": "vite build",
     "dev": "vite",
     "lint": "biome check && tsc && ts-prune && jscpd client server && dpdm --no-tree --no-progress --no-warning vite.config.ts client",
-    "format": "biome check --write",
+    "format": "biome check --write --files-ignore-unknown true",
     "test": "glob -c 'tsx --test' '**/*.test.ts' --ignore='node_modules/**'",
     "prepare": "husky"
   },
@@ -88,6 +88,6 @@
     "vite": "^6.0.0"
   },
   "lint-staged": {
-    "*": "biome check --write"
+    "*": "npm run format --"
   }
 }
