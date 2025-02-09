@@ -1,0 +1,129 @@
+name: Review Pull Request with AI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ai-review:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ai-review') }}
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    name: AI Review
+    permissions:
+      pull-requests: write
+      contents: read
+    timeout-minutes: 30
+    env:
+      OPENROUTER_MODEL: deepseek/deepseek-chat
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Create temporary directory
+        run: mkdir -p /tmp/pr_review
+
+      - name: Process PR description
+        id: process_pr
+        run: |
+          PR_BODY_ESCAPED=$(cat << 'EOF'
+          ${{ github.event.pull_request.body }}
+          EOF
+          )
+          PROCESSED_BODY=$(echo "$PR_BODY_ESCAPED" | sed -E 's/\[(.*?)\]\(.*?\)/\1/g')
+          echo "$PROCESSED_BODY" > /tmp/pr_review/processed_body.txt
+
+      - name: Fetch branches and output the diff
+        run: |
+          git fetch origin main:main
+          git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-branch
+          git diff main..pr-branch > /tmp/pr_review/diff.txt
+
+      - name: Prepare review request
+        id: prepare_request
+        run: |
+          PR_TITLE=$(echo "${{ github.event.pull_request.title }}" | sed 's/[()]/\\&/g')
+          DIFF_CONTENT=$(cat /tmp/pr_review/diff.txt)
+          PROCESSED_BODY=$(cat /tmp/pr_review/processed_body.txt)
+
+          jq -n \
+            --arg model "$OPENROUTER_MODEL" \
+            --arg system "You are an experienced developer reviewing a Pull Request. You focus only on what matters and provide concise, actionable feedback.
+
+          Review Context:
+          Repository Name: \"${{ github.event.repository.name }}\"
+          Repository Description: \"${{ github.event.repository.description }}\"
+          Branch: \"${{ github.event.pull_request.head.ref }}\"
+          PR Title: \"$PR_TITLE\"
+
+          Guidelines:
+          1. Only comment on issues that:
+            - Could cause bugs or security issues
+            - Significantly impact performance
+            - Make the code harder to maintain
+            - Violate critical best practices
+
+          2. For each issue:
+            - Point to the specific line/file
+            - Explain why it's a problem
+            - Suggest a concrete fix
+            
+          3. Praise exceptional solutions briefly, only if truly innovative
+
+          4. Skip commenting on:
+            - Minor style issues
+            - Obvious changes
+            - Working code that could be marginally improved
+            - Things that are just personal preference
+
+          Remember:
+          Less is more. If the code is good and working, just say so, with a short message." \
+            --arg user "This is the description of the pull request:
+          \`\`\`markdown
+          $PROCESSED_BODY
+          \`\`\`
+
+          And here is the diff of the changes, for you to review:
+          \`\`\`diff
+          $DIFF_CONTENT
+          \`\`\`" \
+            '{
+              "model": $model,
+              "messages": [
+                {"role": "system", "content": $system},
+                {"role": "user", "content": $user}
+              ]
+            }' > /tmp/pr_review/request.json
+
+      - name: Get AI Review
+        id: ai_review
+        run: |
+          RESPONSE=$(curl -s https://openrouter.ai/api/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.OPENROUTER_API_KEY }}" \
+            -d @/tmp/pr_review/request.json)
+
+          echo "### Review" > /tmp/pr_review/response.txt
+          echo "" >> /tmp/pr_review/response.txt
+          echo "$RESPONSE" | jq -r '.choices[0].message.content' >> /tmp/pr_review/response.txt
+
+      - name: Find Comment
+        uses: peter-evans/find-comment@v3
+        id: find_comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "### Review"
+
+      - name: Post or Update PR Review
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: /tmp/pr_review/response.txt
+          edit-mode: replace
