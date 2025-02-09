@@ -1,8 +1,9 @@
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { streamText } from "ai";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions.mjs";
-import { getOpenAiClient } from "./openai";
 import {
   getSettings,
+  getTextGenerationState,
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
@@ -11,30 +12,82 @@ import {
   getDefaultChatCompletionCreateParamsStreaming,
   getDefaultChatMessages,
   getFormattedSearchResults,
-  handleStreamingResponse,
 } from "./textGenerationUtilities";
 
-export async function generateTextWithOpenAi() {
+let currentAbortController: AbortController | null = null;
+
+interface StreamOptions {
+  messages: ChatMessage[];
+  onUpdate: (text: string) => void;
+}
+
+async function createOpenAiStream({
+  messages,
+  onUpdate,
+}: StreamOptions): Promise<string> {
   const settings = getSettings();
-  const openai = getOpenAiClient({
+  const openaiProvider = createOpenAICompatible({
+    name: settings.openAiApiBaseUrl,
     baseURL: settings.openAiApiBaseUrl,
     apiKey: settings.openAiApiKey,
   });
 
+  const params = getDefaultChatCompletionCreateParamsStreaming();
+
+  try {
+    currentAbortController = new AbortController();
+
+    const stream = streamText({
+      model: openaiProvider.chatModel(settings.openAiApiModel),
+      messages: messages.map((msg) => ({
+        role: msg.role || "user",
+        content: msg.content,
+      })),
+      maxTokens: params.max_tokens,
+      temperature: params.temperature,
+      topP: params.top_p,
+      frequencyPenalty: params.frequency_penalty,
+      presencePenalty: params.presence_penalty,
+      abortSignal: currentAbortController.signal,
+    });
+
+    let text = "";
+    for await (const part of stream.fullStream) {
+      if (getTextGenerationState() === "interrupted") {
+        currentAbortController.abort();
+        throw new Error("Chat generation interrupted");
+      }
+
+      if (part.type === "text-delta") {
+        text += part.textDelta;
+        onUpdate(text);
+      }
+    }
+
+    return text;
+  } catch (error) {
+    if (
+      getTextGenerationState() === "interrupted" ||
+      (error instanceof DOMException && error.name === "AbortError")
+    ) {
+      throw new Error("Chat generation interrupted");
+    }
+    throw error;
+  } finally {
+    currentAbortController = null;
+  }
+}
+
+export async function generateTextWithOpenAi() {
   await canStartResponding();
   updateTextGenerationState("preparingToGenerate");
 
-  const completion = await openai.chat.completions.create({
-    ...getDefaultChatCompletionCreateParamsStreaming(),
-    model: settings.openAiApiModel,
-    messages: getDefaultChatMessages(
-      getFormattedSearchResults(true),
-    ) as ChatCompletionMessageParam[],
-  });
+  const messages = getDefaultChatMessages(getFormattedSearchResults(true));
+  updateTextGenerationState("generating");
 
-  await handleStreamingResponse(completion, updateResponse, {
-    abortController: completion.controller,
-    shouldUpdateGeneratingState: true,
+  await createOpenAiStream({
+    messages,
+    onUpdate: updateResponse,
   });
 }
 
@@ -42,19 +95,5 @@ export async function generateChatWithOpenAi(
   messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
 ) {
-  const settings = getSettings();
-  const openai = getOpenAiClient({
-    baseURL: settings.openAiApiBaseUrl,
-    apiKey: settings.openAiApiKey,
-  });
-
-  const completion = await openai.chat.completions.create({
-    ...getDefaultChatCompletionCreateParamsStreaming(),
-    model: settings.openAiApiModel,
-    messages: messages as ChatCompletionMessageParam[],
-  });
-
-  return handleStreamingResponse(completion, onUpdate, {
-    abortController: completion.controller,
-  });
+  return createOpenAiStream({ messages, onUpdate });
 }

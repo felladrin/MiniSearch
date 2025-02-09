@@ -1,5 +1,4 @@
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
-import type { ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions.mjs";
 import {
   getQuery,
   getTextGenerationState,
@@ -72,7 +71,7 @@ async function processStreamResponse(
     body: JSON.stringify({
       ...getDefaultChatCompletionCreateParamsStreaming(),
       messages,
-    } as ChatCompletionCreateParamsStreaming),
+    }),
   });
 
   if (!response.ok || !response.body) {

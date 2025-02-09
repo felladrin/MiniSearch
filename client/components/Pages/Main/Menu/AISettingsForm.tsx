@@ -15,7 +15,6 @@ import { IconInfoCircle } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { addLogEntry } from "../../../../modules/logEntries";
-import { getOpenAiClient } from "../../../../modules/openai";
 import { settingsPubSub } from "../../../../modules/pubSub";
 import { defaultSettings, inferenceTypes } from "../../../../modules/settings";
 import {
@@ -66,15 +65,22 @@ export default function AISettingsForm() {
   useEffect(() => {
     async function fetchOpenAiModels() {
       try {
-        const openai = getOpenAiClient({
-          baseURL: settings.openAiApiBaseUrl,
-          apiKey: settings.openAiApiKey,
+        const response = await fetch(`${settings.openAiApiBaseUrl}/models`, {
+          headers: {
+            Authorization: `Bearer ${settings.openAiApiKey}`,
+          },
         });
-        const response = await openai.models.list();
-        const models = response.data.map((model) => ({
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch models: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const models = data.data.map((model: { id: string }) => ({
           label: model.id,
           value: model.id,
         }));
+
         setOpenAiModels(models);
         const hasNoModelsDefined =
           !Array.isArray(models) || models.length === 0;
@@ -253,7 +259,9 @@ export default function AISettingsForm() {
                 label="API Key"
                 description={
                   hordeUserInfo
-                    ? `Logged in as ${hordeUserInfo.username} (${hordeUserInfo.kudos.toLocaleString()} kudos)`
+                    ? `Logged in as ${
+                        hordeUserInfo.username
+                      } (${hordeUserInfo.kudos.toLocaleString()} kudos)`
                     : "By default, it's set to '0000000000', for anonymous access. However, anonymous accounts have the lowest priority when there's too many concurrent requests."
                 }
                 type="password"

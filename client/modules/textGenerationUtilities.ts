@@ -1,7 +1,5 @@
-import type { ChatCompletionChunk as WebLlmChatCompletionChunk } from "@mlc-ai/web-llm";
+import type { ChatCompletionChunk } from "@mlc-ai/web-llm";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
-import type { ChatCompletionChunk } from "openai/resources/chat/completions.mjs";
-import type { Stream } from "openai/streaming.mjs";
 import {
   getQuery,
   getSearchPromise,
@@ -63,9 +61,7 @@ export function getDefaultChatCompletionCreateParamsStreaming() {
 }
 
 export async function handleStreamingResponse(
-  completion:
-    | Stream<ChatCompletionChunk>
-    | AsyncIterable<WebLlmChatCompletionChunk>,
+  completion: AsyncIterable<ChatCompletionChunk>,
   onChunk: (streamedMessage: string) => void,
   options?: {
     abortController?: { abort: () => void };

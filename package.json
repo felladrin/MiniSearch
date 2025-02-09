@@ -22,6 +22,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^0.1.8",
     "@huggingface/hub": "^1.0.0",
     "@mantine/carousel": "^7.12.2",
     "@mantine/core": "^7.12.2",
@@ -31,6 +32,7 @@
     "@mlc-ai/web-llm": "0.2.78",
     "@tabler/icons-react": "^3.16.0",
     "@wllama/wllama": "^2.0.1",
+    "ai": "^4.1.26",
     "country-flag-icons": "^1.5.13",
     "create-pubsub": "^1.6.3",
     "debug": "^4.4.0",
@@ -43,7 +45,6 @@
     "http-compression": "^1.0.20",
     "keyword-extractor": "^0.0.28",
     "node-emoji": "^2.1.3",
-    "openai": "^4.61.1",
     "pm2": "^5.4.2",
     "postcss": "^8.4.45",
     "postcss-preset-mantine": "^1.17.0",
@@ -61,7 +62,8 @@
     "temp-dir": "^3.0.0",
     "throttleit": "^2.1.0",
     "wouter": "^3.3.0",
-    "yet-another-react-lightbox": "^3.21.6"
+    "yet-another-react-lightbox": "^3.21.6",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
