@@ -93,7 +93,8 @@ jobs:
           \`\`\`
           <|im_end|>
           <|im_start|>assistant
-          ### Overall Summary\n\n" > /tmp/llama_review/prompt.txt
+          ### Overall Summary\n\n
+          " > /tmp/llama_review/prompt.txt
 
       - name: Show Prompt
         run: cat /tmp/llama_review/prompt.txt
