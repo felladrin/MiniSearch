@@ -15,8 +15,8 @@ export const defaultSettings = {
   systemPrompt: `Help with my research.
 
 Respond using:
-- Provided search results + your knowledge 
-- Same language as query 
+- Provided search results + your knowledge
+- Same language as query
 - Markdown format
 - Blank lines separating sections, instead of Markdown headers
 - Tables for comparisons
