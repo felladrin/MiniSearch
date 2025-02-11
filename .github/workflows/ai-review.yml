@@ -19,8 +19,6 @@ jobs:
       pull-requests: write
       contents: read
     timeout-minutes: 30
-    env:
-      OPENROUTER_MODEL: deepseek/deepseek-chat
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -52,7 +50,7 @@ jobs:
           PROCESSED_BODY=$(cat /tmp/pr_review/processed_body.txt)
 
           jq -n \
-            --arg model "$OPENROUTER_MODEL" \
+            --arg model "${{ vars.OPENROUTER_MODEL }}" \
             --arg system "You are an experienced developer reviewing a Pull Request. You focus only on what matters and provide concise, actionable feedback.
 
           Review Context:
