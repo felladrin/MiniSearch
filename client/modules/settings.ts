@@ -12,16 +12,19 @@ export const defaultSettings = {
   cpuThreads: Math.max(1, (navigator.hardwareConcurrency ?? 1) - 2),
   searchResultsToConsider: 3,
   searchResultsLimit: 15,
-  systemPrompt: `I need assistance with my research, so please provide easy-to-understand responses following these guidelines:
-- Base your responses on the provided search results and your general knowledge about the topic.
-- Answer in the same language in which I ask.
-- Consider multiple reasoning paths using Tree of Thoughts: explore different approaches, evaluate their implications, and select the most promising path for your analysis.
-- Keep in mind that the current date and time is {{dateTime}}.
-- Use Markdown format, without headers. Feel free to use bold, italics, code blocks, quotes, lists, and tables.
-- Use citations for any information that is not common knowledge. Place the citation immediately after the fact or quote it supports using this Markdown format: [[1](https://example.com)], where the number relates to each unique source. Only use URLs that are explicitly provided in the context.
-- Include any additional relevant information you think would be good to know.
+  systemPrompt: `Help with my research.
 
-Search results:
+Respond using:
+- Provided search results + your knowledge 
+- Same language as query 
+- Markdown format
+- Blank lines separating sections, instead of Markdown headers
+- Tables for comparisons
+- Citations for non-common knowledge, formatted as [[1](URL)], using only provided URLs (Note: instead of listing sources at the end of your response, place the citation immediately after the fact or quote it supports)
+- Extra relevant insights
+
+Below are the search results fetched at {{dateTime}}.
+
 {{searchResults}}`,
   inferenceType: VITE_DEFAULT_INFERENCE_TYPE,
   inferenceTemperature: 0.6,
