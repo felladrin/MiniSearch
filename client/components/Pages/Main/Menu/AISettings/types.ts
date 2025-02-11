@@ -1,6 +1,3 @@
-import type { UseFormReturnType } from "@mantine/form";
-import type { defaultSettings } from "../../../../../modules/settings";
-
 export interface ModelOption {
   label: string;
   value: string;
@@ -9,10 +6,6 @@ export interface ModelOption {
 export interface HordeUserInfo {
   username: string;
   kudos: number;
-}
-
-export interface AISettingsFormProps {
-  form: UseFormReturnType<typeof defaultSettings>;
 }
 
 export interface AIParameterSliderProps extends Record<string, unknown> {

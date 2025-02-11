@@ -1,4 +1,4 @@
-import { Select, Stack, Switch } from "@mantine/core";
+import { Select, Slider, Stack, Switch, Text } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { usePubSub } from "create-pubsub/react";
 import { settingsPubSub } from "../../../../../modules/pubSub";
@@ -39,6 +39,24 @@ export default function AISettingsForm() {
 
       {form.values.enableAiResponse && (
         <>
+          <Stack gap="xs" mb="md">
+            <Text size="sm">Search results to consider</Text>
+            <Text size="xs" c="dimmed">
+              Determines the number of search results to consider when
+              generating AI responses. A higher value may enhance accuracy, but
+              it will also increase response time.
+            </Text>
+            <Slider
+              {...form.getInputProps("searchResultsToConsider")}
+              min={0}
+              max={6}
+              marks={Array.from({ length: 7 }, (_, index) => ({
+                value: index,
+                label: index.toString(),
+              }))}
+            />
+          </Stack>
+
           <Select
             {...form.getInputProps("inferenceType")}
             label="AI Processing Location"

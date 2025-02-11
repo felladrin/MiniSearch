@@ -16,7 +16,7 @@ import { repository } from "../../../../../package.json";
 import { appName, appVersion } from "../../../../modules/appInfo";
 import { addLogEntry } from "../../../../modules/logEntries";
 
-const AISettingsForm = lazy(() => import("./AISettingsForm"));
+const AISettingsForm = lazy(() => import("./AISettings/AISettingsForm"));
 const SearchSettingsForm = lazy(() => import("./SearchSettingsForm"));
 const InterfaceSettingsForm = lazy(() => import("./InterfaceSettingsForm"));
 const ActionsForm = lazy(() => import("./ActionsForm"));
