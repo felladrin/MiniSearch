@@ -18,7 +18,7 @@
     "dev": "vite",
     "lint": "biome check && tsc && ts-prune && jscpd client server && dpdm --no-tree --no-progress --no-warning vite.config.ts client",
     "format": "biome check --write",
-    "test": "glob -c 'tsx --test' '**/*.test.ts' --ignore='node_modules/**'",
+    "test": "glob -c 'node --test' '**/*.test.ts' --ignore='node_modules/**'",
     "prepare": "husky"
   },
   "dependencies": {
@@ -83,7 +83,6 @@
     "lint-staged": "^15.4.3",
     "rollup-plugin-visualizer": "^5.12.0",
     "ts-prune": "^0.10.3",
-    "tsx": "^4.11.0",
     "typescript": "^5.0.2",
     "vite": "^6.0.0"
   },
