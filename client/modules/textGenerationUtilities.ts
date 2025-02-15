@@ -52,7 +52,7 @@ export function getDefaultChatCompletionCreateParamsStreaming() {
   const settings = getSettings();
   return {
     stream: true,
-    max_tokens: defaultContextSize / 2,
+    max_tokens: defaultContextSize,
     temperature: settings.inferenceTemperature,
     top_p: settings.inferenceTopP,
     frequency_penalty: settings.inferenceFrequencyPenalty,

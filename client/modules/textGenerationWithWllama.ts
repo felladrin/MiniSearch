@@ -123,7 +123,7 @@ async function generateWithWllama({
         getFormattedSearchResults(model.shouldIncludeUrlsOnPrompt),
       ),
       {
-        nPredict: defaultContextSize / 2,
+        nPredict: defaultContextSize,
         stopTokens: model.stopTokens,
         sampling: model.getSampling(),
         onNewToken,
