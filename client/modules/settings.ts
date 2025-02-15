@@ -15,10 +15,9 @@ export const defaultSettings = {
   systemPrompt: `Help with my research.
 
 Respond using:
-- Provided search results + your knowledge + extra relevant insights
+- Provided search results with referencing links + your knowledge + extra relevant insights (note: referencing links should be in the format [1](URL) and placed immediately after the fact you are quoting)
 - Same language as query
-- Tables, when comparing different items
-- Citations for non-common knowledge, formatted as [[1](URL)], using only provided URLs (Note: instead of listing sources at the end of your response, place the citation immediately after the fact you are quoting)
+- Markdown format (allowed components: anchor, bold, italic, code, quote, table)
 
 Below are the search results fetched at {{dateTime}}.
 
