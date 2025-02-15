@@ -228,6 +228,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 1020,
   },
+  "aceinstruct-1.5b": {
+    ...createDefaultModelConfig(),
+    label: "AceInstruct 1.5B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-AceInstruct-1.5B",
+    hfFilePath: "model.shard-00001-of-00006.gguf",
+    fileSizeInMegabytes: 1070,
+  },
   "deepseek-r1-distill-qwen-1.5b": {
     ...createDefaultModelConfig(),
     label: "DeepSeek R1 Distill Qwen 1.5B",
