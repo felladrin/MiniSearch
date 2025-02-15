@@ -1,4 +1,9 @@
-import { Box, TypographyStylesProvider, useMantineTheme } from "@mantine/core";
+import {
+  Box,
+  Button,
+  TypographyStylesProvider,
+  useMantineTheme,
+} from "@mantine/core";
 import React from "react";
 import Markdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -36,6 +41,27 @@ const FormattedMarkdown: React.FC<FormattedMarkdownProps> = ({
             ],
           ]}
           components={{
+            a(props) {
+              const { href, children } = props;
+              return (
+                <Button
+                  component="a"
+                  href={href}
+                  target="_blank"
+                  rel="nofollow noopener noreferrer"
+                  variant="light"
+                  color="gray"
+                  size="compact-xs"
+                  radius="xl"
+                  style={{
+                    textDecoration: "none",
+                    transform: "translateY(-2px)",
+                  }}
+                >
+                  {children}
+                </Button>
+              );
+            },
             li(props) {
               const { children } = props;
               const processedChildren = React.Children.map(
