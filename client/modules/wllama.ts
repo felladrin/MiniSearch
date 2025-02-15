@@ -263,6 +263,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00004.gguf",
     fileSizeInMegabytes: 1640,
   },
+  "megrez-3b": {
+    ...createDefaultModelConfig(),
+    label: "Megrez 3B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Megrez-3B-Instruct",
+    hfFilePath: "model.shard-00001-of-00007.gguf",
+    fileSizeInMegabytes: 1740,
+  },
   "granite-3.1-3b": {
     ...createDefaultModelConfig(),
     label: "Granite 3.1 3B [800M]",
