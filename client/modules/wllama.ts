@@ -142,9 +142,10 @@ const createDefaultModelConfig = (): Omit<
       temp: settings.inferenceTemperature,
       penalty_freq: settings.inferenceFrequencyPenalty,
       penalty_present: settings.inferencePresencePenalty,
-      min_p: 0.05,
+      min_p: 0.1,
       top_k: 0,
       typical_p: 0.2,
+      penalty_repeat: 1.05,
     };
   },
 });
