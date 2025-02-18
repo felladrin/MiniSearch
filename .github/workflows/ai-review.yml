@@ -51,6 +51,9 @@ jobs:
 
           jq -n \
             --arg model "${{ vars.OPENROUTER_MODEL }}" \
+            --arg temperature "0.6" \
+            --arg top_p "0.8" \
+            --arg min_p "0.1" \
             --arg system "You are an experienced developer reviewing a Pull Request. You focus only on what matters and provide concise, actionable feedback.
 
           Review Context:
@@ -95,7 +98,10 @@ jobs:
               "messages": [
                 {"role": "system", "content": $system},
                 {"role": "user", "content": $user}
-              ]
+              ],
+              "temperature": $temperature,
+              "top_p": $top_p,
+              "min_p": $min_p
             }' > /tmp/pr_review/request.json
 
       - name: Get AI Review
