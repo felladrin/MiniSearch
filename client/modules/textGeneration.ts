@@ -11,7 +11,6 @@ import {
   updateImageSearchState,
   updateResponse,
   updateSearchPromise,
-  updateSearchResults,
   updateTextGenerationState,
   updateTextSearchResults,
   updateTextSearchState,
@@ -33,7 +32,9 @@ export async function searchAndRespond() {
 
   updateResponse("");
 
-  updateSearchResults({ textResults: [], imageResults: [] });
+  updateTextSearchResults([]);
+
+  updateImageSearchResults([]);
 
   updateSearchPromise(startTextSearch(getQuery()));
 
@@ -205,7 +206,6 @@ async function startTextSearch(query: string) {
     updateTextSearchState(
       results.textResults.length === 0 ? "failed" : "completed",
     );
-    updateSearchResults(results);
     updateTextSearchResults(textResults);
   }
 
@@ -228,7 +228,6 @@ async function startImageSearch(
   updateImageSearchState(
     results.imageResults.length === 0 ? "failed" : "completed",
   );
-  updateSearchResults(results);
   updateImageSearchResults(imageResults);
 }
 

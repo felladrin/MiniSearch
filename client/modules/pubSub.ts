@@ -51,13 +51,6 @@ export const responsePubSub = createPubSub("");
 
 export const updateResponse = throttle(responsePubSub[0], 1000 / 12);
 
-const searchResultsPubSub = createPubSub<SearchResults>({
-  textResults: [],
-  imageResults: [],
-});
-
-export const [updateSearchResults, , getSearchResults] = searchResultsPubSub;
-
 export const [updateSearchPromise, , getSearchPromise] = createPubSub<
   Promise<SearchResults>
 >(Promise.resolve({ textResults: [], imageResults: [] }));
@@ -111,6 +104,7 @@ subscribeToImageSearchState((imageSearchState) => {
 export const textSearchResultsPubSub = createPubSub<TextSearchResults>([]);
 export const imageSearchResultsPubSub = createPubSub<ImageSearchResults>([]);
 
-export const [updateTextSearchResults] = textSearchResultsPubSub;
+export const [updateTextSearchResults, , getTextSearchResults] =
+  textSearchResultsPubSub;
 
 export const [updateImageSearchResults] = imageSearchResultsPubSub;

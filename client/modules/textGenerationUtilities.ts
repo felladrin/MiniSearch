@@ -3,9 +3,9 @@ import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
   getQuery,
   getSearchPromise,
-  getSearchResults,
   getSettings,
   getTextGenerationState,
+  getTextSearchResults,
   updateTextGenerationState,
 } from "./pubSub";
 import { getSystemPrompt } from "./systemPrompt";
@@ -20,7 +20,7 @@ export class ChatGenerationError extends Error {
 }
 
 export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
-  const searchResults = getSearchResults().textResults.slice(
+  const searchResults = getTextSearchResults().slice(
     0,
     getSettings().searchResultsToConsider,
   );
