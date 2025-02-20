@@ -143,13 +143,6 @@ function cacheSearchWithIndexedDB<
       addLogEntry(
         `Search cache hit, returning cached results containing ${cachedResult.results.length} items`,
       );
-      if (storeName === "textSearches") {
-        updateTextSearchResults(cachedResult.results as TextSearchResults);
-        updateTextSearchState("completed");
-      } else if (storeName === "imageSearches") {
-        updateImageSearchResults(cachedResult.results as ImageSearchResults);
-        updateImageSearchState("completed");
-      }
       return cachedResult.results;
     }
 
