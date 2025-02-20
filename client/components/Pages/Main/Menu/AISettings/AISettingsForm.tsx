@@ -1,4 +1,4 @@
-import { Select, Slider, Stack, Switch, Text } from "@mantine/core";
+import { Select, Slider, Stack, Switch, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { usePubSub } from "create-pubsub/react";
 import { settingsPubSub } from "../../../../../modules/pubSub";
@@ -139,6 +139,24 @@ export default function AISettingsForm() {
             step={0.01}
             marks={penaltySliderMarks}
           />
+
+          <Stack gap="xs" mb="md">
+            <Text size="sm">Reasoning Section Parsing</Text>
+            <Text size="xs" c="dimmed">
+              Configure how the AI's reasoning section is parsed in the
+              response.
+            </Text>
+            <Stack gap="xs">
+              <TextInput
+                {...form.getInputProps("reasoningStartMarker")}
+                description="Start Marker, indicating the start of a reasoning section."
+              />
+              <TextInput
+                {...form.getInputProps("reasoningEndMarker")}
+                description="End Marker, indicating the end of a reasoning section."
+              />
+            </Stack>
+          </Stack>
         </>
       )}
     </Stack>

@@ -37,6 +37,8 @@ Below are the search results fetched at {{dateTime}}.
   allowAiModelDownload: false,
   enableTextSearch: true,
   selectedVoiceId: "",
+  reasoningStartMarker: "<think>",
+  reasoningEndMarker: "</think>",
 };
 
 addLogEntry(
