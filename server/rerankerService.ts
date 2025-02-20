@@ -154,5 +154,5 @@ export async function rerank(query: string, documents: string[]) {
   }
 
   const result = await response.json();
-  return result.results;
+  return result.results as { index: number; relevance_score: number }[];
 }

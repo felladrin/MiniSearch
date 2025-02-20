@@ -48,52 +48,70 @@ export function searchEndpointServerHook<
 
       if (isTextSearch) {
         const results = searxngResults as TextResult[];
-        const rankedResults = await rankSearchResults(query, results);
+        const rankedResults = await rankSearchResults(query, results, true);
 
         incrementTextualSearchesSinceLastRestart();
 
         response.setHeader("Content-Type", "application/json");
         response.end(JSON.stringify(rankedResults));
       } else {
-        const results = searxngResults as ImageResult[];
-        const rankedResults = await rankSearchResults(
-          query,
-          results.map(
-            ([title, url, , sourceUrl]) =>
-              [
-                title.slice(0, 100),
-                sourceUrl.slice(0, 100),
-                url.slice(0, 100),
-              ] as TextResult,
-          ),
-        );
+        const uniqueUrlMap = new Map<string, ImageResult>();
+        for (const result of searxngResults as ImageResult[]) {
+          const [, url] = result;
+          if (!uniqueUrlMap.has(url)) {
+            uniqueUrlMap.set(url, result);
+          }
+        }
+        const results = Array.from(uniqueUrlMap.values());
+
+        let rankedResults: [title: string, content: string, url: string][];
+
+        try {
+          rankedResults = await rankSearchResults(
+            query,
+            results.map(
+              ([title, url]) =>
+                [title.slice(0, 100), "", url.slice(0, 100)] as TextResult,
+            ),
+          );
+        } catch (error) {
+          console.error(
+            "Error ranking search results:",
+            error instanceof Error ? error.message : error,
+          );
+          rankedResults = results.map(
+            ([title]) => [title, "", ""] as TextResult,
+          );
+        }
+
         const processedResults = (
           await Promise.all(
-            results
-              .filter((_, index) =>
-                rankedResults.some(([title]) => title === results[index][0]),
-              )
-              .map(async ([title, url, thumbnailSource, sourceUrl]) => {
-                try {
-                  const axiosResponse = await axios.get(thumbnailSource, {
-                    responseType: "arraybuffer",
-                  });
+            rankedResults.map(async ([title]) => {
+              const result = results.find(
+                ([resultTitle]) => resultTitle === title,
+              );
+              if (!result) return null;
+              const [_, url, thumbnailSource, sourceUrl] = result;
+              try {
+                const axiosResponse = await axios.get(thumbnailSource, {
+                  responseType: "arraybuffer",
+                });
 
-                  const contentType = axiosResponse.headers["content-type"];
-                  const base64 = Buffer.from(axiosResponse.data).toString(
-                    "base64",
-                  );
+                const contentType = axiosResponse.headers["content-type"];
+                const base64 = Buffer.from(axiosResponse.data).toString(
+                  "base64",
+                );
 
-                  return [
-                    title,
-                    url,
-                    `data:${contentType};base64,${base64}`,
-                    sourceUrl,
-                  ] as ImageResult;
-                } catch {
-                  return null;
-                }
-              }),
+                return [
+                  title,
+                  url,
+                  `data:${contentType};base64,${base64}`,
+                  sourceUrl,
+                ] as ImageResult;
+              } catch {
+                return null;
+              }
+            }),
           )
         ).filter((result): result is ImageResult => result !== null);
 
