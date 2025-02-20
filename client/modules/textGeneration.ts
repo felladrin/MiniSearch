@@ -7,11 +7,13 @@ import {
   getSettings,
   getTextGenerationState,
   listenToSettingsChanges,
+  updateImageSearchResults,
   updateImageSearchState,
   updateResponse,
   updateSearchPromise,
   updateSearchResults,
   updateTextGenerationState,
+  updateTextSearchResults,
   updateTextSearchState,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
@@ -184,33 +186,27 @@ async function startTextSearch(query: string) {
   if (getSettings().enableTextSearch) {
     updateTextSearchState("running");
 
-    try {
-      let textResults = await searchText(
-        searchQuery,
+    let textResults = await searchText(
+      searchQuery,
+      getSettings().searchResultsLimit,
+    );
+
+    if (textResults.length === 0) {
+      const queryKeywords = await getKeywords(query, 10);
+      const keywordResults = await searchText(
+        queryKeywords.join(" "),
         getSettings().searchResultsLimit,
       );
-
-      if (textResults.length === 0) {
-        const queryKeywords = await getKeywords(query, 10);
-        const keywordResults = await searchText(
-          queryKeywords.join(" "),
-          getSettings().searchResultsLimit,
-        );
-        textResults = keywordResults;
-      }
-
-      results.textResults = textResults;
-
-      updateTextSearchState(
-        results.textResults.length === 0 ? "failed" : "completed",
-      );
-      updateSearchResults(results);
-    } catch (error) {
-      addLogEntry(
-        `Search failed: ${error instanceof Error ? error.message : error}`,
-      );
-      updateTextSearchState("failed");
+      textResults = keywordResults;
     }
+
+    results.textResults = textResults;
+
+    updateTextSearchState(
+      results.textResults.length === 0 ? "failed" : "completed",
+    );
+    updateSearchResults(results);
+    updateTextSearchResults(textResults);
   }
 
   if (getSettings().enableImageSearch) {
@@ -224,22 +220,16 @@ async function startImageSearch(
   searchQuery: string,
   results: { textResults: TextSearchResults; imageResults: ImageSearchResults },
 ) {
-  try {
-    const imageResults = await searchImages(
-      searchQuery,
-      getSettings().searchResultsLimit,
-    );
-    results.imageResults = imageResults;
-    updateImageSearchState(
-      results.imageResults.length === 0 ? "failed" : "completed",
-    );
-    updateSearchResults(results);
-  } catch (error) {
-    addLogEntry(
-      `Image search failed: ${error instanceof Error ? error.message : error}`,
-    );
-    updateImageSearchState("failed");
-  }
+  const imageResults = await searchImages(
+    searchQuery,
+    getSettings().searchResultsLimit,
+  );
+  results.imageResults = imageResults;
+  updateImageSearchState(
+    results.imageResults.length === 0 ? "failed" : "completed",
+  );
+  updateSearchResults(results);
+  updateImageSearchResults(imageResults);
 }
 
 function canDownloadModels(): Promise<void> {

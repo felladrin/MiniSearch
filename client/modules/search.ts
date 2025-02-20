@@ -1,11 +1,5 @@
 import { name } from "../../package.json";
 import { addLogEntry } from "./logEntries";
-import {
-  updateImageSearchResults,
-  updateImageSearchState,
-  updateTextSearchResults,
-  updateTextSearchState,
-} from "./pubSub";
 import { getSearchTokenHash } from "./searchTokenHash";
 import type { ImageSearchResults, TextSearchResults } from "./types";
 
@@ -141,19 +135,14 @@ function cacheSearchWithIndexedDB<
 
     if (cachedResult && Date.now() - cachedResult.timestamp < timeToLive) {
       addLogEntry(
-        `Search cache hit, returning cached results containing ${cachedResult.results.length} items`,
+        `IndexedDB ${storeName}: Search cache hit, returning cached results containing ${cachedResult.results.length} items`,
       );
-      if (storeName === "textSearches") {
-        updateTextSearchResults(cachedResult.results as TextSearchResults);
-        updateTextSearchState("completed");
-      } else if (storeName === "imageSearches") {
-        updateImageSearchResults(cachedResult.results as ImageSearchResults);
-        updateImageSearchState("completed");
-      }
       return cachedResult.results;
     }
 
-    addLogEntry("Search cache miss, fetching new results");
+    addLogEntry(
+      `IndexedDB ${storeName}: Search cache miss, fetching new results`,
+    );
 
     const results = await fn(query, limit);
 
@@ -161,7 +150,9 @@ function cacheSearchWithIndexedDB<
     const writeStore = writeTransaction.objectStore(storeName);
     writeStore.put({ results, timestamp: Date.now() }, key);
 
-    addLogEntry(`Search completed with ${results.length} items`);
+    addLogEntry(
+      `IndexedDB ${storeName}: Search completed with ${results.length} items`,
+    );
 
     return results;
   };
@@ -187,20 +178,11 @@ async function performSearch<T>(
 export const searchText = cacheSearchWithIndexedDB<TextSearchResults>(
   async (query: string, limit?: number): Promise<TextSearchResults> => {
     try {
-      updateTextSearchState("running");
-      const results = await performSearch<TextSearchResults>(
-        "text",
-        query,
-        limit,
-      );
-      updateTextSearchResults(results);
-      updateTextSearchState("completed");
-      return results;
+      return performSearch<TextSearchResults>("text", query, limit);
     } catch (error) {
       addLogEntry(
         `Text search failed: ${error instanceof Error ? error.message : error}`,
       );
-      updateTextSearchState("failed");
       return [];
     }
   },
@@ -210,20 +192,11 @@ export const searchText = cacheSearchWithIndexedDB<TextSearchResults>(
 export const searchImages = cacheSearchWithIndexedDB<ImageSearchResults>(
   async (query: string, limit?: number): Promise<ImageSearchResults> => {
     try {
-      updateImageSearchState("running");
-      const results = await performSearch<ImageSearchResults>(
-        "images",
-        query,
-        limit,
-      );
-      updateImageSearchResults(results);
-      updateImageSearchState("completed");
-      return results;
+      return performSearch<ImageSearchResults>("images", query, limit);
     } catch (error) {
       addLogEntry(
         `Image search failed: ${error instanceof Error ? error.message : error}`,
       );
-      updateImageSearchState("failed");
       return [];
     }
   },
