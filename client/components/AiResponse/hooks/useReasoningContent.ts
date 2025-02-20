@@ -1,36 +1,37 @@
 import { usePubSub } from "create-pubsub/react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { settingsPubSub } from "../../../modules/pubSub";
 
-interface ReasoningContent {
-  reasoningContent: string;
-  mainContent: string;
-  isGenerating: boolean;
-  thinkingTimeMs: number;
-}
-
-export function useReasoningContent(content: string): ReasoningContent {
+export function useReasoningContent(text: string) {
   const [settings] = usePubSub(settingsPubSub);
-  const reasoningStartTime = useRef<number>(0);
-  const totalThinkingTime = useRef<number>(0);
+  const [thinkingTimeMs, setThinkingTimeMs] = useState(0);
+  const startTimeRef = useRef<number | null>(null);
+
+  const initializeTimingIfNeeded = useCallback(() => {
+    if (startTimeRef.current === null) {
+      startTimeRef.current = Date.now();
+    }
+  }, []);
+
+  const finalizeThinkingTimeIfNeeded = useCallback(() => {
+    if (startTimeRef.current !== null) {
+      setThinkingTimeMs(Date.now() - startTimeRef.current);
+      startTimeRef.current = null;
+    }
+  }, []);
 
   const extractReasoningAndMainContent = useCallback(
     (text: string, startMarker: string, endMarker: string) => {
-      if (!text) {
+      if (!text)
         return { reasoningContent: "", mainContent: "", isGenerating: false };
-      }
 
       const startIndex = text.indexOf(startMarker);
-      const isReasoningSectionMissing = startIndex === -1;
-
-      if (isReasoningSectionMissing) {
-        return { reasoningContent: "", mainContent: text, isGenerating: false };
-      }
-
       const endIndex = text.indexOf(endMarker);
-      const isReasoningInProgress = endIndex === -1;
 
-      if (isReasoningInProgress) {
+      if (startIndex === -1)
+        return { reasoningContent: "", mainContent: text, isGenerating: false };
+
+      if (endIndex === -1) {
         initializeTimingIfNeeded();
         return {
           reasoningContent: text.slice(startIndex + startMarker.length),
@@ -39,63 +40,30 @@ export function useReasoningContent(content: string): ReasoningContent {
         };
       }
 
-      const hasValidReasoningSection = startIndex < endIndex;
-      if (hasValidReasoningSection) {
-        finalizeThinkingTimeIfNeeded();
-        return {
-          reasoningContent: text.slice(
-            startIndex + startMarker.length,
-            endIndex,
-          ),
-          mainContent: text.slice(endIndex + endMarker.length),
-          isGenerating: false,
-        };
-      }
-
-      return { reasoningContent: "", mainContent: text, isGenerating: false };
+      finalizeThinkingTimeIfNeeded();
+      return {
+        reasoningContent: text.slice(startIndex + startMarker.length, endIndex),
+        mainContent: text.slice(endIndex + endMarker.length),
+        isGenerating: false,
+      };
     },
-    [],
+    [initializeTimingIfNeeded, finalizeThinkingTimeIfNeeded],
   );
 
-  const initializeTimingIfNeeded = () => {
-    if (!reasoningStartTime.current) {
-      reasoningStartTime.current = Date.now();
-    }
-  };
-
-  const finalizeThinkingTimeIfNeeded = () => {
-    if (reasoningStartTime.current && !totalThinkingTime.current) {
-      totalThinkingTime.current = Date.now() - reasoningStartTime.current;
-    }
-  };
-
-  const { reasoningContent, mainContent, isGenerating } = useMemo(
-    () =>
-      extractReasoningAndMainContent(
-        content,
-        settings.reasoningStartMarker,
-        settings.reasoningEndMarker,
-      ),
-    [
-      content,
-      settings.reasoningStartMarker,
-      settings.reasoningEndMarker,
-      extractReasoningAndMainContent,
-    ],
+  const result = extractReasoningAndMainContent(
+    text,
+    settings.reasoningStartMarker,
+    settings.reasoningEndMarker,
   );
 
   useEffect(() => {
-    const shouldResetTiming = !content;
-    if (shouldResetTiming) {
-      reasoningStartTime.current = 0;
-      totalThinkingTime.current = 0;
-    }
-  }, [content]);
+    return () => {
+      startTimeRef.current = null;
+    };
+  }, []);
 
   return {
-    reasoningContent,
-    mainContent,
-    isGenerating,
-    thinkingTimeMs: totalThinkingTime.current,
+    ...result,
+    thinkingTimeMs,
   };
 }
