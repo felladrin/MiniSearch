@@ -14,13 +14,12 @@ import CopyIconButton from "./CopyIconButton";
 import ReasoningSection from "./ReasoningSection";
 import { useReasoningContent } from "./hooks/useReasoningContent";
 
-interface FormattedMarkdownProps {
-  children: string;
-  className?: string;
+interface MarkdownRendererProps {
+  content: string;
   enableCopy?: boolean;
 }
 
-const MarkdownRenderer: React.FC<{ content: string; enableCopy?: boolean }> = ({
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   enableCopy = true,
 }) => {
@@ -129,6 +128,12 @@ const MarkdownRenderer: React.FC<{ content: string; enableCopy?: boolean }> = ({
     </Markdown>
   );
 };
+
+interface FormattedMarkdownProps {
+  children: string;
+  className?: string;
+  enableCopy?: boolean;
+}
 
 const FormattedMarkdown: React.FC<FormattedMarkdownProps> = ({
   children,
