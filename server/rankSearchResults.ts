@@ -20,8 +20,14 @@ export async function rankSearchResults(
     return [];
   }
 
+  const highestScore = Math.max(...scoredResults.map((r) => r.score));
+
+  const filteredResults = scoredResults.filter(
+    (r) => r.score >= highestScore / 10,
+  );
+
   if (preserveTopResults) {
-    const [firstResult, ...nextResults] = scoredResults;
+    const [firstResult, ...nextResults] = filteredResults;
 
     const nextTopResultsCount = 9;
 
@@ -38,7 +44,7 @@ export async function rankSearchResults(
     );
   }
 
-  return scoredResults
+  return filteredResults
     .sort((a, b) => b.score - a.score)
     .map(({ result }) => result);
 }
