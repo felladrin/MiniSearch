@@ -95,6 +95,7 @@ export function searchEndpointServerHook<
               try {
                 const axiosResponse = await axios.get(thumbnailSource, {
                   responseType: "arraybuffer",
+                  timeout: 1000,
                 });
 
                 const contentType = axiosResponse.headers["content-type"];
