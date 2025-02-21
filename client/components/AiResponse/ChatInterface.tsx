@@ -26,6 +26,12 @@ import { generateChatResponse } from "../../modules/textGeneration";
 const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
 const CopyIconButton = lazy(() => import("./CopyIconButton"));
 
+interface ChatState {
+  input: string;
+  isGenerating: boolean;
+  streamedResponse: string;
+}
+
 export default function ChatInterface({
   initialQuery,
   initialResponse,
@@ -34,9 +40,11 @@ export default function ChatInterface({
   initialResponse: string;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [streamedResponse, setStreamedResponse] = useState("");
+  const [state, setState] = useState<ChatState>({
+    input: "",
+    isGenerating: false,
+    streamedResponse: "",
+  });
   const latestResponseRef = useRef("");
   const [settings] = usePubSub(settingsPubSub);
 
@@ -48,22 +56,25 @@ export default function ChatInterface({
   }, [initialQuery, initialResponse]);
 
   const handleSend = async () => {
-    if (input.trim() === "" || isGenerating) return;
+    if (state.input.trim() === "" || state.isGenerating) return;
 
     const newMessages: ChatMessage[] = [
       ...messages,
-      { role: "user", content: input },
+      { role: "user", content: state.input },
     ];
     setMessages(newMessages);
-    setInput("");
-    setIsGenerating(true);
-    setStreamedResponse("");
+    setState((prev) => ({
+      ...prev,
+      input: "",
+      isGenerating: true,
+      streamedResponse: "",
+    }));
     latestResponseRef.current = "";
 
     try {
       addLogEntry("User sent a follow-up question");
       await generateChatResponse(newMessages, (partialResponse) => {
-        setStreamedResponse(partialResponse);
+        setState((prev) => ({ ...prev, streamedResponse: partialResponse }));
         latestResponseRef.current = partialResponse;
       });
       setMessages((prevMessages) => [
@@ -81,8 +92,11 @@ export default function ChatInterface({
         },
       ]);
     } finally {
-      setIsGenerating(false);
-      setStreamedResponse("");
+      setState((prev) => ({
+        ...prev,
+        isGenerating: false,
+        streamedResponse: "",
+      }));
     }
   };
 
@@ -135,7 +149,7 @@ export default function ChatInterface({
                 </Suspense>
               </Paper>
             ))}
-            {isGenerating && streamedResponse.length > 0 && (
+            {state.isGenerating && state.streamedResponse.length > 0 && (
               <Paper
                 shadow="xs"
                 radius="xl"
@@ -144,7 +158,9 @@ export default function ChatInterface({
                 style={{ alignSelf: "flex-start" }}
               >
                 <Suspense>
-                  <FormattedMarkdown>{streamedResponse}</FormattedMarkdown>
+                  <FormattedMarkdown>
+                    {state.streamedResponse}
+                  </FormattedMarkdown>
                 </Suspense>
               </Paper>
             )}
@@ -153,20 +169,25 @@ export default function ChatInterface({
         <Group align="flex-end" style={{ position: "relative" }}>
           <Textarea
             placeholder="Anything else you would like to know?"
-            value={input}
-            onChange={(event) => setInput(event.currentTarget.value)}
+            value={state.input}
+            onChange={(event) =>
+              setState((prev) => ({
+                ...prev,
+                input: event.currentTarget.value,
+              }))
+            }
             onKeyDown={handleKeyDown}
             autosize
             minRows={1}
             maxRows={4}
             style={{ flexGrow: 1, paddingRight: "50px" }}
-            disabled={isGenerating}
+            disabled={state.isGenerating}
           />
           <Button
             size="sm"
             variant="default"
             onClick={handleSend}
-            loading={isGenerating}
+            loading={state.isGenerating}
             style={{
               height: "100%",
               position: "absolute",

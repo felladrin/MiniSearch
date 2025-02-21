@@ -50,17 +50,19 @@ export function App() {
  */
 function useInitializeSettings() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
-  const [settingsInitialized, setSettingsInitialized] = useState(false);
+  const [state, setState] = useState({
+    settingsInitialized: false,
+  });
 
   useEffect(() => {
-    if (settingsInitialized) return;
+    if (state.settingsInitialized) return;
 
     setSettings({ ...defaultSettings, ...settings });
 
-    setSettingsInitialized(true);
+    setState({ settingsInitialized: true });
 
     addLogEntry("Settings initialized");
-  }, [settings, setSettings, settingsInitialized]);
+  }, [settings, setSettings, state.settingsInitialized]);
 
   return settings;
 }
@@ -71,24 +73,28 @@ function useInitializeSettings() {
  * @returns An object containing the validation state and loading state
  */
 function useAccessKeyValidation() {
-  const [hasValidatedAccessKey, setValidatedAccessKey] = useState(false);
-  const [isCheckingStoredKey, setCheckingStoredKey] = useState(true);
+  const [state, setState] = useState({
+    hasValidatedAccessKey: false,
+    isCheckingStoredKey: true,
+  });
 
   useEffect(() => {
     async function checkStoredAccessKey() {
       if (VITE_ACCESS_KEYS_ENABLED) {
         const isValid = await verifyStoredAccessKey();
-        if (isValid) setValidatedAccessKey(true);
+        if (isValid)
+          setState((prev) => ({ ...prev, hasValidatedAccessKey: true }));
       }
-      setCheckingStoredKey(false);
+      setState((prev) => ({ ...prev, isCheckingStoredKey: false }));
     }
 
     checkStoredAccessKey();
   }, []);
 
   return {
-    hasValidatedAccessKey,
-    isCheckingStoredKey,
-    setValidatedAccessKey,
+    hasValidatedAccessKey: state.hasValidatedAccessKey,
+    isCheckingStoredKey: state.isCheckingStoredKey,
+    setValidatedAccessKey: (value: boolean) =>
+      setState((prev) => ({ ...prev, hasValidatedAccessKey: value })),
   };
 }

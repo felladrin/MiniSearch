@@ -4,26 +4,33 @@ import { addLogEntry } from "../../../../modules/logEntries";
 
 const MenuDrawer = lazy(() => import("./MenuDrawer"));
 
+interface MenuState {
+  isDrawerOpen: boolean;
+  isDrawerLoaded: boolean;
+}
+
 export default function MenuButton() {
-  const [isDrawerOpen, setDrawerOpen] = useState(false);
-  const [isDrawerLoaded, setDrawerLoaded] = useState(false);
+  const [state, setState] = useState<MenuState>({
+    isDrawerOpen: false,
+    isDrawerLoaded: false,
+  });
 
   const openDrawer = useCallback(() => {
-    setDrawerOpen(true);
+    setState((prev) => ({ ...prev, isDrawerOpen: true }));
     addLogEntry("User opened the menu");
   }, []);
 
   const closeDrawer = useCallback(() => {
-    setDrawerOpen(false);
+    setState((prev) => ({ ...prev, isDrawerOpen: false }));
     addLogEntry("User closed the menu");
   }, []);
 
   const handleDrawerLoad = useCallback(() => {
-    if (!isDrawerLoaded) {
+    if (!state.isDrawerLoaded) {
       addLogEntry("Menu drawer loaded");
-      setDrawerLoaded(true);
+      setState((prev) => ({ ...prev, isDrawerLoaded: true }));
     }
-  }, [isDrawerLoaded]);
+  }, [state.isDrawerLoaded]);
 
   return (
     <>
@@ -31,13 +38,13 @@ export default function MenuButton() {
         size="xs"
         onClick={openDrawer}
         variant="default"
-        loading={isDrawerOpen && !isDrawerLoaded}
+        loading={state.isDrawerOpen && !state.isDrawerLoaded}
       >
         Menu
       </Button>
-      {(isDrawerOpen || isDrawerLoaded) && (
+      {(state.isDrawerOpen || state.isDrawerLoaded) && (
         <Suspense fallback={<SuspenseListener onUnload={handleDrawerLoad} />}>
-          <MenuDrawer onClose={closeDrawer} opened={isDrawerOpen} />
+          <MenuDrawer onClose={closeDrawer} opened={state.isDrawerOpen} />
         </Suspense>
       )}
     </>

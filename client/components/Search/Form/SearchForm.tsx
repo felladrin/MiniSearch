@@ -18,6 +18,11 @@ import { getRandomQuerySuggestion } from "../../../modules/querySuggestions";
 import { sleepUntilIdle } from "../../../modules/sleep";
 import { searchAndRespond } from "../../../modules/textGeneration";
 
+interface SearchFormState {
+  textAreaValue: string;
+  suggestedQuery: string;
+}
+
 export default function SearchForm({
   query,
   updateQuery,
@@ -28,9 +33,11 @@ export default function SearchForm({
   additionalButtons?: ReactNode;
 }) {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
-  const [textAreaValue, setTextAreaValue] = useState(query);
   const defaultSuggestedQuery = "Anything you need!";
-  const [suggestedQuery, setSuggestedQuery] = useState(defaultSuggestedQuery);
+  const [state, setState] = useState<SearchFormState>({
+    textAreaValue: query,
+    suggestedQuery: defaultSuggestedQuery,
+  });
   const [, navigate] = useLocation();
   const [settings] = usePubSub(settingsPubSub);
 
@@ -41,7 +48,7 @@ export default function SearchForm({
 
   const handleInitialSuggestion = useCallback(async () => {
     const suggestion = await getRandomQuerySuggestion();
-    setSuggestedQuery(suggestion);
+    setState((prev) => ({ ...prev, suggestedQuery: suggestion }));
   }, []);
 
   useEffect(() => {
@@ -52,25 +59,52 @@ export default function SearchForm({
   const handleInputChange = async (event: ChangeEvent<HTMLTextAreaElement>) => {
     const text = event.target.value;
 
-    setTextAreaValue(text);
+    setState((prev) => ({ ...prev, textAreaValue: text }));
 
     if (text.length === 0) {
-      setSuggestedQuery(await getRandomQuerySuggestion());
+      try {
+        const suggestion = await getRandomQuerySuggestion();
+        setState((prev) => ({ ...prev, suggestedQuery: suggestion }));
+      } catch (error) {
+        addLogEntry("Failed to get query suggestion");
+        setState((prev) => ({
+          ...prev,
+          suggestedQuery: defaultSuggestedQuery,
+        }));
+      }
     }
   };
 
   const handleClearButtonClick = async () => {
-    setSuggestedQuery(await getRandomQuerySuggestion());
-    setTextAreaValue("");
     textAreaRef.current?.focus();
+    setState((prev) => ({
+      ...prev,
+      textAreaValue: "",
+    }));
     addLogEntry("User cleaned the search query field");
+
+    try {
+      const suggestion = await getRandomQuerySuggestion();
+      setState((prev) => ({
+        ...prev,
+        suggestedQuery: suggestion,
+      }));
+    } catch (error) {
+      addLogEntry("Failed to get query suggestion");
+      setState((prev) => ({
+        ...prev,
+        suggestedQuery: defaultSuggestedQuery,
+      }));
+    }
   };
 
   const startSearching = useCallback(() => {
     const queryToEncode =
-      textAreaValue.trim().length >= 1 ? textAreaValue : suggestedQuery;
+      state.textAreaValue.trim().length >= 1
+        ? state.textAreaValue
+        : state.suggestedQuery;
 
-    setTextAreaValue(queryToEncode);
+    setState((prev) => ({ ...prev, textAreaValue: queryToEncode }));
 
     const queryString = `q=${encodeURIComponent(queryToEncode)}`;
 
@@ -85,7 +119,7 @@ export default function SearchForm({
     addLogEntry(
       `User submitted a search with ${queryToEncode.length} characters length`,
     );
-  }, [textAreaValue, suggestedQuery, updateQuery, navigate]);
+  }, [state.textAreaValue, state.suggestedQuery, updateQuery, navigate]);
 
   const handleSubmit = (event: { preventDefault: () => void }) => {
     event.preventDefault();
@@ -100,8 +134,8 @@ export default function SearchForm({
     <form onSubmit={handleSubmit} style={{ width: "100%" }}>
       <Stack gap="xs">
         <Textarea
-          value={textAreaValue}
-          placeholder={suggestedQuery}
+          value={state.textAreaValue}
+          placeholder={state.suggestedQuery}
           ref={textAreaRef}
           onKeyDown={handleKeyDown}
           onChange={handleInputChange}
@@ -111,7 +145,7 @@ export default function SearchForm({
           autoFocus
         />
         <Group gap="xs">
-          {textAreaValue.length >= 1 ? (
+          {state.textAreaValue.length >= 1 ? (
             <Button
               size="xs"
               onClick={handleClearButtonClick}

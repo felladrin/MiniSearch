@@ -3,9 +3,16 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { addLogEntry } from "../../../../modules/logEntries";
 
+interface ClearDataState {
+  isClearingData: boolean;
+  hasClearedData: boolean;
+}
+
 export default function ClearDataButton() {
-  const [isClearingData, setIsClearingData] = useState(false);
-  const [hasClearedData, setHasClearedData] = useState(false);
+  const [state, setState] = useState<ClearDataState>({
+    isClearingData: false,
+    hasClearedData: false,
+  });
   const [, navigate] = useLocation();
 
   const handleClearDataButtonClick = async () => {
@@ -17,7 +24,7 @@ export default function ClearDataButton() {
 
     addLogEntry("User initiated data clearing");
 
-    setIsClearingData(true);
+    setState((prev) => ({ ...prev, isClearingData: true }));
 
     self.localStorage.clear();
 
@@ -33,9 +40,11 @@ export default function ClearDataButton() {
 
     await clearWllamaCache();
 
-    setIsClearingData(false);
-
-    setHasClearedData(true);
+    setState((prev) => ({
+      ...prev,
+      isClearingData: false,
+      hasClearedData: true,
+    }));
 
     addLogEntry("All data cleared successfully");
 
@@ -49,11 +58,11 @@ export default function ClearDataButton() {
       <Button
         onClick={handleClearDataButtonClick}
         variant="default"
-        loading={isClearingData}
+        loading={state.isClearingData}
         loaderProps={{ type: "bars" }}
-        disabled={hasClearedData}
+        disabled={state.hasClearedData}
       >
-        {hasClearedData ? "Data cleared" : "Clear all data"}
+        {state.hasClearedData ? "Data cleared" : "Clear all data"}
       </Button>
       <Text size="xs" c="dimmed">
         Reset settings and delete all files in cache to free up space.

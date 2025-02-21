@@ -10,22 +10,33 @@ import "yet-another-react-lightbox/plugins/captions.css";
 import { addLogEntry } from "../../../../modules/logEntries";
 import { getHostname } from "../../../../modules/stringFormatters";
 
+interface ImageResultsState {
+  isLightboxOpen: boolean;
+  lightboxIndex: number;
+  canStartTransition: boolean;
+}
+
 export default function ImageResultsList({
   imageResults,
 }: {
   imageResults: ImageSearchResult[];
 }) {
-  const [isLightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [canStartTransition, setCanStartTransition] = useState(false);
+  const [state, setState] = useState<ImageResultsState>({
+    isLightboxOpen: false,
+    lightboxIndex: 0,
+    canStartTransition: false,
+  });
 
   useEffect(() => {
-    setCanStartTransition(true);
+    setState((prev) => ({ ...prev, canStartTransition: true }));
   }, []);
 
   const handleImageClick = (index: number) => {
-    setLightboxIndex(index);
-    setLightboxOpen(true);
+    setState((prev) => ({
+      ...prev,
+      lightboxIndex: index,
+      isLightboxOpen: true,
+    }));
   };
 
   const imageStyle = {
@@ -40,10 +51,10 @@ export default function ImageResultsList({
   return (
     <>
       <Carousel slideSize="0" slideGap="xs" align="start" dragFree loop>
-        {imageResults.map(([title, sourceUrl, thumbnailUrl], index) => (
+        {imageResults.map(([title, , thumbnailUrl, url], index) => (
           <Transition
-            key={`${title}-${sourceUrl}-${thumbnailUrl}`}
-            mounted={canStartTransition}
+            key={url}
+            mounted={state.canStartTransition}
             transition="fade"
             timingFunction="ease"
             enterDelay={index * 250}
@@ -69,10 +80,10 @@ export default function ImageResultsList({
         ))}
       </Carousel>
       <Lightbox
-        open={isLightboxOpen}
-        close={() => setLightboxOpen(false)}
+        open={state.isLightboxOpen}
+        close={() => setState((prev) => ({ ...prev, isLightboxOpen: false }))}
         plugins={[Captions]}
-        index={lightboxIndex}
+        index={state.lightboxIndex}
         slides={imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
           src: thumbnailUrl,
           alt: title,
