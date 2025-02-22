@@ -22,12 +22,19 @@ export async function fetchSearXNG(
 ) {
   try {
     if (searchType === "text") {
-      const resultsResponse = await searxng.search(query, {
+      const { results } = await searxng.search(query, {
         categories: ["general"],
       });
 
+      const urls = new Set<string>();
+      const deduplicatedResults = results.filter((result) => {
+        if (urls.has(result.url)) return false;
+        urls.add(result.url);
+        return true;
+      });
+
       const textualResults = await Promise.all(
-        resultsResponse.results.slice(0, limit).map(processTextualResult),
+        deduplicatedResults.slice(0, limit).map(processTextualResult),
       );
 
       return textualResults.filter(
@@ -35,12 +42,19 @@ export async function fetchSearXNG(
       );
     }
 
-    const resultsResponse = await searxng.search(query, {
+    const { results } = await searxng.search(query, {
       categories: ["images", "videos"],
     });
 
+    const urls = new Set<string>();
+    const deduplicatedResults = results.filter((result) => {
+      if (urls.has(result.url)) return false;
+      urls.add(result.url);
+      return true;
+    });
+
     const graphicalResults = await Promise.all(
-      resultsResponse.results.slice(0, limit).map(processGraphicalResult),
+      deduplicatedResults.slice(0, limit).map(processGraphicalResult),
     );
 
     return graphicalResults.filter(
