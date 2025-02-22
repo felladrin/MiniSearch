@@ -46,10 +46,19 @@ export default function SearchForm({
     searchAndRespond();
   }, []);
 
-  const handleInitialSuggestion = useCallback(async () => {
-    const suggestion = await getRandomQuerySuggestion();
-    setState((prev) => ({ ...prev, suggestedQuery: suggestion }));
+  const fetchQuerySuggestion = useCallback(async () => {
+    try {
+      return await getRandomQuerySuggestion();
+    } catch (error) {
+      addLogEntry("Failed to get query suggestion");
+      return defaultSuggestedQuery;
+    }
   }, []);
+
+  const handleInitialSuggestion = useCallback(async () => {
+    const suggestion = await fetchQuerySuggestion();
+    setState((prev) => ({ ...prev, suggestedQuery: suggestion }));
+  }, [fetchQuerySuggestion]);
 
   useEffect(() => {
     handleMount();
@@ -82,20 +91,11 @@ export default function SearchForm({
       textAreaValue: "",
     }));
     addLogEntry("User cleaned the search query field");
-
-    try {
-      const suggestion = await getRandomQuerySuggestion();
-      setState((prev) => ({
-        ...prev,
-        suggestedQuery: suggestion,
-      }));
-    } catch (error) {
-      addLogEntry("Failed to get query suggestion");
-      setState((prev) => ({
-        ...prev,
-        suggestedQuery: defaultSuggestedQuery,
-      }));
-    }
+    const suggestion = await fetchQuerySuggestion();
+    setState((prev) => ({
+      ...prev,
+      suggestedQuery: suggestion,
+    }));
   };
 
   const startSearching = useCallback(() => {
