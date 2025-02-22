@@ -55,14 +55,7 @@ export function searchEndpointServerHook<
         response.setHeader("Content-Type", "application/json");
         response.end(JSON.stringify(rankedResults));
       } else {
-        const uniqueUrlMap = new Map<string, ImageResult>();
-        for (const result of searxngResults as ImageResult[]) {
-          const [, url] = result;
-          if (!uniqueUrlMap.has(url)) {
-            uniqueUrlMap.set(url, result);
-          }
-        }
-        const results = Array.from(uniqueUrlMap.values());
+        const results = searxngResults as ImageResult[];
 
         let rankedResults: [title: string, content: string, url: string][];
 
@@ -70,8 +63,7 @@ export function searchEndpointServerHook<
           rankedResults = await rankSearchResults(
             query,
             results.map(
-              ([title, url]) =>
-                [title.slice(0, 100), "", url.slice(0, 100)] as TextResult,
+              ([title, url]) => [title.slice(0, 100), "", url] as TextResult,
             ),
           );
         } catch (error) {
@@ -80,15 +72,15 @@ export function searchEndpointServerHook<
             error instanceof Error ? error.message : error,
           );
           rankedResults = results.map(
-            ([title]) => [title, "", ""] as TextResult,
+            ([title, url]) => [title, "", url] as TextResult,
           );
         }
 
         const processedResults = (
           await Promise.all(
-            rankedResults.map(async ([title]) => {
+            rankedResults.map(async ([title, , rankedResultUrl]) => {
               const result = results.find(
-                ([resultTitle]) => resultTitle === title,
+                ([, resultUrl]) => resultUrl === rankedResultUrl,
               );
               if (!result) return null;
               const [_, url, thumbnailSource, sourceUrl] = result;

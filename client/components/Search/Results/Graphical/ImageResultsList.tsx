@@ -51,7 +51,7 @@ export default function ImageResultsList({
   return (
     <>
       <Carousel slideSize="0" slideGap="xs" align="start" dragFree loop>
-        {imageResults.map(([title, , thumbnailUrl, url], index) => (
+        {imageResults.map(([title, url, thumbnailUrl], index) => (
           <Transition
             key={url}
             mounted={state.canStartTransition}
