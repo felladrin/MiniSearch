@@ -11,6 +11,7 @@ import { IconSend } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
+  type ChangeEvent,
   type KeyboardEvent,
   Suspense,
   lazy,
@@ -100,6 +101,11 @@ export default function ChatInterface({
     }
   };
 
+  const handleInputChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    const input = event.target.value;
+    setState((prev) => ({ ...prev, input }));
+  };
+
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     handleEnterKeyDown(event, settings, handleSend);
   };
@@ -170,12 +176,7 @@ export default function ChatInterface({
           <Textarea
             placeholder="Anything else you would like to know?"
             value={state.input}
-            onChange={(event) =>
-              setState((prev) => ({
-                ...prev,
-                input: event.currentTarget.value,
-              }))
-            }
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             autosize
             minRows={1}
