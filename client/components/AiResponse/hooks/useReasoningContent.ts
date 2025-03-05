@@ -25,16 +25,15 @@ export function useReasoningContent(text: string) {
       if (!text)
         return { reasoningContent: "", mainContent: "", isGenerating: false };
 
-      const startIndex = text.indexOf(startMarker);
-      const endIndex = text.indexOf(endMarker);
-
-      if (startIndex === -1)
+      if (!text.trim().startsWith(startMarker))
         return { reasoningContent: "", mainContent: text, isGenerating: false };
+
+      const endIndex = text.indexOf(endMarker);
 
       if (endIndex === -1) {
         initializeTimingIfNeeded();
         return {
-          reasoningContent: text.slice(startIndex + startMarker.length),
+          reasoningContent: text.slice(startMarker.length),
           mainContent: "",
           isGenerating: true,
         };
@@ -42,7 +41,7 @@ export function useReasoningContent(text: string) {
 
       finalizeThinkingTimeIfNeeded();
       return {
-        reasoningContent: text.slice(startIndex + startMarker.length, endIndex),
+        reasoningContent: text.slice(startMarker.length, endIndex),
         mainContent: text.slice(endIndex + endMarker.length),
         isGenerating: false,
       };
