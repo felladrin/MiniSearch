@@ -1,4 +1,12 @@
-import { Box, Collapse, Group, Text, UnstyledButton } from "@mantine/core";
+import {
+  Box,
+  Collapse,
+  Flex,
+  Group,
+  Loader,
+  Text,
+  UnstyledButton,
+} from "@mantine/core";
 import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { useState } from "react";
 import { formatThinkingTime } from "../../modules/stringFormatters";
@@ -17,10 +25,6 @@ export default function ReasoningSection({
 }: ReasoningSectionProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  const buttonText = isGenerating
-    ? "Thinking..."
-    : formatThinkingTime(thinkingTimeMs);
-
   return (
     <Box mb="md">
       <UnstyledButton
@@ -35,15 +39,18 @@ export default function ReasoningSection({
           },
         })}
       >
-        <Group>
+        <Group gap={3}>
           {isOpen ? (
             <IconChevronDown size={16} />
           ) : (
             <IconChevronRight size={16} />
           )}
-          <Text size="sm" c="dimmed" fs="italic">
-            {buttonText}
-          </Text>
+          <Flex align="center" gap={6}>
+            <Text size="sm" c="dimmed" fs="italic" span>
+              {isGenerating ? "Thinking" : formatThinkingTime(thinkingTimeMs)}
+            </Text>
+            {isGenerating && <Loader size="sm" color="dimmed" type="dots" />}
+          </Flex>
         </Group>
       </UnstyledButton>
       <Collapse in={isOpen}>
