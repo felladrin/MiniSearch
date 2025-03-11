@@ -22,8 +22,7 @@ export function getSemanticVersion(date: number | string | Date) {
 }
 
 export function formatThinkingTime(ms: number): string {
-  if (ms <= 0) return "No thinking time.";
-  if (ms < 1000) return `${ms} milliseconds.`;
+  if (ms < 1000) return "Thought for a second.";
 
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
