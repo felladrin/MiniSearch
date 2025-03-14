@@ -26,40 +26,26 @@ export async function fetchSearXNG(
         categories: ["general"],
       });
 
-      const urls = new Set<string>();
-      const deduplicatedResults = results.filter((result) => {
-        if (urls.has(result.url)) return false;
-        urls.add(result.url);
-        return true;
-      });
+      const deduplicatedResults = deduplicateResults(results);
 
       const textualResults = await Promise.all(
         deduplicatedResults.slice(0, limit).map(processTextualResult),
       );
 
-      return textualResults.filter(
-        (result): result is NonNullable<typeof result> => result !== null,
-      );
+      return filterNullResults(textualResults);
     }
 
     const { results } = await searxng.search(query, {
       categories: ["images", "videos"],
     });
 
-    const urls = new Set<string>();
-    const deduplicatedResults = results.filter((result) => {
-      if (urls.has(result.url)) return false;
-      urls.add(result.url);
-      return true;
-    });
+    const deduplicatedResults = deduplicateResults(results);
 
     const graphicalResults = await Promise.all(
       deduplicatedResults.slice(0, limit).map(processGraphicalResult),
     );
 
-    return graphicalResults.filter(
-      (result): result is NonNullable<typeof result> => result !== null,
-    );
+    return filterNullResults(graphicalResults);
   } catch (error) {
     console.error(
       "Error fetching search results:",
@@ -129,4 +115,21 @@ async function processTextualResult(result: SearxngSearchResult) {
     );
     return null;
   }
+}
+
+function deduplicateResults(
+  results: SearxngSearchResult[],
+): SearxngSearchResult[] {
+  const urls = new Set<string>();
+  return results.filter((result) => {
+    if (urls.has(result.url)) return false;
+    urls.add(result.url);
+    return true;
+  });
+}
+
+function filterNullResults<T>(results: (T | null)[]): T[] {
+  return results.filter(
+    (result): result is NonNullable<typeof result> => result !== null,
+  );
 }
