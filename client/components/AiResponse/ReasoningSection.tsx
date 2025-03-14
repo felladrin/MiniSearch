@@ -8,9 +8,10 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
-import { useState } from "react";
+import { lazy, useState } from "react";
 import { formatThinkingTime } from "../../modules/stringFormatters";
-import FormattedMarkdown from "./FormattedMarkdown";
+
+const MarkdownRenderer = lazy(() => import("./MarkdownRenderer"));
 
 interface ReasoningSectionProps {
   content: string;
@@ -62,7 +63,7 @@ export default function ReasoningSection({
             borderRadius: theme.radius.sm,
           })}
         >
-          <FormattedMarkdown enableCopy={false}>{content}</FormattedMarkdown>
+          <MarkdownRenderer content={content} enableCopy={false} />
         </Box>
       </Collapse>
     </Box>
