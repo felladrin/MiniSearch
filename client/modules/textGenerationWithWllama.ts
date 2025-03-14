@@ -110,14 +110,16 @@ async function generateWithWllama({
       },
     );
 
-    if (shouldCheckCanRespond && getTextGenerationState() !== "generating") {
-      updateTextGenerationState("generating");
-    }
-
     for await (const chunk of stream) {
-      if (shouldCheckCanRespond && getTextGenerationState() === "interrupted") {
-        abortController.abort();
-        throw new ChatGenerationError("Chat generation interrupted");
+      if (shouldCheckCanRespond) {
+        if (getTextGenerationState() === "interrupted") {
+          abortController.abort();
+          throw new ChatGenerationError("Chat generation interrupted");
+        }
+
+        if (getTextGenerationState() !== "generating") {
+          updateTextGenerationState("generating");
+        }
       }
 
       streamedMessage = handleWllamaCompletion(
