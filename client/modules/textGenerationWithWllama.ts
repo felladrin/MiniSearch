@@ -1,4 +1,4 @@
-import type { ChatCompletionOptions, Wllama } from "@wllama/wllama";
+import type { Wllama } from "@wllama/wllama";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import { addLogEntry } from "./logEntries";
 import {
@@ -73,6 +73,7 @@ async function generateWithWllama({
 }: WllamaConfig): Promise<string> {
   let loadingPercentage = 0;
   let wllamaInstance: Wllama | undefined;
+  const abortController = new AbortController();
 
   try {
     const progressCallback: ProgressCallback | undefined = shouldCheckCanRespond
@@ -94,30 +95,8 @@ async function generateWithWllama({
     }
 
     let streamedMessage = "";
-    const onNewToken: ChatCompletionOptions["onNewToken"] = (
-      _token,
-      _piece,
-      currentText,
-      { abortSignal },
-    ) => {
-      if (shouldCheckCanRespond && getTextGenerationState() === "interrupted") {
-        abortSignal();
-        throw new ChatGenerationError("Chat generation interrupted");
-      }
 
-      if (shouldCheckCanRespond && getTextGenerationState() !== "generating") {
-        updateTextGenerationState("generating");
-      }
-
-      streamedMessage = handleWllamaCompletion(
-        model,
-        currentText,
-        abortSignal,
-        onUpdate,
-      );
-    };
-
-    await wllama.createChatCompletion(
+    const stream = await wllama.createChatCompletion(
       model.getMessages(
         input,
         getFormattedSearchResults(model.shouldIncludeUrlsOnPrompt),
@@ -126,9 +105,28 @@ async function generateWithWllama({
         nPredict: defaultContextSize,
         stopTokens: model.stopTokens,
         sampling: model.getSampling(),
-        onNewToken,
+        stream: true,
+        abortSignal: abortController.signal,
       },
     );
+
+    if (shouldCheckCanRespond && getTextGenerationState() !== "generating") {
+      updateTextGenerationState("generating");
+    }
+
+    for await (const chunk of stream) {
+      if (shouldCheckCanRespond && getTextGenerationState() === "interrupted") {
+        abortController.abort();
+        throw new ChatGenerationError("Chat generation interrupted");
+      }
+
+      streamedMessage = handleWllamaCompletion(
+        model,
+        chunk.currentText,
+        () => abortController.abort(),
+        onUpdate,
+      );
+    }
 
     return streamedMessage;
   } catch (error) {
