@@ -193,6 +193,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00004.gguf",
     fileSizeInMegabytes: 776,
   },
+  "gemma-3-1b": {
+    ...createDefaultModelConfig(),
+    label: "Gemma 3 1B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-gemma-3-1b-it",
+    hfFilePath: "model.shard-00001-of-00003.gguf",
+    fileSizeInMegabytes: 781,
+  },
   "pints-1.5b": {
     ...createDefaultModelConfig(),
     label: "Pints 1.5B",
@@ -313,6 +320,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     fileSizeInMegabytes: 2360,
     contextSize: 2560,
     cacheTypeK: "q8_0",
+  },
+  "gemma-3-4b": {
+    ...createDefaultModelConfig(),
+    label: "Gemma 3 4B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-gemma-3-4b-it",
+    hfFilePath: "model.shard-00001-of-00005.gguf",
+    fileSizeInMegabytes: 2380,
   },
   "olmoe-1b-7b": {
     ...createDefaultModelConfig(),
