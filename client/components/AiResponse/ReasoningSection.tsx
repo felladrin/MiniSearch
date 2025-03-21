@@ -27,17 +27,21 @@ export default function ReasoningSection({
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <Box mb="md">
+    <Box mb="xs">
       <UnstyledButton
         onClick={() => setIsOpen(!isOpen)}
         style={(theme) => ({
           width: "100%",
           padding: theme.spacing.xs,
-          borderRadius: theme.radius.sm,
-          backgroundColor: theme.colors.dark[6],
+          borderStartStartRadius: theme.radius.md,
+          borderStartEndRadius: theme.radius.md,
+          borderEndEndRadius: !isOpen ? theme.radius.md : 0,
+          borderEndStartRadius: !isOpen ? theme.radius.md : 0,
+          backgroundColor: theme.colors.dark[8],
           "&:hover": {
             backgroundColor: theme.colors.dark[5],
           },
+          cursor: isOpen ? "zoom-out" : "zoom-in",
         })}
       >
         <Group gap={3}>
@@ -57,10 +61,10 @@ export default function ReasoningSection({
       <Collapse in={isOpen}>
         <Box
           style={(theme) => ({
-            backgroundColor: theme.colors.dark[7],
+            backgroundColor: theme.colors.dark[8],
             padding: theme.spacing.sm,
-            marginTop: theme.spacing.xs,
-            borderRadius: theme.radius.sm,
+            borderBottomLeftRadius: theme.radius.md,
+            borderBottomRightRadius: theme.radius.md,
           })}
         >
           <MarkdownRenderer content={content} enableCopy={false} />

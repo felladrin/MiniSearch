@@ -1,4 +1,4 @@
-import { Box } from "@mantine/core";
+import { TypographyStylesProvider } from "@mantine/core";
 import { lazy } from "react";
 
 const MarkdownRenderer = lazy(() => import("./MarkdownRenderer"));
@@ -25,7 +25,7 @@ export default function FormattedMarkdown({
     useReasoningContent(children);
 
   return (
-    <Box>
+    <TypographyStylesProvider p="lg">
       {reasoningContent && (
         <ReasoningSection
           content={reasoningContent}
@@ -40,6 +40,6 @@ export default function FormattedMarkdown({
           className={className}
         />
       )}
-    </Box>
+    </TypographyStylesProvider>
   );
 }
