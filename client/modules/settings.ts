@@ -23,8 +23,8 @@ Below are the search results fetched at {{dateTime}}.
 
 {{searchResults}}`,
   inferenceType: VITE_DEFAULT_INFERENCE_TYPE,
-  inferenceTemperature: 0.6,
-  inferenceTopP: 0.8,
+  inferenceTemperature: 0.7,
+  inferenceTopP: 0.9,
   inferenceFrequencyPenalty: 0,
   inferencePresencePenalty: 0,
   openAiApiBaseUrl: "",
