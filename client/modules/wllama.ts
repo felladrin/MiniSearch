@@ -140,13 +140,18 @@ const createDefaultModelConfig = (): Omit<
     return {
       top_p: settings.inferenceTopP,
       temp: settings.inferenceTemperature,
+      dynatemp_range: Math.max(0, settings.inferenceTemperature - 0.2),
       penalty_freq: settings.inferenceFrequencyPenalty,
       penalty_present: settings.inferencePresencePenalty,
       min_p: 0.02,
       top_k: 0,
       typical_p: 0.2,
-      penalty_repeat: 1.05,
-      dry_multiplier: 0.5,
+      penalty_repeat: 1.02,
+      penalty_last_n: defaultContextSize,
+      dry_base: 1.75,
+      dry_multiplier: 0.25,
+      dry_allowed_length: 3,
+      dry_penalty_last_n: defaultContextSize,
     } as SamplingConfig;
   },
 });
