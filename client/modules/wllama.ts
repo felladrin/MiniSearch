@@ -348,6 +348,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 2380,
   },
+  "phi-4-mini-reasoning": {
+    ...createDefaultModelConfig(),
+    label: "Phi 4 Mini Reasoning",
+    hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-Phi-4-mini-reasoning",
+    hfFilePath: "model.shard-00001-of-00005.gguf",
+    fileSizeInMegabytes: 2460,
+  },
   "qwen-3-4b": {
     ...createDefaultModelConfig(),
     label: "Qwen 3 4B",
