@@ -29,7 +29,7 @@
     "@mantine/form": "^7.12.2",
     "@mantine/hooks": "^7.12.2",
     "@mantine/notifications": "^7.12.2",
-    "@mlc-ai/web-llm": "0.2.78",
+    "@mlc-ai/web-llm": "^0.2.79",
     "@tabler/icons-react": "^3.16.0",
     "@wllama/wllama": "^2.2.0",
     "ai": "^4.1.26",
