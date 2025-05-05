@@ -1,4 +1,5 @@
 import { Button, Stack, Text } from "@mantine/core";
+import Dexie from "dexie";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { addLogEntry } from "../../../../modules/logEntries";
@@ -32,8 +33,19 @@ export default function ClearDataButton() {
       await self.caches.delete(cacheName);
     }
 
-    for (const databaseInfo of await self.indexedDB.databases()) {
-      if (databaseInfo.name) self.indexedDB.deleteDatabase(databaseInfo.name);
+    try {
+      const dbNames = await Dexie.getDatabaseNames();
+
+      for (const dbName of dbNames) {
+        await Dexie.delete(dbName);
+        addLogEntry(`Deleted database: ${dbName}`);
+      }
+    } catch (error) {
+      addLogEntry(
+        `Error deleting databases: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
 
     const { clearWllamaCache } = await import("../../../../modules/wllama");

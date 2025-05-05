@@ -1,204 +1,360 @@
+import Dexie, { type Table } from "dexie";
 import { name } from "../../package.json";
 import { addLogEntry } from "./logEntries";
 import { getSearchTokenHash } from "./searchTokenHash";
 import type { ImageSearchResults, TextSearchResults } from "./types";
 
-/**
- * Creates a cached version of a search function using IndexedDB for storage.
- *
- * @param fn - The original search function to be cached.
- * @returns A new function that wraps the original, adding caching functionality.
- *
- * This function implements a caching mechanism for search results using IndexedDB.
- * It stores search results with a 15-minute time-to-live (TTL) to improve performance
- * for repeated searches. The cache is automatically cleaned of expired entries.
- *
- * The returned function behaves as follows:
- * 1. Checks IndexedDB for a cached result matching the query.
- * 2. If a valid (non-expired) cached result exists, it is returned immediately.
- * 3. Otherwise, the original search function is called, and its result is both
- *    returned and stored in the cache for future use.
- *
- * If IndexedDB is not available, the function falls back to using the original
- * search function without caching.
- */
-function cacheSearchWithIndexedDB<
-  T extends ImageSearchResults | TextSearchResults,
->(
-  fn: (query: string, limit?: number) => Promise<T>,
-  storeName: string,
-): (query: string, limit?: number) => Promise<T> {
-  const databaseVersion = 2;
-  const timeToLive = 15 * 60 * 1000;
+const cacheConfig = {
+  ttl: 15 * 60 * 1000,
+  maxEntries: 100,
+  enabled: true,
+};
 
-  async function openDB(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      let request = indexedDB.open(name, databaseVersion);
+const cacheMetrics = {
+  textHits: 0,
+  textMisses: 0,
+  imageHits: 0,
+  imageMisses: 0,
 
-      request.onerror = () => reject(request.error);
+  getTextHitRate(): number {
+    const total = this.textHits + this.textMisses;
+    return total > 0 ? this.textHits / total : 0;
+  },
 
-      request.onsuccess = () => {
-        const db = request.result;
-        if (
-          !db.objectStoreNames.contains("textSearches") ||
-          !db.objectStoreNames.contains("imageSearches")
-        ) {
-          db.close();
-          request = indexedDB.open(name, databaseVersion);
-          request.onupgradeneeded = createStores;
-          request.onsuccess = () => {
-            const upgradedDb = request.result;
-            cleanExpiredCache(upgradedDb);
-            resolve(upgradedDb);
-          };
-          request.onerror = () => reject(request.error);
-        } else {
-          cleanExpiredCache(db);
-          resolve(db);
-        }
-      };
+  getImageHitRate(): number {
+    const total = this.imageHits + this.imageMisses;
+    return total > 0 ? this.imageHits / total : 0;
+  },
 
-      request.onupgradeneeded = createStores;
+  logPerformance(): void {
+    addLogEntry(
+      `Cache performance - Text: ${(this.getTextHitRate() * 100).toFixed(1)}% hits, ` +
+        `Image: ${(this.getImageHitRate() * 100).toFixed(1)}% hits`,
+    );
+  },
+};
+
+interface SearchCacheEntry {
+  key: string;
+  timestamp: number;
+}
+
+interface TextSearchCache extends SearchCacheEntry {
+  results: TextSearchResults;
+}
+
+interface ImageSearchCache extends SearchCacheEntry {
+  results: ImageSearchResults;
+}
+
+class SearchDb extends Dexie {
+  textSearchHistory!: Table<TextSearchCache, string>;
+  imageSearchHistory!: Table<ImageSearchCache, string>;
+
+  constructor() {
+    super(name);
+    this.version(1).stores({
+      textSearchHistory: "key, timestamp",
+      imageSearchHistory: "key, timestamp",
     });
   }
 
-  function createStores(event: IDBVersionChangeEvent): void {
-    const db = (event.target as IDBOpenDBRequest).result;
-    if (!db.objectStoreNames.contains("textSearches")) {
-      db.createObjectStore("textSearches");
-    }
-    if (!db.objectStoreNames.contains("imageSearches")) {
-      db.createObjectStore("imageSearches");
+  async ensureIntegrity(): Promise<void> {
+    try {
+      await this.textSearchHistory.count();
+    } catch (error) {
+      addLogEntry(
+        `Database integrity check failed, rebuilding: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      try {
+        await this.delete();
+        await this.open();
+      } catch (recoveryError) {
+        addLogEntry(
+          `Failed to recover database: ${recoveryError instanceof Error ? recoveryError.message : String(recoveryError)}`,
+        );
+        cacheConfig.enabled = false;
+      }
     }
   }
 
-  async function cleanExpiredCache(db: IDBDatabase): Promise<void> {
-    const transaction = db.transaction(storeName, "readwrite");
-    const store = transaction.objectStore(storeName);
+  async cleanExpiredCache(
+    storeName: "textSearchHistory" | "imageSearchHistory",
+    timeToLive: number = cacheConfig.ttl,
+  ): Promise<void> {
     const currentTime = Date.now();
+    const store = this[storeName];
 
-    return new Promise((resolve) => {
-      const request = store.openCursor();
-      request.onsuccess = (event) => {
-        const cursor = (event.target as IDBRequest).result;
-        if (cursor) {
-          if (currentTime - cursor.value.timestamp >= timeToLive) {
-            cursor.delete();
-          }
-          cursor.continue();
-        } else {
-          resolve();
-        }
-      };
-    });
+    try {
+      const expiredItems = await store
+        .where("timestamp")
+        .below(currentTime - timeToLive)
+        .toArray();
+
+      if (expiredItems.length > 0) {
+        await store.bulkDelete(expiredItems.map((item) => item.key));
+        addLogEntry(
+          `Removed ${expiredItems.length} expired items from ${storeName}`,
+        );
+      }
+    } catch (error) {
+      addLogEntry(
+        `Error cleaning expired cache: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
-  /**
-   * Generates a hash for a given query string.
-   *
-   * This function implements a simple hash algorithm:
-   * 1. It iterates through each character in the query string.
-   * 2. For each character, it updates the hash value using bitwise operations.
-   * 3. The final hash is converted to a 32-bit integer.
-   * 4. The result is returned as a base-36 string representation.
-   *
-   * @param query - The input string to be hashed.
-   * @returns A string representation of the hash in base-36.
-   */
-  function hashQuery(query: string): string {
+  async pruneCache(
+    storeName: "textSearchHistory" | "imageSearchHistory",
+    maxEntries: number = cacheConfig.maxEntries,
+  ): Promise<void> {
+    try {
+      const store = this[storeName];
+      const count = await store.count();
+
+      if (count > maxEntries) {
+        const excess = count - maxEntries;
+        const oldestEntries = await store
+          .orderBy("timestamp")
+          .limit(excess)
+          .primaryKeys();
+
+        if (oldestEntries.length > 0) {
+          await store.bulkDelete(oldestEntries);
+          addLogEntry(
+            `Pruned ${oldestEntries.length} oldest entries from ${storeName}`,
+          );
+        }
+      }
+    } catch (error) {
+      addLogEntry(
+        `Error pruning cache: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  async getCachedResult<T extends TextSearchResults | ImageSearchResults>(
+    storeName: "textSearchHistory" | "imageSearchHistory",
+    key: string,
+  ): Promise<{ results: T; fresh: boolean } | null> {
+    if (!cacheConfig.enabled) return null;
+
+    try {
+      const store = this[storeName] as Table<
+        { key: string; results: T; timestamp: number },
+        string
+      >;
+      const cachedItem = await store.get(key);
+
+      if (!cachedItem) return null;
+
+      const fresh = Date.now() - cachedItem.timestamp < cacheConfig.ttl;
+      return { results: cachedItem.results, fresh };
+    } catch (error) {
+      addLogEntry(
+        `Error retrieving from cache: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
+  }
+
+  async cacheResult<T extends TextSearchResults | ImageSearchResults>(
+    storeName: "textSearchHistory" | "imageSearchHistory",
+    key: string,
+    results: T,
+  ): Promise<void> {
+    if (!cacheConfig.enabled) return;
+
+    try {
+      const store = this[storeName] as Table<
+        { key: string; results: T; timestamp: number },
+        string
+      >;
+      await store.put({
+        key,
+        results,
+        timestamp: Date.now(),
+      });
+
+      this.pruneCache(storeName).catch((error) => {
+        addLogEntry(
+          `Error during cache pruning: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+    } catch (error) {
+      addLogEntry(
+        `Error caching results: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+}
+
+const db = new SearchDb();
+
+db.ensureIntegrity().catch((error) => {
+  addLogEntry(
+    `Database initialization error: ${error instanceof Error ? error.message : String(error)}`,
+  );
+});
+
+const searchService = {
+  hashQuery(query: string): string {
     return query
       .split("")
       .reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0)
       .toString(36);
-  }
+  },
 
-  const dbPromise = openDB();
+  async performSearch<T>(
+    endpoint: "text" | "images",
+    query: string,
+    limit?: number,
+  ): Promise<T> {
+    const searchUrl = new URL(`/search/${endpoint}`, self.location.origin);
+    searchUrl.searchParams.set("q", query);
+    searchUrl.searchParams.set("token", await getSearchTokenHash());
+    if (limit) searchUrl.searchParams.set("limit", limit.toString());
 
-  return async (query: string, limit?: number): Promise<T> => {
-    if (!indexedDB) return fn(query, limit);
-
-    const db = await dbPromise;
-    const transaction = db.transaction(storeName, "readwrite");
-    const store = transaction.objectStore(storeName);
-    const key = hashQuery(query);
-    const cachedResult = await new Promise<
-      | {
-          results: T;
-          timestamp: number;
-        }
-      | undefined
-    >((resolve) => {
-      const request = store.get(key);
-      request.onerror = () => resolve(undefined);
-      request.onsuccess = () => resolve(request.result);
-    });
-
-    if (cachedResult && Date.now() - cachedResult.timestamp < timeToLive) {
-      addLogEntry(
-        `IndexedDB ${storeName}: Search cache hit, returning cached results containing ${cachedResult.results.length} items`,
-      );
-      return cachedResult.results;
+    const response = await fetch(searchUrl.toString());
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    return response.json();
+  },
 
-    addLogEntry(
-      `IndexedDB ${storeName}: Search cache miss, fetching new results`,
-    );
-
-    const results = await fn(query, limit);
-
-    const writeTransaction = db.transaction(storeName, "readwrite");
-    const writeStore = writeTransaction.objectStore(storeName);
-    writeStore.put({ results, timestamp: Date.now() }, key);
-
-    addLogEntry(
-      `IndexedDB ${storeName}: Search completed with ${results.length} items`,
-    );
-
-    return results;
-  };
-}
-
-async function performSearch<T>(
-  endpoint: "text" | "images",
-  query: string,
-  limit?: number,
-): Promise<T> {
-  const searchUrl = new URL(`/search/${endpoint}`, self.location.origin);
-  searchUrl.searchParams.set("q", query);
-  searchUrl.searchParams.set("token", await getSearchTokenHash());
-  if (limit) searchUrl.searchParams.set("limit", limit.toString());
-
-  const response = await fetch(searchUrl.toString());
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-  return response.json();
-}
-
-export const searchText = cacheSearchWithIndexedDB<TextSearchResults>(
-  async (query: string, limit?: number): Promise<TextSearchResults> => {
+  async searchText(query: string, limit?: number): Promise<TextSearchResults> {
     try {
-      return performSearch<TextSearchResults>("text", query, limit);
+      await db.cleanExpiredCache("textSearchHistory");
+
+      const key = this.hashQuery(query);
+      const cachedData = await db.getCachedResult<TextSearchResults>(
+        "textSearchHistory",
+        key,
+      );
+
+      if (cachedData?.fresh) {
+        cacheMetrics.textHits++;
+        addLogEntry(
+          `Text search cache hit for "${query}" (${cachedData.results.length} results)`,
+        );
+        return cachedData.results;
+      }
+
+      cacheMetrics.textMisses++;
+      addLogEntry(`Text search cache miss for "${query}", fetching from API`);
+
+      const results = await this.performSearch<TextSearchResults>(
+        "text",
+        query,
+        limit,
+      );
+
+      await db.cacheResult("textSearchHistory", key, results);
+
+      if ((cacheMetrics.textHits + cacheMetrics.textMisses) % 10 === 0) {
+        cacheMetrics.logPerformance();
+      }
+
+      return results;
     } catch (error) {
       addLogEntry(
-        `Text search failed: ${error instanceof Error ? error.message : error}`,
+        `Text search failed: ${error instanceof Error ? error.message : String(error)}`,
       );
       return [];
     }
   },
-  "textSearches",
-);
 
-export const searchImages = cacheSearchWithIndexedDB<ImageSearchResults>(
-  async (query: string, limit?: number): Promise<ImageSearchResults> => {
+  async searchImages(
+    query: string,
+    limit?: number,
+  ): Promise<ImageSearchResults> {
     try {
-      return performSearch<ImageSearchResults>("images", query, limit);
+      await db.cleanExpiredCache("imageSearchHistory");
+
+      const key = this.hashQuery(query);
+      const cachedData = await db.getCachedResult<ImageSearchResults>(
+        "imageSearchHistory",
+        key,
+      );
+
+      if (cachedData?.fresh) {
+        cacheMetrics.imageHits++;
+        addLogEntry(
+          `Image search cache hit for "${query}" (${cachedData.results.length} results)`,
+        );
+        return cachedData.results;
+      }
+
+      cacheMetrics.imageMisses++;
+      addLogEntry(`Image search cache miss for "${query}", fetching from API`);
+
+      const results = await this.performSearch<ImageSearchResults>(
+        "images",
+        query,
+        limit,
+      );
+
+      await db.cacheResult("imageSearchHistory", key, results);
+
+      if ((cacheMetrics.imageHits + cacheMetrics.imageMisses) % 10 === 0) {
+        cacheMetrics.logPerformance();
+      }
+
+      return results;
     } catch (error) {
       addLogEntry(
-        `Image search failed: ${error instanceof Error ? error.message : error}`,
+        `Image search failed: ${error instanceof Error ? error.message : String(error)}`,
       );
       return [];
     }
   },
-  "imageSearches",
-);
+
+  async clearSearchCache(): Promise<void> {
+    try {
+      await db.delete();
+      db.version(1).stores({
+        textSearchHistory: "key, timestamp",
+        imageSearchHistory: "key, timestamp",
+      });
+      await db.open();
+
+      cacheMetrics.textHits = 0;
+      cacheMetrics.textMisses = 0;
+      cacheMetrics.imageHits = 0;
+      cacheMetrics.imageMisses = 0;
+
+      addLogEntry("Search cache cleared successfully");
+    } catch (error) {
+      addLogEntry(
+        `Failed to clear search cache: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  },
+
+  getCacheStats() {
+    return {
+      textHitRate: cacheMetrics.getTextHitRate(),
+      imageHitRate: cacheMetrics.getImageHitRate(),
+      textHits: cacheMetrics.textHits,
+      textMisses: cacheMetrics.textMisses,
+      imageHits: cacheMetrics.imageHits,
+      imageMisses: cacheMetrics.imageMisses,
+      config: { ...cacheConfig },
+    };
+  },
+
+  updateCacheConfig(newConfig: Partial<typeof cacheConfig>) {
+    Object.assign(cacheConfig, newConfig);
+    addLogEntry(
+      `Cache configuration updated: TTL=${cacheConfig.ttl}ms, maxEntries=${cacheConfig.maxEntries}, enabled=${cacheConfig.enabled}`,
+    );
+  },
+};
+
+export const searchText = searchService.searchText.bind(searchService);
+export const searchImages = searchService.searchImages.bind(searchService);
+export const clearSearchCache =
+  searchService.clearSearchCache.bind(searchService);
+export const getCacheStats = searchService.getCacheStats.bind(searchService);
+export const updateCacheConfig =
+  searchService.updateCacheConfig.bind(searchService);
