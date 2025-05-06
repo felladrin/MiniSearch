@@ -25,7 +25,7 @@ jobs:
 
       - name: Update Dockerfile
         run: |
-          sed -i 's|FROM searxng/searxng:.*|FROM searxng/searxng:${{ steps.get_latest_tag.outputs.LATEST_TAG }}|' Dockerfile
+          sed -i 's|FROM searxng/searxng:.*|FROM searxng/searxng:${{ steps.get_latest_tag.outputs.LATEST_TAG }}|g' Dockerfile
 
       - name: Check for changes
         id: git_status
