@@ -1,13 +1,14 @@
 # Build llama.cpp in a separate stage
-FROM alpine:3.21 AS llama-builder
+FROM searxng/searxng:2025.5.6-a2fa7de88 AS llama-builder
 
 # Install build dependencies
-RUN apk add --update \
-  build-base \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  build-essential \
   cmake \
   ccache \
   git \
-  curl
+  curl \
+  && rm -rf /var/lib/apt/lists/*
 
 # Build llama.cpp server and collect libraries
 RUN cd /tmp && \
@@ -27,12 +28,19 @@ ENV PORT=7860
 # Expose the port specified by the PORT environment variable
 EXPOSE $PORT
 
-# Install necessary packages using Alpine's package manager
-RUN apk add --update \
-  nodejs \
-  npm \
+# Install necessary packages using Debian's package manager
+RUN apt-get update && apt-get install -y --no-install-recommends \
   git \
-  build-base
+  build-essential \
+  curl \
+  && rm -rf /var/lib/apt/lists/* \
+  && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+  && apt-get install -y nodejs \
+  && npm --version \
+  && node --version
+
+# Install latest npm
+RUN npm install -g npm@latest
 
 # Copy llama.cpp artifacts from builder
 COPY --from=llama-builder /tmp/llama.cpp/build/bin/llama-server /usr/local/bin/
@@ -57,7 +65,7 @@ ARG HOME_DIR=/home/${USERNAME}
 ARG APP_DIR=${HOME_DIR}/app
 
 # Create a non-root user and set up the application directory
-RUN adduser -D -u 1000 ${USERNAME} \
+RUN useradd -m -u 1000 ${USERNAME} \
   && mkdir -p ${APP_DIR} \
   && chown -R ${USERNAME}:${USERNAME} ${HOME_DIR}
 
