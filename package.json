@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^0.2.0",
-    "@huggingface/hub": "^1.0.0",
+    "@huggingface/hub": "^2.0.0",
     "@mantine/carousel": "^7.12.2",
     "@mantine/core": "^7.12.2",
     "@mantine/form": "^7.12.2",
