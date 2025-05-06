@@ -353,8 +353,3 @@ const searchService = {
 
 export const searchText = searchService.searchText.bind(searchService);
 export const searchImages = searchService.searchImages.bind(searchService);
-export const clearSearchCache =
-  searchService.clearSearchCache.bind(searchService);
-export const getCacheStats = searchService.getCacheStats.bind(searchService);
-export const updateCacheConfig =
-  searchService.updateCacheConfig.bind(searchService);
