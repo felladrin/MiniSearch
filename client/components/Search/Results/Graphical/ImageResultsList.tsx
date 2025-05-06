@@ -50,7 +50,15 @@ export default function ImageResultsList({
 
   return (
     <>
-      <Carousel slideSize="0" slideGap="xs" align="start" dragFree loop>
+      <Carousel
+        slideSize="0"
+        slideGap="xs"
+        emblaOptions={{
+          align: "start",
+          dragFree: true,
+          loop: true,
+        }}
+      >
         {imageResults.map(([title, url, thumbnailUrl], index) => (
           <Transition
             key={url}
