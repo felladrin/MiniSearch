@@ -39,6 +39,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && npm --version \
   && node --version
 
+# Install latest npm
+RUN npm install -g npm@latest
+
 # Copy llama.cpp artifacts from builder
 COPY --from=llama-builder /tmp/llama.cpp/build/bin/llama-server /usr/local/bin/
 COPY --from=llama-builder /usr/local/lib/llama/* /usr/local/lib/
