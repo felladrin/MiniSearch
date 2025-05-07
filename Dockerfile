@@ -1,5 +1,5 @@
 # Build llama.cpp in a separate stage
-FROM searxng/searxng:2025.5.7-ff60fe635r
+FROM python:3.13-slim AS llama-builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -20,7 +20,7 @@ RUN cd /tmp && \
   find build -type f \( -name "libllama.so" -o -name "libggml.so" -o -name "libggml-base.so" -o -name "libggml-cpu.so" \) -exec cp {} /usr/local/lib/llama/ \;
 
 # Use the SearXNG image as the base for final image
-FROM searxng/searxng:2025.5.7-ff60fe6358
+FROM searxng/searxng:2025.5.7-ff60fe635
 
 # Set the default port to 7860 if not provided
 ENV PORT=7860
