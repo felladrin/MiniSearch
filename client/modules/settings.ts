@@ -2,7 +2,8 @@ import { addLogEntry } from "./logEntries";
 import { isF16Supported } from "./webGpu";
 
 export const defaultSettings = {
-  enableAiResponse: true,
+  showEnableAiResponsePrompt: true,
+  enableAiResponse: false,
   enableWebGpu: true,
   enableImageSearch: true,
   webLlmModelId: isF16Supported
