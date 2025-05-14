@@ -57,7 +57,7 @@ ARG SEARXNG_SETTINGS_FOLDER=/etc/searxng
 RUN sed -i 's/- html/- json/' /usr/local/searxng/searx/settings.yml \
   && sed -i 's/su-exec searxng:searxng //' /usr/local/searxng/container/docker-entrypoint.sh \
   && mkdir -p ${SEARXNG_SETTINGS_FOLDER}  \
-  && chmod 777 ${SEARXNG_SETTINGS_FOLDER}
+  && chmod 755 ${SEARXNG_SETTINGS_FOLDER}
 
 # Set up user and directory structure
 ARG USERNAME=user
