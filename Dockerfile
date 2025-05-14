@@ -47,17 +47,11 @@ COPY --from=llama-builder /tmp/llama.cpp/build/bin/llama-server /usr/local/bin/
 COPY --from=llama-builder /usr/local/lib/llama/* /usr/local/lib/
 RUN ldconfig /usr/local/lib
 
-# Set the SearXNG settings folder path
-ARG SEARXNG_SETTINGS_FOLDER=/etc/searxng
-
 # Modify SearXNG configuration:
 # 1. Change output format from HTML to JSON
 # 2. Remove user switching in the entrypoint script
-# 3. Create and set permissions for the settings folder
 RUN sed -i 's/- html/- json/' /usr/local/searxng/searx/settings.yml \
-  && sed -i 's/su-exec searxng:searxng //' /usr/local/searxng/container/docker-entrypoint.sh \
-  && mkdir -p ${SEARXNG_SETTINGS_FOLDER}  \
-  && chmod 755 ${SEARXNG_SETTINGS_FOLDER}
+  && sed -i 's/su-exec searxng:searxng //' /usr/local/searxng/container/docker-entrypoint.sh
 
 # Set up user and directory structure
 ARG USERNAME=user
@@ -68,6 +62,13 @@ ARG APP_DIR=${HOME_DIR}/app
 RUN useradd -m -u 1000 ${USERNAME} \
   && mkdir -p ${APP_DIR} \
   && chown -R ${USERNAME}:${USERNAME} ${HOME_DIR}
+
+# Set the SearXNG settings folder path
+ARG SEARXNG_SETTINGS_FOLDER=/etc/searxng
+
+# Create the SearXNG settings folder and set permissions
+RUN mkdir -p ${SEARXNG_SETTINGS_FOLDER} \
+  && chown -R ${USERNAME}:${USERNAME} ${SEARXNG_SETTINGS_FOLDER}
 
 # Switch to the non-root user
 USER ${USERNAME}
