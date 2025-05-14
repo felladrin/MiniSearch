@@ -55,7 +55,7 @@ ARG SEARXNG_SETTINGS_FOLDER=/etc/searxng
 # 2. Remove user switching in the entrypoint script
 # 3. Create and set permissions for the settings folder
 RUN sed -i 's/- html/- json/' /usr/local/searxng/searx/settings.yml \
-  && sed -i 's/su-exec searxng:searxng //' /usr/local/searxng/dockerfiles/docker-entrypoint.sh \
+  && sed -i 's/su-exec searxng:searxng //' /usr/local/searxng/container/docker-entrypoint.sh \
   && mkdir -p ${SEARXNG_SETTINGS_FOLDER}  \
   && chmod 777 ${SEARXNG_SETTINGS_FOLDER}
 
@@ -113,4 +113,4 @@ RUN npm run build
 ENTRYPOINT [ "/bin/sh", "-c" ]
 
 # Run SearXNG in the background and start the Node.js application using PM2
-CMD [ "(/usr/local/searxng/dockerfiles/docker-entrypoint.sh -f > /dev/null 2>&1) & (npx pm2 start ecosystem.config.cjs && npx pm2 logs production-server)" ]
+CMD [ "(/usr/local/searxng/container/docker-entrypoint.sh -f > /dev/null 2>&1) & (npx pm2 start ecosystem.config.cjs && npx pm2 logs production-server)" ]
