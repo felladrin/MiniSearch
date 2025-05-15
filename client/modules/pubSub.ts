@@ -108,3 +108,8 @@ export const [updateTextSearchResults, , getTextSearchResults] =
   textSearchResultsPubSub;
 
 export const [updateImageSearchResults] = imageSearchResultsPubSub;
+
+export const menuExpandedAccordionsPubSub = createLocalStoragePubSub<string[]>(
+  "menuExpandedAccordions",
+  [],
+);

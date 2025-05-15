@@ -10,11 +10,13 @@ import {
   Stack,
 } from "@mantine/core";
 import { IconBrandGithub } from "@tabler/icons-react";
+import { usePubSub } from "create-pubsub/react";
 import prettyMilliseconds from "pretty-ms";
 import { Suspense, lazy } from "react";
 import { repository } from "../../../../../package.json";
 import { appName, appVersion } from "../../../../modules/appInfo";
 import { addLogEntry } from "../../../../modules/logEntries";
+import { menuExpandedAccordionsPubSub } from "../../../../modules/pubSub";
 
 const AISettingsForm = lazy(() => import("./AISettings/AISettingsForm"));
 const SearchSettingsForm = lazy(() => import("./SearchSettingsForm"));
@@ -23,6 +25,10 @@ const ActionsForm = lazy(() => import("./ActionsForm"));
 const VoiceSettingsForm = lazy(() => import("./VoiceSettingsForm"));
 
 export default function MenuDrawer(drawerProps: DrawerProps) {
+  const [menuExpandedAccordions, updateMenuExpandedAccordions] = usePubSub(
+    menuExpandedAccordionsPubSub,
+  );
+
   return (
     <Drawer
       {...drawerProps}
@@ -68,7 +74,12 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
     >
       <FocusTrap.InitialFocus />
       <Drawer.Body>
-        <Accordion variant="separated" multiple>
+        <Accordion
+          variant="separated"
+          multiple
+          value={menuExpandedAccordions}
+          onChange={updateMenuExpandedAccordions}
+        >
           <Accordion.Item value="aiSettings">
             <Accordion.Control>AI Settings</Accordion.Control>
             <Accordion.Panel>
