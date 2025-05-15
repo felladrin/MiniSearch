@@ -1,10 +1,9 @@
 import { TypographyStylesProvider } from "@mantine/core";
 import { lazy } from "react";
+import { useReasoningContent } from "./hooks/useReasoningContent";
 
 const MarkdownRenderer = lazy(() => import("./MarkdownRenderer"));
 const ReasoningSection = lazy(() => import("./ReasoningSection"));
-
-import { useReasoningContent } from "./hooks/useReasoningContent";
 
 interface FormattedMarkdownProps {
   children: string;
@@ -21,7 +20,7 @@ export default function FormattedMarkdown({
     return null;
   }
 
-  const { reasoningContent, mainContent, isGenerating, thinkingTimeMs } =
+  const { reasoningContent, mainContent, isGenerating } =
     useReasoningContent(children);
 
   return (
@@ -30,7 +29,6 @@ export default function FormattedMarkdown({
         <ReasoningSection
           content={reasoningContent}
           isGenerating={isGenerating}
-          thinkingTimeMs={thinkingTimeMs}
         />
       )}
       {!isGenerating && mainContent && (

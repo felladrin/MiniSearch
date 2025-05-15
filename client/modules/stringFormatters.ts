@@ -20,15 +20,3 @@ export function getSemanticVersion(date: number | string | Date) {
   const targetDate = new Date(date);
   return `${targetDate.getFullYear()}.${targetDate.getMonth() + 1}.${targetDate.getDate()}`;
 }
-
-export function formatThinkingTime(ms: number): string {
-  const seconds = Math.max(1, Math.floor(ms / 1000));
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-
-  if (minutes > 0) {
-    return `Thought for ${minutes} minute${minutes > 1 ? "s" : ""} ${remainingSeconds} second${remainingSeconds !== 1 ? "s" : ""}.`;
-  }
-
-  return `Thought for ${seconds} second${seconds !== 1 ? "s" : ""}.`;
-}

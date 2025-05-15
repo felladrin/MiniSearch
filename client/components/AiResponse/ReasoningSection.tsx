@@ -9,20 +9,17 @@ import {
 } from "@mantine/core";
 import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
 import { lazy, useState } from "react";
-import { formatThinkingTime } from "../../modules/stringFormatters";
 
 const MarkdownRenderer = lazy(() => import("./MarkdownRenderer"));
 
 interface ReasoningSectionProps {
   content: string;
   isGenerating?: boolean;
-  thinkingTimeMs?: number;
 }
 
 export default function ReasoningSection({
   content,
   isGenerating = false,
-  thinkingTimeMs = 0,
 }: ReasoningSectionProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -52,7 +49,7 @@ export default function ReasoningSection({
           )}
           <Flex align="center" gap={6}>
             <Text size="sm" c="dimmed" fs="italic" span>
-              {isGenerating ? "Thinking" : formatThinkingTime(thinkingTimeMs)}
+              {isGenerating ? "Thinking" : "Thought Process"}
             </Text>
             {isGenerating && <Loader size="sm" color="dimmed" type="dots" />}
           </Flex>
