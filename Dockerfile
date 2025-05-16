@@ -1,14 +1,13 @@
 # Build llama.cpp in a separate stage
-FROM python:3.13-slim AS llama-builder
+FROM cgr.dev/chainguard/wolfi-base:latest AS llama-builder
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-  build-essential \
+RUN apk add --update \
+  build-base \
   cmake \
   ccache \
   git \
-  curl \
-  && rm -rf /var/lib/apt/lists/*
+  curl
 
 # Build llama.cpp server and collect libraries
 RUN cd /tmp && \
@@ -28,14 +27,12 @@ ENV PORT=7860
 # Expose the port specified by the PORT environment variable
 EXPOSE $PORT
 
-# Install necessary packages using Debian's package manager
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install necessary packages using Wolfi's package manager
+RUN apk add --update \
+  nodejs \
+  npm \
   git \
-  build-essential \
-  curl \
-  && rm -rf /var/lib/apt/lists/* \
-  && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-  && apt-get install -y nodejs \
+  build-base \
   && npm --version \
   && node --version
 
@@ -59,7 +56,7 @@ ARG HOME_DIR=/home/${USERNAME}
 ARG APP_DIR=${HOME_DIR}/app
 
 # Create a non-root user and set up the application directory
-RUN useradd -m -u 1000 ${USERNAME} \
+RUN adduser -D -u 1000 ${USERNAME} \
   && mkdir -p ${APP_DIR} \
   && chown -R ${USERNAME}:${USERNAME} ${HOME_DIR}
 
