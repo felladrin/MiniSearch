@@ -73,54 +73,41 @@ export default function MarkdownRenderer({
           code(props) {
             const { children, className, node, ref, ...rest } = props;
             void node;
-            const languageMatch = /language-(\w+)/.exec(className || "");
+            let language = "text";
+            if (className) {
+              const languageMatch = /language-(\w+)/.exec(className);
+              if (languageMatch) language = languageMatch[1];
+            }
             const codeContent = children?.toString().replace(/\n$/, "") ?? "";
 
-            if (languageMatch) {
-              return (
-                <Box
-                  style={{
-                    position: "relative",
-                    marginBottom: theme.spacing.md,
-                  }}
-                >
-                  {enableCopy && (
-                    <Box
-                      style={{
-                        position: "absolute",
-                        top: theme.spacing.xs,
-                        right: theme.spacing.xs,
-                        zIndex: 2,
-                      }}
-                    >
-                      <CopyIconButton value={codeContent} />
-                    </Box>
-                  )}
-                  <SyntaxHighlighter
-                    {...rest}
-                    ref={ref as never}
-                    language={languageMatch[1]}
-                    style={syntaxHighlighterStyle}
-                  >
-                    {codeContent}
-                  </SyntaxHighlighter>
-                </Box>
-              );
-            }
-
             return (
-              <code
-                {...rest}
-                className={className}
+              <Box
                 style={{
-                  backgroundColor: theme.colors.gray[8],
-                  padding: "0.2em 0.4em",
-                  borderRadius: theme.radius.sm,
-                  fontSize: "0.9em",
+                  position: "relative",
+                  marginBottom: theme.spacing.md,
                 }}
               >
-                {children}
-              </code>
+                {enableCopy && (
+                  <Box
+                    style={{
+                      position: "absolute",
+                      top: theme.spacing.xs,
+                      right: theme.spacing.xs,
+                      zIndex: 2,
+                    }}
+                  >
+                    <CopyIconButton value={codeContent} />
+                  </Box>
+                )}
+                <SyntaxHighlighter
+                  {...rest}
+                  ref={ref as never}
+                  language={language}
+                  style={syntaxHighlighterStyle}
+                >
+                  {codeContent}
+                </SyntaxHighlighter>
+              </Box>
             );
           },
         }}
