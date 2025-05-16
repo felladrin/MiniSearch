@@ -119,6 +119,20 @@ export default function AISettingsForm() {
           />
 
           <AIParameterSlider
+            label="Min P"
+            description="Sets a minimum probability for token selection. Helps to filter out very unlikely tokens, making responses more coherent."
+            defaultValue={defaultSettings.minP}
+            {...form.getInputProps("minP")}
+            min={0}
+            max={1}
+            step={0.01}
+            marks={Array.from({ length: 3 }, (_, index) => ({
+              value: index / 2,
+              label: (index / 2).toString(),
+            }))}
+          />
+
+          <AIParameterSlider
             label="Frequency Penalty"
             description="Reduces repetition by penalizing tokens based on their frequency. Higher values decrease the likelihood of repeating the same information."
             defaultValue={defaultSettings.inferenceFrequencyPenalty}

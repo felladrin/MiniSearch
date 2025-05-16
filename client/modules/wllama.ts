@@ -139,11 +139,11 @@ const createDefaultModelConfig = (): Omit<
     const settings = getSettings();
     return {
       top_p: settings.inferenceTopP,
+      min_p: settings.minP,
       temp: settings.inferenceTemperature,
       dynatemp_range: Math.max(0, settings.inferenceTemperature - 0.2),
       penalty_freq: settings.inferenceFrequencyPenalty,
       penalty_present: settings.inferencePresencePenalty,
-      min_p: 0.02,
       top_k: 0,
       typical_p: 0.2,
       penalty_repeat: 1.02,

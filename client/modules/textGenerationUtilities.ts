@@ -55,6 +55,7 @@ export function getDefaultChatCompletionCreateParamsStreaming() {
     max_tokens: defaultContextSize,
     temperature: settings.inferenceTemperature,
     top_p: settings.inferenceTopP,
+    min_p: settings.minP,
     frequency_penalty: settings.inferenceFrequencyPenalty,
     presence_penalty: settings.inferencePresencePenalty,
   } as const;

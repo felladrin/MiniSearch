@@ -26,6 +26,7 @@ Below are the search results fetched at {{dateTime}}.
   inferenceType: VITE_DEFAULT_INFERENCE_TYPE,
   inferenceTemperature: 0.7,
   inferenceTopP: 0.9,
+  minP: 0.1,
   inferenceFrequencyPenalty: 0,
   inferencePresencePenalty: 0,
   openAiApiBaseUrl: "",

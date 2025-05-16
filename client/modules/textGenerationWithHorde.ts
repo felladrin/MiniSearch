@@ -68,7 +68,7 @@ async function startGeneration(messages: ChatMessage[]) {
         singleline: false,
         temperature: settings.inferenceTemperature,
         top_p: settings.inferenceTopP,
-        min_p: 0.1,
+        min_p: settings.minP,
         top_k: 0,
         typical: 0.2,
         rep_pen: 1.05,
