@@ -13,12 +13,9 @@ export const defaultSettings = {
   cpuThreads: Math.max(1, (navigator.hardwareConcurrency ?? 1) - 2),
   searchResultsToConsider: 3,
   searchResultsLimit: 15,
-  systemPrompt: `Help with my research.
-
-Respond using:
-- Provided search results with referencing links + your knowledge + extra relevant insights (note: referencing links should be in the format [1](URL) and placed immediately after the fact you are quoting)
-- Same language as query
-- Markdown format (allowed components: anchor, bold, italic, code, quote, table)
+  systemPrompt: `- Respond using the provided search results with referencing links + your knowledge + extra relevant insights (note: referencing links should be placed near the fact you are quoting, in this format: [N](URL). For example: [1](http://example.com))
+- Write your response in the same language as the query
+- You are allowed to use the following Markdown components in your response: anchor, bold, italic, code, quote, table
 
 Below are the search results fetched at {{dateTime}}.
 
