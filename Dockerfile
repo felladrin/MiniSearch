@@ -27,7 +27,16 @@ ENV PORT=7860
 # Expose the port specified by the PORT environment variable
 EXPOSE $PORT
 
-# Install necessary packages using Wolfi's package manager
+# Install apk package manager first
+RUN LATEST_APK_VERSION=$(wget -qO- https://api.github.com/repos/alpinelinux/apk-tools/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') && \
+  wget -O /tmp/apk-tools.tar.gz https://github.com/alpinelinux/apk-tools/releases/download/${LATEST_APK_VERSION}/apk-tools-$(echo ${LATEST_APK_VERSION} | sed 's/^v//')-x86_64-linux.tar.gz && \
+  tar -xzf /tmp/apk-tools.tar.gz -C /tmp && \
+  mv /tmp/apk-tools-*/apk /sbin/ && \
+  rm -rf /tmp/apk-tools* && \
+  chmod +x /sbin/apk && \
+  apk update
+
+# Install necessary packages
 RUN apk add --update \
   nodejs \
   npm \
