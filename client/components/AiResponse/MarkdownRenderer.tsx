@@ -1,4 +1,4 @@
-import { Box, Button, useMantineTheme } from "@mantine/core";
+import { Box, Button, Code, useMantineTheme } from "@mantine/core";
 import React, { lazy } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import syntaxHighlighterStyle from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
@@ -72,13 +72,16 @@ export default function MarkdownRenderer({
           },
           code(props) {
             const { children, className, node, ref, ...rest } = props;
-            void node;
             let language = "text";
             if (className) {
               const languageMatch = /language-(\w+)/.exec(className);
               if (languageMatch) language = languageMatch[1];
             }
             const codeContent = children?.toString().replace(/\n$/, "") ?? "";
+
+            if (node?.position?.end.line === node?.position?.start.line) {
+              return <Code>{codeContent}</Code>;
+            }
 
             return (
               <Box
