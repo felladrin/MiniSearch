@@ -27,14 +27,10 @@ ENV PORT=7860
 # Expose the port specified by the PORT environment variable
 EXPOSE $PORT
 
-# Install apk package manager first
-RUN LATEST_APK_VERSION=$(wget -qO- https://api.github.com/repos/alpinelinux/apk-tools/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') && \
-  wget -O /tmp/apk-tools.tar.gz https://github.com/alpinelinux/apk-tools/releases/download/${LATEST_APK_VERSION}/apk-tools-$(echo ${LATEST_APK_VERSION} | sed 's/^v//')-x86_64-linux.tar.gz && \
-  tar -xzf /tmp/apk-tools.tar.gz -C /tmp && \
-  mv /tmp/apk-tools-*/apk /sbin/ && \
-  rm -rf /tmp/apk-tools* && \
-  chmod +x /sbin/apk && \
-  apk update
+# Copy apk and necessary dependencies from the first stage
+COPY --from=llama-builder /sbin/apk /sbin/apk
+COPY --from=llama-builder /etc/apk /etc/apk
+COPY --from=llama-builder /usr/lib/libapk.so* /usr/lib/
 
 # Install necessary packages
 RUN apk add --update \
@@ -42,6 +38,8 @@ RUN apk add --update \
   npm \
   git \
   build-base \
+  python3 \
+  py3-pip \
   && npm --version \
   && node --version
 
@@ -53,11 +51,16 @@ COPY --from=llama-builder /tmp/llama.cpp/build/bin/llama-server /usr/local/bin/
 COPY --from=llama-builder /usr/local/lib/llama/* /usr/local/lib/
 RUN ldconfig /usr/local/lib
 
-# Modify SearXNG configuration:
-# 1. Change output format from HTML to JSON
-# 2. Remove user switching in the entrypoint script
-RUN sed -i 's/- html/- json/' /usr/local/searxng/searx/settings.yml \
-  && sed -i 's/su-exec searxng:searxng //' /usr/local/searxng/container/docker-entrypoint.sh
+# Change output format from HTML to JSON in SearXNG configuration
+RUN sed -i 's/- html/- json/' /usr/local/searxng/searx/settings.yml
+
+# Set the SearXNG settings folder path
+ARG SEARXNG_SETTINGS_FOLDER=/etc/searxng
+
+# Create the SearXNG settings folder and set permissions
+RUN mkdir -p ${SEARXNG_SETTINGS_FOLDER} \
+  && chmod -R 777 ${SEARXNG_SETTINGS_FOLDER} \
+  && chown -R searxng:searxng ${SEARXNG_SETTINGS_FOLDER}
 
 # Set up user and directory structure
 ARG USERNAME=user
@@ -68,13 +71,6 @@ ARG APP_DIR=${HOME_DIR}/app
 RUN adduser -D -u 1000 ${USERNAME} \
   && mkdir -p ${APP_DIR} \
   && chown -R ${USERNAME}:${USERNAME} ${HOME_DIR}
-
-# Set the SearXNG settings folder path
-ARG SEARXNG_SETTINGS_FOLDER=/etc/searxng
-
-# Create the SearXNG settings folder and set permissions
-RUN mkdir -p ${SEARXNG_SETTINGS_FOLDER} \
-  && chown -R ${USERNAME}:${USERNAME} ${SEARXNG_SETTINGS_FOLDER}
 
 # Switch to the non-root user
 USER ${USERNAME}
@@ -120,4 +116,4 @@ RUN npm run build
 ENTRYPOINT [ "/bin/sh", "-c" ]
 
 # Run SearXNG in the background and start the Node.js application using PM2
-CMD [ "(/usr/local/searxng/container/docker-entrypoint.sh -f > /dev/null 2>&1) & (npx pm2 start ecosystem.config.cjs && npx pm2 logs production-server)" ]
+CMD [ "(/usr/local/searxng/entrypoint.sh > /dev/null 2>&1) & (npx pm2 start ecosystem.config.cjs && npx pm2 logs)" ]
