@@ -54,13 +54,13 @@ export function internalApiEndpointServerHook<
     const tokenPrefix = "Bearer ";
     const token = authHeader?.startsWith(tokenPrefix)
       ? authHeader.slice(tokenPrefix.length)
-      : null;
+      : authHeader;
+    const { isAuthorized, statusCode, error } =
+      await verifyTokenAndRateLimit(token);
 
-    const authResult = await verifyTokenAndRateLimit(token);
-
-    if (!authResult.isAuthorized) {
-      response.statusCode = authResult.statusCode;
-      response.end(authResult.error);
+    if (!isAuthorized && statusCode && error) {
+      response.statusCode = statusCode;
+      response.end(JSON.stringify({ error }));
       return;
     }
 
