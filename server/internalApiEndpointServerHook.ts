@@ -60,6 +60,7 @@ export function internalApiEndpointServerHook<
 
     if (!isAuthorized && statusCode && error) {
       response.statusCode = statusCode;
+      response.setHeader("Content-Type", "application/json");
       response.end(JSON.stringify({ error }));
       return;
     }
@@ -119,6 +120,7 @@ export function internalApiEndpointServerHook<
         console.error("Error in stream processing:", streamError);
         if (!response.headersSent) {
           response.statusCode = 500;
+          response.setHeader("Content-Type", "application/json");
           response.end(JSON.stringify({ error: "Stream processing error" }));
         } else {
           response.end();

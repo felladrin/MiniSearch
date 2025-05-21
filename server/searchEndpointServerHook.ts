@@ -29,6 +29,7 @@ export function searchEndpointServerHook<
 
     if (!query) {
       response.statusCode = 400;
+      response.setHeader("Content-Type", "application/json");
       response.end(JSON.stringify({ error: "Missing query parameter" }));
       return;
     }
@@ -37,6 +38,7 @@ export function searchEndpointServerHook<
       await verifyTokenAndRateLimit(token);
     if (!isAuthorized && statusCode && error) {
       response.statusCode = statusCode;
+      response.setHeader("Content-Type", "application/json");
       response.end(JSON.stringify({ error }));
       return;
     }
@@ -119,6 +121,7 @@ export function searchEndpointServerHook<
         error instanceof Error ? error.message : error,
       );
       response.statusCode = 500;
+      response.setHeader("Content-Type", "application/json");
       response.end(JSON.stringify({ error: "Internal server error" }));
     }
   });

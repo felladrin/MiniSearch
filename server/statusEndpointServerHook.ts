@@ -47,7 +47,6 @@ export function statusEndpointServerHook<
     };
 
     response.setHeader("Content-Type", "application/json");
-
     response.end(JSON.stringify(status));
   });
 }
