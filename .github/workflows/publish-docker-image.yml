@@ -1,11 +1,11 @@
-name: Deploy
+name: Publish Docker Image
 
 on:
   workflow_dispatch:
 
 jobs:
   build-and-push-image:
-    name: Publish Docker image to GitHub Packages
+    name: Publish Docker Image to GitHub Packages
     runs-on: ubuntu-latest
     env:
       REGISTRY: ghcr.io
@@ -29,7 +29,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build and push Docker image
+      - name: Build and push Docker Image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -37,18 +37,3 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
-
-  sync-to-hf:
-    name: Sync to HuggingFace Spaces
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          lfs: true
-      - uses: JacobLinCool/huggingface-sync@v1
-        with:
-          github: ${{ secrets.GITHUB_TOKEN }}
-          user: ${{ vars.HF_SPACE_OWNER }}
-          space: ${{ vars.HF_SPACE_NAME }}
-          token: ${{ secrets.HF_TOKEN }}
-          configuration: "hf-space-config.yml"

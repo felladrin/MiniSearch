@@ -1,0 +1,20 @@
+name: Deploy to Hugging Face
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sync-to-hf:
+    name: Sync to Hugging Face Spaces
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: JacobLinCool/huggingface-sync@v1
+        with:
+          github: ${{ secrets.GITHUB_TOKEN }}
+          user: ${{ vars.HF_SPACE_OWNER }}
+          space: ${{ vars.HF_SPACE_NAME }}
+          token: ${{ secrets.HF_TOKEN }}
+          configuration: "hf-space-config.yml"
