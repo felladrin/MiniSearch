@@ -17,7 +17,7 @@ export async function verifyTokenAndRateLimit(token: string | null): Promise<{
     return {
       isAuthorized: false,
       statusCode: 401,
-      error: "Missing or invalid token",
+      error: "Missing token.",
     };
   }
 
@@ -39,7 +39,7 @@ export async function verifyTokenAndRateLimit(token: string | null): Promise<{
       return {
         isAuthorized: false,
         statusCode: 401,
-        error: "Unauthorized.",
+        error: "Invalid token.",
       };
     }
   }
