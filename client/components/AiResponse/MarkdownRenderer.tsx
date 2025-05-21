@@ -1,13 +1,10 @@
-import { Box, Button, Code, useMantineTheme } from "@mantine/core";
+import { CodeHighlight } from "@mantine/code-highlight";
+import { Box, Button, Code } from "@mantine/core";
 import React, { lazy } from "react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import syntaxHighlighterStyle from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
 import rehypeExternalLinks from "rehype-external-links";
 import remarkGfm from "remark-gfm";
 
 const Markdown = lazy(() => import("react-markdown"));
-const CopyIconButton = lazy(() => import("./CopyIconButton"));
-
 interface MarkdownRendererProps {
   content: string;
   enableCopy?: boolean;
@@ -19,8 +16,6 @@ export default function MarkdownRenderer({
   enableCopy = true,
   className = "",
 }: MarkdownRendererProps) {
-  const theme = useMantineTheme();
-
   if (!content) {
     return null;
   }
@@ -71,46 +66,30 @@ export default function MarkdownRenderer({
             return <>{props.children}</>;
           },
           code(props) {
-            const { children, className, node, ref, ...rest } = props;
+            const { children, className, node } = props;
+            const codeContent = children?.toString().replace(/\n$/, "") ?? "";
             let language = "text";
+
             if (className) {
               const languageMatch = /language-(\w+)/.exec(className);
               if (languageMatch) language = languageMatch[1];
             }
-            const codeContent = children?.toString().replace(/\n$/, "") ?? "";
 
-            if (node?.position?.end.line === node?.position?.start.line) {
+            if (
+              language === "text" &&
+              node?.position?.end.line === node?.position?.start.line
+            ) {
               return <Code>{codeContent}</Code>;
             }
 
             return (
-              <Box
-                style={{
-                  position: "relative",
-                  marginBottom: theme.spacing.md,
-                }}
-              >
-                {enableCopy && (
-                  <Box
-                    style={{
-                      position: "absolute",
-                      top: theme.spacing.xs,
-                      right: theme.spacing.xs,
-                      zIndex: 2,
-                    }}
-                  >
-                    <CopyIconButton value={codeContent} />
-                  </Box>
-                )}
-                <SyntaxHighlighter
-                  {...rest}
-                  ref={ref as never}
-                  language={language}
-                  style={syntaxHighlighterStyle}
-                >
-                  {codeContent}
-                </SyntaxHighlighter>
-              </Box>
+              <CodeHighlight
+                code={codeContent}
+                language={language}
+                radius="md"
+                withCopyButton={enableCopy}
+                mb="xs"
+              />
             );
           },
         }}
