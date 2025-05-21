@@ -8,7 +8,10 @@ import { addLogEntry } from "../../modules/logEntries";
 import { settingsPubSub } from "../../modules/pubSub";
 import { defaultSettings } from "../../modules/settings";
 import "@mantine/notifications/styles.css";
+import { CodeHighlightAdapterProvider } from "@mantine/code-highlight";
 import { verifyStoredAccessKey } from "../../modules/accessKey";
+import "@mantine/code-highlight/styles.css";
+import { shikiAdapter } from "../../modules/shiki";
 
 const MainPage = lazy(() => import("../Pages/Main/MainPage"));
 const AccessPage = lazy(() => import("../Pages/AccessPage"));
@@ -24,16 +27,20 @@ export function App() {
 
   return (
     <MantineProvider defaultColorScheme="dark">
-      <Notifications />
-      <Switch>
-        <Route path="/">
-          {VITE_ACCESS_KEYS_ENABLED && !hasValidatedAccessKey ? (
-            <AccessPage onAccessKeyValid={() => setValidatedAccessKey(true)} />
-          ) : (
-            <MainPage />
-          )}
-        </Route>
-      </Switch>
+      <CodeHighlightAdapterProvider adapter={shikiAdapter}>
+        <Notifications />
+        <Switch>
+          <Route path="/">
+            {VITE_ACCESS_KEYS_ENABLED && !hasValidatedAccessKey ? (
+              <AccessPage
+                onAccessKeyValid={() => setValidatedAccessKey(true)}
+              />
+            ) : (
+              <MainPage />
+            )}
+          </Route>
+        </Switch>
+      </CodeHighlightAdapterProvider>
     </MantineProvider>
   );
 }
