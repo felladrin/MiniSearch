@@ -50,11 +50,8 @@ export function internalApiEndpointServerHook<
   server.middlewares.use(async (request, response, next) => {
     if (!request.url.startsWith("/inference")) return next();
 
-    const authHeader = request.headers.authorization;
-    const tokenPrefix = "Bearer ";
-    const token = authHeader?.startsWith(tokenPrefix)
-      ? authHeader.slice(tokenPrefix.length)
-      : authHeader;
+    const url = new URL(request.url, `http://${request.headers.host}`);
+    const token = url.searchParams.get("token");
     const { isAuthorized, statusCode, error } =
       await verifyTokenAndRateLimit(token);
 

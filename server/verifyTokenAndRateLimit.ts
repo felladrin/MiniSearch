@@ -16,7 +16,7 @@ export async function verifyTokenAndRateLimit(token: string | null): Promise<{
   if (!token) {
     return {
       isAuthorized: false,
-      statusCode: 401,
+      statusCode: 400,
       error: "Missing token.",
     };
   }

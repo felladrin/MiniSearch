@@ -59,14 +59,13 @@ async function processStreamResponse(
   onChunk: (message: string) => void,
 ): Promise<string> {
   const inferenceUrl = new URL("/inference", self.location.origin);
-  const tokenPrefix = "Bearer ";
   const token = await getSearchTokenHash();
+  inferenceUrl.searchParams.set("token", token);
 
   const response = await fetch(inferenceUrl.toString(), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `${tokenPrefix}${token}`,
     },
     body: JSON.stringify({
       ...getDefaultChatCompletionCreateParamsStreaming(),
