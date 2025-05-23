@@ -1,3 +1,4 @@
+import { CodeHighlightAdapterProvider } from "@mantine/code-highlight";
 import { usePubSub } from "create-pubsub/react";
 import { Suspense, lazy, useMemo } from "react";
 import {
@@ -8,6 +9,8 @@ import {
   settingsPubSub,
   textGenerationStatePubSub,
 } from "../../modules/pubSub";
+import { shikiAdapter } from "../../modules/shiki";
+import "@mantine/code-highlight/styles.css";
 
 const AiResponseContent = lazy(() => import("./AiResponseContent"));
 const PreparingContent = lazy(() => import("./PreparingContent"));
@@ -40,7 +43,7 @@ export default function AiResponseSection() {
     ];
     if (generatingStates.includes(textGenerationState)) {
       return (
-        <>
+        <CodeHighlightAdapterProvider adapter={shikiAdapter}>
           <Suspense>
             <AiResponseContent
               textGenerationState={textGenerationState}
@@ -53,7 +56,7 @@ export default function AiResponseSection() {
               <ChatInterface initialQuery={query} initialResponse={response} />
             </Suspense>
           )}
-        </>
+        </CodeHighlightAdapterProvider>
       );
     }
 
