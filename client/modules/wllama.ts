@@ -362,6 +362,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00009.gguf",
     fileSizeInMegabytes: 2550,
   },
+  "llama-3.1-nemotron-nano-4b": {
+    ...createDefaultModelConfig(),
+    label: "Llama 3.1 Nemotron Nano 4B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Llama-3.1-Nemotron-Nano-4B-v1.1",
+    hfFilePath: "model.shard-00001-of-00009.gguf",
+    fileSizeInMegabytes: 2660,
+  },
   "olmoe-1b-7b": {
     ...createDefaultModelConfig(),
     label: "OLMoE 7B [1B]",
