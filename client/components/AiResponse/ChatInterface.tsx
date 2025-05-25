@@ -1,13 +1,4 @@
-import {
-  Button,
-  Card,
-  Group,
-  Paper,
-  Stack,
-  Text,
-  Textarea,
-} from "@mantine/core";
-import { IconSend } from "@tabler/icons-react";
+import { Card, Stack, Text } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
@@ -19,13 +10,15 @@ import {
   useRef,
   useState,
 } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import { handleEnterKeyDown } from "../../modules/keyboard";
 import { addLogEntry } from "../../modules/logEntries";
 import { settingsPubSub } from "../../modules/pubSub";
 import { generateChatResponse } from "../../modules/textGeneration";
 
-const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
-const CopyIconButton = lazy(() => import("./CopyIconButton"));
+const ChatHeader = lazy(() => import("./ChatHeader"));
+const MessageList = lazy(() => import("./MessageList"));
+const ChatInputArea = lazy(() => import("./ChatInputArea"));
 
 interface ChatState {
   input: string;
@@ -110,98 +103,34 @@ export default function ChatInterface({
     handleEnterKeyDown(event, settings, handleSend);
   };
 
-  const getChatContent = () => {
-    return messages
-      .slice(2)
-      .map(
-        (msg, index) =>
-          `${index + 1}. ${msg.role?.toUpperCase()}\n\n${msg.content}`,
-      )
-      .join("\n\n");
-  };
-
   return (
     <Card withBorder shadow="sm" radius="md">
       <Card.Section withBorder inheritPadding py="xs">
-        <Group justify="space-between">
-          <Text fw={500}>Follow-up questions</Text>
-          {messages.length > 2 && (
-            <Suspense>
-              <CopyIconButton
-                value={getChatContent()}
-                tooltipLabel="Copy conversation"
-              />
-            </Suspense>
-          )}
-        </Group>
+        <Suspense fallback={<Text>Loading header...</Text>}>
+          <ChatHeader messages={messages} />
+        </Suspense>
       </Card.Section>
       <Stack gap="md" pt="md">
-        {messages.slice(2).length > 0 && (
-          <Stack gap="md">
-            {messages.slice(2).map((message, index) => (
-              <Paper
-                key={`${message.role}-${index}`}
-                shadow="xs"
-                radius="xl"
-                p="sm"
-                maw="90%"
-                style={{
-                  alignSelf:
-                    message.role === "user" ? "flex-end" : "flex-start",
-                }}
-              >
-                <Suspense>
-                  <FormattedMarkdown>{message.content}</FormattedMarkdown>
-                </Suspense>
-              </Paper>
-            ))}
-            {state.isGenerating && state.streamedResponse.length > 0 && (
-              <Paper
-                shadow="xs"
-                radius="xl"
-                p="sm"
-                maw="90%"
-                style={{ alignSelf: "flex-start" }}
-              >
-                <Suspense>
-                  <FormattedMarkdown>
-                    {state.streamedResponse}
-                  </FormattedMarkdown>
-                </Suspense>
-              </Paper>
-            )}
-          </Stack>
-        )}
-        <Group align="flex-end" style={{ position: "relative" }}>
-          <Textarea
-            placeholder="Anything else you would like to know?"
-            value={state.input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            autosize
-            minRows={1}
-            maxRows={4}
-            style={{ flexGrow: 1, paddingRight: "50px" }}
-            disabled={state.isGenerating}
-          />
-          <Button
-            size="sm"
-            variant="default"
-            onClick={handleSend}
-            loading={state.isGenerating}
-            style={{
-              height: "100%",
-              position: "absolute",
-              right: 0,
-              top: 0,
-              bottom: 0,
-              borderTopLeftRadius: 0,
-              borderBottomLeftRadius: 0,
-            }}
-          >
-            <IconSend size={16} />
-          </Button>
-        </Group>
+        <ErrorBoundary
+          fallback={<Text c="red">Chat interface failed to load</Text>}
+        >
+          <Suspense fallback={<Text>Loading messages...</Text>}>
+            <MessageList
+              messages={messages}
+              isGenerating={state.isGenerating}
+              streamedResponse={state.streamedResponse}
+            />
+          </Suspense>
+          <Suspense fallback={<Text>Loading input area...</Text>}>
+            <ChatInputArea
+              value={state.input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              handleSend={handleSend}
+              isGenerating={state.isGenerating}
+            />
+          </Suspense>
+        </ErrorBoundary>
       </Stack>
     </Card>
   );
