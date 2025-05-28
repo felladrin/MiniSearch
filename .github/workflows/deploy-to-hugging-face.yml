@@ -17,4 +17,4 @@ jobs:
           user: ${{ vars.HF_SPACE_OWNER }}
           space: ${{ vars.HF_SPACE_NAME }}
           token: ${{ secrets.HF_TOKEN }}
-          configuration: "hf-space-config.yml"
+          configuration: ".github/hf-space-config.yml"
