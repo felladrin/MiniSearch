@@ -2,82 +2,128 @@ import { Card, Stack, Text } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
-  type ChangeEvent,
   type KeyboardEvent,
   Suspense,
   lazy,
+  useCallback,
   useEffect,
-  useRef,
   useState,
 } from "react";
 import { ErrorBoundary } from "react-error-boundary";
+import { generateFollowUpQuestion } from "../../modules/followUpQuestions";
 import { handleEnterKeyDown } from "../../modules/keyboard";
 import { addLogEntry } from "../../modules/logEntries";
-import { settingsPubSub } from "../../modules/pubSub";
+import {
+  chatGenerationStatePubSub,
+  chatInputPubSub,
+  followUpQuestionPubSub,
+  settingsPubSub,
+} from "../../modules/pubSub";
 import { generateChatResponse } from "../../modules/textGeneration";
 
 const ChatHeader = lazy(() => import("./ChatHeader"));
 const MessageList = lazy(() => import("./MessageList"));
 const ChatInputArea = lazy(() => import("./ChatInputArea"));
 
-interface ChatState {
-  input: string;
-  isGenerating: boolean;
-  streamedResponse: string;
+export interface ChatInterfaceProps {
+  initialQuery?: string;
+  initialResponse?: string;
 }
 
 export default function ChatInterface({
   initialQuery,
   initialResponse,
-}: {
-  initialQuery: string;
-  initialResponse: string;
-}) {
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [state, setState] = useState<ChatState>({
-    input: "",
-    isGenerating: false,
-    streamedResponse: "",
-  });
-  const latestResponseRef = useRef("");
+  const [input, setInput] = usePubSub(chatInputPubSub);
+  const [generationState, setGenerationState] = usePubSub(
+    chatGenerationStatePubSub,
+  );
+  const [, setFollowUpQuestion] = usePubSub(followUpQuestionPubSub);
   const [settings] = usePubSub(settingsPubSub);
+  const [streamedResponse, setStreamedResponse] = useState("");
+
+  const regenerateFollowUpQuestion = useCallback(
+    async (currentQuery: string, currentResponse: string) => {
+      if (!currentResponse || !currentQuery.trim()) return;
+
+      try {
+        setGenerationState({
+          ...generationState,
+          isGeneratingFollowUpQuestion: true,
+        });
+
+        const newQuestion = await generateFollowUpQuestion({
+          topic: currentQuery,
+          currentContent: currentResponse,
+        });
+
+        setFollowUpQuestion(newQuestion);
+        setGenerationState({
+          ...generationState,
+          isGeneratingFollowUpQuestion: false,
+        });
+      } catch (error) {
+        setFollowUpQuestion("");
+        setGenerationState({
+          ...generationState,
+          isGeneratingFollowUpQuestion: false,
+        });
+      }
+    },
+    [setFollowUpQuestion, setGenerationState, generationState],
+  );
 
   useEffect(() => {
-    setMessages([
-      { role: "user", content: initialQuery },
-      { role: "assistant", content: initialResponse },
-    ]);
-  }, [initialQuery, initialResponse]);
+    if (messages.length === 0 && initialQuery && initialResponse) {
+      setMessages([
+        { role: "user", content: initialQuery },
+        { role: "assistant", content: initialResponse },
+      ]);
+      regenerateFollowUpQuestion(initialQuery, initialResponse);
+    }
+  }, [
+    initialQuery,
+    initialResponse,
+    messages.length,
+    regenerateFollowUpQuestion,
+  ]);
 
-  const handleSend = async () => {
-    if (state.input.trim() === "" || state.isGenerating) return;
+  const handleSend = async (textToSend?: string) => {
+    const currentInput = textToSend ?? input;
+    if (currentInput.trim() === "" || generationState.isGeneratingResponse)
+      return;
 
-    const newMessages: ChatMessage[] = [
-      ...messages,
-      { role: "user", content: state.input },
-    ];
+    const userMessage: ChatMessage = { role: "user", content: currentInput };
+    const newMessages: ChatMessage[] = [...messages, userMessage];
+
     setMessages(newMessages);
-    setState((prev) => ({
-      ...prev,
-      input: "",
-      isGenerating: true,
-      streamedResponse: "",
-    }));
-    latestResponseRef.current = "";
+    setInput(textToSend ? input : "");
+    setGenerationState({
+      ...generationState,
+      isGeneratingResponse: true,
+    });
+    setFollowUpQuestion("");
+    setStreamedResponse("");
 
     try {
-      addLogEntry("User sent a follow-up question");
-      await generateChatResponse(newMessages, (partialResponse) => {
-        setState((prev) => ({ ...prev, streamedResponse: partialResponse }));
-        latestResponseRef.current = partialResponse;
-      });
+      const finalResponse = await generateChatResponse(
+        newMessages,
+        (partialResponse) => {
+          setStreamedResponse(partialResponse);
+        },
+      );
+
       setMessages((prevMessages) => [
         ...prevMessages,
-        { role: "assistant", content: latestResponseRef.current },
+        { role: "assistant", content: finalResponse },
       ]);
-      addLogEntry("AI responded to follow-up question");
+
+      addLogEntry("AI response completed");
+
+      await regenerateFollowUpQuestion(currentInput, finalResponse);
     } catch (error) {
-      addLogEntry(`Error generating chat response: ${error}`);
+      addLogEntry(`Error in chat response: ${error}`);
       setMessages((prevMessages) => [
         ...prevMessages,
         {
@@ -86,17 +132,11 @@ export default function ChatInterface({
         },
       ]);
     } finally {
-      setState((prev) => ({
-        ...prev,
-        isGenerating: false,
-        streamedResponse: "",
-      }));
+      setGenerationState({
+        ...generationState,
+        isGeneratingResponse: false,
+      });
     }
-  };
-
-  const handleInputChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
-    const input = event.target.value;
-    setState((prev) => ({ ...prev, input }));
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -116,19 +156,18 @@ export default function ChatInterface({
         >
           <Suspense fallback={<Text>Loading messages...</Text>}>
             <MessageList
-              messages={messages}
-              isGenerating={state.isGenerating}
-              streamedResponse={state.streamedResponse}
+              messages={
+                generationState.isGeneratingResponse
+                  ? [
+                      ...messages,
+                      { role: "assistant", content: streamedResponse },
+                    ]
+                  : messages
+              }
             />
           </Suspense>
           <Suspense fallback={<Text>Loading input area...</Text>}>
-            <ChatInputArea
-              value={state.input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              handleSend={handleSend}
-              isGenerating={state.isGenerating}
-            />
+            <ChatInputArea onKeyDown={handleKeyDown} handleSend={handleSend} />
           </Suspense>
         </ErrorBoundary>
       </Stack>

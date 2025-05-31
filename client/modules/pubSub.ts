@@ -113,3 +113,12 @@ export const menuExpandedAccordionsPubSub = createLocalStoragePubSub<string[]>(
   "menuExpandedAccordions",
   [],
 );
+
+export const chatInputPubSub = createPubSub("");
+
+export const chatGenerationStatePubSub = createPubSub({
+  isGeneratingResponse: false,
+  isGeneratingFollowUpQuestion: false,
+});
+
+export const followUpQuestionPubSub = createPubSub("");

@@ -1,5 +1,11 @@
 import { Button, Group, Textarea } from "@mantine/core";
+import { usePubSub } from "create-pubsub/react";
 import { Suspense, lazy } from "react";
+import {
+  chatGenerationStatePubSub,
+  chatInputPubSub,
+  followUpQuestionPubSub,
+} from "../../modules/pubSub";
 
 const IconSend = lazy(() =>
   import("@tabler/icons-react").then((module) => ({
@@ -8,28 +14,55 @@ const IconSend = lazy(() =>
 );
 
 interface ChatInputAreaProps {
-  value: string;
-  onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
-  handleSend: () => void;
-  isGenerating: boolean;
+  handleSend: (textToSend?: string) => void;
 }
 
-function ChatInputArea({
-  value,
-  onChange,
-  onKeyDown,
-  handleSend,
-  isGenerating,
-}: ChatInputAreaProps) {
+function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
+  const [input, setInput] = usePubSub(chatInputPubSub);
+  const [generationState] = usePubSub(chatGenerationStatePubSub);
+  const [followUpQuestion] = usePubSub(followUpQuestionPubSub);
+
+  const isGenerating =
+    generationState.isGeneratingResponse &&
+    !generationState.isGeneratingFollowUpQuestion;
+
+  const placeholder =
+    followUpQuestion || "Anything else you would like to know?";
+
+  const onChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(event.target.value);
+  };
+  const handleKeyDownWithPlaceholder = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
+    if (input.trim() === "" && followUpQuestion) {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        handleSend(followUpQuestion);
+        return;
+      }
+    }
+
+    onKeyDown(event);
+  };
+
+  const handleSendWithPlaceholder = () => {
+    if (input.trim() === "" && followUpQuestion) {
+      handleSend(followUpQuestion);
+    } else {
+      handleSend();
+    }
+  };
+
   return (
     <Group align="flex-end" style={{ position: "relative" }}>
       <Textarea
         aria-label="Chat input"
-        placeholder="Anything else you would like to know?"
-        value={value}
+        placeholder={placeholder}
+        value={input}
         onChange={onChange}
-        onKeyDown={onKeyDown}
+        onKeyDown={handleKeyDownWithPlaceholder}
         autosize
         minRows={1}
         maxRows={4}
@@ -40,7 +73,7 @@ function ChatInputArea({
         aria-label="Send message"
         size="sm"
         variant="default"
-        onClick={handleSend}
+        onClick={handleSendWithPlaceholder}
         loading={isGenerating}
         style={{
           height: "100%",
