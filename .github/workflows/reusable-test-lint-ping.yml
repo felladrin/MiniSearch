@@ -22,4 +22,5 @@ jobs:
       - run: docker compose -f docker-compose.production.yml up -d
       - name: Check if main page is available
         run: until curl -s -o /dev/null -w "%{http_code}" localhost:7860 | grep 200; do sleep 1; done
+        timeout-minutes: 1
       - run: docker compose -f docker-compose.production.yml down
