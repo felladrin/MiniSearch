@@ -83,11 +83,16 @@ export async function generateTextWithOpenAi() {
   updateTextGenerationState("preparingToGenerate");
 
   const messages = getDefaultChatMessages(getFormattedSearchResults(true));
-  updateTextGenerationState("generating");
 
   await createOpenAiStream({
     messages,
-    onUpdate: updateResponse,
+    onUpdate: (text) => {
+      if (getTextGenerationState() !== "generating") {
+        updateTextGenerationState("generating");
+      }
+
+      updateResponse(text);
+    },
   });
 }
 
