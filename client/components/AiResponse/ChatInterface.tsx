@@ -49,7 +49,7 @@ export default function ChatInterface({
 
       try {
         setGenerationState({
-          ...generationState,
+          isGeneratingResponse: false,
           isGeneratingFollowUpQuestion: true,
         });
 
@@ -60,18 +60,18 @@ export default function ChatInterface({
 
         setFollowUpQuestion(newQuestion);
         setGenerationState({
-          ...generationState,
+          isGeneratingResponse: false,
           isGeneratingFollowUpQuestion: false,
         });
       } catch (error) {
         setFollowUpQuestion("");
         setGenerationState({
-          ...generationState,
+          isGeneratingResponse: false,
           isGeneratingFollowUpQuestion: false,
         });
       }
     },
-    [setFollowUpQuestion, setGenerationState, generationState],
+    [setFollowUpQuestion, setGenerationState],
   );
 
   useEffect(() => {
