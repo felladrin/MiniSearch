@@ -30,39 +30,41 @@ ENV PORT=7860
 # Expose the port
 EXPOSE $PORT
 
+# Set up user and directory structure
+ARG USERNAME=node
+ARG HOME_DIR=/home/${USERNAME}
+ARG APP_DIR=${HOME_DIR}/app
+
 # Install minimal dependencies for SearXNG
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
   python3 \
-  python3-venv \
-  sudo && \
+  python3-venv && \
   apt-get clean && \
-  rm -rf /var/lib/apt/lists/* && \
-  echo "node ALL=(searxng) NOPASSWD: /usr/local/searxng/searxng-venv/bin/python -m searx.webapp" >> /etc/sudoers
+  rm -rf /var/lib/apt/lists/*
 
-# Create directories and user for SearXNG
+# Create directories for SearXNG
 RUN mkdir -p /usr/local/searxng /etc/searxng && \
-  useradd --shell /bin/bash --system --home /usr/local/searxng searxng && \
-  chown -R searxng:searxng /usr/local/searxng /etc/searxng && \
+  chown -R ${USERNAME}:${USERNAME} /usr/local/searxng /etc/searxng && \
   chmod 755 /etc/searxng
 
 # Set up Python virtual environment for SearXNG
 WORKDIR /usr/local/searxng
 RUN python3 -m venv searxng-venv && \
-  chown -R searxng:searxng /usr/local/searxng/searxng-venv && \
+  chown -R ${USERNAME}:${USERNAME} /usr/local/searxng/searxng-venv && \
   /usr/local/searxng/searxng-venv/bin/pip install --upgrade pip && \
   /usr/local/searxng/searxng-venv/bin/pip install wheel setuptools pyyaml lxml
 
 # Clone SearXNG repository and configure
 RUN git clone https://github.com/searxng/searxng.git /usr/local/searxng/searxng-src && \
-  chown -R searxng:searxng /usr/local/searxng/searxng-src
+  chown -R ${USERNAME}:${USERNAME} /usr/local/searxng/searxng-src
 
 ARG SEARXNG_SETTINGS_PATH="/etc/searxng/settings.yml"
 
 # Copy settings file and install SearXNG
 WORKDIR /usr/local/searxng/searxng-src
 RUN cp searx/settings.yml $SEARXNG_SETTINGS_PATH && \
-  chown searxng:searxng $SEARXNG_SETTINGS_PATH && \
+  chown ${USERNAME}:${USERNAME} $SEARXNG_SETTINGS_PATH && \
   chmod 644 $SEARXNG_SETTINGS_PATH && \
   sed -i 's/ultrasecretkey/'$(openssl rand -hex 32)'/g' $SEARXNG_SETTINGS_PATH && \
   sed -i 's/- html/- json/' $SEARXNG_SETTINGS_PATH && \
@@ -72,11 +74,6 @@ RUN cp searx/settings.yml $SEARXNG_SETTINGS_PATH && \
 COPY --from=llama-builder /tmp/llama.cpp/build/bin/llama-server /usr/local/bin/
 COPY --from=llama-builder /usr/local/lib/llama/* /usr/local/lib/
 RUN ldconfig /usr/local/lib
-
-# Set up user and directory structure
-ARG USERNAME=node
-ARG HOME_DIR=/home/${USERNAME}
-ARG APP_DIR=${HOME_DIR}/app
 
 # Switch to the non-root user
 USER ${USERNAME}
@@ -113,4 +110,4 @@ RUN git config --global --add safe.directory ${APP_DIR} && \
 # Set the entrypoint and command
 ENTRYPOINT [ "/bin/sh", "-c" ]
 
-CMD ["(cd /usr/local/searxng/searxng-src && sudo -u searxng /usr/local/searxng/searxng-venv/bin/python -m searx.webapp > /dev/null 2>&1) & (npx pm2 start ecosystem.config.cjs && npx pm2 logs)" ]
+CMD ["(cd /usr/local/searxng/searxng-src && /usr/local/searxng/searxng-venv/bin/python -m searx.webapp > /dev/null 2>&1) & (npx pm2 start ecosystem.config.cjs && npx pm2 logs)" ]
