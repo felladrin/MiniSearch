@@ -15,5 +15,5 @@ services:
       - .:/home/user/app/
     command:
       [
-        "(/usr/local/searxng/entrypoint.sh > /tmp/searxng.log 2>&1) & (npm install && npm run dev)",
+        "(cd /usr/local/searxng/searxng-src && sudo -u searxng /usr/local/searxng/searxng-venv/bin/python -m searx.webapp > /tmp/searxng.log 2>&1) & (npm install && npm run dev)",
       ]
