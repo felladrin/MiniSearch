@@ -12,7 +12,7 @@ services:
       dockerfile: Dockerfile
       context: .
     volumes:
-      - .:/home/user/app/
+      - .:/home/node/app/
     command:
       [
         "(cd /usr/local/searxng/searxng-src && /usr/local/searxng/searxng-venv/bin/python -m searx.webapp > /tmp/searxng.log 2>&1) & (npm install && npm run dev)",
