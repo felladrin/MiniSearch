@@ -1,0 +1,11 @@
+.control {
+  transition: all 0.2s ease;
+  opacity: 0.3;
+}
+
+.root:hover .control {
+  background-color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  opacity: 1;
+}

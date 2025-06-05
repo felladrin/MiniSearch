@@ -5,6 +5,7 @@ import type { ImageSearchResult } from "../../../../modules/types";
 import "@mantine/carousel/styles.css";
 import Lightbox from "yet-another-react-lightbox";
 import Captions from "yet-another-react-lightbox/plugins/captions";
+import carouselClassNames from "./ImageResultsList.module.css";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/captions.css";
 import { addLogEntry } from "../../../../modules/logEntries";
@@ -53,6 +54,7 @@ export default function ImageResultsList({
       <Carousel
         slideSize="0"
         slideGap="xs"
+        classNames={carouselClassNames}
         emblaOptions={{
           align: "start",
           dragFree: true,
