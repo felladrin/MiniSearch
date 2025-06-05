@@ -97,7 +97,7 @@ ARG HMR_PORT
 ARG ALLOWED_HOSTS
 
 # Copy package files and install dependencies
-COPY --chown=${USERNAME}:${USERNAME} ./package*.json ./.npmrc ./
+COPY --chown=${USERNAME}:${USERNAME} ./package.json ./package-lock.json ./.npmrc ./
 RUN npm ci
 
 # Copy the rest of the application files
