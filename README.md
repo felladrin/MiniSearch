@@ -111,14 +111,3 @@ Once the container is running, open http://localhost:7860 in your browser and st
   <p><code>docker compose up</code></p>
   <p>Make your changes, push them to your fork, and open a pull request! All contributions are welcome!</p>
 </details>
-
-<details>
-  <summary>Why is MiniSearch built upon SearXNG's Docker Image and using a single image instead of composing it from multiple services?</summary>
-  <p>There are a few reasons for this:</p>
-  <ul>
-    <li>MiniSearch utilizes SearXNG as its meta-search engine.</li>
-    <li>Manual installation of SearXNG is not trivial, so we use the docker image they provide, which has everything set up.</li>
-    <li>The user of the image needs to be customized in a specific way to run on HuggingFace Spaces, where MiniSearch's demo runs.</li>
-    <li>HuggingFace only accepts a single docker image. It doesn't run docker compose or multiple images, unfortunately.</li>
-  </ul>
-</details>
