@@ -235,13 +235,12 @@ const searchService = {
       if (cachedData?.fresh) {
         cacheMetrics.textHits++;
         addLogEntry(
-          `Text search cache hit for "${query}" (${cachedData.results.length} results)`,
+          `Text search: Reused ${cachedData.results.length} results from the cache`,
         );
         return cachedData.results;
       }
 
       cacheMetrics.textMisses++;
-      addLogEntry(`Text search cache miss for "${query}", fetching from API`);
 
       const results = await this.performSearch<TextSearchResults>(
         "text",
@@ -254,6 +253,10 @@ const searchService = {
       if ((cacheMetrics.textHits + cacheMetrics.textMisses) % 10 === 0) {
         cacheMetrics.logPerformance();
       }
+
+      addLogEntry(
+        `Text search: Fetched ${results.length} results from the API`,
+      );
 
       return results;
     } catch (error) {
@@ -280,13 +283,12 @@ const searchService = {
       if (cachedData?.fresh) {
         cacheMetrics.imageHits++;
         addLogEntry(
-          `Image search cache hit for "${query}" (${cachedData.results.length} results)`,
+          `Image search: Reused ${cachedData.results.length} results from the cache`,
         );
         return cachedData.results;
       }
 
       cacheMetrics.imageMisses++;
-      addLogEntry(`Image search cache miss for "${query}", fetching from API`);
 
       const results = await this.performSearch<ImageSearchResults>(
         "images",
@@ -299,6 +301,10 @@ const searchService = {
       if ((cacheMetrics.imageHits + cacheMetrics.imageMisses) % 10 === 0) {
         cacheMetrics.logPerformance();
       }
+
+      addLogEntry(
+        `Image search: Fetched ${results.length} results from the API`,
+      );
 
       return results;
     } catch (error) {
