@@ -6,10 +6,10 @@ import { downloadFileFromHuggingFaceRepository } from "./downloadFileFromHugging
 
 const fileName = path.basename(import.meta.url);
 const printMessage = debug(fileName);
-debug.enable(fileName);
+printMessage.enabled = true;
 
-const SERVER_HOST = "127.0.0.1";
-const SERVER_PORT = 8012;
+const SERVICE_HOST = "127.0.0.1";
+const SERVICE_PORT = 8012;
 const VERBOSE_MODE = false;
 const MODEL_HF_REPO = "Felladrin/gguf-jina-reranker-v1-tiny-en";
 const MODEL_HF_FILE = "jina-reranker-v1-tiny-en-Q8_0.gguf";
@@ -54,9 +54,9 @@ export async function startRerankerService() {
       contextSize.toString(),
       "--flash-attn",
       "--host",
-      SERVER_HOST,
+      SERVICE_HOST,
       "--port",
-      SERVER_PORT.toString(),
+      SERVICE_PORT.toString(),
       "--log-verbosity",
       VERBOSE_MODE ? "1" : "0",
       "--threads",
@@ -85,7 +85,7 @@ export async function startRerankerService() {
     const checkReady = async () => {
       try {
         const response = await fetch(
-          `http://${SERVER_HOST}:${SERVER_PORT}/health`,
+          `http://${SERVICE_HOST}:${SERVICE_PORT}/health`,
         );
         const responseJson = (await response.json()) as {
           status: "ok" | string;
@@ -120,7 +120,9 @@ export async function getRerankerStatus() {
   }
 
   try {
-    const response = await fetch(`http://${SERVER_HOST}:${SERVER_PORT}/health`);
+    const response = await fetch(
+      `http://${SERVICE_HOST}:${SERVICE_PORT}/health`,
+    );
     const responseJson = (await response.json()) as { status: "ok" | string };
     return responseJson.status === "ok";
   } catch {
@@ -134,7 +136,7 @@ export async function rerank(query: string, documents: string[]) {
   }
 
   const response = await fetch(
-    `http://${SERVER_HOST}:${SERVER_PORT}/v1/rerank`,
+    `http://${SERVICE_HOST}:${SERVICE_PORT}/v1/rerank`,
     {
       method: "POST",
       headers: {
