@@ -1,4 +1,5 @@
 import {
+  Box,
   Flex,
   Stack,
   Text,
@@ -42,23 +43,36 @@ export default function SearchResultsList({
             <Stack gap={16} style={styles}>
               <Flex
                 gap={shouldDisplayDomainBelowTitle ? 0 : 16}
-                justify="space-between"
                 align="flex-start"
                 direction={shouldDisplayDomainBelowTitle ? "column" : "row"}
               >
-                <UnstyledButton
-                  variant="transparent"
-                  component="a"
-                  href={url}
-                  target="_blank"
-                  onClick={() => {
-                    addLogEntry("User clicked a text result");
-                  }}
+                <Box
+                  w={shouldDisplayDomainBelowTitle ? "100%" : "auto"}
+                  flex={shouldDisplayDomainBelowTitle ? 0 : 1}
+                  style={{ overflow: "hidden" }}
                 >
-                  <Text fw="bold" c="var(--mantine-color-blue-light-color)">
-                    {title}
-                  </Text>
-                </UnstyledButton>
+                  <UnstyledButton
+                    variant="transparent"
+                    component="a"
+                    href={url}
+                    target="_blank"
+                    onClick={() => {
+                      addLogEntry("User clicked a text result");
+                    }}
+                  >
+                    <Text
+                      fw="bold"
+                      c="var(--mantine-color-blue-light-color)"
+                      style={{
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {title}
+                    </Text>
+                  </UnstyledButton>
+                </Box>
                 <Tooltip label={url}>
                   <UnstyledButton
                     variant="transparent"
@@ -66,7 +80,6 @@ export default function SearchResultsList({
                     href={url}
                     target="_blank"
                     fs="italic"
-                    ta="end"
                     onClick={() => {
                       addLogEntry("User clicked a text result");
                     }}
