@@ -6,6 +6,7 @@ import {
   getTextualSearchesSinceLastRestart,
 } from "./searchesSinceLastRestart";
 import { getVerifiedTokensAmount } from "./verifiedTokens";
+import { getWebSearchStatus } from "./webSearchService";
 
 const serverStartTime = new Date().getTime();
 
@@ -27,6 +28,9 @@ export function statusEndpointServerHook<
     const rerankerServiceStatus = (await getRerankerStatus())
       ? "healthy"
       : "unhealthy";
+    const webSearchServiceStatus = (await getWebSearchStatus())
+      ? "healthy"
+      : "unhealthy";
 
     const status = {
       uptime: prettyMilliseconds(new Date().getTime() - serverStartTime, {
@@ -38,6 +42,7 @@ export function statusEndpointServerHook<
       averageTextualSearchesPerSession,
       averageGraphicalSearchesPerSession,
       rerankerServiceStatus,
+      webSearchServiceStatus,
       build: {
         timestamp: new Date(
           server.config.define.VITE_BUILD_DATE_TIME,
