@@ -60,7 +60,7 @@ export async function startRerankerService() {
       "--log-verbosity",
       VERBOSE_MODE ? "1" : "0",
       "--threads",
-      "1",
+      "-1",
       "--parallel",
       "1",
       "--no-warmup",
@@ -135,6 +135,10 @@ export async function rerank(query: string, documents: string[]) {
     throw new Error("Reranker service is not ready");
   }
 
+  if (VERBOSE_MODE) {
+    console.time("Time to rerank");
+  }
+
   const response = await fetch(
     `http://${SERVICE_HOST}:${SERVICE_PORT}/v1/rerank`,
     {
@@ -155,6 +159,26 @@ export async function rerank(query: string, documents: string[]) {
     throw new Error(`Reranking failed: ${response.statusText}`);
   }
 
-  const result = await response.json();
-  return result.results as { index: number; relevance_score: number }[];
+  const jsonResponse = await response.json();
+
+  const results = jsonResponse.results as {
+    index: number;
+    relevance_score: number;
+  }[];
+
+  if (VERBOSE_MODE) {
+    console.timeEnd("Time to rerank");
+    const sortedResults = results
+      .slice()
+      .sort((a, b) => b.relevance_score - a.relevance_score);
+    const rankedDocuments = results.map(({ index, relevance_score }) => ({
+      document: documents[index],
+      ranking_position:
+        sortedResults.findIndex((result) => result.index === index) + 1,
+      relevance_score,
+    }));
+    printMessage(rankedDocuments);
+  }
+
+  return results;
 }
