@@ -20,31 +20,84 @@ export async function rankSearchResults(
     return [];
   }
 
-  const highestScore = Math.max(...scoredResults.map((r) => r.score));
+  if (!preserveTopResults) {
+    return filterResultsByScore(scoredResults)
+      .sort((a, b) => b.score - a.score)
+      .map(({ result }) => result);
+  }
 
-  const filteredResults = scoredResults.filter(
-    (r) => r.score >= highestScore / 10,
+  const [firstResult, ...nextResults] = scoredResults;
+
+  const filteredNextResults = filterResultsByScore(nextResults);
+
+  const nextTopResultsCount = 9;
+
+  const nextTopResults = filteredNextResults
+    .slice(0, nextTopResultsCount)
+    .sort((a, b) => b.score - a.score);
+
+  const remainingResults = filteredNextResults
+    .slice(nextTopResultsCount)
+    .sort((a, b) => b.score - a.score);
+
+  return [firstResult, ...nextTopResults, ...remainingResults].map(
+    ({ result }) => result,
+  );
+}
+
+type SearchResultTuple = [title: string, content: string, url: string];
+type ScoredResultItem = { result: SearchResultTuple; score: number };
+type ScoredResultItemWithNormalizedScore = ScoredResultItem & {
+  normalizedScore: number;
+};
+
+function filterResultsByScore(
+  inputResults: ScoredResultItem[],
+  kStandardDeviationFactor = 0.3,
+  minPercentageFallback = 0.4,
+): ScoredResultItemWithNormalizedScore[] {
+  if (inputResults.length === 0) return [];
+
+  const originalScores = inputResults.map(({ score }) => score);
+  const minScore = Math.min(...originalScores);
+
+  const itemsWithNormalizedScore = inputResults.map((item) => ({
+    ...item,
+    normalizedScore: item.score + Math.abs(minScore),
+  }));
+
+  const normalizedScores = itemsWithNormalizedScore.map(
+    ({ normalizedScore }) => normalizedScore,
   );
 
-  if (preserveTopResults) {
-    const [firstResult, ...nextResults] = filteredResults;
+  const mean =
+    normalizedScores.reduce((sum, score) => sum + score, 0) /
+    normalizedScores.length;
+  const variance =
+    normalizedScores.reduce((sum, score) => sum + (score - mean) ** 2, 0) /
+    normalizedScores.length;
+  const standardDeviation = Math.sqrt(variance);
 
-    const nextTopResultsCount = 9;
+  const threshold = Math.max(
+    0,
+    mean - kStandardDeviationFactor * standardDeviation,
+  );
 
-    const nextTopResults = nextResults
-      .slice(0, nextTopResultsCount)
-      .sort((a, b) => b.score - a.score);
+  let filteredItems = itemsWithNormalizedScore.filter(
+    ({ normalizedScore }) => normalizedScore >= threshold,
+  );
 
-    const remainingResults = nextResults
-      .slice(nextTopResultsCount)
-      .sort((a, b) => b.score - a.score);
-
-    return [firstResult, ...nextTopResults, ...remainingResults].map(
-      ({ result }) => result,
+  if (
+    filteredItems.length <
+      Math.ceil(itemsWithNormalizedScore.length * minPercentageFallback) &&
+    itemsWithNormalizedScore.length > 0
+  ) {
+    const highestNormalizedScore = Math.max(...normalizedScores);
+    filteredItems = itemsWithNormalizedScore.filter(
+      ({ normalizedScore }) =>
+        normalizedScore >= highestNormalizedScore * minPercentageFallback,
     );
   }
 
-  return filteredResults
-    .sort((a, b) => b.score - a.score)
-    .map(({ result }) => result);
+  return filteredItems;
 }
