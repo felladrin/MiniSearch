@@ -60,7 +60,7 @@ export async function startRerankerService() {
       "--log-verbosity",
       VERBOSE_MODE ? "1" : "0",
       "--threads",
-      "-1",
+      "1",
       "--parallel",
       "1",
       "--no-warmup",
