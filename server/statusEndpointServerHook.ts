@@ -19,12 +19,12 @@ export function statusEndpointServerHook<
     const sessions = getVerifiedTokensAmount();
     const textualSearches = getTextualSearchesSinceLastRestart();
     const graphicalSearches = getGraphicalSearchesSinceLastRestart();
-    const averageTextualSearchesPerSession = (
-      textualSearches / sessions || 0
-    ).toFixed(1);
-    const averageGraphicalSearchesPerSession = (
-      graphicalSearches / sessions || 0
-    ).toFixed(1);
+    const averageTextualSearchesPerSession = Number(
+      (textualSearches / sessions || 0).toFixed(1),
+    );
+    const averageGraphicalSearchesPerSession = Number(
+      (graphicalSearches / sessions || 0).toFixed(1),
+    );
     const rerankerServiceStatus = (await getRerankerStatus())
       ? "healthy"
       : "unhealthy";
