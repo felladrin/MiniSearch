@@ -1,12 +1,12 @@
 import axios from "axios";
 import type { PreviewServer, ViteDevServer } from "vite";
-import { fetchSearXNG } from "./fetchSearXNG";
 import { rankSearchResults } from "./rankSearchResults";
 import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
 } from "./searchesSinceLastRestart";
 import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit";
+import { fetchSearXNG } from "./webSearchService";
 
 type TextResult = [title: string, content: string, url: string];
 type ImageResult = [

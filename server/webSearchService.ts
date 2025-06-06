@@ -11,13 +11,9 @@ const searxng = new SearxngService({
   },
 });
 
-export { processTextualResult, processGraphicalResult };
-
-type SearchType = "text" | "images";
-
 export async function fetchSearXNG(
   query: string,
-  searchType: SearchType,
+  searchType: "text" | "images",
   limit = 30,
 ) {
   try {
