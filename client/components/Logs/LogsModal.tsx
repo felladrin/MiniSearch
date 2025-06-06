@@ -2,14 +2,17 @@ import {
   Alert,
   Button,
   Center,
+  CloseButton,
   Group,
   Modal,
   Pagination,
   Table,
+  TextInput,
+  Tooltip,
 } from "@mantine/core";
-import { IconInfoCircle } from "@tabler/icons-react";
+import { IconInfoCircle, IconSearch } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { logEntriesPubSub } from "../../modules/logEntries";
 
 export default function LogsModal({
@@ -22,17 +25,31 @@ export default function LogsModal({
   const [logEntries] = usePubSub(logEntriesPubSub);
 
   const [page, setPage] = useState(1);
+  const [filterText, setFilterText] = useState("");
 
   const logEntriesPerPage = 5;
 
+  const filteredLogEntries = useMemo(() => {
+    if (!filterText) return logEntries;
+    const lowerCaseFilter = filterText.toLowerCase();
+    return logEntries.filter((entry) =>
+      entry.message.toLowerCase().includes(lowerCaseFilter),
+    );
+  }, [logEntries, filterText]);
+
   const logEntriesFromCurrentPage = useMemo(
     () =>
-      logEntries.slice(
+      filteredLogEntries.slice(
         (page - 1) * logEntriesPerPage,
         page * logEntriesPerPage,
       ),
-    [logEntries, page],
+    [filteredLogEntries, page],
   );
+
+  useEffect(() => {
+    void filterText;
+    setPage(1);
+  }, [filterText]);
 
   const downloadLogsAsJson = useCallback(() => {
     const jsonString = JSON.stringify(logEntries, null, 2);
@@ -69,10 +86,28 @@ export default function LogsModal({
           </Button>
         </Group>
       </Alert>
+      <TextInput
+        placeholder="Filter logs..."
+        mb="md"
+        leftSection={<IconSearch size={16} />}
+        value={filterText}
+        onChange={(event) => setFilterText(event.currentTarget.value)}
+        rightSection={
+          filterText ? (
+            <Tooltip label="Clear filter" withArrow>
+              <CloseButton
+                size="sm"
+                onClick={() => setFilterText("")}
+                aria-label="Clear filter"
+              />
+            </Tooltip>
+          ) : null
+        }
+      />
       <Table striped highlightOnHover withTableBorder>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Time</Table.Th>
+            <Table.Th style={{ width: 80 }}>Time</Table.Th>
             <Table.Th>Message</Table.Th>
           </Table.Tr>
         </Table.Thead>
@@ -89,7 +124,7 @@ export default function LogsModal({
       </Table>
       <Center>
         <Pagination
-          total={Math.ceil(logEntries.length / logEntriesPerPage)}
+          total={Math.ceil(filteredLogEntries.length / logEntriesPerPage)}
           value={page}
           onChange={setPage}
           size="sm"
