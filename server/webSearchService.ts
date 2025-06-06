@@ -1,15 +1,44 @@
+import { basename } from "node:path";
+import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
 import { type SearxngSearchResult, SearxngService } from "searxng";
 
+const fileName = basename(import.meta.url);
+const printMessage = debug(fileName);
+printMessage.enabled = true;
+
+const SERVICE_HOST = "127.0.0.1";
+const SERVICE_PORT = 8888;
+
 const searxng = new SearxngService({
-  baseURL: "http://localhost:8888",
+  baseURL: `http://${SERVICE_HOST}:${SERVICE_PORT}`,
   defaultSearchParams: {
     lang: "auto",
     safesearch: 1,
     format: "json",
   },
 });
+
+getWebSearchStatus().then((isReady) => {
+  if (isReady) {
+    printMessage("Service ready!");
+  } else {
+    printMessage("Service not available!");
+  }
+});
+
+export async function getWebSearchStatus() {
+  try {
+    const response = await fetch(
+      `http://${SERVICE_HOST}:${SERVICE_PORT}/healthz`,
+    );
+    const responseText = await response.text();
+    return responseText.trim() === "OK";
+  } catch {
+    return false;
+  }
+}
 
 export async function fetchSearXNG(
   query: string,
