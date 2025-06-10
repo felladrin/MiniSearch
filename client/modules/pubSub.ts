@@ -102,7 +102,9 @@ subscribeToImageSearchState((imageSearchState) => {
 });
 
 export const textSearchResultsPubSub = createPubSub<TextSearchResults>([]);
-export const llmTextSearchResultsPubSub = createPubSub<TextSearchResults>([]);
+
+const llmTextSearchResultsPubSub = createPubSub<TextSearchResults>([]);
+
 export const imageSearchResultsPubSub = createPubSub<ImageSearchResults>([]);
 
 export const [updateTextSearchResults, , getTextSearchResults] =

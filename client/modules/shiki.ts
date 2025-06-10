@@ -1,6 +1,6 @@
 import { createShikiAdapter } from "@mantine/code-highlight";
 
-export async function loadShiki() {
+async function loadShiki() {
   const { createHighlighter, bundledLanguages } = await import(
     "shiki/bundle/full"
   );

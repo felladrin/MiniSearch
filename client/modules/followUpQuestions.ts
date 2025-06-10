@@ -2,7 +2,7 @@ import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import { addLogEntry } from "./logEntries";
 import { generateChatResponse } from "./textGeneration";
 
-export interface FollowUpQuestionParams {
+interface FollowUpQuestionParams {
   topic: string;
   currentContent: string;
 }
