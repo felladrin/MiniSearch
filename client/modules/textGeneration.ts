@@ -101,30 +101,43 @@ export async function generateChatResponse(
   let response = "";
 
   try {
-    const allMessages: ChatMessage[] = [
-      {
-        role: "user",
-        content: getSystemPrompt(getFormattedSearchResults(true)),
-      },
-      { role: "assistant", content: "Ok!" },
-      ...newMessages,
-    ];
+    const systemPrompt: ChatMessage = {
+      role: "user",
+      content: getSystemPrompt(getFormattedSearchResults(true)),
+    };
+    const initialResponse: ChatMessage = { role: "assistant", content: "Ok!" };
+    const systemPromptTokens = gptTokenizer.encode(systemPrompt.content).length;
+    const initialResponseTokens = gptTokenizer.encode(
+      initialResponse.content,
+    ).length;
+    const reservedTokens = systemPromptTokens + initialResponseTokens;
+    const availableTokenBudget = defaultContextSize * 0.85 - reservedTokens;
+    const processedMessages: ChatMessage[] = [];
+    const reversedMessages = [...newMessages].reverse();
 
-    const lastMessagesReversed: ChatMessage[] = [];
+    let currentTokenCount = 0;
 
-    let totalTokens = 0;
+    for (let i = 0; i < reversedMessages.length; i++) {
+      const message = reversedMessages[i];
+      const messageTokens = gptTokenizer.encode(message.content).length;
 
-    for (const message of allMessages.reverse()) {
-      const newTotalTokens =
-        totalTokens + gptTokenizer.encode(message.content).length;
+      if (currentTokenCount + messageTokens > availableTokenBudget) {
+        break;
+      }
 
-      if (newTotalTokens > defaultContextSize * 0.6) break;
-
-      totalTokens = newTotalTokens;
-      lastMessagesReversed.push(message);
+      processedMessages.unshift(message);
+      currentTokenCount += messageTokens;
     }
 
-    const lastMessages = lastMessagesReversed.reverse();
+    if (processedMessages.length > 0) {
+      const expectedFirstRole = "user";
+
+      if (processedMessages[0].role !== expectedFirstRole) {
+        processedMessages.shift();
+      }
+    }
+
+    const lastMessages = [systemPrompt, initialResponse, ...processedMessages];
 
     if (settings.inferenceType === "openai") {
       const { generateChatWithOpenAi } = await import(
