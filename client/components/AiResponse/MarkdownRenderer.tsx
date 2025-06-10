@@ -1,8 +1,9 @@
 import { CodeHighlight } from "@mantine/code-highlight";
-import { Box, Button, Code } from "@mantine/core";
+import { Box, Code } from "@mantine/core";
 import React, { lazy } from "react";
 import rehypeExternalLinks from "rehype-external-links";
 import remarkGfm from "remark-gfm";
+import ExpandableLink from "./ExpandableLink";
 
 const Markdown = lazy(() => import("react-markdown"));
 interface MarkdownRendererProps {
@@ -34,22 +35,7 @@ export default function MarkdownRenderer({
           a(props) {
             const { href, children } = props;
             return (
-              <Button
-                component="a"
-                href={href}
-                target="_blank"
-                rel="nofollow noopener noreferrer"
-                variant="light"
-                color="gray"
-                size="compact-xs"
-                radius="xl"
-                style={{
-                  textDecoration: "none",
-                  transform: "translateY(-2px)",
-                }}
-              >
-                {children}
-              </Button>
+              <ExpandableLink href={href || ""}>{children}</ExpandableLink>
             );
           },
           li(props) {

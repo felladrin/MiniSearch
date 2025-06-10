@@ -13,7 +13,7 @@ export const defaultSettings = {
   cpuThreads: Math.max(1, (navigator.hardwareConcurrency ?? 1) - 2),
   searchResultsToConsider: 3,
   searchResultsLimit: 15,
-  systemPrompt: `- Respond using the provided search results with referencing links + your knowledge + extra relevant insights (note: referencing links should be placed near the fact you are quoting, in this format: [N](URL). For example: [1](http://example.com))
+  systemPrompt: `- Respond using the provided search results with referencing links + your knowledge + extra relevant insights (note: referencing links should be placed near the fact you are quoting, in this format: [example.com](http://example.com/article/123))
 - Write your response in the same language as the query
 - You are allowed to use the following Markdown components in your response: anchor, bold, italic, code, quote, table
 
