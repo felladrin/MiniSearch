@@ -149,11 +149,11 @@ export default function ChatInterface({
           .then((imageResults) => {
             if (imageResults.length > 0) {
               const existingUrls = new Set(
-                getImageSearchResults().map(([, , url]) => url),
+                getImageSearchResults().map(([, url]) => url),
               );
 
               const uniqueFreshResults = imageResults.filter(
-                ([, , url]) => !existingUrls.has(url),
+                ([, url]) => !existingUrls.has(url),
               );
 
               if (uniqueFreshResults.length > 0) {
