@@ -13,31 +13,36 @@ export default function ExpandableLink({
 }: ExpandableLinkProps) {
   const childContent = children?.toString() || "";
   const firstChar = childContent.charAt(0);
-  const [isHovered, setIsHovered] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(true);
   const timerRef = React.useRef<number | null>(null);
 
-  const handleMouseEnter = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    setIsHovered(true);
-  };
-
-  const handleMouseLeave = () => {
+  React.useEffect(() => {
     timerRef.current = window.setTimeout(() => {
-      setIsHovered(false);
+      setIsExpanded(false);
       timerRef.current = null;
     }, 3000);
-  };
 
-  React.useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
     };
   }, []);
+
+  const handleMouseEnter = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsExpanded(true);
+  };
+
+  const handleMouseLeave = () => {
+    timerRef.current = window.setTimeout(() => {
+      setIsExpanded(false);
+      timerRef.current = null;
+    }, 3000);
+  };
 
   const fullTextRef = React.useRef<HTMLDivElement>(null);
   const [fullTextWidth, setFullTextWidth] = React.useState(0);
@@ -72,7 +77,7 @@ export default function ExpandableLink({
         transform: "translateY(-2px)",
         overflow: "hidden",
         position: "relative",
-        width: isHovered ? `${fullTextWidth + theme.spacing.md}px` : "2em",
+        width: isExpanded ? `${fullTextWidth + theme.spacing.md}px` : "2em",
         transition: "width 0.3s ease-in-out",
         textAlign: "center",
       })}
@@ -91,7 +96,7 @@ export default function ExpandableLink({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          opacity: isHovered ? 0 : 1,
+          opacity: isExpanded ? 0 : 1,
           transition: "opacity 0.2s ease-in-out",
         }}
       >
@@ -100,9 +105,9 @@ export default function ExpandableLink({
       <span
         ref={fullTextRef}
         style={{
-          opacity: isHovered ? 1 : 0,
+          opacity: isExpanded ? 1 : 0,
           transition: "opacity 0.3s ease-in-out",
-          visibility: isHovered ? "visible" : "hidden",
+          visibility: isExpanded ? "visible" : "hidden",
           whiteSpace: "nowrap",
           display: "flex",
           alignItems: "center",
