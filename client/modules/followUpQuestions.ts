@@ -25,12 +25,15 @@ export async function generateFollowUpQuestion({
       },
       {
         role: "user",
-        content:
-          "Based on the previous question and your response, generate a single, " +
-          "concise follow-up question that explores an important unexplored aspect " +
-          "of the topic. The question should be 1-2 sentences maximum and end with a question mark. " +
-          "Respond with just the question, no additional text or explanations. " +
-          "Generate it using the same language as the previous question and your response.",
+        content: `CRITICAL INSTRUCTION: You MUST use the EXACT SAME LANGUAGE as the original question and response.
+
+Based on the previous question and your response, generate one short follow-up question that explores an important unexplored aspect of the topic.
+
+- The question MUST be in the SAME LANGUAGE as the previous text (this is the highest priority requirement)
+- Keep it to 1-2 sentences maximum
+- End with a question mark
+
+Respond with just the question, no additional text or explanations.`,
       },
     ];
 
@@ -42,11 +45,24 @@ export async function generateFollowUpQuestion({
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
 
-    const questionLine = lines.reverse().find((line) => line.endsWith("?"));
+    let questionLine = lines
+      .reverse()
+      .find(
+        (line) =>
+          line.endsWith("?") || line.endsWith('?"') || line.endsWith("?'"),
+      );
 
     if (!questionLine) {
       addLogEntry("No valid follow-up question generated");
       return "";
+    }
+
+    if (questionLine.startsWith('"') || questionLine.startsWith("'")) {
+      questionLine = questionLine.slice(1);
+    }
+
+    if (questionLine.endsWith('"') || questionLine.endsWith("'")) {
+      questionLine = questionLine.slice(0, -1);
     }
 
     addLogEntry("Generated follow-up question successfully");
