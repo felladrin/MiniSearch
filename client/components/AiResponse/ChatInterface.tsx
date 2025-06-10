@@ -17,8 +17,15 @@ import {
   chatGenerationStatePubSub,
   chatInputPubSub,
   followUpQuestionPubSub,
+  getImageSearchResults,
+  getTextSearchResults,
   settingsPubSub,
+  updateImageSearchResults,
+  updateLlmTextSearchResults,
+  updateTextSearchResults,
 } from "../../modules/pubSub";
+import { generateRelatedSearchQuery } from "../../modules/relatedSearchQuery";
+import { searchImages, searchText } from "../../modules/search";
 import { generateChatResponse } from "../../modules/textGeneration";
 
 const ChatHeader = lazy(() => import("./ChatHeader"));
@@ -105,6 +112,65 @@ export default function ChatInterface({
     });
     setFollowUpQuestion("");
     setStreamedResponse("");
+
+    try {
+      const relatedQuery = await generateRelatedSearchQuery([...newMessages]);
+      const searchQuery = relatedQuery || currentInput;
+
+      if (settings.enableTextSearch) {
+        const freshResults = await searchText(
+          searchQuery,
+          settings.searchResultsLimit,
+        );
+
+        if (freshResults.length > 0) {
+          const existingUrls = new Set(
+            getTextSearchResults().map(([, , url]) => url),
+          );
+
+          const uniqueFreshResults = freshResults.filter(
+            ([, , url]) => !existingUrls.has(url),
+          );
+
+          if (uniqueFreshResults.length > 0) {
+            updateTextSearchResults([
+              ...getTextSearchResults(),
+              ...uniqueFreshResults,
+            ]);
+            updateLlmTextSearchResults(
+              uniqueFreshResults.slice(0, settings.searchResultsToConsider),
+            );
+          }
+        }
+      }
+
+      if (settings.enableImageSearch) {
+        searchImages(searchQuery, settings.searchResultsLimit)
+          .then((imageResults) => {
+            if (imageResults.length > 0) {
+              const existingUrls = new Set(
+                getImageSearchResults().map(([, , url]) => url),
+              );
+
+              const uniqueFreshResults = imageResults.filter(
+                ([, , url]) => !existingUrls.has(url),
+              );
+
+              if (uniqueFreshResults.length > 0) {
+                updateImageSearchResults([
+                  ...uniqueFreshResults,
+                  ...getImageSearchResults(),
+                ]);
+              }
+            }
+          })
+          .catch((error) => {
+            addLogEntry(`Error in follow-up image search: ${error}`);
+          });
+      }
+    } catch (error) {
+      addLogEntry(`Error in follow-up search: ${error}`);
+    }
 
     try {
       const finalResponse = await generateChatResponse(

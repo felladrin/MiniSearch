@@ -9,6 +9,7 @@ import {
   listenToSettingsChanges,
   updateImageSearchResults,
   updateImageSearchState,
+  updateLlmTextSearchResults,
   updateResponse,
   updateSearchPromise,
   updateTextGenerationState,
@@ -207,6 +208,9 @@ async function startTextSearch(query: string) {
       results.textResults.length === 0 ? "failed" : "completed",
     );
     updateTextSearchResults(textResults);
+    updateLlmTextSearchResults(
+      textResults.slice(0, getSettings().searchResultsToConsider),
+    );
   }
 
   if (getSettings().enableImageSearch) {

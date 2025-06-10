@@ -1,11 +1,11 @@
 import type { ChatCompletionChunk } from "@mlc-ai/web-llm";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
+  getLlmTextSearchResults,
   getQuery,
   getSearchPromise,
   getSettings,
   getTextGenerationState,
-  getTextSearchResults,
   updateTextGenerationState,
 } from "./pubSub";
 import { getSystemPrompt } from "./systemPrompt";
@@ -20,24 +20,18 @@ export class ChatGenerationError extends Error {
 }
 
 export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
-  const searchResults = getTextSearchResults().slice(
-    0,
-    getSettings().searchResultsToConsider,
-  );
+  const searchResults = getLlmTextSearchResults();
 
   if (searchResults.length === 0) return "None.";
 
   if (shouldIncludeUrl) {
     return searchResults
-      .map(
-        ([title, snippet, url], index) =>
-          `${index + 1}. [${title}](${url}) | ${snippet}`,
-      )
+      .map(([title, snippet, url]) => `• [${title}](${url}) | ${snippet}`)
       .join("\n");
   }
 
   return searchResults
-    .map(([title, snippet]) => `- ${title} | ${snippet}`)
+    .map(([title, snippet]) => `• ${title} | ${snippet}`)
     .join("\n");
 }
 

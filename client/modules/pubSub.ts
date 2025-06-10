@@ -102,12 +102,17 @@ subscribeToImageSearchState((imageSearchState) => {
 });
 
 export const textSearchResultsPubSub = createPubSub<TextSearchResults>([]);
+export const llmTextSearchResultsPubSub = createPubSub<TextSearchResults>([]);
 export const imageSearchResultsPubSub = createPubSub<ImageSearchResults>([]);
 
 export const [updateTextSearchResults, , getTextSearchResults] =
   textSearchResultsPubSub;
 
-export const [updateImageSearchResults] = imageSearchResultsPubSub;
+export const [updateLlmTextSearchResults, , getLlmTextSearchResults] =
+  llmTextSearchResultsPubSub;
+
+export const [updateImageSearchResults, , getImageSearchResults] =
+  imageSearchResultsPubSub;
 
 export const menuExpandedAccordionsPubSub = createLocalStoragePubSub<string[]>(
   "menuExpandedAccordions",
