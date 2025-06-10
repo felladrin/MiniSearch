@@ -13,9 +13,3 @@ export interface AIParameterSliderProps extends Record<string, unknown> {
   description: string;
   defaultValue: number;
 }
-
-export const penaltySliderMarks = [
-  { value: -2.0, label: "-2.0" },
-  { value: 0.0, label: "0" },
-  { value: 2.0, label: "2.0" },
-];

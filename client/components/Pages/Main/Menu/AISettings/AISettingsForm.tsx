@@ -1,6 +1,7 @@
 import { Select, Slider, Stack, Switch, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { usePubSub } from "create-pubsub/react";
+import { useMemo } from "react";
 import { settingsPubSub } from "../../../../../modules/pubSub";
 import {
   defaultSettings,
@@ -15,7 +16,6 @@ import { SystemPromptInput } from "./components/SystemPromptInput";
 import { useHordeModels } from "./hooks/useHordeModels";
 import { useHordeUserInfo } from "./hooks/useHordeUserInfo";
 import { useOpenAiModels } from "./hooks/useOpenAiModels";
-import { penaltySliderMarks } from "./types";
 
 export default function AISettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
@@ -27,6 +27,42 @@ export default function AISettingsForm() {
     initialValues: settings,
     onValuesChange: setSettings,
   });
+
+  const penaltySliderMarks = useMemo(
+    () => [
+      { value: -2.0, label: "-2.0" },
+      { value: 0.0, label: "0" },
+      { value: 2.0, label: "2.0" },
+    ],
+    [],
+  );
+
+  const probabilitySliderMarks = useMemo(
+    () =>
+      Array.from({ length: 3 }, (_, index) => ({
+        value: index / 2,
+        label: (index / 2).toString(),
+      })),
+    [],
+  );
+
+  const searchResultsToConsiderSliderMarks = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, index) => ({
+        value: index,
+        label: index.toString(),
+      })),
+    [],
+  );
+
+  const temperatureSliderMarks = useMemo(
+    () => [
+      { value: 0, label: "0" },
+      { value: 1, label: "1" },
+      { value: 2, label: "2" },
+    ],
+    [],
+  );
 
   return (
     <Stack gap="md">
@@ -50,10 +86,7 @@ export default function AISettingsForm() {
               {...form.getInputProps("searchResultsToConsider")}
               min={0}
               max={6}
-              marks={Array.from({ length: 7 }, (_, index) => ({
-                value: index,
-                label: index.toString(),
-              }))}
+              marks={searchResultsToConsiderSliderMarks}
             />
           </Stack>
 
@@ -97,11 +130,7 @@ export default function AISettingsForm() {
             min={0}
             max={2}
             step={0.01}
-            marks={[
-              { value: 0, label: "0" },
-              { value: 1, label: "1" },
-              { value: 2, label: "2" },
-            ]}
+            marks={temperatureSliderMarks}
           />
 
           <AIParameterSlider
@@ -112,10 +141,7 @@ export default function AISettingsForm() {
             min={0}
             max={1}
             step={0.01}
-            marks={Array.from({ length: 3 }, (_, index) => ({
-              value: index / 2,
-              label: (index / 2).toString(),
-            }))}
+            marks={probabilitySliderMarks}
           />
 
           <AIParameterSlider
@@ -126,10 +152,7 @@ export default function AISettingsForm() {
             min={0}
             max={1}
             step={0.01}
-            marks={Array.from({ length: 3 }, (_, index) => ({
-              value: index / 2,
-              label: (index / 2).toString(),
-            }))}
+            marks={probabilitySliderMarks}
           />
 
           <AIParameterSlider
