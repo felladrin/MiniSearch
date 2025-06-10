@@ -1,7 +1,7 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { type CoreMessage, type Message, streamText } from "ai";
 import type { Connect, PreviewServer, ViteDevServer } from "vite";
-import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit";
+import { handleTokenVerification } from "./handleTokenVerification";
 
 interface ChatCompletionRequestBody {
   messages: CoreMessage[] | Omit<Message, "id">[];
@@ -52,15 +52,9 @@ export function internalApiEndpointServerHook<
 
     const url = new URL(request.url, `http://${request.headers.host}`);
     const token = url.searchParams.get("token");
-    const { isAuthorized, statusCode, error } =
-      await verifyTokenAndRateLimit(token);
+    const { shouldContinue } = await handleTokenVerification(token, response);
 
-    if (!isAuthorized && statusCode && error) {
-      response.statusCode = statusCode;
-      response.setHeader("Content-Type", "application/json");
-      response.end(JSON.stringify({ error }));
-      return;
-    }
+    if (!shouldContinue) return;
 
     if (
       !process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL ||

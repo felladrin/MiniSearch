@@ -1,11 +1,11 @@
 import axios from "axios";
 import type { PreviewServer, ViteDevServer } from "vite";
+import { handleTokenVerification } from "./handleTokenVerification";
 import { rankSearchResults } from "./rankSearchResults";
 import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
 } from "./searchesSinceLastRestart";
-import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit";
 import { fetchSearXNG } from "./webSearchService";
 
 type TextResult = [title: string, content: string, url: string];
@@ -34,14 +34,9 @@ export function searchEndpointServerHook<
       return;
     }
 
-    const { isAuthorized, statusCode, error } =
-      await verifyTokenAndRateLimit(token);
-    if (!isAuthorized && statusCode && error) {
-      response.statusCode = statusCode;
-      response.setHeader("Content-Type", "application/json");
-      response.end(JSON.stringify({ error }));
-      return;
-    }
+    const { shouldContinue } = await handleTokenVerification(token, response);
+
+    if (!shouldContinue) return;
 
     try {
       const isTextSearch = request.url?.startsWith("/search/text");
