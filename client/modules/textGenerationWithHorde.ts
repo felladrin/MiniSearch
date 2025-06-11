@@ -24,6 +24,7 @@ interface HordeStatusResponse {
   generations?: { text: string; model: string }[];
   done?: boolean;
   faulted?: boolean;
+  is_possible?: boolean;
 }
 
 interface HordeModelInfo {
@@ -122,20 +123,27 @@ async function handleGenerationStatus(
         onUpdate(lastText.split(userMarker)[0]);
       }
 
-      if (!status.done && !status.faulted) {
+      if (!status.done && !status.faulted && status.is_possible) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
       if (getTextGenerationState() === "interrupted") {
         throw new ChatGenerationError("Generation interrupted");
       }
-    } while (!status.done && !status.faulted);
+    } while (!status.done && !status.faulted && status.is_possible);
 
     if (status.faulted) {
-      throw new Error("Generation failed");
+      throw new ChatGenerationError("Generation failed");
+    }
+
+    if (!status.is_possible) {
+      throw new ChatGenerationError(
+        "Generation not possible with the selected model",
+      );
     }
 
     const generatedText = status.generations?.[0].text;
+
     if (!generatedText) {
       throw new Error("No text generated");
     }
