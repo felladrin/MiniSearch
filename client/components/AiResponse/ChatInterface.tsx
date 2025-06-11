@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { ErrorBoundary } from "react-error-boundary";
+import throttle from "throttleit";
 import { generateFollowUpQuestion } from "../../modules/followUpQuestions";
 import { handleEnterKeyDown } from "../../modules/keyboard";
 import { addLogEntry } from "../../modules/logEntries";
@@ -49,6 +50,12 @@ export default function ChatInterface({
   const [, setFollowUpQuestion] = usePubSub(followUpQuestionPubSub);
   const [settings] = usePubSub(settingsPubSub);
   const [streamedResponse, setStreamedResponse] = useState("");
+  const updateStreamedResponse = useCallback(
+    throttle((response: string) => {
+      setStreamedResponse(response);
+    }, 1000 / 12),
+    [],
+  );
 
   const regenerateFollowUpQuestion = useCallback(
     async (currentQuery: string, currentResponse: string) => {
@@ -175,9 +182,7 @@ export default function ChatInterface({
     try {
       const finalResponse = await generateChatResponse(
         newMessages,
-        (partialResponse) => {
-          setStreamedResponse(partialResponse);
-        },
+        updateStreamedResponse,
       );
 
       setMessages((prevMessages) => [
