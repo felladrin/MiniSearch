@@ -70,9 +70,19 @@ export default function AiResponseContent({
     }
 
     const prepareTextForSpeech = (textToClean: string) => {
-      const withoutLinks = textToClean.replace(/\[([^\]]+)\]\([^)]+\)/g, "");
+      const withoutReasoning = textToClean.replace(
+        new RegExp(
+          `${settings.reasoningStartMarker}[\\s\\S]*?${settings.reasoningEndMarker}`,
+          "g",
+        ),
+        "",
+      );
+      const withoutLinks = withoutReasoning.replace(
+        /\[([^\]]+)\]\([^)]+\)/g,
+        "($1)",
+      );
       const withoutMarkdown = withoutLinks.replace(/[#*`_~\[\]]/g, "");
-      return withoutMarkdown;
+      return withoutMarkdown.trim();
     };
 
     const utterance = new SpeechSynthesisUtterance(prepareTextForSpeech(text));
