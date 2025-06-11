@@ -5,11 +5,13 @@ import { generateChatResponse } from "./textGeneration";
 interface FollowUpQuestionParams {
   topic: string;
   currentContent: string;
+  previousQuestions?: string[];
 }
 
 export async function generateFollowUpQuestion({
   topic,
   currentContent,
+  previousQuestions = [],
 }: FollowUpQuestionParams): Promise<string> {
   try {
     addLogEntry("Generating a follow-up question");
@@ -25,11 +27,17 @@ export async function generateFollowUpQuestion({
       },
       {
         role: "user",
-        content: `CRITICAL INSTRUCTION: You MUST use the EXACT SAME LANGUAGE as the original question and response.
+        content: `CRITICAL INSTRUCTION: You MUST use the EXACT SAME LANGUAGE as the original question and response. Also, note that the following follow-up questions were already asked. Do NOT repeat them or their meaning:
+${
+  previousQuestions.length > 0
+    ? previousQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")
+    : "(No previous follow-up questions yet)"
+}
 
-Based on the previous question and your response, generate one short follow-up question that explores an important unexplored aspect of the topic.
+Knowing that, generate one short follow-up question that explores an important unexplored aspect of the topic.
 
 - The question MUST be in the SAME LANGUAGE as the previous text (this is the highest priority requirement)
+- The question MUST be different from all previously asked questions above
 - Keep it to 1-2 sentences maximum
 - End with a question mark
 

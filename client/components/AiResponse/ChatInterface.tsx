@@ -48,6 +48,9 @@ export default function ChatInterface({
     chatGenerationStatePubSub,
   );
   const [, setFollowUpQuestion] = usePubSub(followUpQuestionPubSub);
+  const [previousFollowUpQuestions, setPreviousFollowUpQuestions] = useState<
+    string[]
+  >([]);
   const [settings] = usePubSub(settingsPubSub);
   const [streamedResponse, setStreamedResponse] = useState("");
   const updateStreamedResponse = useCallback(
@@ -70,8 +73,12 @@ export default function ChatInterface({
         const newQuestion = await generateFollowUpQuestion({
           topic: currentQuery,
           currentContent: currentResponse,
+          previousQuestions: previousFollowUpQuestions,
         });
 
+        setPreviousFollowUpQuestions((prev) =>
+          [...prev, newQuestion].slice(-5),
+        );
         setFollowUpQuestion(newQuestion);
         setGenerationState({
           isGeneratingResponse: false,
@@ -85,7 +92,7 @@ export default function ChatInterface({
         });
       }
     },
-    [setFollowUpQuestion, setGenerationState],
+    [setFollowUpQuestion, setGenerationState, previousFollowUpQuestions],
   );
 
   useEffect(() => {
@@ -110,6 +117,10 @@ export default function ChatInterface({
 
     const userMessage: ChatMessage = { role: "user", content: currentInput };
     const newMessages: ChatMessage[] = [...messages, userMessage];
+
+    if (messages.length === 0) {
+      setPreviousFollowUpQuestions([]);
+    }
 
     setMessages(newMessages);
     setInput(textToSend ? input : "");
