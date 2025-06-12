@@ -28,6 +28,10 @@ export default function AISettingsForm() {
     onValuesChange: setSettings,
   });
 
+  const inferenceTypeSupportsMinP =
+    form.values.inferenceType === "browser" ||
+    form.values.inferenceType === "horde";
+
   const penaltySliderMarks = useMemo(
     () => [
       { value: -2.0, label: "-2.0" },
@@ -144,16 +148,18 @@ export default function AISettingsForm() {
             marks={probabilitySliderMarks}
           />
 
-          <AIParameterSlider
-            label="Min P"
-            description="Sets a minimum probability for token selection. Helps to filter out very unlikely tokens, making responses more coherent."
-            defaultValue={defaultSettings.minP}
-            {...form.getInputProps("minP")}
-            min={0}
-            max={1}
-            step={0.01}
-            marks={probabilitySliderMarks}
-          />
+          {inferenceTypeSupportsMinP && (
+            <AIParameterSlider
+              label="Min P"
+              description="Sets a minimum probability for token selection. Helps to filter out very unlikely tokens, making responses more coherent."
+              defaultValue={defaultSettings.minP}
+              {...form.getInputProps("minP")}
+              min={0}
+              max={1}
+              step={0.01}
+              marks={probabilitySliderMarks}
+            />
+          )}
 
           <AIParameterSlider
             label="Frequency Penalty"
