@@ -1,5 +1,5 @@
 import { CodeHighlight } from "@mantine/code-highlight";
-import { Box, Code } from "@mantine/core";
+import { Box, Code, Divider } from "@mantine/core";
 import React, { lazy } from "react";
 import rehypeExternalLinks from "rehype-external-links";
 import remarkGfm from "remark-gfm";
@@ -47,6 +47,9 @@ export default function MarkdownRenderer({
               return child;
             });
             return <li>{processedChildren}</li>;
+          },
+          hr() {
+            return <Divider variant="dashed" />;
           },
           pre(props) {
             return <>{props.children}</>;
