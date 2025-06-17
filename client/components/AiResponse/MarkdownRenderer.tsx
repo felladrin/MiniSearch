@@ -49,7 +49,7 @@ export default function MarkdownRenderer({
             return <li>{processedChildren}</li>;
           },
           hr() {
-            return <Divider variant="dashed" />;
+            return <Divider variant="dashed" my="md" />;
           },
           pre(props) {
             return <>{props.children}</>;
