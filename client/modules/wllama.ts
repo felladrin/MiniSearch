@@ -220,6 +220,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00018.gguf",
     fileSizeInMegabytes: 905,
   },
+  "olmo-2-0425-1b": {
+    ...createDefaultModelConfig(),
+    label: "OLMo 2 1B",
+    hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-OLMo-2-0425-1B-Instruct",
+    hfFilePath: "model.shard-00001-of-00006.gguf",
+    fileSizeInMegabytes: 967,
+  },
   "stablelm-2-zephyr-1.6b": {
     ...createDefaultModelConfig(),
     label: "StableLM 2 Zephyr 1.6B",
