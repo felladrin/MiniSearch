@@ -1,5 +1,5 @@
 import { Stack } from "@mantine/core";
-import { Suspense, lazy } from "react";
+import { lazy, Suspense } from "react";
 
 const ClearDataButton = lazy(() => import("./ClearDataButton"));
 const ShowLogsButton = lazy(() => import("../../../Logs/ShowLogsButton"));

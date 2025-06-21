@@ -1,6 +1,6 @@
 import { NumberInput, Skeleton, Switch } from "@mantine/core";
 import type { UseFormReturnType } from "@mantine/form";
-import { Suspense, lazy } from "react";
+import { lazy, Suspense } from "react";
 import type { defaultSettings } from "../../../../../../modules/settings";
 
 const WebLlmModelSelect = lazy(

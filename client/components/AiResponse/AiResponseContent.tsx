@@ -19,7 +19,7 @@ import {
 } from "@tabler/icons-react";
 import type { PublishFunction } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
-import { type ReactNode, Suspense, lazy, useMemo, useState } from "react";
+import { lazy, type ReactNode, Suspense, useMemo, useState } from "react";
 import { addLogEntry } from "../../modules/logEntries";
 import { settingsPubSub } from "../../modules/pubSub";
 import { searchAndRespond } from "../../modules/textGeneration";
@@ -81,7 +81,7 @@ export default function AiResponseContent({
         /\[([^\]]+)\]\([^)]+\)/g,
         "($1)",
       );
-      const withoutMarkdown = withoutLinks.replace(/[#*`_~\[\]]/g, "");
+      const withoutMarkdown = withoutLinks.replace(/[#*`_~[\]]/g, "");
       return withoutMarkdown.trim();
     };
 

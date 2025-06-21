@@ -1,5 +1,5 @@
 import { Button, Center, Loader, Stack, Text } from "@mantine/core";
-import { Suspense, lazy, useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { addLogEntry } from "../../modules/logEntries";
 
 const LogsModal = lazy(() => import("./LogsModal"));

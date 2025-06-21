@@ -144,7 +144,7 @@ async function getRequestBody(
       try {
         const body = Buffer.concat(chunks).toString();
         resolve(JSON.parse(body));
-      } catch (error) {
+      } catch (_) {
         reject(new Error("Failed to parse request body"));
       }
     });

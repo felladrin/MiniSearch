@@ -1,6 +1,6 @@
 import { Button, Group, Textarea } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
-import { Suspense, lazy } from "react";
+import { lazy, Suspense } from "react";
 import {
   chatGenerationStatePubSub,
   chatInputPubSub,

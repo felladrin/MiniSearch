@@ -1,5 +1,5 @@
-import { Button } from "@mantine/core";
 import type { MantineTheme } from "@mantine/core";
+import { Button } from "@mantine/core";
 import React from "react";
 
 interface ExpandableLinkProps {

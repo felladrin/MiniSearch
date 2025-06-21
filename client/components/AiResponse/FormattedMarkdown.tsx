@@ -16,12 +16,12 @@ export default function FormattedMarkdown({
   className = "",
   enableCopy = true,
 }: FormattedMarkdownProps) {
+  const { reasoningContent, mainContent, isGenerating } =
+    useReasoningContent(children);
+
   if (!children) {
     return null;
   }
-
-  const { reasoningContent, mainContent, isGenerating } =
-    useReasoningContent(children);
 
   return (
     <TypographyStylesProvider p="lg">

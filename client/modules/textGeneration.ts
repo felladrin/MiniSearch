@@ -41,7 +41,7 @@ export async function searchAndRespond() {
 
   if (!getSettings().enableAiResponse) return;
 
-  const responseGenerationStartTime = new Date().getTime();
+  const responseGenerationStartTime = Date.now();
 
   try {
     const settings = getSettings();
@@ -87,7 +87,7 @@ export async function searchAndRespond() {
 
   addLogEntry(
     `Response generation took ${prettyMilliseconds(
-      new Date().getTime() - responseGenerationStartTime,
+      Date.now() - responseGenerationStartTime,
       { verbose: true },
     )}`,
   );

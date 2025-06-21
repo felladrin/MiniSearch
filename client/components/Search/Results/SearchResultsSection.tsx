@@ -1,6 +1,6 @@
 import { Alert, Loader, Stack, Text } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
-import { Suspense, lazy } from "react";
+import { lazy, Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { settingsPubSub } from "../../../modules/pubSub";
 

@@ -49,7 +49,7 @@ export default function SearchForm({
   const fetchQuerySuggestion = useCallback(async () => {
     try {
       return await getRandomQuerySuggestion();
-    } catch (error) {
+    } catch (_) {
       addLogEntry("Failed to get query suggestion");
       return defaultSuggestedQuery;
     }
@@ -74,7 +74,7 @@ export default function SearchForm({
       try {
         const suggestion = await getRandomQuerySuggestion();
         setState((prev) => ({ ...prev, suggestedQuery: suggestion }));
-      } catch (error) {
+      } catch (_) {
         addLogEntry("Failed to get query suggestion");
         setState((prev) => ({
           ...prev,

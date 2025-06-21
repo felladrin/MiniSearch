@@ -1,6 +1,6 @@
 import { Paper, Stack } from "@mantine/core";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
-import { Suspense, lazy, memo } from "react";
+import { lazy, memo, Suspense } from "react";
 
 const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
 

@@ -1,4 +1,4 @@
-import { argon2Verify, argon2id } from "hash-wasm";
+import { argon2id, argon2Verify } from "hash-wasm";
 import { addLogEntry } from "./logEntries";
 import { getLastSearchTokenHash, updateLastSearchTokenHash } from "./pubSub";
 
