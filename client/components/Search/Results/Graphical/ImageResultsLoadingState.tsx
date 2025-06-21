@@ -1,5 +1,4 @@
-import { AspectRatio, Group, Skeleton } from "@mantine/core";
-import { em } from "@mantine/core";
+import { AspectRatio, em, Group, Skeleton } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 
 export default function ImageResultsLoadingState() {

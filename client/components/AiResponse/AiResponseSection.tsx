@@ -1,6 +1,6 @@
 import { CodeHighlightAdapterProvider } from "@mantine/code-highlight";
 import { usePubSub } from "create-pubsub/react";
-import { Suspense, lazy, useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import {
   modelLoadingProgressPubSub,
   modelSizeInMegabytesPubSub,

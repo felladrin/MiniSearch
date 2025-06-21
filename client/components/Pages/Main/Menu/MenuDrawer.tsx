@@ -12,7 +12,7 @@ import {
 import { IconBrandGithub } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import prettyMilliseconds from "pretty-ms";
-import { Suspense, lazy } from "react";
+import { lazy, Suspense } from "react";
 import { repository } from "../../../../../package.json";
 import { appName, appVersion } from "../../../../modules/appInfo";
 import { addLogEntry } from "../../../../modules/logEntries";
@@ -57,8 +57,7 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
                 <Center>
                   Released{" "}
                   {prettyMilliseconds(
-                    new Date().getTime() -
-                      new Date(VITE_BUILD_DATE_TIME).getTime(),
+                    Date.now() - new Date(VITE_BUILD_DATE_TIME).getTime(),
                     {
                       compact: true,
                       verbose: true,

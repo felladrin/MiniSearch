@@ -8,7 +8,7 @@ import {
 import { getVerifiedTokensAmount } from "./verifiedTokens";
 import { getWebSearchStatus } from "./webSearchService";
 
-const serverStartTime = new Date().getTime();
+const serverStartTime = Date.now();
 
 export function statusEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
@@ -33,7 +33,7 @@ export function statusEndpointServerHook<
       : "unhealthy";
 
     const status = {
-      uptime: prettyMilliseconds(new Date().getTime() - serverStartTime, {
+      uptime: prettyMilliseconds(Date.now() - serverStartTime, {
         verbose: true,
       }),
       sessions,

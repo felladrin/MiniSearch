@@ -1,6 +1,6 @@
 import { Group, Text } from "@mantine/core";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
-import { Suspense, lazy } from "react";
+import { lazy, Suspense } from "react";
 
 const CopyIconButton = lazy(() => import("./CopyIconButton"));
 

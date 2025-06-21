@@ -3,8 +3,8 @@ import { usePubSub } from "create-pubsub/react";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
   type KeyboardEvent,
-  Suspense,
   lazy,
+  Suspense,
   useCallback,
   useEffect,
   useState,
@@ -84,7 +84,7 @@ export default function ChatInterface({
           isGeneratingResponse: false,
           isGeneratingFollowUpQuestion: false,
         });
-      } catch (error) {
+      } catch (_) {
         setFollowUpQuestion("");
         setGenerationState({
           isGeneratingResponse: false,

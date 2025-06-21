@@ -1,5 +1,5 @@
 import { Carousel } from "@mantine/carousel";
-import { Button, Group, Stack, Text, Transition, rem } from "@mantine/core";
+import { Button, Group, rem, Stack, Text, Transition } from "@mantine/core";
 import { useEffect, useState } from "react";
 import type { ImageSearchResult } from "../../../../modules/types";
 import "@mantine/carousel/styles.css";

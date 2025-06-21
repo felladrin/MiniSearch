@@ -1,7 +1,6 @@
 import { Center, Container, Loader, Stack } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
-import { Suspense } from "react";
-import { lazy } from "react";
+import { lazy, Suspense } from "react";
 import {
   imageSearchStatePubSub,
   queryPubSub,

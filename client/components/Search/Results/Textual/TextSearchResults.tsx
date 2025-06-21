@@ -1,7 +1,7 @@
 import { Alert } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
-import { Suspense, lazy } from "react";
+import { lazy, Suspense } from "react";
 import {
   textSearchResultsPubSub,
   textSearchStatePubSub,
