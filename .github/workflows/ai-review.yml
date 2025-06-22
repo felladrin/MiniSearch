@@ -99,11 +99,7 @@ jobs:
                 {"role": "user", "content": $user}
               ],
               "temperature": 0.7,
-              "top_p": 0.9,
-              "extra_headers": {
-                "HTTP-Referer": $http_referer,
-                "X-Title": $title
-              }
+              "top_p": 0.9
             }' > /tmp/pr_review/request.json
       - name: Get AI Review
         id: ai_review
