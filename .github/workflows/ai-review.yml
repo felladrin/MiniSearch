@@ -50,7 +50,7 @@ jobs:
           PROCESSED_BODY=$(cat /tmp/pr_review/processed_body.txt)
 
           jq -n \
-            --arg model "${{ vars.OPENROUTER_MODEL }}" \
+            --arg model "${{ vars.OPENAI_COMPATIBLE_API_MODEL }}" \
             --arg http_referer "${{ github.event.repository.html_url }}" \
             --arg title "${{ github.event.repository.name }}" \
             --arg system "You are an experienced developer reviewing a Pull Request. You focus only on what matters and provide concise, actionable feedback.
@@ -99,21 +99,23 @@ jobs:
                 {"role": "user", "content": $user}
               ],
               "temperature": 0.7,
-              "top_p": 0.9,
-              "min_p": 0.1,
-              "extra_headers": {
-                "HTTP-Referer": $http_referer,
-                "X-Title": $title
-              }
+              "top_p": 0.9
             }' > /tmp/pr_review/request.json
-
       - name: Get AI Review
         id: ai_review
         run: |
-          RESPONSE=$(curl -s https://openrouter.ai/api/v1/chat/completions \
+          RESPONSE=$(curl -s ${{ vars.OPENAI_COMPATIBLE_API_BASE_URL }}/chat/completions \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.OPENROUTER_API_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}" \
             -d @/tmp/pr_review/request.json)
+          
+          # Check for errors in the response
+          if echo "$RESPONSE" | jq -e '.object == "error"' > /dev/null; then
+            echo "Error from API:" >&2
+            ERROR_MSG=$(echo "$RESPONSE" | jq -r '.message.detail[0].msg // .message')
+            echo "$ERROR_MSG" >&2
+            exit 1
+          fi
 
           echo "### Review" > /tmp/pr_review/response.txt
           echo "" >> /tmp/pr_review/response.txt
