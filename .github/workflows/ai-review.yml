@@ -105,7 +105,6 @@ jobs:
                 "X-Title": $title
               }
             }' > /tmp/pr_review/request.json
-
       - name: Get AI Review
         id: ai_review
         run: |
@@ -113,6 +112,13 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}" \
             -d @/tmp/pr_review/request.json)
+
+          # Check for errors in the response
+          if echo "$RESPONSE" | jq -e '.error' > /dev/null; then
+            echo "Error from API:" >&2
+            echo "$RESPONSE" | jq -r '.error' >&2
+            exit 1
+          fi
 
           echo "### Review" > /tmp/pr_review/response.txt
           echo "" >> /tmp/pr_review/response.txt
