@@ -88,6 +88,6 @@
     "vite": "^6.0.0"
   },
   "lint-staged": {
-    "*": "biome check --write --staged --no-errors-on-unmatched"
+    "*": "npx @biomejs/biome check --write --staged --no-errors-on-unmatched"
   }
 }
