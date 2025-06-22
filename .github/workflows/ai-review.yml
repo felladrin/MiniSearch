@@ -112,6 +112,8 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}" \
             -d @/tmp/pr_review/request.json)
+          
+          echo "$RESPONSE"
 
           # Check for errors in the response
           if echo "$RESPONSE" | jq -e '.error' > /dev/null; then
