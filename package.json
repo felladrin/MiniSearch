@@ -85,7 +85,7 @@
     "rollup-plugin-visualizer": "^6.0.0",
     "ts-prune": "^0.10.3",
     "typescript": "^5.0.2",
-    "vite": "^6.0.0"
+    "vite": "^7.0.0"
   },
   "lint-staged": {
     "*": "npx @biomejs/biome check --write --staged --no-errors-on-unmatched"
