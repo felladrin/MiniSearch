@@ -38,7 +38,7 @@
     "create-pubsub": "^1.6.3",
     "debug": "^4.4.0",
     "dexie": "^4.0.11",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.0.0",
     "embla-carousel-react": "^8.3.0",
     "gpt-tokenizer": "^3.0.0",
     "hash-wasm": "^4.11.0",
