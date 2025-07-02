@@ -332,11 +332,32 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00034.gguf",
     fileSizeInMegabytes: 2190,
   },
+  "gemma-3-4b": {
+    ...createDefaultModelConfig(),
+    label: "Gemma 3 4B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-gemma-3-4b-it",
+    hfFilePath: "model.shard-00001-of-00005.gguf",
+    fileSizeInMegabytes: 2380,
+  },
+  "polaris-4b-preview": {
+    ...createDefaultModelConfig(),
+    label: "Polaris 4B Preview",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Polaris-4B-Preview",
+    hfFilePath: "model.shard-00001-of-00008.gguf",
+    fileSizeInMegabytes: 2380,
+  },
   "phi-4-mini-reasoning": {
     ...createDefaultModelConfig(),
     label: "Phi 4 Mini Reasoning 3.8B",
     hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-Phi-4-mini-reasoning",
     hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 2460,
+  },
+  "llama-3.1-nemotron-nano-4b": {
+    ...createDefaultModelConfig(),
+    label: "Llama 3.1 Nemotron Nano 4B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Llama-3.1-Nemotron-Nano-4B-v1.1",
+    hfFilePath: "model.shard-00001-of-00009.gguf",
+    fileSizeInMegabytes: 2660,
   },
 };

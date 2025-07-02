@@ -32,7 +32,7 @@
     "@mantine/notifications": "^8.0.0",
     "@mlc-ai/web-llm": "^0.2.79",
     "@tabler/icons-react": "^3.16.0",
-    "@wllama/wllama": "^2.2.0",
+    "@wllama/wllama": "^2.3.1",
     "ai": "^4.1.26",
     "country-flag-icons": "^1.5.13",
     "create-pubsub": "^1.6.3",
