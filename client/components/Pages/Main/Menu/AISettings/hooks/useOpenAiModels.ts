@@ -23,9 +23,13 @@ export const useOpenAiModels = (settings: Settings) => {
         }
 
         const data = await response.json();
-        const models = data.data.map((model: { id: string }) => ({
-          label: model.id,
-          value: model.id,
+        const modelIds: string[] = data.data.map(
+          (model: { id: string }) => model.id,
+        );
+        const uniqueModelIds = [...new Set(modelIds)];
+        const models = uniqueModelIds.map((id) => ({
+          label: id,
+          value: id,
         }));
 
         setOpenAiModels(models);
