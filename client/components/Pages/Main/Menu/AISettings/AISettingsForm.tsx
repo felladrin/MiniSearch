@@ -29,7 +29,8 @@ export default function AISettingsForm() {
   });
 
   const inferenceTypeSupportsMinP =
-    form.values.inferenceType === "browser" ||
+    (form.values.inferenceType === "browser" &&
+      (!isWebGPUAvailable || !form.values.enableWebGpu)) ||
     form.values.inferenceType === "horde";
 
   const penaltySliderMarks = useMemo(
