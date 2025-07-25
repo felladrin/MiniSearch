@@ -178,13 +178,6 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 260,
   },
-  "qwen-2.5-0.5b": {
-    ...createDefaultModelConfig(),
-    label: "Qwen 2.5 0.5B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Qwen2.5-0.5B-Instruct",
-    hfFilePath: "model.shard-00001-of-00003.gguf",
-    fileSizeInMegabytes: 386,
-  },
   "qwen-3-0.6b": {
     ...createDefaultModelConfig(),
     label: "Qwen 3 0.6B",
@@ -198,13 +191,6 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-LFM2-700M",
     hfFilePath: "model.shard-00001-of-00006.gguf",
     fileSizeInMegabytes: 449,
-  },
-  "amd-olmo-1b": {
-    ...createDefaultModelConfig(),
-    label: "AMD OLMo 1B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-AMD-OLMo-1B-SFT-DPO",
-    hfFilePath: "model.shard-00001-of-00009.gguf",
-    fileSizeInMegabytes: 697,
   },
   "lfm2-1.2b": {
     ...createDefaultModelConfig(),
@@ -297,10 +283,10 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 1140,
   },
-  "granite-3.1-2b": {
+  "granite-3.3-2b": {
     ...createDefaultModelConfig(),
-    label: "Granite 3.1 2B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-3.1-2b-instruct",
+    label: "Granite 3.3 2B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-3.3-2b-instruct",
     hfFilePath: "model.shard-00001-of-00019.gguf",
     fileSizeInMegabytes: 1460,
   },
@@ -369,7 +355,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
   },
   "polaris-4b-preview": {
     ...createDefaultModelConfig(),
-    label: "Polaris 4B Preview",
+    label: "Polaris 4B",
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Polaris-4B-Preview",
     hfFilePath: "model.shard-00001-of-00008.gguf",
     fileSizeInMegabytes: 2380,
