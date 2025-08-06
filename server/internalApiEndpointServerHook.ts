@@ -1,10 +1,10 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { type CoreMessage, type Message, streamText } from "ai";
+import { type ModelMessage, streamText } from "ai";
 import type { Connect, PreviewServer, ViteDevServer } from "vite";
 import { handleTokenVerification } from "./handleTokenVerification";
 
 interface ChatCompletionRequestBody {
-  messages: CoreMessage[] | Omit<Message, "id">[];
+  messages: ModelMessage[];
   temperature?: number;
   top_p?: number;
   frequency_penalty?: number;
@@ -88,7 +88,7 @@ export function internalApiEndpointServerHook<
         topP: requestBody.top_p,
         frequencyPenalty: requestBody.frequency_penalty,
         presencePenalty: requestBody.presence_penalty,
-        maxTokens: requestBody.max_tokens,
+        maxOutputTokens: requestBody.max_tokens,
       });
 
       response.setHeader("Content-Type", "text/event-stream");
@@ -98,7 +98,7 @@ export function internalApiEndpointServerHook<
       try {
         for await (const part of stream.fullStream) {
           if (part.type === "text-delta") {
-            const payload = createChunkPayload(model, part.textDelta);
+            const payload = createChunkPayload(model, part.text);
             response.write(`data: ${JSON.stringify(payload)}\n\n`);
           } else if (part.type === "finish") {
             const payload = createChunkPayload(model, undefined, "stop");

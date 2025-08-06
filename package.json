@@ -22,7 +22,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^0.2.0",
+    "@ai-sdk/openai-compatible": "^1.0.0",
     "@huggingface/hub": "^2.0.0",
     "@mantine/carousel": "^8.0.0",
     "@mantine/code-highlight": "^8.0.1",
@@ -33,7 +33,7 @@
     "@mlc-ai/web-llm": "^0.2.79",
     "@tabler/icons-react": "^3.16.0",
     "@wllama/wllama": "^2.3.1",
-    "ai": "^4.1.26",
+    "ai": "^5.0.0",
     "country-flag-icons": "^1.5.13",
     "create-pubsub": "^1.6.3",
     "debug": "^4.4.0",

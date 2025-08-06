@@ -43,7 +43,7 @@ async function createOpenAiStream({
         role: msg.role || "user",
         content: msg.content,
       })),
-      maxTokens: params.max_tokens,
+      maxOutputTokens: params.max_tokens,
       temperature: params.temperature,
       topP: params.top_p,
       frequencyPenalty: params.frequency_penalty,
@@ -59,7 +59,7 @@ async function createOpenAiStream({
       }
 
       if (part.type === "text-delta") {
-        text += part.textDelta;
+        text += part.text;
         onUpdate(text);
       }
     }
