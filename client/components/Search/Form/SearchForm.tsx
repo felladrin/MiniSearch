@@ -140,7 +140,7 @@ export default function SearchForm({
           onKeyDown={handleKeyDown}
           onChange={handleInputChange}
           autosize
-          minRows={1}
+          minRows={2}
           maxRows={8}
           autoFocus
         />
