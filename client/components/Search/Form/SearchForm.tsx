@@ -134,13 +134,14 @@ export default function SearchForm({
     <form onSubmit={handleSubmit} style={{ width: "100%" }}>
       <Stack gap="xs">
         <Textarea
+          size="sm"
           value={state.textAreaValue}
           placeholder={state.suggestedQuery}
           ref={textAreaRef}
           onKeyDown={handleKeyDown}
           onChange={handleInputChange}
           autosize
-          minRows={2}
+          minRows={1}
           maxRows={8}
           autoFocus
         />

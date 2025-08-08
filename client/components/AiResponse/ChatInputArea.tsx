@@ -58,13 +58,14 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
   return (
     <Group align="flex-end" style={{ position: "relative" }}>
       <Textarea
+        size="sm"
         aria-label="Chat input"
         placeholder={placeholder}
         value={input}
         onChange={onChange}
         onKeyDown={handleKeyDownWithPlaceholder}
         autosize
-        minRows={2}
+        minRows={1}
         maxRows={4}
         style={{ flexGrow: 1, paddingRight: "50px" }}
         disabled={isGenerating}

@@ -16,6 +16,7 @@ export const SystemPromptInput = ({ form }: SystemPromptInputProps) => {
 
   return (
     <Textarea
+      size="sm"
       label="Instructions for AI"
       description={
         <>
