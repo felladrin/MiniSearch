@@ -9,8 +9,8 @@ import { settingsPubSub } from "../../modules/pubSub";
 import { defaultSettings } from "../../modules/settings";
 import "@mantine/notifications/styles.css";
 import { verifyStoredAccessKey } from "../../modules/accessKey";
+import MainPage from "../Pages/Main/MainPage";
 
-const MainPage = lazy(() => import("../Pages/Main/MainPage"));
 const AccessPage = lazy(() => import("../Pages/AccessPage"));
 
 export function App() {

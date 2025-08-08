@@ -12,17 +12,15 @@ import {
 import { IconBrandGithub } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import prettyMilliseconds from "pretty-ms";
-import { lazy, Suspense } from "react";
 import { repository } from "../../../../../package.json";
 import { appName, appVersion } from "../../../../modules/appInfo";
 import { addLogEntry } from "../../../../modules/logEntries";
 import { menuExpandedAccordionsPubSub } from "../../../../modules/pubSub";
-
-const AISettingsForm = lazy(() => import("./AISettings/AISettingsForm"));
-const SearchSettingsForm = lazy(() => import("./SearchSettingsForm"));
-const InterfaceSettingsForm = lazy(() => import("./InterfaceSettingsForm"));
-const ActionsForm = lazy(() => import("./ActionsForm"));
-const VoiceSettingsForm = lazy(() => import("./VoiceSettingsForm"));
+import ActionsForm from "./ActionsForm";
+import AISettingsForm from "./AISettings/AISettingsForm";
+import InterfaceSettingsForm from "./InterfaceSettingsForm";
+import SearchSettingsForm from "./SearchSettingsForm";
+import VoiceSettingsForm from "./VoiceSettingsForm";
 
 export default function MenuDrawer(drawerProps: DrawerProps) {
   const [menuExpandedAccordions, updateMenuExpandedAccordions] = usePubSub(
@@ -82,41 +80,31 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
           <Accordion.Item value="aiSettings">
             <Accordion.Control>AI Settings</Accordion.Control>
             <Accordion.Panel>
-              <Suspense>
-                <AISettingsForm />
-              </Suspense>
+              <AISettingsForm />
             </Accordion.Panel>
           </Accordion.Item>
           <Accordion.Item value="searchSettings">
             <Accordion.Control>Search Settings</Accordion.Control>
             <Accordion.Panel>
-              <Suspense>
-                <SearchSettingsForm />
-              </Suspense>
+              <SearchSettingsForm />
             </Accordion.Panel>
           </Accordion.Item>
           <Accordion.Item value="interfaceSettings">
             <Accordion.Control>Interface Settings</Accordion.Control>
             <Accordion.Panel>
-              <Suspense>
-                <InterfaceSettingsForm />
-              </Suspense>
+              <InterfaceSettingsForm />
             </Accordion.Panel>
           </Accordion.Item>
           <Accordion.Item value="voiceSettings">
             <Accordion.Control>Voice Settings</Accordion.Control>
             <Accordion.Panel>
-              <Suspense>
-                <VoiceSettingsForm />
-              </Suspense>
+              <VoiceSettingsForm />
             </Accordion.Panel>
           </Accordion.Item>
           <Accordion.Item value="actions">
             <Accordion.Control>Actions</Accordion.Control>
             <Accordion.Panel>
-              <Suspense>
-                <ActionsForm />
-              </Suspense>
+              <ActionsForm />
             </Accordion.Panel>
           </Accordion.Item>
         </Accordion>

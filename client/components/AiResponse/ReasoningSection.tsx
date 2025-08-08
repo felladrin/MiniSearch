@@ -8,9 +8,8 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
-import { lazy, useState } from "react";
-
-const MarkdownRenderer = lazy(() => import("./MarkdownRenderer"));
+import { useState } from "react";
+import MarkdownRenderer from "./MarkdownRenderer";
 
 interface ReasoningSectionProps {
   content: string;

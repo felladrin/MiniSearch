@@ -1,8 +1,6 @@
 import { Group, Text } from "@mantine/core";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
-import { lazy, Suspense } from "react";
-
-const CopyIconButton = lazy(() => import("./CopyIconButton"));
+import CopyIconButton from "./CopyIconButton";
 
 interface ChatHeaderProps {
   messages: ChatMessage[];
@@ -23,12 +21,10 @@ function ChatHeader({ messages }: ChatHeaderProps) {
     <Group justify="space-between">
       <Text fw={500}>Follow-up questions</Text>
       {messages.length > 2 && (
-        <Suspense fallback={<Text size="xs">Loading...</Text>}>
-          <CopyIconButton
-            value={getChatContent()}
-            tooltipLabel="Copy conversation"
-          />
-        </Suspense>
+        <CopyIconButton
+          value={getChatContent()}
+          tooltipLabel="Copy conversation"
+        />
       )}
     </Group>
   );

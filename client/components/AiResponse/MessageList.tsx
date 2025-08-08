@@ -1,8 +1,7 @@
 import { Paper, Stack } from "@mantine/core";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
-import { lazy, memo, Suspense } from "react";
-
-const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
+import { memo } from "react";
+import FormattedMarkdown from "./FormattedMarkdown";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -26,9 +25,7 @@ const Message = memo(
           alignSelf: message.role === "user" ? "flex-end" : "flex-start",
         }}
       >
-        <Suspense fallback={message.content}>
-          <FormattedMarkdown>{message.content}</FormattedMarkdown>
-        </Suspense>
+        <FormattedMarkdown>{message.content}</FormattedMarkdown>
       </Paper>
     );
   },

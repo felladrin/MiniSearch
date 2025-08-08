@@ -1,4 +1,4 @@
-import { Center, Container, Loader, Stack } from "@mantine/core";
+import { Container, Stack } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import { lazy, Suspense } from "react";
 import {
@@ -9,6 +9,8 @@ import {
   textSearchStatePubSub,
 } from "../../../modules/pubSub";
 import { searchAndRespond } from "../../../modules/textGeneration";
+import SearchForm from "../../Search/Form/SearchForm";
+import MenuButton from "./Menu/MenuButton";
 
 const AiResponseSection = lazy(
   () => import("../../AiResponse/AiResponseSection"),
@@ -16,8 +18,6 @@ const AiResponseSection = lazy(
 const SearchResultsSection = lazy(
   () => import("../../Search/Results/SearchResultsSection"),
 );
-const MenuButton = lazy(() => import("./Menu/MenuButton"));
-const SearchForm = lazy(() => import("../../Search/Form/SearchForm"));
 const EnableAiResponsePrompt = lazy(
   () => import("../../AiResponse/EnableAiResponsePrompt"),
 );
@@ -34,19 +34,11 @@ export default function MainPage() {
   return (
     <Container>
       <Stack py="md" mih="100vh" justify={isQueryEmpty ? "center" : undefined}>
-        <Suspense
-          fallback={
-            <Center>
-              <Loader type="bars" />
-            </Center>
-          }
-        >
-          <SearchForm
-            query={query}
-            updateQuery={updateQuery}
-            additionalButtons={<MenuButton />}
-          />
-        </Suspense>
+        <SearchForm
+          query={query}
+          updateQuery={updateQuery}
+          additionalButtons={<MenuButton />}
+        />
         {!isQueryEmpty && (
           <>
             {settings.showEnableAiResponsePrompt && (

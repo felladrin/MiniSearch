@@ -1,9 +1,7 @@
 import { TypographyStylesProvider } from "@mantine/core";
-import { lazy } from "react";
 import { useReasoningContent } from "./hooks/useReasoningContent";
-
-const MarkdownRenderer = lazy(() => import("./MarkdownRenderer"));
-const ReasoningSection = lazy(() => import("./ReasoningSection"));
+import MarkdownRenderer from "./MarkdownRenderer";
+import ReasoningSection from "./ReasoningSection";
 
 interface FormattedMarkdownProps {
   children: string;

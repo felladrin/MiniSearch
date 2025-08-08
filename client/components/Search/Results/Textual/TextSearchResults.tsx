@@ -1,34 +1,25 @@
 import { Alert } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
-import { lazy, Suspense } from "react";
 import {
   textSearchResultsPubSub,
   textSearchStatePubSub,
 } from "../../../../modules/pubSub";
 
-const SearchResultsList = lazy(() => import("./SearchResultsList"));
-const TextResultsLoadingState = lazy(() => import("./TextResultsLoadingState"));
+import SearchResultsList from "./SearchResultsList";
+import TextResultsLoadingState from "./TextResultsLoadingState";
 
 export default function TextSearchResults() {
   const [searchState] = usePubSub(textSearchStatePubSub);
   const [results] = usePubSub(textSearchResultsPubSub);
 
   if (searchState === "running") {
-    return (
-      <Suspense>
-        <TextResultsLoadingState />
-      </Suspense>
-    );
+    return <TextResultsLoadingState />;
   }
 
   if (searchState === "completed") {
     if (results.length > 0) {
-      return (
-        <Suspense>
-          <SearchResultsList searchResults={results} />
-        </Suspense>
-      );
+      return <SearchResultsList searchResults={results} />;
     }
 
     return (

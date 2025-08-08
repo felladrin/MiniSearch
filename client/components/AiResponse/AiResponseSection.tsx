@@ -1,6 +1,6 @@
 import { CodeHighlightAdapterProvider } from "@mantine/code-highlight";
 import { usePubSub } from "create-pubsub/react";
-import { lazy, Suspense, useMemo } from "react";
+import { useMemo } from "react";
 import {
   modelLoadingProgressPubSub,
   modelSizeInMegabytesPubSub,
@@ -11,14 +11,11 @@ import {
 } from "../../modules/pubSub";
 import { shikiAdapter } from "../../modules/shiki";
 import "@mantine/code-highlight/styles.css";
-
-const AiResponseContent = lazy(() => import("./AiResponseContent"));
-const PreparingContent = lazy(() => import("./PreparingContent"));
-const LoadingModelContent = lazy(() => import("./LoadingModelContent"));
-const ChatInterface = lazy(() => import("./ChatInterface"));
-const AiModelDownloadAllowanceContent = lazy(
-  () => import("./AiModelDownloadAllowanceContent"),
-);
+import AiModelDownloadAllowanceContent from "./AiModelDownloadAllowanceContent";
+import AiResponseContent from "./AiResponseContent";
+import ChatInterface from "./ChatInterface";
+import LoadingModelContent from "./LoadingModelContent";
+import PreparingContent from "./PreparingContent";
 
 export default function AiResponseSection() {
   const [query] = usePubSub(queryPubSub);
@@ -44,17 +41,14 @@ export default function AiResponseSection() {
     if (generatingStates.includes(textGenerationState)) {
       return (
         <CodeHighlightAdapterProvider adapter={shikiAdapter}>
-          <Suspense>
-            <AiResponseContent
-              textGenerationState={textGenerationState}
-              response={response}
-              setTextGenerationState={setTextGenerationState}
-            />
-          </Suspense>
+          <AiResponseContent
+            textGenerationState={textGenerationState}
+            response={response}
+            setTextGenerationState={setTextGenerationState}
+          />
+
           {textGenerationState === "completed" && (
-            <Suspense>
-              <ChatInterface initialQuery={query} initialResponse={response} />
-            </Suspense>
+            <ChatInterface initialQuery={query} initialResponse={response} />
           )}
         </CodeHighlightAdapterProvider>
       );
@@ -62,37 +56,23 @@ export default function AiResponseSection() {
 
     if (textGenerationState === "loadingModel") {
       return (
-        <Suspense>
-          <LoadingModelContent
-            modelLoadingProgress={modelLoadingProgress}
-            modelSizeInMegabytes={modelSizeInMegabytes}
-          />
-        </Suspense>
+        <LoadingModelContent
+          modelLoadingProgress={modelLoadingProgress}
+          modelSizeInMegabytes={modelSizeInMegabytes}
+        />
       );
     }
 
     if (textGenerationState === "preparingToGenerate") {
-      return (
-        <Suspense>
-          <PreparingContent textGenerationState={textGenerationState} />
-        </Suspense>
-      );
+      return <PreparingContent textGenerationState={textGenerationState} />;
     }
 
     if (textGenerationState === "awaitingSearchResults") {
-      return (
-        <Suspense>
-          <PreparingContent textGenerationState={textGenerationState} />
-        </Suspense>
-      );
+      return <PreparingContent textGenerationState={textGenerationState} />;
     }
 
     if (textGenerationState === "awaitingModelDownloadAllowance") {
-      return (
-        <Suspense>
-          <AiModelDownloadAllowanceContent />
-        </Suspense>
-      );
+      return <AiModelDownloadAllowanceContent />;
     }
 
     return null;

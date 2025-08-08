@@ -1,14 +1,7 @@
 import { Card, Stack, Text } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
-import {
-  type KeyboardEvent,
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { type KeyboardEvent, useCallback, useEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import throttle from "throttleit";
 import { generateFollowUpQuestion } from "../../modules/followUpQuestions";
@@ -28,12 +21,11 @@ import {
 import { generateRelatedSearchQuery } from "../../modules/relatedSearchQuery";
 import { searchImages, searchText } from "../../modules/search";
 import { generateChatResponse } from "../../modules/textGeneration";
+import ChatHeader from "./ChatHeader";
+import ChatInputArea from "./ChatInputArea";
+import MessageList from "./MessageList";
 
-const ChatHeader = lazy(() => import("./ChatHeader"));
-const MessageList = lazy(() => import("./MessageList"));
-const ChatInputArea = lazy(() => import("./ChatInputArea"));
-
-export interface ChatInterfaceProps {
+interface ChatInterfaceProps {
   initialQuery?: string;
   initialResponse?: string;
 }
@@ -228,29 +220,23 @@ export default function ChatInterface({
   return (
     <Card withBorder shadow="sm" radius="md">
       <Card.Section withBorder inheritPadding py="xs">
-        <Suspense fallback={<Text>Loading header...</Text>}>
-          <ChatHeader messages={messages} />
-        </Suspense>
+        <ChatHeader messages={messages} />
       </Card.Section>
       <Stack gap="md" pt="md">
         <ErrorBoundary
           fallback={<Text c="red">Chat interface failed to load</Text>}
         >
-          <Suspense fallback={<Text>Loading messages...</Text>}>
-            <MessageList
-              messages={
-                generationState.isGeneratingResponse
-                  ? [
-                      ...messages,
-                      { role: "assistant", content: streamedResponse },
-                    ]
-                  : messages
-              }
-            />
-          </Suspense>
-          <Suspense fallback={<Text>Loading input area...</Text>}>
-            <ChatInputArea onKeyDown={handleKeyDown} handleSend={handleSend} />
-          </Suspense>
+          <MessageList
+            messages={
+              generationState.isGeneratingResponse
+                ? [
+                    ...messages,
+                    { role: "assistant", content: streamedResponse },
+                  ]
+                : messages
+            }
+          />
+          <ChatInputArea onKeyDown={handleKeyDown} handleSend={handleSend} />
         </ErrorBoundary>
       </Stack>
     </Card>

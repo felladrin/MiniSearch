@@ -1,18 +1,12 @@
 import { Stack } from "@mantine/core";
-import { lazy, Suspense } from "react";
-
-const ClearDataButton = lazy(() => import("./ClearDataButton"));
-const ShowLogsButton = lazy(() => import("../../../Logs/ShowLogsButton"));
+import ShowLogsButton from "../../../Logs/ShowLogsButton";
+import ClearDataButton from "./ClearDataButton";
 
 export default function ActionsForm() {
   return (
     <Stack gap="lg">
-      <Suspense>
-        <ClearDataButton />
-      </Suspense>
-      <Suspense>
-        <ShowLogsButton />
-      </Suspense>
+      <ClearDataButton />
+      <ShowLogsButton />
     </Stack>
   );
 }

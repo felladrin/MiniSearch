@@ -19,13 +19,12 @@ import {
 } from "@tabler/icons-react";
 import type { PublishFunction } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
-import { lazy, type ReactNode, Suspense, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { addLogEntry } from "../../modules/logEntries";
 import { settingsPubSub } from "../../modules/pubSub";
 import { searchAndRespond } from "../../modules/textGeneration";
-
-const FormattedMarkdown = lazy(() => import("./FormattedMarkdown"));
-const CopyIconButton = lazy(() => import("./CopyIconButton"));
+import CopyIconButton from "./CopyIconButton";
+import FormattedMarkdown from "./FormattedMarkdown";
 
 export default function AiResponseContent({
   textGenerationState,
@@ -191,17 +190,13 @@ export default function AiResponseContent({
                 </ActionIcon>
               </Tooltip>
             )}
-            <Suspense>
-              <CopyIconButton value={response} tooltipLabel="Copy response" />
-            </Suspense>
+            <CopyIconButton value={response} tooltipLabel="Copy response" />
           </Group>
         </Group>
       </Card.Section>
       <Card.Section withBorder>
         <ConditionalScrollArea>
-          <Suspense>
-            <FormattedMarkdown>{response}</FormattedMarkdown>
-          </Suspense>
+          <FormattedMarkdown>{response}</FormattedMarkdown>
         </ConditionalScrollArea>
         {textGenerationState === "failed" && (
           <Alert

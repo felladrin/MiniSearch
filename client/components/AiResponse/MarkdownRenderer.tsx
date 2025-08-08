@@ -1,11 +1,11 @@
 import { CodeHighlight } from "@mantine/code-highlight";
 import { Box, Code, Divider } from "@mantine/core";
-import React, { lazy } from "react";
+import React from "react";
+import Markdown from "react-markdown";
 import rehypeExternalLinks from "rehype-external-links";
 import remarkGfm from "remark-gfm";
 import ExpandableLink from "./ExpandableLink";
 
-const Markdown = lazy(() => import("react-markdown"));
 interface MarkdownRendererProps {
   content: string;
   enableCopy?: boolean;

@@ -1,17 +1,11 @@
 import { Button, Group, Textarea } from "@mantine/core";
+import { IconSend } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
-import { lazy, Suspense } from "react";
 import {
   chatGenerationStatePubSub,
   chatInputPubSub,
   followUpQuestionPubSub,
 } from "../../modules/pubSub";
-
-const IconSend = lazy(() =>
-  import("@tabler/icons-react").then((module) => ({
-    default: module.IconSend,
-  })),
-);
 
 interface ChatInputAreaProps {
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -86,9 +80,7 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
           borderBottomLeftRadius: 0,
         }}
       >
-        <Suspense fallback={<span>→</span>}>
-          <IconSend size={16} />
-        </Suspense>
+        <IconSend size={16} />
       </Button>
     </Group>
   );
