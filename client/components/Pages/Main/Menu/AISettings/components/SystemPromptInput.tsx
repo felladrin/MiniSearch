@@ -18,13 +18,15 @@ export const SystemPromptInput = ({ form }: SystemPromptInputProps) => {
     <Textarea
       size="sm"
       label="Instructions for AI"
+      descriptionProps={{
+        // @ts-expect-error Mantine v7: `InputDescriptionProps` does not support `component`.
+        component: "div",
+      }}
       description={
         <>
-          <span>
+          <Text size="xs" component="span">
             Customize instructions for the AI to tailor its responses.
-          </span>
-          <br />
-          <span>For example:</span>
+          </Text>
           <ul>
             <li>
               Specify preferences
@@ -63,29 +65,31 @@ export const SystemPromptInput = ({ form }: SystemPromptInputProps) => {
               </ul>
             </li>
           </ul>
-          <span>
+
+          <Text size="xs" component="span">
             The special tag <em>{"{{searchResults}}"}</em> will be replaced with
             the search results, while <em>{"{{dateTime}}"}</em> will be replaced
             with the current date and time.
-          </span>
+          </Text>
+
           {isUsingCustomInstructions && (
             <>
               <br />
               <br />
-              <span>
+              <Text size="xs" component="span">
                 Currently, you're using custom instructions. If you ever need to
-                restore the default instructions, you can do so by clicking
-              </span>{" "}
-              <Text
-                component="span"
-                size="xs"
-                c="blue"
-                style={{ cursor: "pointer" }}
-                onClick={handleRestoreDefaultInstructions}
-              >
-                here
+                restore the default instructions, you can do so by clicking{" "}
+                <Text
+                  component="span"
+                  size="xs"
+                  c="blue"
+                  style={{ cursor: "pointer" }}
+                  onClick={handleRestoreDefaultInstructions}
+                >
+                  here
+                </Text>
+                .
               </Text>
-              <span>.</span>
             </>
           )}
         </>
