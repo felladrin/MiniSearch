@@ -73,7 +73,7 @@ export default function MarkdownRenderer({
             }
 
             return (
-              <ErrorBoundary fallback={<Code>{codeContent}</Code>}>
+              <ErrorBoundary fallback={<Code block>{codeContent}</Code>}>
                 <CodeHighlight
                   code={codeContent}
                   language={language}
