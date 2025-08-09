@@ -1,8 +1,7 @@
-import { Card, Stack, Text } from "@mantine/core";
+import { Card, Stack } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import { type KeyboardEvent, useCallback, useEffect, useState } from "react";
-import { ErrorBoundary } from "react-error-boundary";
 import throttle from "throttleit";
 import { generateFollowUpQuestion } from "../../modules/followUpQuestions";
 import { handleEnterKeyDown } from "../../modules/keyboard";
@@ -223,21 +222,14 @@ export default function ChatInterface({
         <ChatHeader messages={messages} />
       </Card.Section>
       <Stack gap="md" pt="md">
-        <ErrorBoundary
-          fallback={<Text c="red">Chat interface failed to load</Text>}
-        >
-          <MessageList
-            messages={
-              generationState.isGeneratingResponse
-                ? [
-                    ...messages,
-                    { role: "assistant", content: streamedResponse },
-                  ]
-                : messages
-            }
-          />
-          <ChatInputArea onKeyDown={handleKeyDown} handleSend={handleSend} />
-        </ErrorBoundary>
+        <MessageList
+          messages={
+            generationState.isGeneratingResponse
+              ? [...messages, { role: "assistant", content: streamedResponse }]
+              : messages
+          }
+        />
+        <ChatInputArea onKeyDown={handleKeyDown} handleSend={handleSend} />
       </Stack>
     </Card>
   );
