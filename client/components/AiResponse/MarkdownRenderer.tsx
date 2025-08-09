@@ -1,6 +1,7 @@
 import { CodeHighlight } from "@mantine/code-highlight";
 import { Box, Code, Divider } from "@mantine/core";
 import React from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import Markdown from "react-markdown";
 import rehypeExternalLinks from "rehype-external-links";
 import remarkGfm from "remark-gfm";
@@ -72,13 +73,15 @@ export default function MarkdownRenderer({
             }
 
             return (
-              <CodeHighlight
-                code={codeContent}
-                language={language}
-                radius="md"
-                withCopyButton={enableCopy}
-                mb="xs"
-              />
+              <ErrorBoundary fallback={<Code>{codeContent}</Code>}>
+                <CodeHighlight
+                  code={codeContent}
+                  language={language}
+                  radius="md"
+                  withCopyButton={enableCopy}
+                  mb="xs"
+                />
+              </ErrorBoundary>
             );
           },
         }}
