@@ -87,6 +87,48 @@ async function startGeneration(messages: ChatMessage[]) {
   return data;
 }
 
+async function startGenerationWithAbort(
+  messages: ChatMessage[],
+  signal: AbortSignal,
+) {
+  const settings = getSettings();
+  const aiHordeApiKey = settings.hordeApiKey || aiHordeDefaultApiKey;
+  const aiHordeMaxResponseLengthInTokens =
+    aiHordeApiKey === aiHordeDefaultApiKey ? 512 : 1024;
+  const response = await fetch(`${aiHordeApiBaseUrl}/generate/text/async`, {
+    method: "POST",
+    signal,
+    headers: {
+      apikey: aiHordeApiKey,
+      "client-agent": aiHordeClientAgent,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      prompt: formatPrompt(messages),
+      params: {
+        max_context_length: defaultContextSize,
+        max_length: aiHordeMaxResponseLengthInTokens,
+        singleline: false,
+        temperature: settings.inferenceTemperature,
+        top_p: settings.inferenceTopP,
+        min_p: settings.minP,
+        top_k: 30,
+        typical: 0.2,
+        rep_pen: 1,
+        stop_sequence: [userMarker, assistantMarker],
+      },
+      models: settings.hordeModel ? [settings.hordeModel] : undefined,
+    }),
+  });
+
+  const data = (await response.json()) as HordeResponse;
+  if (!data.id) {
+    throw new Error("Failed to start generation");
+  }
+
+  return data;
+}
+
 async function handleGenerationStatus(
   generationId: string,
   onUpdate: (text: string) => void,
@@ -157,6 +199,108 @@ async function handleGenerationStatus(
   }
 }
 
+async function handleGenerationStatusWithAbort(
+  generationId: string,
+  onUpdate: (text: string) => void,
+  signal: AbortSignal,
+): Promise<string> {
+  let lastText = "";
+
+  try {
+    let status: HordeStatusResponse;
+
+    do {
+      if (signal.aborted) {
+        throw new Error("Request was aborted");
+      }
+
+      const response = await fetch(
+        `${aiHordeApiBaseUrl}/generate/text/status/${generationId}`,
+        {
+          method: "GET",
+          signal,
+          headers: {
+            "client-agent": aiHordeClientAgent,
+            "content-type": "application/json",
+          },
+        },
+      );
+
+      status = await response.json();
+
+      if (
+        status.generations?.[0]?.text &&
+        status.generations[0].text !== lastText
+      ) {
+        lastText = status.generations[0].text;
+        if (status.generations[0].model) {
+          addLogEntry(
+            `AI Horde completed the generation using the model "${status.generations[0].model}"`,
+          );
+        }
+        onUpdate(lastText.split(userMarker)[0]);
+      }
+
+      if (!status.done && !status.faulted && status.is_possible) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      if (getTextGenerationState() === "interrupted") {
+        throw new ChatGenerationError("Generation interrupted");
+      }
+    } while (
+      !status.done &&
+      !status.faulted &&
+      status.is_possible &&
+      !signal.aborted
+    );
+
+    if (signal.aborted) {
+      throw new Error("Request was aborted");
+    }
+
+    if (status.faulted) {
+      throw new ChatGenerationError("Generation failed");
+    }
+
+    if (!status.is_possible) {
+      throw new ChatGenerationError(
+        "Generation not possible with the selected model",
+      );
+    }
+
+    const generatedText = status.generations?.[0].text;
+
+    if (!generatedText) {
+      throw new Error("No text generated");
+    }
+
+    return generatedText.split(userMarker)[0];
+  } catch (error) {
+    if (signal.aborted) {
+      throw new Error("Request was aborted");
+    }
+    if (error instanceof ChatGenerationError) {
+      throw error;
+    }
+    throw new Error(`Error while checking generation status: ${error}`);
+  }
+}
+
+async function cancelGeneration(generationId: string): Promise<void> {
+  try {
+    await fetch(`${aiHordeApiBaseUrl}/generate/text/status/${generationId}`, {
+      method: "DELETE",
+      headers: {
+        "client-agent": aiHordeClientAgent,
+        "content-type": "application/json",
+      },
+    });
+  } catch (error) {
+    addLogEntry(`Failed to cancel generation ${generationId}: ${error}`);
+  }
+}
+
 export async function fetchHordeModels(): Promise<HordeModelInfo[]> {
   const response = await fetch(
     `${aiHordeApiBaseUrl}/status/models?type=text&model_state=all`,
@@ -217,8 +361,60 @@ async function executeHordeGeneration(
   messages: ChatMessage[],
   onUpdate: (text: string) => void,
 ): Promise<string> {
-  const generation = await startGeneration(messages);
-  return await handleGenerationStatus(generation.id, onUpdate);
+  const settings = getSettings();
+
+  if (settings.hordeModel) {
+    const generation = await startGeneration(messages);
+    return await handleGenerationStatus(generation.id, onUpdate);
+  }
+
+  const parallelRequestCount = 2;
+  const pendingRequests: Array<{
+    id: string;
+    abortController: AbortController;
+  }> = [];
+
+  try {
+    const generationPromises = Array.from(
+      { length: parallelRequestCount },
+      async () => {
+        const abortController = new AbortController();
+        const generation = await startGenerationWithAbort(
+          messages,
+          abortController.signal,
+        );
+        pendingRequests.push({ id: generation.id, abortController });
+        return generation;
+      },
+    );
+
+    const generations = await Promise.all(generationPromises);
+
+    const statusPromises = generations.map(
+      (generation: HordeResponse, index: number) =>
+        handleGenerationStatusWithAbort(
+          generation.id,
+          onUpdate,
+          pendingRequests[index].abortController.signal,
+        ).then((result: string) => ({ result, generationId: generation.id })),
+    );
+
+    const winner = await Promise.race(statusPromises);
+
+    pendingRequests.forEach(({ id, abortController }) => {
+      if (id !== winner.generationId) {
+        abortController.abort();
+        cancelGeneration(id).catch(() => {});
+      }
+    });
+
+    return winner.result;
+  } catch (error) {
+    pendingRequests.forEach(({ abortController }) => {
+      abortController.abort();
+    });
+    throw error;
+  }
 }
 
 function formatPrompt(messages: ChatMessage[]): string {
