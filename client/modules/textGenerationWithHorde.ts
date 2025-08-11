@@ -390,11 +390,21 @@ async function executeHordeGeneration(
 
     const generations = await Promise.all(generationPromises);
 
+    const raceState = { winnerId: null as string | null };
+
     const statusPromises = generations.map(
       (generation: HordeResponse, index: number) =>
         handleGenerationStatusWithAbort(
           generation.id,
-          onUpdate,
+          (text: string) => {
+            if (raceState.winnerId === null) {
+              raceState.winnerId = generation.id;
+            }
+
+            if (raceState.winnerId === generation.id) {
+              onUpdate(text);
+            }
+          },
           pendingRequests[index].abortController.signal,
         ).then((result: string) => ({ result, generationId: generation.id })),
     );
