@@ -8,6 +8,7 @@ import {
   Group,
   HoverCard,
   Stack,
+  Tooltip,
 } from "@mantine/core";
 import { IconBrandGithub } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
@@ -34,16 +35,18 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
       size="md"
       title={
         <Group gap="xs">
-          <ActionIcon
-            variant="subtle"
-            component="a"
-            color="var(--mantine-color-text)"
-            href={repository.url}
-            target="_blank"
-            onClick={() => addLogEntry("User clicked the GitHub link")}
-          >
-            <IconBrandGithub size={16} />
-          </ActionIcon>
+          <Tooltip label="View source code on GitHub">
+            <ActionIcon
+              variant="subtle"
+              component="a"
+              color="var(--mantine-color-text)"
+              href={repository.url}
+              target="_blank"
+              onClick={() => addLogEntry("User clicked the GitHub link")}
+            >
+              <IconBrandGithub size={16} />
+            </ActionIcon>
+          </Tooltip>
           <HoverCard shadow="md" withArrow>
             <HoverCard.Target>
               <Center>{appName}</Center>
