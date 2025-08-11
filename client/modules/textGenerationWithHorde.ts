@@ -49,48 +49,7 @@ const assistantMarker = "**ASSISTANT**:";
 
 export const aiHordeDefaultApiKey = "0000000000";
 
-async function startGeneration(messages: ChatMessage[]) {
-  const settings = getSettings();
-  const aiHordeApiKey = settings.hordeApiKey || aiHordeDefaultApiKey;
-  const aiHordeMaxResponseLengthInTokens =
-    aiHordeApiKey === aiHordeDefaultApiKey ? 512 : 1024;
-  const response = await fetch(`${aiHordeApiBaseUrl}/generate/text/async`, {
-    method: "POST",
-    headers: {
-      apikey: aiHordeApiKey,
-      "client-agent": aiHordeClientAgent,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      prompt: formatPrompt(messages),
-      params: {
-        max_context_length: defaultContextSize,
-        max_length: aiHordeMaxResponseLengthInTokens,
-        singleline: false,
-        temperature: settings.inferenceTemperature,
-        top_p: settings.inferenceTopP,
-        min_p: settings.minP,
-        top_k: 30,
-        typical: 0.2,
-        rep_pen: 1,
-        stop_sequence: [userMarker, assistantMarker],
-      },
-      models: settings.hordeModel ? [settings.hordeModel] : undefined,
-    }),
-  });
-
-  const data = (await response.json()) as HordeResponse;
-  if (!data.id) {
-    throw new Error("Failed to start generation");
-  }
-
-  return data;
-}
-
-async function startGenerationWithAbort(
-  messages: ChatMessage[],
-  signal: AbortSignal,
-) {
+async function startGeneration(messages: ChatMessage[], signal?: AbortSignal) {
   const settings = getSettings();
   const aiHordeApiKey = settings.hordeApiKey || aiHordeDefaultApiKey;
   const aiHordeMaxResponseLengthInTokens =
@@ -116,6 +75,7 @@ async function startGenerationWithAbort(
         typical: 0.2,
         rep_pen: 1,
         stop_sequence: [userMarker, assistantMarker],
+        validated_backends: false,
       },
       models: settings.hordeModel ? [settings.hordeModel] : undefined,
     }),
@@ -132,6 +92,7 @@ async function startGenerationWithAbort(
 async function handleGenerationStatus(
   generationId: string,
   onUpdate: (text: string) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
   let lastText = "";
 
@@ -139,78 +100,7 @@ async function handleGenerationStatus(
     let status: HordeStatusResponse;
 
     do {
-      const response = await fetch(
-        `${aiHordeApiBaseUrl}/generate/text/status/${generationId}`,
-        {
-          method: "GET",
-          headers: {
-            "client-agent": aiHordeClientAgent,
-            "content-type": "application/json",
-          },
-        },
-      );
-
-      status = await response.json();
-
-      if (
-        status.generations?.[0]?.text &&
-        status.generations[0].text !== lastText
-      ) {
-        lastText = status.generations[0].text;
-        if (status.generations[0].model) {
-          addLogEntry(
-            `AI Horde completed the generation using the model "${status.generations[0].model}"`,
-          );
-        }
-        onUpdate(lastText.split(userMarker)[0]);
-      }
-
-      if (!status.done && !status.faulted && status.is_possible) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-
-      if (getTextGenerationState() === "interrupted") {
-        throw new ChatGenerationError("Generation interrupted");
-      }
-    } while (!status.done && !status.faulted && status.is_possible);
-
-    if (status.faulted) {
-      throw new ChatGenerationError("Generation failed");
-    }
-
-    if (!status.is_possible) {
-      throw new ChatGenerationError(
-        "Generation not possible with the selected model",
-      );
-    }
-
-    const generatedText = status.generations?.[0].text;
-
-    if (!generatedText) {
-      throw new Error("No text generated");
-    }
-
-    return generatedText.split(userMarker)[0];
-  } catch (error) {
-    if (error instanceof ChatGenerationError) {
-      throw error;
-    }
-    throw new Error(`Error while checking generation status: ${error}`);
-  }
-}
-
-async function handleGenerationStatusWithAbort(
-  generationId: string,
-  onUpdate: (text: string) => void,
-  signal: AbortSignal,
-): Promise<string> {
-  let lastText = "";
-
-  try {
-    let status: HordeStatusResponse;
-
-    do {
-      if (signal.aborted) {
+      if (signal?.aborted) {
         throw new Error("Request was aborted");
       }
 
@@ -252,10 +142,10 @@ async function handleGenerationStatusWithAbort(
       !status.done &&
       !status.faulted &&
       status.is_possible &&
-      !signal.aborted
+      !signal?.aborted
     );
 
-    if (signal.aborted) {
+    if (signal?.aborted) {
       throw new Error("Request was aborted");
     }
 
@@ -277,7 +167,7 @@ async function handleGenerationStatusWithAbort(
 
     return generatedText.split(userMarker)[0];
   } catch (error) {
-    if (signal.aborted) {
+    if (signal?.aborted) {
       throw new Error("Request was aborted");
     }
     if (error instanceof ChatGenerationError) {
@@ -379,7 +269,7 @@ async function executeHordeGeneration(
       { length: parallelRequestCount },
       async () => {
         const abortController = new AbortController();
-        const generation = await startGenerationWithAbort(
+        const generation = await startGeneration(
           messages,
           abortController.signal,
         );
@@ -394,7 +284,7 @@ async function executeHordeGeneration(
 
     const statusPromises = generations.map(
       (generation: HordeResponse, index: number) =>
-        handleGenerationStatusWithAbort(
+        handleGenerationStatus(
           generation.id,
           (text: string) => {
             if (raceState.winnerId === null) {
