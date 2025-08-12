@@ -8,9 +8,7 @@ jobs:
     name: Sync to Hugging Face Spaces
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          lfs: true
+      - uses: actions/checkout@v5
       - uses: JacobLinCool/huggingface-sync@v1
         with:
           github: ${{ secrets.GITHUB_TOKEN }}

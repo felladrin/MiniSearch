@@ -5,7 +5,7 @@ jobs:
     name: Check Code Quality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
@@ -18,7 +18,7 @@ jobs:
     name: Check Docker Container
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: docker compose -f docker-compose.production.yml up -d
       - name: Check if main page is available
         run: until curl -s -o /dev/null -w "%{http_code}" localhost:7860 | grep 200; do sleep 1; done
