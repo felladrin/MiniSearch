@@ -118,6 +118,7 @@ export interface WllamaModel {
   readonly shouldIncludeUrlsOnPrompt: boolean;
   readonly stopStrings?: string[];
   readonly stopTokens?: number[];
+  readonly flash_attn?: boolean;
   getSampling: () => SamplingConfig;
   getMessages: (query: string, searchResults: string) => WllamaChatMessage[];
 }
@@ -133,6 +134,7 @@ const createDefaultModelConfig = (): Omit<
   ],
   cacheTypeK: "f16",
   cacheTypeV: "f16",
+  flash_attn: true,
   contextSize: defaultContextSize,
   shouldIncludeUrlsOnPrompt: true,
   getSampling: () => {
@@ -170,6 +172,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-LFM2-350M",
     hfFilePath: "model.shard-00001-of-00004.gguf",
     fileSizeInMegabytes: 221,
+  },
+  "gemma-3-270m": {
+    ...createDefaultModelConfig(),
+    label: "Gemma 3 270M",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-gemma-3-270m-it",
+    hfFilePath: "model.shard-00001-of-00002.gguf",
+    fileSizeInMegabytes: 250,
   },
   "smollm2-360m": {
     ...createDefaultModelConfig(),

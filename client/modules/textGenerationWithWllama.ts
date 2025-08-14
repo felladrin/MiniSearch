@@ -168,6 +168,7 @@ async function initializeWllamaInstance(progressCallback?: ProgressCallback) {
       n_batch: 512,
       cache_type_k: model.cacheTypeK,
       cache_type_v: model.cacheTypeV,
+      flash_attn: model.flash_attn,
       embeddings: false,
       progressCallback,
     },
