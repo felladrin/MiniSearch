@@ -1,5 +1,5 @@
 import { CodeHighlight } from "@mantine/code-highlight";
-import { Box, Code, Divider } from "@mantine/core";
+import { Blockquote, Box, Code, Divider, Text } from "@mantine/core";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import Markdown from "react-markdown";
@@ -22,6 +22,15 @@ export default function MarkdownRenderer({
     return null;
   }
 
+  const unwrapParagraphs = (children: React.ReactNode) => {
+    return React.Children.map(children, (child) => {
+      if (React.isValidElement(child) && child.type === "p") {
+        return (child.props as { children: React.ReactNode }).children;
+      }
+      return child;
+    });
+  };
+
   return (
     <Box className={className}>
       <Markdown
@@ -41,19 +50,21 @@ export default function MarkdownRenderer({
           },
           li(props) {
             const { children } = props;
-            const processedChildren = React.Children.map(children, (child) => {
-              if (React.isValidElement(child) && child.type === "p") {
-                return (child.props as { children: React.ReactNode }).children;
-              }
-              return child;
-            });
-            return <li>{processedChildren}</li>;
+            return <li>{unwrapParagraphs(children)}</li>;
           },
           hr() {
             return <Divider variant="dashed" my="md" />;
           },
           pre(props) {
             return <>{props.children}</>;
+          },
+          blockquote(props) {
+            const { children } = props;
+            return (
+              <Blockquote>
+                <Text size="md">{unwrapParagraphs(children)}</Text>
+              </Blockquote>
+            );
           },
           code(props) {
             const { children, className, node } = props;
