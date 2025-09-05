@@ -55,6 +55,7 @@ RUN cp searx/settings.yml $SEARXNG_SETTINGS_PATH && \
   chmod 644 $SEARXNG_SETTINGS_PATH && \
   sed -i 's/ultrasecretkey/'$(openssl rand -hex 32)'/g' $SEARXNG_SETTINGS_PATH && \
   sed -i 's/- html/- json/' $SEARXNG_SETTINGS_PATH && \
+  /usr/local/searxng/searxng-venv/bin/pip install -r requirements.txt && \
   /usr/local/searxng/searxng-venv/bin/pip install -e .
 
 COPY --from=llama-builder /tmp/llama.cpp/build/bin/llama-server /usr/local/bin/
