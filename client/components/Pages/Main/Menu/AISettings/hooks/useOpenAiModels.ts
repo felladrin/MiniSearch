@@ -14,7 +14,10 @@ export const useOpenAiModels = (settings: Settings) => {
       try {
         const response = await fetch(`${settings.openAiApiBaseUrl}/models`, {
           headers: {
-            Authorization: `Bearer ${settings.openAiApiKey}`,
+            ...(settings.openAiApiKey
+              ? { Authorization: `Bearer ${settings.openAiApiKey}` }
+              : {}),
+            "Content-Type": "application/json",
           },
         });
 
