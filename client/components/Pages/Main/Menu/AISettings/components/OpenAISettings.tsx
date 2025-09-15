@@ -51,6 +51,7 @@ export const OpenAISettings = ({
         allowDeselect={false}
         disabled={openAiModels.length === 0}
         searchable
+        clearable
       />
     )}
   </>

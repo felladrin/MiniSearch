@@ -34,11 +34,31 @@ async function createOpenAiStream({
 
   const params = getDefaultChatCompletionCreateParamsStreaming();
 
+  let effectiveModel = settings.openAiApiModel;
+
+  if (!effectiveModel) {
+    const response = await fetch(`${settings.openAiApiBaseUrl}/models`, {
+      headers: {
+        ...(settings.openAiApiKey
+          ? { Authorization: `Bearer ${settings.openAiApiKey}` }
+          : {}),
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (response.ok) {
+      const json = await response.json();
+      const firstModel = json?.data?.[0]?.id;
+
+      if (firstModel) effectiveModel = firstModel;
+    }
+  }
+
   try {
     currentAbortController = new AbortController();
 
     const stream = streamText({
-      model: openaiProvider.chatModel(settings.openAiApiModel),
+      model: openaiProvider.chatModel(effectiveModel),
       messages: messages.map((msg) => ({
         role: msg.role || "user",
         content: msg.content,
