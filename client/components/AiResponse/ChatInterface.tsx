@@ -101,6 +101,13 @@ export default function ChatInterface({
     regenerateFollowUpQuestion,
   ]);
 
+  useEffect(() => {
+    return () => {
+      setFollowUpQuestion("");
+      setPreviousFollowUpQuestions([]);
+    };
+  }, [setFollowUpQuestion]);
+
   const handleSend = async (textToSend?: string) => {
     const currentInput = textToSend ?? input;
     if (currentInput.trim() === "" || generationState.isGeneratingResponse)
@@ -108,10 +115,6 @@ export default function ChatInterface({
 
     const userMessage: ChatMessage = { role: "user", content: currentInput };
     const newMessages: ChatMessage[] = [...messages, userMessage];
-
-    if (messages.length === 0) {
-      setPreviousFollowUpQuestions([]);
-    }
 
     setMessages(newMessages);
     setInput(textToSend ? input : "");
