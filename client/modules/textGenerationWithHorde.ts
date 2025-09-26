@@ -72,7 +72,6 @@ async function startGeneration(messages: ChatMessage[], signal?: AbortSignal) {
         top_p: settings.inferenceTopP,
         min_p: settings.minP,
         top_k: 30,
-        typical: 0.2,
         rep_pen: 1,
         stop_sequence: [userMarker, assistantMarker],
         validated_backends: false,

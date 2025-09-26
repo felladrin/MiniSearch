@@ -147,7 +147,6 @@ const createDefaultModelConfig = (): Omit<
       penalty_freq: settings.inferenceFrequencyPenalty,
       penalty_present: settings.inferencePresencePenalty,
       top_k: 30,
-      typical_p: 0.2,
       penalty_repeat: 1,
       penalty_last_n: defaultContextSize,
       dry_base: 1.75,
