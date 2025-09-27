@@ -1,6 +1,6 @@
 FROM node:lts AS llama-builder
 
-ARG LLAMA_CPP_RELEASE_TAG="b5595"
+ARG LLAMA_CPP_RELEASE_TAG="b6604"
 
 RUN apt-get update && apt-get install -y \
   build-essential \

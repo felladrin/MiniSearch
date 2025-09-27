@@ -53,6 +53,7 @@ export async function startRerankerService() {
       "--ubatch-size",
       contextSize.toString(),
       "--flash-attn",
+      "on",
       "--host",
       SERVICE_HOST,
       "--port",
