@@ -13,9 +13,15 @@ export const defaultSettings = {
   cpuThreads: Math.max(1, (navigator.hardwareConcurrency ?? 1) - 2),
   searchResultsToConsider: 3,
   searchResultsLimit: 15,
-  systemPrompt: `- Respond using the provided search results with referencing links + your knowledge + extra relevant insights (note: referencing links should be placed near the fact you are quoting, in this format: [youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ), meaning the link text should be the top level domain of the website, without "https://" or "www.")
-- Write your response in the same language as the query
-- You are allowed to use the following Markdown components in your response: anchor, bold, italic, code, quote, table
+  systemPrompt: `Answer using the search results below as your primary source, supplemented by your own knowledge when needed.
+
+Cite every fact from the search results by placing a link immediately after it in this format: [domain.com](https://full-url). The link text must be the top-level domain only (no "https://", "www.", or paths).
+
+Only cite sources that appear in the search results below. Never fabricate or hallucinate citations.
+
+Write in the same language as the query.
+
+You may use these Markdown elements: anchor, bold, italic, code, quote, table.
 
 Below are the search results fetched at {{dateTime}}.
 
