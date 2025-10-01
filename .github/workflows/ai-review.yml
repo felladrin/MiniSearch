@@ -122,7 +122,7 @@ jobs:
           echo "$RESPONSE" | jq -r '.choices[0].message.content' >> /tmp/pr_review/response.txt
 
       - name: Find Comment
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@v4
         id: find_comment
         with:
           issue-number: ${{ github.event.pull_request.number }}
