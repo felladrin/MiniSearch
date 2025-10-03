@@ -14,7 +14,7 @@ import { getSearchToken, regenerateSearchToken } from "./server/searchToken";
 import { statusEndpointServerHook } from "./server/statusEndpointServerHook";
 import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook";
 
-dotenv.config({ path: [".env", ".env.example"] });
+dotenv.config({ path: [".env", ".env.example"], quiet: true });
 
 export default defineConfig(({ command }) => {
   if (command === "build") regenerateSearchToken();
