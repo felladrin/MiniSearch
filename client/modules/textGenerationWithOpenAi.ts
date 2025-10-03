@@ -1,6 +1,10 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { streamText } from "ai";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
+import {
+  listOpenAiCompatibleModels,
+  selectRandomModel,
+} from "../../shared/openaiModels";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
@@ -15,21 +19,6 @@ import {
   getDefaultChatMessages,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
-
-interface ModelData {
-  id: string;
-}
-
-function selectRandomModel(
-  models: ModelData[],
-  excludeIds: Set<string> = new Set(),
-): string | null {
-  if (!models || models.length === 0) return null;
-  const availableModels = models.filter((m) => !excludeIds.has(m.id));
-  if (availableModels.length === 0) return null;
-  const randomIndex = Math.floor(Math.random() * availableModels.length);
-  return availableModels[randomIndex].id;
-}
 
 let currentAbortController: AbortController | null = null;
 
@@ -52,24 +41,20 @@ async function createOpenAiStream({
   const params = getDefaultChatCompletionCreateParamsStreaming();
 
   let effectiveModel = settings.openAiApiModel;
-  let availableModels: ModelData[] = [];
+  let availableModels: { id: string }[] = [];
 
   if (!effectiveModel) {
-    const response = await fetch(`${settings.openAiApiBaseUrl}/models`, {
-      headers: {
-        ...(settings.openAiApiKey
-          ? { Authorization: `Bearer ${settings.openAiApiKey}` }
-          : {}),
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (response.ok) {
-      const json = await response.json();
-      availableModels = json?.data || [];
+    try {
+      availableModels = await listOpenAiCompatibleModels(
+        settings.openAiApiBaseUrl,
+        settings.openAiApiKey,
+      );
       const selectedModel = selectRandomModel(availableModels);
-
       if (selectedModel) effectiveModel = selectedModel;
+    } catch (err) {
+      addLogEntry(
+        `Failed to list OpenAI models: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 

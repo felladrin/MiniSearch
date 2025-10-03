@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import viteBasicSSLPlugin from "@vitejs/plugin-basic-ssl";
 import viteReactPlugin from "@vitejs/plugin-react";
 import dotenv from "dotenv";
@@ -15,6 +17,9 @@ import { statusEndpointServerHook } from "./server/statusEndpointServerHook";
 import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook";
 
 dotenv.config({ path: [".env", ".env.example"], quiet: true });
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default defineConfig(({ command }) => {
   if (command === "build") regenerateSearchToken();
@@ -55,6 +60,12 @@ export default defineConfig(({ command }) => {
       port: process.env.PORT ? Number(process.env.PORT) : undefined,
       hmr: {
         port: process.env.HMR_PORT ? Number(process.env.HMR_PORT) : undefined,
+      },
+      fs: {
+        allow: [
+          path.resolve(__dirname, "shared"),
+          path.resolve(__dirname, "client"),
+        ],
       },
     },
     preview: {

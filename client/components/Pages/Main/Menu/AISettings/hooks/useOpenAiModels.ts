@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { listOpenAiCompatibleModels } from "../../../../../../../shared/openaiModels";
 import { addLogEntry } from "../../../../../../modules/logEntries";
 import type { defaultSettings } from "../../../../../../modules/settings";
 import type { ModelOption } from "../types";
@@ -12,31 +13,20 @@ export const useOpenAiModels = (settings: Settings) => {
   useEffect(() => {
     async function fetchOpenAiModels() {
       try {
-        const response = await fetch(`${settings.openAiApiBaseUrl}/models`, {
-          headers: {
-            ...(settings.openAiApiKey
-              ? { Authorization: `Bearer ${settings.openAiApiKey}` }
-              : {}),
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch models: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        const modelIds: string[] = data.data.map(
-          (model: { id: string }) => model.id,
+        const models = await listOpenAiCompatibleModels(
+          settings.openAiApiBaseUrl,
+          settings.openAiApiKey,
         );
-        const uniqueModelIds = [...new Set(modelIds)];
-        const models = uniqueModelIds.map((id) => ({
+        const uniqueModelIds = [
+          ...new Set(models.map((m: { id: string }) => m.id)),
+        ];
+        const options: ModelOption[] = uniqueModelIds.map((id) => ({
           label: id,
           value: id,
         }));
 
-        setOpenAiModels(models);
-        setUseTextInput(!Array.isArray(models) || models.length === 0);
+        setOpenAiModels(options);
+        setUseTextInput(!Array.isArray(options) || options.length === 0);
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);

@@ -1,22 +1,14 @@
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import {
+  createOpenAICompatible,
+  type OpenAICompatibleChatModelId,
+} from "@ai-sdk/openai-compatible";
 import { type ModelMessage, streamText } from "ai";
 import type { Connect, PreviewServer, ViteDevServer } from "vite";
+import {
+  listOpenAiCompatibleModels,
+  selectRandomModel,
+} from "../shared/openaiModels";
 import { handleTokenVerification } from "./handleTokenVerification";
-
-interface ModelData {
-  id: string;
-}
-
-function selectRandomModel(
-  models: ModelData[],
-  excludeIds: Set<string> = new Set(),
-): string | null {
-  if (!models || models.length === 0) return null;
-  const availableModels = models.filter((m) => !excludeIds.has(m.id));
-  if (availableModels.length === 0) return null;
-  const randomIndex = Math.floor(Math.random() * availableModels.length);
-  return availableModels[randomIndex].id;
-}
 
 interface ChatCompletionRequestBody {
   messages: ModelMessage[];
@@ -31,7 +23,7 @@ interface ChatCompletionChunk {
   id: string;
   object: string;
   created: number;
-  model: string;
+  model?: string;
   choices: Array<{
     index: number;
     delta: { content?: string };
@@ -63,12 +55,11 @@ export function internalApiEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
 >(server: T) {
   server.middlewares.use(async (request, response, next) => {
-    if (!request.url.startsWith("/inference")) return next();
+    if (!request.url || !request.url.startsWith("/inference")) return next();
 
     const url = new URL(request.url, `http://${request.headers.host}`);
     const token = url.searchParams.get("token");
     const { shouldContinue } = await handleTokenVerification(token, response);
-
     if (!shouldContinue) return;
 
     if (
@@ -91,38 +82,20 @@ export function internalApiEndpointServerHook<
     try {
       const requestBody = await getRequestBody(request);
       let model = process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL;
-      let availableModels: ModelData[] = [];
+      let availableModels: { id: OpenAICompatibleChatModelId }[] = [];
 
       if (!model) {
         try {
-          const modelsResponse = await fetch(
-            `${process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL}/models`,
-            {
-              headers: {
-                ...(process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY
-                  ? {
-                      Authorization: `Bearer ${process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY}`,
-                    }
-                  : {}),
-                "Content-Type": "application/json",
-              },
-            },
+          availableModels = await listOpenAiCompatibleModels(
+            process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
+            process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
           );
+          const selectedModel = selectRandomModel(availableModels);
 
-          if (modelsResponse.ok) {
-            const modelsData = await modelsResponse.json();
-            availableModels = modelsData?.data || [];
-            const selectedModel = selectRandomModel(availableModels);
-
-            if (selectedModel) {
-              model = selectedModel;
-            } else {
-              throw new Error("No models available from the API");
-            }
+          if (selectedModel) {
+            model = selectedModel;
           } else {
-            throw new Error(
-              `Failed to fetch models: ${modelsResponse.statusText}`,
-            );
+            throw new Error("No models available from the API");
           }
         } catch (modelFetchError) {
           console.error("Error fetching models:", modelFetchError);
@@ -166,7 +139,7 @@ export function internalApiEndpointServerHook<
         currentAttempt++;
 
         const stream = streamText({
-          model: openaiProvider.chatModel(model),
+          model: openaiProvider.chatModel(model as string),
           messages: requestBody.messages,
           temperature: requestBody.temperature,
           topP: requestBody.top_p,
@@ -182,23 +155,10 @@ export function internalApiEndpointServerHook<
               !process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL
             ) {
               try {
-                const modelsResponse = await fetch(
-                  `${process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL}/models`,
-                  {
-                    headers: {
-                      ...(process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY
-                        ? {
-                            Authorization: `Bearer ${process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY}`,
-                          }
-                        : {}),
-                      "Content-Type": "application/json",
-                    },
-                  },
+                availableModels = await listOpenAiCompatibleModels(
+                  process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL as string,
+                  process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
                 );
-                if (modelsResponse.ok) {
-                  const modelsData = await modelsResponse.json();
-                  availableModels = modelsData?.data || [];
-                }
               } catch (refetchErr) {
                 console.warn("Failed to refetch models:", refetchErr);
               }
@@ -241,10 +201,14 @@ export function internalApiEndpointServerHook<
         try {
           for await (const part of stream.fullStream) {
             if (part.type === "text-delta") {
-              const payload = createChunkPayload(model, part.text);
+              const payload = createChunkPayload(model as string, part.text);
               response.write(`data: ${JSON.stringify(payload)}\n\n`);
             } else if (part.type === "finish") {
-              const payload = createChunkPayload(model, undefined, "stop");
+              const payload = createChunkPayload(
+                model as string,
+                undefined,
+                "stop",
+              );
               response.write(`data: ${JSON.stringify(payload)}\n\n`);
               response.write("data: [DONE]\n\n");
               response.end();
