@@ -210,8 +210,8 @@ export function internalApiEndpointServerHook<
                 attemptedModels,
               );
               if (nextModel) {
-                console.log(
-                  `Model ${model} failed, retrying with ${nextModel} (attempt ${currentAttempt}/${maxRetries})`,
+                console.warn(
+                  `Model "${model}" failed, retrying with "${nextModel}" (Attempt ${currentAttempt}/${maxRetries})`,
                 );
                 model = nextModel;
                 await new Promise((resolve) =>

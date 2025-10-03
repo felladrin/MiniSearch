@@ -7,6 +7,7 @@ import {
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
+import { sleep } from "./sleep";
 import {
   ChatGenerationError,
   canStartResponding,
@@ -131,7 +132,7 @@ async function handleGenerationStatus(
       }
 
       if (!status.done && !status.faulted && status.is_possible) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await sleep(1000);
       }
 
       if (getTextGenerationState() === "interrupted") {

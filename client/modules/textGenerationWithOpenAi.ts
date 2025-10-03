@@ -1,12 +1,14 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { streamText } from "ai";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
+import { addLogEntry } from "./logEntries";
 import {
   getSettings,
   getTextGenerationState,
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
+import { sleep } from "./sleep";
 import {
   canStartResponding,
   getDefaultChatCompletionCreateParamsStreaming,
@@ -119,14 +121,12 @@ async function createOpenAiStream({
               attemptedModels,
             );
             if (nextModel) {
-              console.log(
-                `Model ${effectiveModel} failed, retrying with ${nextModel} (attempt ${currentAttempt}/${maxRetries})`,
+              addLogEntry(
+                `Model "${effectiveModel}" failed, retrying with "${nextModel}" (Attempt ${currentAttempt}/${maxRetries})`,
               );
               effectiveModel = nextModel;
               shouldRetry = true;
-              await new Promise((resolve) =>
-                setTimeout(resolve, 100 * currentAttempt),
-              );
+              await sleep(100 * currentAttempt);
               throw error;
             }
           }
