@@ -14,6 +14,21 @@ import {
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
 
+interface ModelData {
+  id: string;
+}
+
+function selectRandomModel(
+  models: ModelData[],
+  excludeIds: Set<string> = new Set(),
+): string | null {
+  if (!models || models.length === 0) return null;
+  const availableModels = models.filter((m) => !excludeIds.has(m.id));
+  if (availableModels.length === 0) return null;
+  const randomIndex = Math.floor(Math.random() * availableModels.length);
+  return availableModels[randomIndex].id;
+}
+
 let currentAbortController: AbortController | null = null;
 
 interface StreamOptions {
@@ -35,6 +50,7 @@ async function createOpenAiStream({
   const params = getDefaultChatCompletionCreateParamsStreaming();
 
   let effectiveModel = settings.openAiApiModel;
+  let availableModels: ModelData[] = [];
 
   if (!effectiveModel) {
     const response = await fetch(`${settings.openAiApiBaseUrl}/models`, {
@@ -48,54 +64,110 @@ async function createOpenAiStream({
 
     if (response.ok) {
       const json = await response.json();
-      const firstModel = json?.data?.[0]?.id;
+      availableModels = json?.data || [];
+      const selectedModel = selectRandomModel(availableModels);
 
-      if (firstModel) effectiveModel = firstModel;
+      if (selectedModel) effectiveModel = selectedModel;
     }
   }
 
-  try {
+  const maxRetries = 5;
+  const attemptedModels = new Set<string>();
+  let currentAttempt = 0;
+
+  const tryNextModel = async (): Promise<string> => {
+    if (currentAttempt >= maxRetries) {
+      throw new Error(
+        `Failed to generate text after ${maxRetries} retries with different models`,
+      );
+    }
+
+    if (effectiveModel) {
+      attemptedModels.add(effectiveModel);
+    }
+
+    currentAttempt++;
+
     currentAbortController = new AbortController();
+    let shouldRetry = false;
 
-    const stream = streamText({
-      model: openaiProvider.chatModel(effectiveModel),
-      messages: messages.map((msg) => ({
-        role: msg.role || "user",
-        content: msg.content,
-      })),
-      maxOutputTokens: params.max_tokens,
-      temperature: params.temperature,
-      topP: params.top_p,
-      frequencyPenalty: params.frequency_penalty,
-      presencePenalty: params.presence_penalty,
-      abortSignal: currentAbortController.signal,
-    });
+    try {
+      const stream = streamText({
+        model: openaiProvider.chatModel(effectiveModel),
+        messages: messages.map((msg) => ({
+          role: msg.role || "user",
+          content: msg.content,
+        })),
+        maxOutputTokens: params.max_tokens,
+        temperature: params.temperature,
+        topP: params.top_p,
+        frequencyPenalty: params.frequency_penalty,
+        presencePenalty: params.presence_penalty,
+        abortSignal: currentAbortController.signal,
+        maxRetries: 0,
+        onError: async (error) => {
+          if (
+            getTextGenerationState() === "interrupted" ||
+            (error instanceof DOMException && error.name === "AbortError")
+          ) {
+            throw new Error("Chat generation interrupted");
+          }
 
-    let text = "";
-    for await (const part of stream.fullStream) {
-      if (getTextGenerationState() === "interrupted") {
-        currentAbortController.abort();
+          if (availableModels.length > 0 && currentAttempt < maxRetries) {
+            const nextModel = selectRandomModel(
+              availableModels,
+              attemptedModels,
+            );
+            if (nextModel) {
+              console.log(
+                `Model ${effectiveModel} failed, retrying with ${nextModel} (attempt ${currentAttempt}/${maxRetries})`,
+              );
+              effectiveModel = nextModel;
+              shouldRetry = true;
+              await new Promise((resolve) =>
+                setTimeout(resolve, 100 * currentAttempt),
+              );
+              throw error;
+            }
+          }
+
+          throw error;
+        },
+      });
+
+      let text = "";
+      for await (const part of stream.fullStream) {
+        if (getTextGenerationState() === "interrupted") {
+          currentAbortController.abort();
+          throw new Error("Chat generation interrupted");
+        }
+
+        if (part.type === "text-delta") {
+          text += part.text;
+          onUpdate(text);
+        }
+      }
+
+      return text;
+    } catch (error) {
+      if (
+        getTextGenerationState() === "interrupted" ||
+        (error instanceof DOMException && error.name === "AbortError")
+      ) {
         throw new Error("Chat generation interrupted");
       }
 
-      if (part.type === "text-delta") {
-        text += part.text;
-        onUpdate(text);
+      if (shouldRetry) {
+        return tryNextModel();
       }
-    }
 
-    return text;
-  } catch (error) {
-    if (
-      getTextGenerationState() === "interrupted" ||
-      (error instanceof DOMException && error.name === "AbortError")
-    ) {
-      throw new Error("Chat generation interrupted");
+      throw error;
+    } finally {
+      currentAbortController = null;
     }
-    throw error;
-  } finally {
-    currentAbortController = null;
-  }
+  };
+
+  return tryNextModel();
 }
 
 export async function generateTextWithOpenAi() {

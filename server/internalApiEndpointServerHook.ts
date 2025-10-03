@@ -3,6 +3,21 @@ import { type ModelMessage, streamText } from "ai";
 import type { Connect, PreviewServer, ViteDevServer } from "vite";
 import { handleTokenVerification } from "./handleTokenVerification";
 
+interface ModelData {
+  id: string;
+}
+
+function selectRandomModel(
+  models: ModelData[],
+  excludeIds: Set<string> = new Set(),
+): string | null {
+  if (!models || models.length === 0) return null;
+  const availableModels = models.filter((m) => !excludeIds.has(m.id));
+  if (availableModels.length === 0) return null;
+  const randomIndex = Math.floor(Math.random() * availableModels.length);
+  return availableModels[randomIndex].id;
+}
+
 interface ChatCompletionRequestBody {
   messages: ModelMessage[];
   temperature?: number;
@@ -75,47 +90,192 @@ export function internalApiEndpointServerHook<
 
     try {
       const requestBody = await getRequestBody(request);
-      const model = process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL;
+      let model = process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL;
+      let availableModels: ModelData[] = [];
+
+      if (!model) {
+        try {
+          const modelsResponse = await fetch(
+            `${process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL}/models`,
+            {
+              headers: {
+                ...(process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY
+                  ? {
+                      Authorization: `Bearer ${process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY}`,
+                    }
+                  : {}),
+                "Content-Type": "application/json",
+              },
+            },
+          );
+
+          if (modelsResponse.ok) {
+            const modelsData = await modelsResponse.json();
+            availableModels = modelsData?.data || [];
+            const selectedModel = selectRandomModel(availableModels);
+
+            if (selectedModel) {
+              model = selectedModel;
+            } else {
+              throw new Error("No models available from the API");
+            }
+          } else {
+            throw new Error(
+              `Failed to fetch models: ${modelsResponse.statusText}`,
+            );
+          }
+        } catch (modelFetchError) {
+          console.error("Error fetching models:", modelFetchError);
+          throw new Error(
+            "Unable to determine model for OpenAI-compatible API",
+          );
+        }
+      }
 
       if (!model) {
         throw new Error("OpenAI model configuration is missing");
       }
 
-      const stream = streamText({
-        model: openaiProvider.chatModel(model),
-        messages: requestBody.messages,
-        temperature: requestBody.temperature,
-        topP: requestBody.top_p,
-        frequencyPenalty: requestBody.frequency_penalty,
-        presencePenalty: requestBody.presence_penalty,
-        maxOutputTokens: requestBody.max_tokens,
-      });
+      const maxRetries = 5;
+      const attemptedModels = new Set<string>();
+      let currentAttempt = 0;
+      let streamError: unknown = null;
 
-      response.setHeader("Content-Type", "text/event-stream");
-      response.setHeader("Cache-Control", "no-cache");
-      response.setHeader("Connection", "keep-alive");
+      const tryNextModel = async (): Promise<void> => {
+        if (currentAttempt >= maxRetries) {
+          if (!response.headersSent) {
+            response.statusCode = 503;
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+              JSON.stringify({
+                error: "Service unavailable - all models failed",
+                lastError:
+                  streamError instanceof Error
+                    ? streamError.message
+                    : "Unknown error",
+              }),
+            );
+          }
+          return;
+        }
 
-      try {
-        for await (const part of stream.fullStream) {
-          if (part.type === "text-delta") {
-            const payload = createChunkPayload(model, part.text);
-            response.write(`data: ${JSON.stringify(payload)}\n\n`);
-          } else if (part.type === "finish") {
-            const payload = createChunkPayload(model, undefined, "stop");
-            response.write(`data: ${JSON.stringify(payload)}\n\n`);
-            response.write("data: [DONE]\n\n");
-            response.end();
+        if (model) {
+          attemptedModels.add(model);
+        }
+
+        currentAttempt++;
+
+        const stream = streamText({
+          model: openaiProvider.chatModel(model),
+          messages: requestBody.messages,
+          temperature: requestBody.temperature,
+          topP: requestBody.top_p,
+          frequencyPenalty: requestBody.frequency_penalty,
+          presencePenalty: requestBody.presence_penalty,
+          maxOutputTokens: requestBody.max_tokens,
+          maxRetries: 0,
+          onError: async (error) => {
+            streamError = error;
+
+            if (
+              availableModels.length === 0 &&
+              !process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL
+            ) {
+              try {
+                const modelsResponse = await fetch(
+                  `${process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL}/models`,
+                  {
+                    headers: {
+                      ...(process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY
+                        ? {
+                            Authorization: `Bearer ${process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY}`,
+                          }
+                        : {}),
+                      "Content-Type": "application/json",
+                    },
+                  },
+                );
+                if (modelsResponse.ok) {
+                  const modelsData = await modelsResponse.json();
+                  availableModels = modelsData?.data || [];
+                }
+              } catch (refetchErr) {
+                console.warn("Failed to refetch models:", refetchErr);
+              }
+            }
+
+            if (availableModels.length > 0 && currentAttempt < maxRetries) {
+              const nextModel = selectRandomModel(
+                availableModels,
+                attemptedModels,
+              );
+              if (nextModel) {
+                console.log(
+                  `Model ${model} failed, retrying with ${nextModel} (attempt ${currentAttempt}/${maxRetries})`,
+                );
+                model = nextModel;
+                await new Promise((resolve) =>
+                  setTimeout(resolve, 100 * currentAttempt),
+                );
+                await tryNextModel();
+                return;
+              }
+            }
+
+            if (!response.headersSent) {
+              response.statusCode = 503;
+              response.setHeader("Content-Type", "application/json");
+              response.end(
+                JSON.stringify({
+                  error: "Service unavailable - all models failed",
+                }),
+              );
+            }
+          },
+        });
+
+        response.setHeader("Content-Type", "text/event-stream");
+        response.setHeader("Cache-Control", "no-cache");
+        response.setHeader("Connection", "keep-alive");
+
+        try {
+          for await (const part of stream.fullStream) {
+            if (part.type === "text-delta") {
+              const payload = createChunkPayload(model, part.text);
+              response.write(`data: ${JSON.stringify(payload)}\n\n`);
+            } else if (part.type === "finish") {
+              const payload = createChunkPayload(model, undefined, "stop");
+              response.write(`data: ${JSON.stringify(payload)}\n\n`);
+              response.write("data: [DONE]\n\n");
+              response.end();
+              return;
+            }
+          }
+        } catch (iterationError) {
+          console.error("Error during stream iteration:", iterationError);
+          if (!response.headersSent) {
+            response.statusCode = 500;
+            response.setHeader("Content-Type", "application/json");
+            response.end(
+              JSON.stringify({
+                error: "Stream iteration error",
+              }),
+            );
           }
         }
-      } catch (streamError) {
-        console.error("Error in stream processing:", streamError);
-        if (!response.headersSent) {
-          response.statusCode = 500;
-          response.setHeader("Content-Type", "application/json");
-          response.end(JSON.stringify({ error: "Stream processing error" }));
-        } else {
-          response.end();
-        }
+      };
+
+      await tryNextModel();
+
+      if (!response.headersSent) {
+        response.statusCode = 503;
+        response.setHeader("Content-Type", "application/json");
+        response.end(
+          JSON.stringify({
+            error:
+              "Failed to generate text after multiple retries with different models",
+          }),
+        );
       }
     } catch (error) {
       console.error("Error in internal API endpoint:", error);
