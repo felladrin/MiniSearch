@@ -186,6 +186,20 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 260,
   },
+  "minicpm4-0.5b": {
+    ...createDefaultModelConfig(),
+    label: "MiniCPM4 0.5B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-MiniCPM4-0.5B-QAT",
+    hfFilePath: "model.shard-00001-of-00005.gguf",
+    fileSizeInMegabytes: 267,
+  },
+  "falcon-h1-0.5b": {
+    ...createDefaultModelConfig(),
+    label: "Falcon H1 0.5B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Falcon-H1-0.5B-Instruct",
+    hfFilePath: "model.shard-00001-of-00011.gguf",
+    fileSizeInMegabytes: 306,
+  },
   "qwen-3-0.6b": {
     ...createDefaultModelConfig(),
     label: "Qwen 3 0.6B",
