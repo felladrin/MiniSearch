@@ -108,6 +108,63 @@ export default function ChatInterface({
     };
   }, [setFollowUpQuestion]);
 
+  const handleEditMessage = useCallback(
+    (absoluteIndex: number) => {
+      const target = messages[absoluteIndex];
+      if (!target || target.role !== "user") return;
+      setInput(target.content);
+      setMessages(messages.slice(0, absoluteIndex));
+      setFollowUpQuestion("");
+    },
+    [messages, setInput, setFollowUpQuestion],
+  );
+
+  const handleRegenerateResponse = useCallback(async () => {
+    if (
+      generationState.isGeneratingResponse ||
+      messages.length < 3 ||
+      messages[messages.length - 1].role !== "assistant"
+    )
+      return;
+
+    const history = messages.slice(0, -1);
+    const lastUser = history[history.length - 1];
+
+    setMessages(history);
+    setGenerationState({ ...generationState, isGeneratingResponse: true });
+    setFollowUpQuestion("");
+    setStreamedResponse("");
+
+    try {
+      const finalResponse = await generateChatResponse(
+        history,
+        updateStreamedResponse,
+      );
+
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: finalResponse },
+      ]);
+
+      addLogEntry("AI response re-generated");
+
+      if (lastUser?.role === "user") {
+        await regenerateFollowUpQuestion(lastUser.content, finalResponse);
+      }
+    } catch (error) {
+      addLogEntry(`Error re-generating response: ${error}`);
+    } finally {
+      setGenerationState({ ...generationState, isGeneratingResponse: false });
+    }
+  }, [
+    generationState,
+    messages,
+    regenerateFollowUpQuestion,
+    setFollowUpQuestion,
+    setGenerationState,
+    updateStreamedResponse,
+  ]);
+
   const handleSend = async (textToSend?: string) => {
     const currentInput = textToSend ?? input;
     if (currentInput.trim() === "" || generationState.isGeneratingResponse)
@@ -231,6 +288,9 @@ export default function ChatInterface({
               ? [...messages, { role: "assistant", content: streamedResponse }]
               : messages
           }
+          onEditMessage={handleEditMessage}
+          onRegenerate={() => handleRegenerateResponse()}
+          isGenerating={generationState.isGeneratingResponse}
         />
         <ChatInputArea onKeyDown={handleKeyDown} handleSend={handleSend} />
       </Stack>
