@@ -258,60 +258,70 @@ async function executeHordeGeneration(
     return await handleGenerationStatus(generation.id, onUpdate);
   }
 
-  const parallelRequestCount = 2;
-  const pendingRequests: Array<{
-    id: string;
-    abortController: AbortController;
-  }> = [];
-
+  const controllers: AbortController[] = [
+    new AbortController(),
+    new AbortController(),
+  ];
   try {
-    const generationPromises = Array.from(
-      { length: parallelRequestCount },
-      async () => {
-        const abortController = new AbortController();
-        const generation = await startGeneration(
-          messages,
-          abortController.signal,
-        );
-        pendingRequests.push({ id: generation.id, abortController });
-        return generation;
-      },
-    );
+    const startPromises = controllers.map(async (ctrl) => {
+      const generation = await startGeneration(messages, ctrl.signal);
+      return { id: generation.id, ctrl };
+    });
 
-    const generations = await Promise.all(generationPromises);
+    const startResults = await Promise.allSettled(startPromises);
+    const generations: Array<{ id: string; ctrl: AbortController }> =
+      startResults
+        .map((generationPromise) =>
+          generationPromise.status === "fulfilled"
+            ? generationPromise.value
+            : null,
+        )
+        .filter(
+          (generation): generation is { id: string; ctrl: AbortController } =>
+            generation !== null,
+        );
+
+    if (generations.length === 0) {
+      throw new Error("Failed to start any AI Horde generation");
+    }
 
     const raceState = { winnerId: null as string | null };
-
-    const statusPromises = generations.map(
-      (generation: HordeResponse, index: number) =>
-        handleGenerationStatus(
-          generation.id,
-          (text: string) => {
-            if (raceState.winnerId === null) {
-              raceState.winnerId = generation.id;
-            }
-
-            if (raceState.winnerId === generation.id) {
-              onUpdate(text);
-            }
-          },
-          pendingRequests[index].abortController.signal,
-        ).then((result: string) => ({ result, generationId: generation.id })),
+    const statusPromises = generations.map((generation) =>
+      handleGenerationStatus(
+        generation.id,
+        (text: string) => {
+          if (raceState.winnerId === null) {
+            raceState.winnerId = generation.id;
+          }
+          if (raceState.winnerId === generation.id) {
+            onUpdate(text);
+          }
+        },
+        generation.ctrl.signal,
+      ).then((result: string) => ({ result, generationId: generation.id })),
     );
 
     const winner = await Promise.race(statusPromises);
 
-    pendingRequests.forEach(({ id, abortController }) => {
-      if (id !== winner.generationId) {
-        abortController.abort();
-        cancelGeneration(id).catch(() => {});
-      }
-    });
+    await Promise.all(
+      generations.map(async (generation) => {
+        if (generation.id !== winner.generationId) {
+          try {
+            generation.ctrl.abort();
+          } catch {}
+          try {
+            await cancelGeneration(generation.id);
+          } catch {}
+        }
+      }),
+    );
 
     return winner.result;
   } catch (error) {
-    pendingRequests.forEach(({ abortController }) => {
-      abortController.abort();
+    controllers.forEach((controller) => {
+      try {
+        controller.abort();
+      } catch {}
     });
     throw error;
   }
