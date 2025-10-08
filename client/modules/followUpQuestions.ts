@@ -58,33 +58,29 @@ Respond with just the question, no additional text or explanations.`,
       },
     ];
 
-    const response = await generateChatResponse(promptMessages, () => {});
+    let response = await generateChatResponse(promptMessages, () => {});
 
-    const lines = response
+    const lastQuestionMarkIndex = response.lastIndexOf("?");
+
+    if (lastQuestionMarkIndex >= 0) {
+      response = response.slice(0, lastQuestionMarkIndex + 1).trim();
+    }
+
+    let questionLine = response
       .trim()
       .split("\n")
       .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-
-    let questionLine = lines
       .reverse()
-      .find(
-        (line) =>
-          line.endsWith("?") || line.endsWith('?"') || line.endsWith("?'"),
-      );
+      .find((line) => line.endsWith("?"));
 
     if (!questionLine) {
       addLogEntry("No valid follow-up question generated");
       return "";
     }
 
-    if (questionLine.startsWith('"') || questionLine.startsWith("'")) {
-      questionLine = questionLine.slice(1);
-    }
+    questionLine = questionLine.replace(/^[^a-zA-Z]+/, "");
 
-    if (questionLine.endsWith('"') || questionLine.endsWith("'")) {
-      questionLine = questionLine.slice(0, -1);
-    }
+    questionLine = questionLine.charAt(0).toUpperCase() + questionLine.slice(1);
 
     addLogEntry("Generated follow-up question successfully");
 
