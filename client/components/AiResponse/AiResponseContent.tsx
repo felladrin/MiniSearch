@@ -51,7 +51,12 @@ export default function AiResponseContent({
     () =>
       ({ children }: { children: ReactNode }) => {
         return settings.enableAiResponseScrolling ? (
-          <ScrollArea.Autosize mah={300} type="auto" offsetScrollbars>
+          <ScrollArea.Autosize
+            mah={300}
+            type="auto"
+            scrollbars="y"
+            offsetScrollbars
+          >
             {children}
           </ScrollArea.Autosize>
         ) : (
