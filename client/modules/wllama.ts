@@ -381,19 +381,4 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 2460,
   },
-  "llama-3.1-nemotron-nano-4b": {
-    ...createDefaultModelConfig(),
-    label: "Llama 3.1 Nemotron Nano 4B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Llama-3.1-Nemotron-Nano-4B-v1.1",
-    hfFilePath: "model.shard-00001-of-00009.gguf",
-    fileSizeInMegabytes: 2660,
-  },
-  "gemma-3n-e2b": {
-    ...createDefaultModelConfig(),
-    label: "Gemma 3n E2B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-gemma-3n-E2B-it",
-    hfFilePath: "model.shard-00001-of-00004.gguf",
-    fileSizeInMegabytes: 2730,
-    contextSize: 3328,
-  },
 };
