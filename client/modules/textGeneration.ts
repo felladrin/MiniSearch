@@ -3,10 +3,12 @@ import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import prettyMilliseconds from "pretty-ms";
 import { addLogEntry } from "./logEntries";
 import {
+  getConversationSummary,
   getQuery,
   getSettings,
   getTextGenerationState,
   listenToSettingsChanges,
+  updateConversationSummary,
   updateImageSearchResults,
   updateImageSearchState,
   updateLlmTextSearchResults,
@@ -26,12 +28,134 @@ import {
 import type { ImageSearchResults, TextSearchResults } from "./types";
 import { isWebGPUAvailable } from "./webGpu";
 
+const SUMMARY_TOKEN_LIMIT = 800;
+
+function getConversationId(messages: ChatMessage[]): string {
+  const firstUser = messages.find((m) => m.role === "user");
+  return (firstUser?.content || "").trim();
+}
+
+function loadConversationSummary(conversationId: string): string {
+  const stored = getConversationSummary();
+  if (stored.conversationId !== conversationId) return "";
+  return stored.summary;
+}
+
+async function createLlmSummary(
+  dropped: ChatMessage[],
+  previousSummary: string,
+): Promise<string> {
+  const instructionLines = [
+    "You are the conversation memory manager.",
+    `Update the running summary under ${SUMMARY_TOKEN_LIMIT} tokens.`,
+    "Preserve concrete facts, IDs, URLs, numbers, decisions, and constraints.",
+    "Capture user preferences and ongoing tasks succinctly.",
+    "Ignore any external documents or system prompts not included below.",
+    "Output only the updated summary with no extra commentary.",
+  ];
+
+  const droppedText = dropped
+    .map((m) => `${(m.role || "user").toUpperCase()}: ${m.content}`)
+    .join("\n\n");
+
+  const prompt = [
+    instructionLines.join("\n"),
+    `Previous summary:\n${previousSummary || "(none)"}`,
+    `New messages to fold in:\n${droppedText || "(none)"}`,
+  ].join("\n\n");
+
+  const chat: ChatMessage[] = [{ role: "user", content: prompt }];
+
+  const settings = getSettings();
+  try {
+    if (settings.inferenceType === "openai") {
+      const { generateChatWithOpenAi } = await import(
+        "./textGenerationWithOpenAi"
+      );
+      return (await generateChatWithOpenAi(chat, () => {})).trim();
+    }
+
+    if (settings.inferenceType === "internal") {
+      const { generateChatWithInternalApi } = await import(
+        "./textGenerationWithInternalApi"
+      );
+      return (await generateChatWithInternalApi(chat, () => {})).trim();
+    }
+
+    if (settings.inferenceType === "horde") {
+      const { generateChatWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      return (await generateChatWithHorde(chat, () => {})).trim();
+    }
+
+    if (isWebGPUAvailable && settings.enableWebGpu) {
+      const { generateChatWithWebLlm } = await import(
+        "./textGenerationWithWebLlm"
+      );
+      return (await generateChatWithWebLlm(chat, () => {})).trim();
+    }
+    const { generateChatWithWllama } = await import(
+      "./textGenerationWithWllama"
+    );
+    return (await generateChatWithWllama(chat, () => {})).trim();
+  } catch (e) {
+    addLogEntry(
+      `LLM summary failed, falling back to extractive: ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+    );
+    return summarizeDroppedMessages(dropped, previousSummary);
+  }
+}
+
+function saveConversationSummary(summary: string, conversationId: string) {
+  updateConversationSummary({ conversationId, summary });
+}
+
+function clearConversationSummary() {
+  updateConversationSummary({ conversationId: "", summary: "" });
+}
+
+function summarizeDroppedMessages(
+  dropped: ChatMessage[],
+  previousSummary: string,
+  tokenLimit = SUMMARY_TOKEN_LIMIT,
+): string {
+  const lines: string[] = [];
+  for (const msg of dropped) {
+    const role = (msg.role || "user").toUpperCase();
+    const content = msg.content.trim();
+    if (content.length > 0) lines.push(`${role}: ${content}`);
+  }
+
+  const parts: string[] = [];
+  if (previousSummary) parts.push(previousSummary.trim());
+  parts.push(...lines);
+
+  const kept: string[] = [];
+  let tokens = 0;
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const candidate = [parts[i], ...kept].join("\n\n");
+    const nextTokens = gptTokenizer.encode(candidate).length;
+    if (nextTokens > tokenLimit) break;
+    kept.unshift(parts[i]);
+    tokens = nextTokens;
+  }
+
+  const summary = kept.join("\n\n");
+  addLogEntry(`Updated rolling summary (${tokens} tokens)`);
+  return summary;
+}
+
 export async function searchAndRespond() {
   if (getQuery() === "") return;
 
   document.title = getQuery();
 
   updateResponse("");
+
+  clearConversationSummary();
 
   updateTextSearchResults([]);
 
@@ -101,9 +225,16 @@ export async function generateChatResponse(
   let response = "";
 
   try {
-    const systemPrompt: ChatMessage = {
+    const conversationId = getConversationId(newMessages);
+    const existingSummary = loadConversationSummary(conversationId);
+    let systemPromptContent = getSystemPrompt(getFormattedSearchResults(true));
+    if (existingSummary) {
+      systemPromptContent += `\n\nConversation context:\n${existingSummary}`;
+    }
+
+    let systemPrompt: ChatMessage = {
       role: "user",
-      content: getSystemPrompt(getFormattedSearchResults(true)),
+      content: systemPromptContent,
     };
     const initialResponse: ChatMessage = { role: "assistant", content: "Ok!" };
     const systemPromptTokens = gptTokenizer.encode(systemPrompt.content).length;
@@ -111,7 +242,7 @@ export async function generateChatResponse(
       initialResponse.content,
     ).length;
     const reservedTokens = systemPromptTokens + initialResponseTokens;
-    const availableTokenBudget = defaultContextSize * 0.85 - reservedTokens;
+    const availableTokenBudget = defaultContextSize * 0.75 - reservedTokens;
     const processedMessages: ChatMessage[] = [];
     const reversedMessages = [...newMessages].reverse();
 
@@ -135,6 +266,23 @@ export async function generateChatResponse(
       if (processedMessages[0].role !== expectedFirstRole) {
         processedMessages.shift();
       }
+    }
+
+    if (newMessages.length > processedMessages.length) {
+      const droppedCount = newMessages.length - processedMessages.length;
+      const droppedMessages = newMessages.slice(0, droppedCount);
+      const updatedSummary = await createLlmSummary(
+        droppedMessages,
+        existingSummary,
+      );
+      saveConversationSummary(updatedSummary, conversationId);
+      let updatedSystemPromptContent = getSystemPrompt(
+        getFormattedSearchResults(true),
+      );
+      if (updatedSummary) {
+        updatedSystemPromptContent += `\n\nConversation context:\n${updatedSummary}`;
+      }
+      systemPrompt = { role: "user", content: updatedSystemPromptContent };
     }
 
     const lastMessages = [systemPrompt, initialResponse, ...processedMessages];

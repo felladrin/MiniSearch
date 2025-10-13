@@ -129,3 +129,11 @@ export const chatGenerationStatePubSub = createPubSub({
 });
 
 export const followUpQuestionPubSub = createPubSub("");
+
+export const conversationSummaryPubSub = createPubSub({
+  conversationId: "",
+  summary: "",
+});
+
+export const [updateConversationSummary, , getConversationSummary] =
+  conversationSummaryPubSub;

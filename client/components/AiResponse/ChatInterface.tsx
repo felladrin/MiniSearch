@@ -165,116 +165,133 @@ export default function ChatInterface({
     updateStreamedResponse,
   ]);
 
-  const handleSend = async (textToSend?: string) => {
-    const currentInput = textToSend ?? input;
-    if (currentInput.trim() === "" || generationState.isGeneratingResponse)
-      return;
+  const handleSend = useCallback(
+    async (textToSend?: string) => {
+      const currentInput = textToSend ?? input;
+      if (currentInput.trim() === "" || generationState.isGeneratingResponse)
+        return;
 
-    const userMessage: ChatMessage = { role: "user", content: currentInput };
-    const newMessages: ChatMessage[] = [...messages, userMessage];
+      const userMessage: ChatMessage = { role: "user", content: currentInput };
+      const newMessages: ChatMessage[] = [...messages, userMessage];
 
-    setMessages(newMessages);
-    setInput(textToSend ? input : "");
-    setGenerationState({
-      ...generationState,
-      isGeneratingResponse: true,
-    });
-    setFollowUpQuestion("");
-    setStreamedResponse("");
-
-    try {
-      const relatedQuery = await generateRelatedSearchQuery([...newMessages]);
-      const searchQuery = relatedQuery || currentInput;
-
-      if (settings.enableTextSearch) {
-        const freshResults = await searchText(
-          searchQuery,
-          settings.searchResultsLimit,
-        );
-
-        if (freshResults.length > 0) {
-          const existingUrls = new Set(
-            getTextSearchResults().map(([, , url]) => url),
-          );
-
-          const uniqueFreshResults = freshResults.filter(
-            ([, , url]) => !existingUrls.has(url),
-          );
-
-          if (uniqueFreshResults.length > 0) {
-            updateTextSearchResults([
-              ...getTextSearchResults(),
-              ...uniqueFreshResults,
-            ]);
-            updateLlmTextSearchResults(
-              uniqueFreshResults.slice(0, settings.searchResultsToConsider),
-            );
-          }
-        }
-      }
-
-      if (settings.enableImageSearch) {
-        searchImages(searchQuery, settings.searchResultsLimit)
-          .then((imageResults) => {
-            if (imageResults.length > 0) {
-              const existingUrls = new Set(
-                getImageSearchResults().map(([, url]) => url),
-              );
-
-              const uniqueFreshResults = imageResults.filter(
-                ([, url]) => !existingUrls.has(url),
-              );
-
-              if (uniqueFreshResults.length > 0) {
-                updateImageSearchResults([
-                  ...uniqueFreshResults,
-                  ...getImageSearchResults(),
-                ]);
-              }
-            }
-          })
-          .catch((error) => {
-            addLogEntry(`Error in follow-up image search: ${error}`);
-          });
-      }
-    } catch (error) {
-      addLogEntry(`Error in follow-up search: ${error}`);
-    }
-
-    try {
-      const finalResponse = await generateChatResponse(
-        newMessages,
-        updateStreamedResponse,
-      );
-
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { role: "assistant", content: finalResponse },
-      ]);
-
-      addLogEntry("AI response completed");
-
-      await regenerateFollowUpQuestion(currentInput, finalResponse);
-    } catch (error) {
-      addLogEntry(`Error in chat response: ${error}`);
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          role: "assistant",
-          content: "Sorry, I encountered an error while generating a response.",
-        },
-      ]);
-    } finally {
+      setMessages(newMessages);
+      if (!textToSend) setInput("");
       setGenerationState({
         ...generationState,
-        isGeneratingResponse: false,
+        isGeneratingResponse: true,
       });
-    }
-  };
+      setFollowUpQuestion("");
+      setStreamedResponse("");
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    handleEnterKeyDown(event, settings, handleSend);
-  };
+      try {
+        const relatedQuery = await generateRelatedSearchQuery([...newMessages]);
+        const searchQuery = relatedQuery || currentInput;
+
+        if (settings.enableTextSearch) {
+          const freshResults = await searchText(
+            searchQuery,
+            settings.searchResultsLimit,
+          );
+
+          if (freshResults.length > 0) {
+            const existingUrls = new Set(
+              getTextSearchResults().map(([, , url]) => url),
+            );
+
+            const uniqueFreshResults = freshResults.filter(
+              ([, , url]) => !existingUrls.has(url),
+            );
+
+            if (uniqueFreshResults.length > 0) {
+              updateTextSearchResults([
+                ...getTextSearchResults(),
+                ...uniqueFreshResults,
+              ]);
+              updateLlmTextSearchResults(
+                uniqueFreshResults.slice(0, settings.searchResultsToConsider),
+              );
+            }
+          }
+        }
+
+        if (settings.enableImageSearch) {
+          searchImages(searchQuery, settings.searchResultsLimit)
+            .then((imageResults) => {
+              if (imageResults.length > 0) {
+                const existingUrls = new Set(
+                  getImageSearchResults().map(([, url]) => url),
+                );
+
+                const uniqueFreshResults = imageResults.filter(
+                  ([, url]) => !existingUrls.has(url),
+                );
+
+                if (uniqueFreshResults.length > 0) {
+                  updateImageSearchResults([
+                    ...uniqueFreshResults,
+                    ...getImageSearchResults(),
+                  ]);
+                }
+              }
+            })
+            .catch((error) => {
+              addLogEntry(`Error in follow-up image search: ${error}`);
+            });
+        }
+      } catch (error) {
+        addLogEntry(`Error in follow-up search: ${error}`);
+      }
+
+      try {
+        const finalResponse = await generateChatResponse(
+          newMessages,
+          updateStreamedResponse,
+        );
+
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          { role: "assistant", content: finalResponse },
+        ]);
+
+        addLogEntry("AI response completed");
+
+        await regenerateFollowUpQuestion(currentInput, finalResponse);
+      } catch (error) {
+        addLogEntry(`Error in chat response: ${error}`);
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          {
+            role: "assistant",
+            content:
+              "Sorry, I encountered an error while generating a response.",
+          },
+        ]);
+      } finally {
+        setGenerationState({
+          ...generationState,
+          isGeneratingResponse: false,
+        });
+      }
+    },
+    [
+      generationState,
+      messages,
+      settings,
+      input,
+      regenerateFollowUpQuestion,
+      setFollowUpQuestion,
+      setGenerationState,
+      setInput,
+      updateStreamedResponse,
+    ],
+  );
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      handleEnterKeyDown(event, settings, handleSend);
+    },
+    [settings, handleSend],
+  );
 
   return (
     <Card withBorder shadow="sm" radius="md">
@@ -289,7 +306,7 @@ export default function ChatInterface({
               : messages
           }
           onEditMessage={handleEditMessage}
-          onRegenerate={() => handleRegenerateResponse()}
+          onRegenerate={handleRegenerateResponse}
           isGenerating={generationState.isGeneratingResponse}
         />
         <ChatInputArea onKeyDown={handleKeyDown} handleSend={handleSend} />
