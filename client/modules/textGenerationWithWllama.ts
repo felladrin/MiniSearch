@@ -10,13 +10,14 @@ import {
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
+import { getSystemPrompt } from "./systemPrompt";
 import {
   ChatGenerationError,
   canStartResponding,
   defaultContextSize,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
-import type { WllamaModel } from "./wllama";
+import { type WllamaModel, wllamaModels } from "./wllama";
 
 type ProgressCallback = ({
   loaded,
@@ -30,8 +31,20 @@ export async function generateTextWithWllama(): Promise<void> {
   if (!getSettings().enableAiResponse) return;
 
   try {
+    const settings = getSettings();
+    const modelConfig = wllamaModels[settings.wllamaModelId];
+    const messages: ChatMessage[] = [
+      {
+        role: "user",
+        content: getSystemPrompt(
+          getFormattedSearchResults(modelConfig.shouldIncludeUrlsOnPrompt),
+        ),
+      },
+      { role: "assistant", content: "Ok!" },
+      { role: "user", content: getQuery() },
+    ];
     const response = await generateWithWllama({
-      input: getQuery(),
+      messages,
       onUpdate: updateResponse,
       shouldCheckCanRespond: true,
     });
@@ -50,24 +63,25 @@ export async function generateChatWithWllama(
   messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
 ): Promise<string> {
-  const lastMessage = messages[messages.length - 1];
-  if (!lastMessage) throw new Error("No messages provided for chat generation");
+  if (messages.length === 0) {
+    throw new Error("No messages provided for chat generation");
+  }
 
   return generateWithWllama({
-    input: lastMessage.content,
+    messages,
     onUpdate,
     shouldCheckCanRespond: false,
   });
 }
 
 interface WllamaConfig {
-  input: string;
+  messages: ChatMessage[];
   onUpdate: (text: string) => void;
   shouldCheckCanRespond?: boolean;
 }
 
 async function generateWithWllama({
-  input,
+  messages,
   onUpdate,
   shouldCheckCanRespond = false,
 }: WllamaConfig): Promise<string> {
@@ -96,19 +110,18 @@ async function generateWithWllama({
 
     let streamedMessage = "";
 
-    const stream = await wllama.createChatCompletion(
-      model.getMessages(
-        input,
-        getFormattedSearchResults(model.shouldIncludeUrlsOnPrompt),
-      ),
-      {
-        nPredict: defaultContextSize,
-        stopTokens: model.stopTokens,
-        sampling: model.getSampling(),
-        stream: true,
-        abortSignal: abortController.signal,
-      },
-    );
+    const chatMessages = messages.map((msg) => ({
+      role: msg.role || "user",
+      content: msg.content,
+    }));
+
+    const stream = await wllama.createChatCompletion(chatMessages, {
+      nPredict: defaultContextSize,
+      stopTokens: model.stopTokens,
+      sampling: model.getSampling(),
+      stream: true,
+      abortSignal: abortController.signal,
+    });
 
     for await (const chunk of stream) {
       if (shouldCheckCanRespond) {

@@ -2,7 +2,6 @@ import {
   type LoadModelConfig,
   type SamplingConfig,
   Wllama,
-  type WllamaChatMessage,
   type WllamaConfig,
 } from "@wllama/wllama";
 import type { DownloadOptions } from "@wllama/wllama/esm/cache-manager";
@@ -10,7 +9,6 @@ import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.was
 import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
 import { addLogEntry } from "./logEntries";
 import { getSettings } from "./pubSub";
-import { getSystemPrompt } from "./systemPrompt";
 import { defaultContextSize } from "./textGenerationUtilities";
 
 interface WllamaInitConfig {
@@ -120,18 +118,12 @@ export interface WllamaModel {
   readonly stopTokens?: number[];
   readonly flash_attn?: boolean;
   getSampling: () => SamplingConfig;
-  getMessages: (query: string, searchResults: string) => WllamaChatMessage[];
 }
 
 const createDefaultModelConfig = (): Omit<
   WllamaModel,
   "label" | "fileSizeInMegabytes" | "hfRepoId" | "hfFilePath"
 > => ({
-  getMessages: (query, searchResults) => [
-    { role: "user", content: getSystemPrompt(searchResults) },
-    { role: "assistant", content: "Ok!" },
-    { role: "user", content: query },
-  ],
   cacheTypeK: "f16",
   cacheTypeV: "f16",
   flash_attn: true,
