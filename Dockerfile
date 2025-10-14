@@ -93,4 +93,4 @@ HEALTHCHECK --interval=5m CMD curl -f http://localhost:7860/status || exit 1
 
 ENTRYPOINT [ "/bin/sh", "-c" ]
 
-CMD ["(cd /usr/local/searxng/searxng-src && /usr/local/searxng/searxng-venv/bin/python -m searx.webapp > /dev/null 2>&1) & (npx pm2 start ecosystem.config.cjs && npx pm2 logs)" ]
+CMD ["(cd /usr/local/searxng/searxng-src && /usr/local/searxng/searxng-venv/bin/python -m searx.webapp > /dev/null 2>&1) & npm start -- --host"]
