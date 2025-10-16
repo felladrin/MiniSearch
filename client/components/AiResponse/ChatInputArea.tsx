@@ -60,7 +60,7 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
         onKeyDown={handleKeyDownWithPlaceholder}
         autosize
         minRows={1}
-        maxRows={4}
+        maxRows={8}
         style={{ flexGrow: 1, paddingRight: "50px" }}
         disabled={isGenerating}
       />
