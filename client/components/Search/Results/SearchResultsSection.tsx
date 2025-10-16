@@ -1,4 +1,4 @@
-import { Alert, Stack, Text } from "@mantine/core";
+import { Alert, Box, Divider, Stack, Text } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import { ErrorBoundary } from "react-error-boundary";
 import { settingsPubSub } from "../../../modules/pubSub";
@@ -19,18 +19,26 @@ export default function SearchResultsSection() {
 
   const renderSearchResults = (
     Component: React.ComponentType,
+    displayDivider: boolean,
     enabled: boolean,
   ) =>
     enabled && (
       <ErrorBoundary FallbackComponent={ErrorFallback}>
-        <Component />
+        <Box>
+          {displayDivider && <Divider mb="sm" variant="dashed" />}
+          <Component />
+        </Box>
       </ErrorBoundary>
     );
 
   return (
-    <Stack gap="xl">
-      {renderSearchResults(ImageSearchResults, settings.enableImageSearch)}
-      {renderSearchResults(TextSearchResults, settings.enableTextSearch)}
+    <Stack gap="sm">
+      {renderSearchResults(
+        ImageSearchResults,
+        false,
+        settings.enableImageSearch,
+      )}
+      {renderSearchResults(TextSearchResults, true, settings.enableTextSearch)}
     </Stack>
   );
 }
