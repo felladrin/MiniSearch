@@ -39,6 +39,7 @@ const Message = memo(function Message({
     <Group
       gap="xs"
       align="center"
+      w="100%"
       justify={message.role === "user" ? "flex-end" : "flex-start"}
     >
       {canEdit && (
@@ -60,7 +61,7 @@ const Message = memo(function Message({
         shadow="xs"
         radius="xl"
         p="sm"
-        maw="90%"
+        style={{ flex: 1, overflow: "auto" }}
       >
         <FormattedMarkdown>{message.content}</FormattedMarkdown>
       </Paper>
