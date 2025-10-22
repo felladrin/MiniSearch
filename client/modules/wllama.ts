@@ -138,7 +138,7 @@ const createDefaultModelConfig = (): Omit<
       dynatemp_range: Math.max(0, settings.inferenceTemperature - 0.2),
       penalty_freq: settings.inferenceFrequencyPenalty,
       penalty_present: settings.inferencePresencePenalty,
-      top_k: 30,
+      top_k: 0,
       penalty_repeat: 1,
       penalty_last_n: defaultContextSize,
       dry_base: 1.75,
