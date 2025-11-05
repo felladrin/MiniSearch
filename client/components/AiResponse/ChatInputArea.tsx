@@ -5,6 +5,8 @@ import {
   chatGenerationStatePubSub,
   chatInputPubSub,
   followUpQuestionPubSub,
+  isRestoringFromHistoryPubSub,
+  suppressNextFollowUpPubSub,
 } from "../../modules/pubSub";
 
 interface ChatInputAreaProps {
@@ -16,13 +18,18 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
   const [input, setInput] = usePubSub(chatInputPubSub);
   const [generationState] = usePubSub(chatGenerationStatePubSub);
   const [followUpQuestion] = usePubSub(followUpQuestionPubSub);
+  const [isRestoringFromHistory] = usePubSub(isRestoringFromHistoryPubSub);
+  const [suppressNextFollowUp] = usePubSub(suppressNextFollowUpPubSub);
 
   const isGenerating =
     generationState.isGeneratingResponse &&
     !generationState.isGeneratingFollowUpQuestion;
 
+  const defaultPlaceholder = "Anything else you would like to know?";
   const placeholder =
-    followUpQuestion || "Anything else you would like to know?";
+    isRestoringFromHistory || suppressNextFollowUp
+      ? defaultPlaceholder
+      : followUpQuestion || defaultPlaceholder;
 
   const onChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(event.target.value);
@@ -30,7 +37,12 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
   const handleKeyDownWithPlaceholder = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
-    if (input.trim() === "" && followUpQuestion) {
+    if (
+      input.trim() === "" &&
+      followUpQuestion &&
+      !isRestoringFromHistory &&
+      !suppressNextFollowUp
+    ) {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         handleSend(followUpQuestion);
@@ -42,7 +54,12 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
   };
 
   const handleSendWithPlaceholder = () => {
-    if (input.trim() === "" && followUpQuestion) {
+    if (
+      input.trim() === "" &&
+      followUpQuestion &&
+      !isRestoringFromHistory &&
+      !suppressNextFollowUp
+    ) {
       handleSend(followUpQuestion);
     } else {
       handleSend();

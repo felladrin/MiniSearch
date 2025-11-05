@@ -1,5 +1,7 @@
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
+import { historyDatabase } from "./history";
 import { addLogEntry } from "./logEntries";
+import { getSuppressNextFollowUp } from "./pubSub";
 import { generateChatResponse } from "./textGeneration";
 
 interface FollowUpQuestionParams {
@@ -14,7 +16,22 @@ export async function generateFollowUpQuestion({
   previousQuestions = [],
 }: FollowUpQuestionParams): Promise<string> {
   try {
+    if (getSuppressNextFollowUp()) {
+      return "";
+    }
+
     addLogEntry("Generating a follow-up question");
+
+    await historyDatabase.chatHistory
+      .add({
+        role: "user",
+        content: topic,
+        timestamp: Date.now(),
+        conversationId: `follow-up-${Date.now()}`,
+      })
+      .catch((error) => {
+        addLogEntry(`Error saving chat history: ${error}`);
+      });
 
     const promptMessages: ChatMessage[] = [
       {
@@ -58,31 +75,47 @@ Respond with just the question, no additional text or explanations.`,
       },
     ];
 
-    let response = await generateChatResponse(promptMessages, () => {});
+    const response = await generateChatResponse(promptMessages, () => {});
 
-    const lastQuestionMarkIndex = response.lastIndexOf("?");
+    await historyDatabase.chatHistory
+      .add({
+        role: "assistant",
+        content: response,
+        timestamp: Date.now(),
+        conversationId: `follow-up-${Date.now()}`,
+      })
+      .catch((error) => {
+        addLogEntry(`Error saving chat history: ${error}`);
+      });
 
-    if (lastQuestionMarkIndex >= 0) {
-      response = response.slice(0, lastQuestionMarkIndex + 1).trim();
-    }
-
-    let questionLine = response
+    const lines = response
       .trim()
       .split("\n")
       .map((line) => line.trim())
       .reverse()
       .find((line) => line.endsWith("?"));
 
-    if (!questionLine) {
+    if (!lines) {
       addLogEntry("No valid follow-up question generated");
       return "";
     }
 
-    questionLine = questionLine.replace(/^[^a-zA-Z]+/, "");
+    let questionLine = lines.replace(/^[^a-zA-Z]+/, "");
 
     questionLine = questionLine.charAt(0).toUpperCase() + questionLine.slice(1);
 
     addLogEntry("Generated follow-up question successfully");
+
+    await historyDatabase.chatHistory
+      .add({
+        role: "assistant",
+        content: questionLine,
+        timestamp: Date.now(),
+        conversationId: `follow-up-${Date.now()}`,
+      })
+      .catch((error) => {
+        addLogEntry(`Error saving chat history: ${error}`);
+      });
 
     return questionLine;
   } catch (error) {

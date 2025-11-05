@@ -1,20 +1,32 @@
 import { Card, Stack } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
-import { type KeyboardEvent, useCallback, useEffect, useState } from "react";
+import {
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import throttle from "throttleit";
 import { generateFollowUpQuestion } from "../../modules/followUpQuestions";
+import {
+  getCurrentSearchRunId,
+  saveChatMessageForQuery,
+  updateSearchResults,
+} from "../../modules/history";
 import { handleEnterKeyDown } from "../../modules/keyboard";
 import { addLogEntry } from "../../modules/logEntries";
 import {
   chatGenerationStatePubSub,
   chatInputPubSub,
   followUpQuestionPubSub,
-  getImageSearchResults,
-  getTextSearchResults,
+  imageSearchResultsPubSub,
+  queryPubSub,
   settingsPubSub,
+  suppressNextFollowUpPubSub,
+  textSearchResultsPubSub,
   updateImageSearchResults,
-  updateLlmTextSearchResults,
   updateTextSearchResults,
 } from "../../modules/pubSub";
 import { generateRelatedSearchQuery } from "../../modules/relatedSearchQuery";
@@ -27,23 +39,45 @@ import MessageList from "./MessageList";
 interface ChatInterfaceProps {
   initialQuery?: string;
   initialResponse?: string;
+  initialMessages?: ChatMessage[];
+  suppressInitialFollowUp?: boolean;
 }
 
 export default function ChatInterface({
   initialQuery,
   initialResponse,
+  initialMessages,
+  suppressInitialFollowUp,
 }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const initialMessagesArray =
+    initialMessages &&
+    initialMessages.length > 0 &&
+    initialQuery &&
+    initialResponse
+      ? [
+          { role: "user" as const, content: initialQuery },
+          { role: "assistant" as const, content: initialResponse },
+          ...initialMessages,
+        ]
+      : initialMessages || [];
+
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessagesArray);
   const [input, setInput] = usePubSub(chatInputPubSub);
   const [generationState, setGenerationState] = usePubSub(
     chatGenerationStatePubSub,
   );
   const [, setFollowUpQuestion] = usePubSub(followUpQuestionPubSub);
+  const [textSearchResults] = usePubSub(textSearchResultsPubSub);
+  const [imageSearchResults] = usePubSub(imageSearchResultsPubSub);
+  const [currentQuery] = usePubSub(queryPubSub);
+  const [suppressNextFollowUp] = usePubSub(suppressNextFollowUpPubSub);
   const [previousFollowUpQuestions, setPreviousFollowUpQuestions] = useState<
     string[]
   >([]);
   const [settings] = usePubSub(settingsPubSub);
   const [streamedResponse, setStreamedResponse] = useState("");
+  const hasInitialized = useRef(false);
+  const prevInitialMessagesRef = useRef<ChatMessage[] | undefined>(undefined);
   const updateStreamedResponse = useCallback(
     throttle((response: string) => {
       setStreamedResponse(response);
@@ -53,6 +87,7 @@ export default function ChatInterface({
 
   const regenerateFollowUpQuestion = useCallback(
     async (currentQuery: string, currentResponse: string) => {
+      if (suppressNextFollowUp) return;
       if (!currentResponse || !currentQuery.trim()) return;
 
       try {
@@ -83,22 +118,75 @@ export default function ChatInterface({
         });
       }
     },
-    [setFollowUpQuestion, setGenerationState, previousFollowUpQuestions],
+    [
+      setFollowUpQuestion,
+      setGenerationState,
+      previousFollowUpQuestions,
+      suppressNextFollowUp,
+    ],
   );
 
   useEffect(() => {
-    if (messages.length === 0 && initialQuery && initialResponse) {
+    const messagesChanged =
+      !prevInitialMessagesRef.current ||
+      JSON.stringify(prevInitialMessagesRef.current) !==
+        JSON.stringify(initialMessages);
+
+    if (!messagesChanged) return;
+
+    prevInitialMessagesRef.current = initialMessages;
+
+    const newInitialMessagesArray =
+      initialMessages &&
+      initialMessages.length > 0 &&
+      initialQuery &&
+      initialResponse
+        ? [
+            { role: "user" as const, content: initialQuery },
+            { role: "assistant" as const, content: initialResponse },
+            ...initialMessages,
+          ]
+        : initialMessages || [];
+
+    if (newInitialMessagesArray.length > 0) {
+      setMessages(newInitialMessagesArray);
+    } else if (initialQuery && initialResponse) {
       setMessages([
         { role: "user", content: initialQuery },
         { role: "assistant", content: initialResponse },
       ]);
+    }
+  }, [initialQuery, initialResponse, initialMessages]);
+
+  useEffect(() => {
+    if (suppressNextFollowUp) {
+      hasInitialized.current = true;
+      return;
+    }
+    if (suppressInitialFollowUp) return;
+    if (hasInitialized.current) return;
+
+    if (initialMessages && initialMessages.length > 0) {
+      const lastAssistant = messages
+        .filter((m) => m.role === "assistant")
+        .pop();
+      const lastUser = messages.filter((m) => m.role === "user").pop();
+      if (lastUser && lastAssistant) {
+        regenerateFollowUpQuestion(lastUser.content, lastAssistant.content);
+        hasInitialized.current = true;
+      }
+    } else if (messages.length >= 2 && initialQuery && initialResponse) {
       regenerateFollowUpQuestion(initialQuery, initialResponse);
+      hasInitialized.current = true;
     }
   }, [
     initialQuery,
     initialResponse,
-    messages.length,
+    initialMessages,
+    messages,
     regenerateFollowUpQuestion,
+    suppressInitialFollowUp,
+    suppressNextFollowUp,
   ]);
 
   useEffect(() => {
@@ -195,7 +283,7 @@ export default function ChatInterface({
 
           if (freshResults.length > 0) {
             const existingUrls = new Set(
-              getTextSearchResults().map(([, , url]) => url),
+              textSearchResults.map(([, , url]) => url),
             );
 
             const uniqueFreshResults = freshResults.filter(
@@ -203,13 +291,22 @@ export default function ChatInterface({
             );
 
             if (uniqueFreshResults.length > 0) {
-              updateTextSearchResults([
-                ...getTextSearchResults(),
+              const updatedResults = [
+                ...textSearchResults,
                 ...uniqueFreshResults,
-              ]);
-              updateLlmTextSearchResults(
-                uniqueFreshResults.slice(0, settings.searchResultsToConsider),
-              );
+              ];
+              updateTextSearchResults(updatedResults);
+
+              updateSearchResults(getCurrentSearchRunId(), {
+                textResults: {
+                  type: "text",
+                  items: updatedResults.map(([title, snippet, url]) => ({
+                    title,
+                    url,
+                    snippet,
+                  })),
+                },
+              });
             }
           }
         }
@@ -219,7 +316,7 @@ export default function ChatInterface({
             .then((imageResults) => {
               if (imageResults.length > 0) {
                 const existingUrls = new Set(
-                  getImageSearchResults().map(([, url]) => url),
+                  imageSearchResults.map(([, url]) => url),
                 );
 
                 const uniqueFreshResults = imageResults.filter(
@@ -227,10 +324,25 @@ export default function ChatInterface({
                 );
 
                 if (uniqueFreshResults.length > 0) {
-                  updateImageSearchResults([
+                  const updatedImageResults = [
                     ...uniqueFreshResults,
-                    ...getImageSearchResults(),
-                  ]);
+                    ...imageSearchResults,
+                  ];
+                  updateImageSearchResults(updatedImageResults);
+
+                  updateSearchResults(getCurrentSearchRunId(), {
+                    imageResults: {
+                      type: "image",
+                      items: updatedImageResults.map(
+                        ([title, url, thumbnailUrl, sourceUrl]) => ({
+                          title,
+                          url,
+                          thumbnailUrl,
+                          sourceUrl,
+                        }),
+                      ),
+                    },
+                  });
                 }
               }
             })
@@ -254,6 +366,9 @@ export default function ChatInterface({
         ]);
 
         addLogEntry("AI response completed");
+
+        await saveChatMessageForQuery(currentQuery, "user", currentInput);
+        await saveChatMessageForQuery(currentQuery, "assistant", finalResponse);
 
         await regenerateFollowUpQuestion(currentInput, finalResponse);
       } catch (error) {
@@ -283,6 +398,9 @@ export default function ChatInterface({
       setGenerationState,
       setInput,
       updateStreamedResponse,
+      currentQuery,
+      textSearchResults,
+      imageSearchResults,
     ],
   );
 

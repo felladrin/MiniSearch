@@ -2,6 +2,8 @@ import { CodeHighlightAdapterProvider } from "@mantine/code-highlight";
 import { usePubSub } from "create-pubsub/react";
 import { useMemo } from "react";
 import {
+  chatMessagesPubSub,
+  isRestoringFromHistoryPubSub,
   modelLoadingProgressPubSub,
   modelSizeInMegabytesPubSub,
   queryPubSub,
@@ -26,6 +28,8 @@ export default function AiResponseSection() {
   const [modelLoadingProgress] = usePubSub(modelLoadingProgressPubSub);
   const [settings] = usePubSub(settingsPubSub);
   const [modelSizeInMegabytes] = usePubSub(modelSizeInMegabytesPubSub);
+  const [chatMessages] = usePubSub(chatMessagesPubSub);
+  const [isRestoringFromHistory] = usePubSub(isRestoringFromHistoryPubSub);
 
   return useMemo(() => {
     if (!settings.enableAiResponse || textGenerationState === "idle") {
@@ -48,7 +52,14 @@ export default function AiResponseSection() {
           />
 
           {textGenerationState === "completed" && (
-            <ChatInterface initialQuery={query} initialResponse={response} />
+            <ChatInterface
+              initialQuery={query}
+              initialResponse={response}
+              initialMessages={
+                chatMessages.length > 0 ? chatMessages : undefined
+              }
+              suppressInitialFollowUp={isRestoringFromHistory}
+            />
           )}
         </CodeHighlightAdapterProvider>
       );
@@ -81,8 +92,10 @@ export default function AiResponseSection() {
     textGenerationState,
     response,
     query,
+    chatMessages,
     modelLoadingProgress,
     modelSizeInMegabytes,
     setTextGenerationState,
+    isRestoringFromHistory,
   ]);
 }

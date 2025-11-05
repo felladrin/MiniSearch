@@ -24,6 +24,7 @@
   "dependencies": {
     "@ai-sdk/openai-compatible": "^1.0.0",
     "@huggingface/hub": "^2.0.0",
+    "@leeoniya/ufuzzy": "^1.0.19",
     "@mantine/carousel": "^8.0.0",
     "@mantine/code-highlight": "^8.0.1",
     "@mantine/core": "^8.0.0",

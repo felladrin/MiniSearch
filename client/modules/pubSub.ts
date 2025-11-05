@@ -50,6 +50,7 @@ export const [, , getQuery] = queryPubSub;
 export const responsePubSub = createPubSub("");
 
 export const updateResponse = throttle(responsePubSub[0], 1000 / 12);
+export const [, , getResponse] = responsePubSub;
 
 export const [updateSearchPromise, , getSearchPromise] = createPubSub<
   Promise<SearchResults>
@@ -107,14 +108,12 @@ const llmTextSearchResultsPubSub = createPubSub<TextSearchResults>([]);
 
 export const imageSearchResultsPubSub = createPubSub<ImageSearchResults>([]);
 
-export const [updateTextSearchResults, , getTextSearchResults] =
-  textSearchResultsPubSub;
+export const [updateTextSearchResults] = textSearchResultsPubSub;
 
 export const [updateLlmTextSearchResults, , getLlmTextSearchResults] =
   llmTextSearchResultsPubSub;
 
-export const [updateImageSearchResults, , getImageSearchResults] =
-  imageSearchResultsPubSub;
+export const [updateImageSearchResults] = imageSearchResultsPubSub;
 
 export const menuExpandedAccordionsPubSub = createLocalStoragePubSub<string[]>(
   "menuExpandedAccordions",
@@ -123,6 +122,8 @@ export const menuExpandedAccordionsPubSub = createLocalStoragePubSub<string[]>(
 
 export const chatInputPubSub = createPubSub("");
 
+export const [updateChatInput] = chatInputPubSub;
+
 export const chatGenerationStatePubSub = createPubSub({
   isGeneratingResponse: false,
   isGeneratingFollowUpQuestion: false,
@@ -130,10 +131,27 @@ export const chatGenerationStatePubSub = createPubSub({
 
 export const followUpQuestionPubSub = createPubSub("");
 
-export const conversationSummaryPubSub = createPubSub({
+export const [updateFollowUpQuestion] = followUpQuestionPubSub;
+
+const conversationSummaryPubSub = createPubSub({
   conversationId: "",
   summary: "",
 });
 
 export const [updateConversationSummary, , getConversationSummary] =
   conversationSummaryPubSub;
+
+export const chatMessagesPubSub = createPubSub<
+  Array<{ role: "user" | "assistant"; content: string }>
+>([]);
+
+export const [updateChatMessages] = chatMessagesPubSub;
+
+export const isRestoringFromHistoryPubSub = createPubSub(false);
+
+export const [updateIsRestoringFromHistory] = isRestoringFromHistoryPubSub;
+
+export const suppressNextFollowUpPubSub = createPubSub(false);
+
+export const [updateSuppressNextFollowUp, , getSuppressNextFollowUp] =
+  suppressNextFollowUpPubSub;

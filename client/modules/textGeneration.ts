@@ -1,10 +1,16 @@
 import gptTokenizer from "gpt-tokenizer";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import prettyMilliseconds from "pretty-ms";
+import {
+  getCurrentSearchRunId,
+  saveLlmResponseForQuery,
+  updateSearchResults,
+} from "./history";
 import { addLogEntry } from "./logEntries";
 import {
   getConversationSummary,
   getQuery,
+  getResponse,
   getSettings,
   getTextGenerationState,
   listenToSettingsChanges,
@@ -29,6 +35,24 @@ import type { ImageSearchResults, TextSearchResults } from "./types";
 import { isWebGPUAvailable } from "./webGpu";
 
 const SUMMARY_TOKEN_LIMIT = 800;
+
+function getCurrentModelName(): string {
+  const settings = getSettings();
+  switch (settings.inferenceType) {
+    case "openai":
+      return settings.openAiApiModel || "";
+    case "horde":
+      return "AI Horde";
+    case "internal":
+      return "Internal API";
+    case "browser":
+      return settings.enableWebGpu
+        ? settings.webLlmModelId || "WebLLM"
+        : settings.wllamaModelId || "Wllama";
+    default:
+      return "Unknown";
+  }
+}
 
 function getConversationId(messages: ChatMessage[]): string {
   const firstUser = messages.find((m) => m.role === "user");
@@ -199,6 +223,18 @@ export async function searchAndRespond() {
         );
         await generateTextWithWllama();
       }
+    }
+
+    try {
+      await saveLlmResponseForQuery(
+        getQuery(),
+        getResponse(),
+        getCurrentModelName(),
+      );
+    } catch (e) {
+      addLogEntry(
+        `Failed to persist LLM response: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
 
     updateTextGenerationState("completed");
@@ -372,6 +408,17 @@ async function startTextSearch(query: string) {
     updateLlmTextSearchResults(
       textResults.slice(0, getSettings().searchResultsToConsider),
     );
+
+    updateSearchResults(getCurrentSearchRunId(), {
+      textResults: {
+        type: "text",
+        items: textResults.map(([title, snippet, url]) => ({
+          title,
+          url,
+          snippet,
+        })),
+      },
+    });
   }
 
   if (getSettings().enableImageSearch) {
@@ -394,6 +441,18 @@ async function startImageSearch(
     results.imageResults.length === 0 ? "failed" : "completed",
   );
   updateImageSearchResults(imageResults);
+
+  updateSearchResults(getCurrentSearchRunId(), {
+    imageResults: {
+      type: "image",
+      items: imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
+        title,
+        url,
+        thumbnailUrl,
+        sourceUrl,
+      })),
+    },
+  });
 }
 
 function canDownloadModels(): Promise<void> {

@@ -10,13 +10,23 @@ import {
   useState,
 } from "react";
 import { useLocation } from "wouter";
+import { useHistoryRestore } from "../../../hooks/useHistoryRestore";
+import { useSearchHistory } from "../../../hooks/useSearchHistory";
+import { resetSearchRunId } from "../../../modules/history";
 import { handleEnterKeyDown } from "../../../modules/keyboard";
 import { addLogEntry } from "../../../modules/logEntries";
 import { postMessageToParentWindow } from "../../../modules/parentWindow";
-import { settingsPubSub } from "../../../modules/pubSub";
+import {
+  imageSearchResultsPubSub,
+  isRestoringFromHistoryPubSub,
+  responsePubSub,
+  settingsPubSub,
+  textSearchResultsPubSub,
+} from "../../../modules/pubSub";
 import { getRandomQuerySuggestion } from "../../../modules/querySuggestions";
 import { sleepUntilIdle } from "../../../modules/sleep";
 import { searchAndRespond } from "../../../modules/textGeneration";
+import HistoryButton from "../History/HistoryButton";
 
 interface SearchFormState {
   textAreaValue: string;
@@ -38,32 +48,68 @@ export default function SearchForm({
     textAreaValue: query,
     suggestedQuery: defaultSuggestedQuery,
   });
+
   const [, navigate] = useLocation();
-  const [settings] = usePubSub(settingsPubSub);
-
-  const handleMount = useCallback(async () => {
-    await sleepUntilIdle();
-    searchAndRespond();
-  }, []);
-
+  const [pubSubSettings] = usePubSub(settingsPubSub);
+  const [isRestoringFromHistory] = usePubSub(isRestoringFromHistoryPubSub);
+  const [textSearchResults] = usePubSub(textSearchResultsPubSub);
+  const [imageSearchResults] = usePubSub(imageSearchResultsPubSub);
+  const [responseValue] = usePubSub(responsePubSub);
+  const { addToHistory } = useSearchHistory();
+  const { restoreSearch } = useHistoryRestore((newQuery) => {
+    setState((prev) => ({ ...prev, textAreaValue: newQuery }));
+    updateQuery(newQuery);
+  }, textAreaRef);
   const fetchQuerySuggestion = useCallback(async () => {
     try {
       return await getRandomQuerySuggestion();
-    } catch (_) {
-      addLogEntry("Failed to get query suggestion");
+    } catch {
       return defaultSuggestedQuery;
     }
   }, []);
 
-  const handleInitialSuggestion = useCallback(async () => {
-    const suggestion = await fetchQuerySuggestion();
-    setState((prev) => ({ ...prev, suggestedQuery: suggestion }));
-  }, [fetchQuerySuggestion]);
+  useEffect(() => {
+    const initializeComponent = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlQuery = urlParams.get("q");
+
+      const hasRestoredResults =
+        textSearchResults.length > 0 || imageSearchResults.length > 0;
+      const hasRestoredResponse = responseValue.trim().length > 0;
+
+      if (
+        urlQuery?.trim() &&
+        !isRestoringFromHistory &&
+        !hasRestoredResults &&
+        !hasRestoredResponse
+      ) {
+        await sleepUntilIdle();
+        searchAndRespond();
+      }
+    };
+
+    initializeComponent();
+  }, [
+    isRestoringFromHistory,
+    textSearchResults.length,
+    imageSearchResults.length,
+    responseValue,
+  ]);
 
   useEffect(() => {
-    handleMount();
-    handleInitialSuggestion();
-  }, [handleMount, handleInitialSuggestion]);
+    if (state.textAreaValue.length === 0) {
+      fetchQuerySuggestion()
+        .then((suggestion) => {
+          setState((prev) => ({ ...prev, suggestedQuery: suggestion }));
+        })
+        .catch(() => {
+          setState((prev) => ({
+            ...prev,
+            suggestedQuery: defaultSuggestedQuery,
+          }));
+        });
+    }
+  }, [state.textAreaValue.length, fetchQuerySuggestion]);
 
   const handleInputChange = async (event: ChangeEvent<HTMLTextAreaElement>) => {
     const text = event.target.value;
@@ -74,7 +120,7 @@ export default function SearchForm({
       try {
         const suggestion = await getRandomQuerySuggestion();
         setState((prev) => ({ ...prev, suggestedQuery: suggestion }));
-      } catch (_) {
+      } catch {
         addLogEntry("Failed to get query suggestion");
         setState((prev) => ({
           ...prev,
@@ -98,45 +144,65 @@ export default function SearchForm({
     }));
   };
 
-  const startSearching = useCallback(() => {
+  const startSearching = useCallback(async () => {
     const queryToEncode =
       state.textAreaValue.trim().length >= 1
         ? state.textAreaValue
         : state.suggestedQuery;
 
     setState((prev) => ({ ...prev, textAreaValue: queryToEncode }));
+    updateQuery(queryToEncode);
 
     const queryString = `q=${encodeURIComponent(queryToEncode)}`;
 
     postMessageToParentWindow({ queryString, hash: "" });
-
     navigate(`/?${queryString}`, { replace: true });
 
-    updateQuery(queryToEncode);
+    try {
+      resetSearchRunId();
+      await addToHistory(queryToEncode, {
+        type: "text" as const,
+        items: [],
+      });
+    } catch (error) {
+      addLogEntry(`Failed to add search to history: ${error}`);
+    }
 
     searchAndRespond();
 
     addLogEntry(
       `User submitted a search with ${queryToEncode.length} characters length`,
     );
-  }, [state.textAreaValue, state.suggestedQuery, updateQuery, navigate]);
+  }, [
+    state.textAreaValue,
+    state.suggestedQuery,
+    updateQuery,
+    navigate,
+    addToHistory,
+  ]);
 
-  const handleSubmit = (event: { preventDefault: () => void }) => {
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     startSearching();
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    handleEnterKeyDown(event, settings, () => handleSubmit(event));
+    if (event.key === "Enter" && !event.shiftKey) {
+      handleEnterKeyDown(event, pubSubSettings, startSearching);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ width: "100%" }}>
+    <form
+      onSubmit={handleSubmit}
+      style={{ width: "100%", position: "relative" }}
+    >
       <Stack gap="xs">
         <Textarea
-          size="sm"
           value={state.textAreaValue}
-          placeholder={state.suggestedQuery}
+          placeholder={
+            state.textAreaValue.length === 0 ? state.suggestedQuery : ""
+          }
           ref={textAreaRef}
           onKeyDown={handleKeyDown}
           onChange={handleInputChange}
@@ -146,7 +212,8 @@ export default function SearchForm({
           autoFocus
         />
         <Group gap="xs">
-          {state.textAreaValue.length >= 1 ? (
+          <HistoryButton onSearchSelect={restoreSearch} />
+          {state.textAreaValue.length >= 1 && (
             <Button
               size="xs"
               onClick={handleClearButtonClick}
@@ -154,8 +221,8 @@ export default function SearchForm({
             >
               Clear
             </Button>
-          ) : null}
-          <Button size="xs" type="submit" variant="default" flex={1}>
+          )}
+          <Button type="submit" size="xs" variant="default" flex={1}>
             Search
           </Button>
           {additionalButtons}

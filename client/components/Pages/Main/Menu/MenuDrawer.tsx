@@ -17,6 +17,7 @@ import { repository } from "../../../../../package.json";
 import { appName, appVersion } from "../../../../modules/appInfo";
 import { addLogEntry } from "../../../../modules/logEntries";
 import { menuExpandedAccordionsPubSub } from "../../../../modules/pubSub";
+import HistorySettings from "../../../Settings/HistorySettings";
 import ActionsForm from "./ActionsForm";
 import AISettingsForm from "./AISettings/AISettingsForm";
 import InterfaceSettingsForm from "./InterfaceSettingsForm";
@@ -96,6 +97,12 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
             <Accordion.Control>Interface Settings</Accordion.Control>
             <Accordion.Panel>
               <InterfaceSettingsForm />
+            </Accordion.Panel>
+          </Accordion.Item>
+          <Accordion.Item value="historySettings">
+            <Accordion.Control>History Settings</Accordion.Control>
+            <Accordion.Panel>
+              <HistorySettings />
             </Accordion.Panel>
           </Accordion.Item>
           <Accordion.Item value="voiceSettings">

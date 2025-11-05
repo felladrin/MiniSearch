@@ -1,5 +1,4 @@
 import Dexie, { type Table } from "dexie";
-import { name } from "../../package.json";
 import { addLogEntry } from "./logEntries";
 import { getSearchTokenHash } from "./searchTokenHash";
 import type { ImageSearchResults, TextSearchResults } from "./types";
@@ -47,12 +46,12 @@ interface ImageSearchCache extends SearchCacheEntry {
   results: ImageSearchResults;
 }
 
-class SearchDb extends Dexie {
+class SearchCacheDatabase extends Dexie {
   textSearchHistory!: Table<TextSearchCache, string>;
   imageSearchHistory!: Table<ImageSearchCache, string>;
 
   constructor() {
-    super(name);
+    super("SearchCache");
     this.version(1).stores({
       textSearchHistory: "key, timestamp",
       imageSearchHistory: "key, timestamp",
@@ -189,7 +188,7 @@ class SearchDb extends Dexie {
   }
 }
 
-const db = new SearchDb();
+const db = new SearchCacheDatabase();
 
 db.ensureIntegrity().catch((error) => {
   addLogEntry(
