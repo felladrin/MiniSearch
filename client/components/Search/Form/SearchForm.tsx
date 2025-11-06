@@ -84,6 +84,17 @@ export default function SearchForm({
         !hasRestoredResponse
       ) {
         await sleepUntilIdle();
+
+        try {
+          resetSearchRunId();
+          await addToHistory(urlQuery, {
+            type: "text" as const,
+            items: [],
+          });
+        } catch (error) {
+          addLogEntry(`Failed to add search to history: ${error}`);
+        }
+
         searchAndRespond();
       }
     };
@@ -94,6 +105,7 @@ export default function SearchForm({
     textSearchResults.length,
     imageSearchResults.length,
     responseValue,
+    addToHistory,
   ]);
 
   useEffect(() => {
