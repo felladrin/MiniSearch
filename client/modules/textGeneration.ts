@@ -1,5 +1,4 @@
 import gptTokenizer from "gpt-tokenizer";
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import prettyMilliseconds from "pretty-ms";
 import {
   getCurrentSearchRunId,
@@ -31,7 +30,11 @@ import {
   defaultContextSize,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
-import type { ImageSearchResults, TextSearchResults } from "./types";
+import type {
+  ChatMessage,
+  ImageSearchResults,
+  TextSearchResults,
+} from "./types";
 import { isWebGPUAvailable } from "./webGpu";
 
 const SUMMARY_TOKEN_LIMIT = 800;

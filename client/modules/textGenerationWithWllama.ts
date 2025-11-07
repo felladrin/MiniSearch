@@ -1,5 +1,4 @@
 import type { Wllama } from "@wllama/wllama";
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import { addLogEntry } from "./logEntries";
 import {
   getQuery,
@@ -17,6 +16,7 @@ import {
   defaultContextSize,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
+import type { ChatMessage } from "./types";
 import { type WllamaModel, wllamaModels } from "./wllama";
 
 type ProgressCallback = ({
@@ -110,21 +110,7 @@ async function generateWithWllama({
 
     let streamedMessage = "";
 
-    const chatMessages = messages.map((msg) => {
-      const role = msg.role || "user";
-      const wllamaRole =
-        role === "developer"
-          ? "system"
-          : role === "system" || role === "user" || role === "assistant"
-            ? role
-            : "user";
-      return {
-        role: wllamaRole as "system" | "user" | "assistant",
-        content: msg.content,
-      };
-    });
-
-    const stream = await wllama.createChatCompletion(chatMessages, {
+    const stream = await wllama.createChatCompletion(messages, {
       nPredict: defaultContextSize,
       stopTokens: model.stopTokens,
       sampling: model.getSampling(),

@@ -1,8 +1,8 @@
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import { historyDatabase } from "./history";
 import { addLogEntry } from "./logEntries";
 import { getSuppressNextFollowUp } from "./pubSub";
 import { generateChatResponse } from "./textGeneration";
+import type { ChatMessage } from "./types";
 
 interface FollowUpQuestionParams {
   topic: string;

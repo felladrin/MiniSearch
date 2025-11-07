@@ -1,6 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { type ModelMessage, streamText } from "ai";
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
+import { streamText } from "ai";
 import {
   listOpenAiCompatibleModels,
   selectRandomModel,
@@ -19,11 +18,12 @@ import {
   getDefaultChatMessages,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
+import type { ChatMessage } from "./types";
 
 let currentAbortController: AbortController | null = null;
 
 interface StreamOptions {
-  messages: ModelMessage[];
+  messages: ChatMessage[];
   onUpdate: (text: string) => void;
 }
 
@@ -156,9 +156,7 @@ export async function generateTextWithOpenAi() {
   await canStartResponding();
   updateTextGenerationState("preparingToGenerate");
 
-  const messages = getDefaultChatMessages(
-    getFormattedSearchResults(true),
-  ) as ModelMessage[];
+  const messages = getDefaultChatMessages(getFormattedSearchResults(true));
 
   await createOpenAiStream({
     messages,
@@ -176,22 +174,5 @@ export async function generateChatWithOpenAi(
   messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
 ) {
-  const modelMessages = chatMessagesToModelMessages(messages);
-  return createOpenAiStream({ messages: modelMessages, onUpdate });
-}
-
-function chatMessagesToModelMessages(messages: ChatMessage[]): ModelMessage[] {
-  return messages.map((msg) => {
-    const role = msg.role || "user";
-    const modelRole =
-      role === "developer"
-        ? "system"
-        : role === "system" || role === "user" || role === "assistant"
-          ? role
-          : "user";
-    return {
-      role: modelRole as "system" | "user" | "assistant",
-      content: msg.content,
-    };
-  });
+  return createOpenAiStream({ messages, onUpdate });
 }

@@ -1,4 +1,3 @@
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
   getQuery,
   getTextGenerationState,
@@ -13,6 +12,7 @@ import {
   getDefaultChatCompletionCreateParamsStreaming,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
+import type { ChatMessage } from "./types";
 
 export async function generateTextWithInternalApi() {
   await canStartResponding();

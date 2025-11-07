@@ -91,7 +91,7 @@ interface LLMResponse {
   quality?: number;
 }
 
-interface ChatMessage {
+interface ChatHistoryMessage {
   id?: number;
   role: "user" | "assistant";
   content: string;
@@ -103,7 +103,7 @@ interface ChatMessage {
 class HistoryDatabase extends Dexie {
   searches!: Table<SearchEntry>;
   llmResponses!: Table<LLMResponse>;
-  chatHistory!: Table<ChatMessage>;
+  chatHistory!: Table<ChatHistoryMessage>;
 
   constructor() {
     super("History");
