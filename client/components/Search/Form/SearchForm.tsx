@@ -43,6 +43,7 @@ export default function SearchForm({
   additionalButtons?: ReactNode;
 }) {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  const autoInitializedQueriesRef = useRef(new Set<string>());
   const defaultSuggestedQuery = "Anything you need!";
   const [state, setState] = useState<SearchFormState>({
     textAreaValue: query,
@@ -72,22 +73,25 @@ export default function SearchForm({
     const initializeComponent = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const urlQuery = urlParams.get("q");
+      const normalizedUrlQuery = urlQuery?.trim();
 
       const hasRestoredResults =
         textSearchResults.length > 0 || imageSearchResults.length > 0;
       const hasRestoredResponse = responseValue.trim().length > 0;
 
       if (
-        urlQuery?.trim() &&
+        normalizedUrlQuery &&
+        !autoInitializedQueriesRef.current.has(normalizedUrlQuery) &&
         !isRestoringFromHistory &&
         !hasRestoredResults &&
         !hasRestoredResponse
       ) {
+        autoInitializedQueriesRef.current.add(normalizedUrlQuery);
         await sleepUntilIdle();
 
         try {
           resetSearchRunId();
-          await addToHistory(urlQuery, {
+          await addToHistory(normalizedUrlQuery, {
             type: "text" as const,
             items: [],
           });
@@ -99,7 +103,7 @@ export default function SearchForm({
       }
     };
 
-    initializeComponent();
+    void initializeComponent();
   }, [
     isRestoringFromHistory,
     textSearchResults.length,
@@ -161,6 +165,11 @@ export default function SearchForm({
       state.textAreaValue.trim().length >= 1
         ? state.textAreaValue
         : state.suggestedQuery;
+    const normalizedQuery = queryToEncode.trim();
+
+    if (normalizedQuery.length > 0) {
+      autoInitializedQueriesRef.current.add(normalizedQuery);
+    }
 
     setState((prev) => ({ ...prev, textAreaValue: queryToEncode }));
     updateQuery(queryToEncode);
