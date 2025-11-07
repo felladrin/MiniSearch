@@ -4,7 +4,6 @@ import type {
   InitProgressCallback,
   MLCEngineConfig,
 } from "@mlc-ai/web-llm";
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
@@ -21,6 +20,7 @@ import {
   getFormattedSearchResults,
   handleStreamingResponse,
 } from "./textGenerationUtilities";
+import type { ChatMessage } from "./types";
 
 export async function generateTextWithWebLlm() {
   const engine = await initializeWebLlmEngine();

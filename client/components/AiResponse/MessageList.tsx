@@ -1,7 +1,7 @@
 import { ActionIcon, Group, Paper, Stack, Tooltip } from "@mantine/core";
 import { IconPencil, IconRefresh } from "@tabler/icons-react";
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import { memo } from "react";
+import type { ChatMessage } from "../../modules/types";
 import FormattedMarkdown from "./FormattedMarkdown";
 
 interface MessageListProps {
@@ -21,72 +21,74 @@ interface MessageProps {
   onRegenerate: () => void;
 }
 
-const Message = memo(function Message({
-  message,
-  index,
-  absoluteIndex,
-  isLastAssistant,
-  isGenerating,
-  onEditMessage,
-  onRegenerate,
-}: MessageProps) {
-  const canEdit = message.role === "user";
-  const canRegenerate = isLastAssistant && message.role === "assistant";
-  const iconSize = 16;
-  const iconVariant: "subtle" = "subtle";
+const Message = memo(
+  ({
+    message,
+    index,
+    absoluteIndex,
+    isLastAssistant,
+    isGenerating,
+    onEditMessage,
+    onRegenerate,
+  }: MessageProps) => {
+    const canEdit = message.role === "user";
+    const canRegenerate = isLastAssistant && message.role === "assistant";
+    const iconSize = 16;
+    const iconVariant: "subtle" = "subtle";
 
-  return (
-    <Group
-      gap="xs"
-      align="center"
-      w="100%"
-      justify={message.role === "user" ? "flex-end" : "flex-start"}
-    >
-      {canEdit && (
-        <Tooltip label="Edit" withArrow position="right" openDelay={300}>
-          <ActionIcon
-            aria-label="Edit message"
-            color="gray"
-            variant={iconVariant}
-            disabled={isGenerating}
-            onClick={() => onEditMessage(absoluteIndex)}
-          >
-            <IconPencil size={iconSize} />
-          </ActionIcon>
-        </Tooltip>
-      )}
-
-      <Paper
-        key={`${message.role}-${index}`}
-        shadow="xs"
-        radius="xl"
-        p="sm"
-        style={{ flex: 1, overflow: "auto" }}
+    return (
+      <Group
+        gap="xs"
+        align="center"
+        w="100%"
+        justify={message.role === "user" ? "flex-end" : "flex-start"}
       >
-        <FormattedMarkdown>{message.content}</FormattedMarkdown>
-      </Paper>
+        {canEdit && (
+          <Tooltip label="Edit" withArrow position="right" openDelay={300}>
+            <ActionIcon
+              aria-label="Edit message"
+              color="gray"
+              variant={iconVariant}
+              disabled={isGenerating}
+              onClick={() => onEditMessage(absoluteIndex)}
+            >
+              <IconPencil size={iconSize} />
+            </ActionIcon>
+          </Tooltip>
+        )}
 
-      {canRegenerate && (
-        <Tooltip
-          label="Re-generate response"
-          withArrow
-          position="left"
-          openDelay={300}
+        <Paper
+          key={`${message.role}-${index}`}
+          shadow="xs"
+          radius="xl"
+          p="sm"
+          style={{ flex: 1, overflow: "auto" }}
         >
-          <ActionIcon
-            aria-label="Re-generate response"
-            color="gray"
-            variant={iconVariant}
-            disabled={isGenerating}
-            onClick={() => onRegenerate()}
+          <FormattedMarkdown>{message.content}</FormattedMarkdown>
+        </Paper>
+
+        {canRegenerate && (
+          <Tooltip
+            label="Re-generate response"
+            withArrow
+            position="left"
+            openDelay={300}
           >
-            <IconRefresh size={iconSize} />
-          </ActionIcon>
-        </Tooltip>
-      )}
-    </Group>
-  );
-});
+            <ActionIcon
+              aria-label="Re-generate response"
+              color="gray"
+              variant={iconVariant}
+              disabled={isGenerating}
+              onClick={() => onRegenerate()}
+            >
+              <IconRefresh size={iconSize} />
+            </ActionIcon>
+          </Tooltip>
+        )}
+      </Group>
+    );
+  },
+);
 
 const MessageList = memo(function MessageList({
   messages,

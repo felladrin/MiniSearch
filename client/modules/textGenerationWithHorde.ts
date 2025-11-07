@@ -1,4 +1,3 @@
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import { appName, appRepository, appVersion } from "./appInfo";
 import { addLogEntry } from "./logEntries";
 import {
@@ -15,6 +14,7 @@ import {
   getDefaultChatMessages,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
+import type { ChatMessage } from "./types";
 
 interface HordeResponse {
   id: string;

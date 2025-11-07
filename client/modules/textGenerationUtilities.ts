@@ -1,5 +1,4 @@
 import type { ChatCompletionChunk } from "@mlc-ai/web-llm";
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
   getLlmTextSearchResults,
   getQuery,
@@ -9,6 +8,7 @@ import {
   updateTextGenerationState,
 } from "./pubSub";
 import { getSystemPrompt } from "./systemPrompt";
+import type { ChatMessage } from "./types";
 
 export const defaultContextSize = 4096;
 

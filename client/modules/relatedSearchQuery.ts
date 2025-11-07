@@ -1,6 +1,6 @@
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import { addLogEntry } from "./logEntries";
 import { generateChatResponse } from "./textGeneration";
+import type { ChatMessage } from "./types";
 
 export async function generateRelatedSearchQuery(
   conversation: ChatMessage[],

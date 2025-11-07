@@ -1,6 +1,5 @@
 import { Card, Stack } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
   type KeyboardEvent,
   useCallback,
@@ -32,6 +31,7 @@ import {
 import { generateRelatedSearchQuery } from "../../modules/relatedSearchQuery";
 import { searchImages, searchText } from "../../modules/search";
 import { generateChatResponse } from "../../modules/textGeneration";
+import type { ChatMessage } from "../../modules/types";
 import ChatHeader from "./ChatHeader";
 import ChatInputArea from "./ChatInputArea";
 import MessageList from "./MessageList";

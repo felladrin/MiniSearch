@@ -1,6 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { streamText } from "ai";
-import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
   listOpenAiCompatibleModels,
   selectRandomModel,
@@ -19,6 +18,7 @@ import {
   getDefaultChatMessages,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
+import type { ChatMessage } from "./types";
 
 let currentAbortController: AbortController | null = null;
 
@@ -81,10 +81,7 @@ async function createOpenAiStream({
     try {
       const stream = streamText({
         model: openaiProvider.chatModel(effectiveModel),
-        messages: messages.map((msg) => ({
-          role: msg.role || "user",
-          content: msg.content,
-        })),
+        messages,
         maxOutputTokens: params.max_tokens,
         temperature: params.temperature,
         topP: params.top_p,
@@ -92,7 +89,7 @@ async function createOpenAiStream({
         presencePenalty: params.presence_penalty,
         abortSignal: currentAbortController.signal,
         maxRetries: 0,
-        onError: async (error) => {
+        onError: async (error: unknown) => {
           if (
             getTextGenerationState() === "interrupted" ||
             (error instanceof DOMException && error.name === "AbortError")
