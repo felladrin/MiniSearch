@@ -110,10 +110,19 @@ async function generateWithWllama({
 
     let streamedMessage = "";
 
-    const chatMessages = messages.map((msg) => ({
-      role: msg.role || "user",
-      content: msg.content,
-    }));
+    const chatMessages = messages.map((msg) => {
+      const role = msg.role || "user";
+      const wllamaRole =
+        role === "developer"
+          ? "system"
+          : role === "system" || role === "user" || role === "assistant"
+            ? role
+            : "user";
+      return {
+        role: wllamaRole as "system" | "user" | "assistant",
+        content: msg.content,
+      };
+    });
 
     const stream = await wllama.createChatCompletion(chatMessages, {
       nPredict: defaultContextSize,

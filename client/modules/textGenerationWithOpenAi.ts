@@ -1,5 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { streamText } from "ai";
+import { type ModelMessage, streamText } from "ai";
 import type { ChatMessage } from "gpt-tokenizer/GptEncoding";
 import {
   listOpenAiCompatibleModels,
@@ -23,7 +23,7 @@ import {
 let currentAbortController: AbortController | null = null;
 
 interface StreamOptions {
-  messages: ChatMessage[];
+  messages: ModelMessage[];
   onUpdate: (text: string) => void;
 }
 
@@ -81,10 +81,7 @@ async function createOpenAiStream({
     try {
       const stream = streamText({
         model: openaiProvider.chatModel(effectiveModel),
-        messages: messages.map((msg) => ({
-          role: msg.role || "user",
-          content: msg.content,
-        })),
+        messages,
         maxOutputTokens: params.max_tokens,
         temperature: params.temperature,
         topP: params.top_p,
@@ -92,7 +89,7 @@ async function createOpenAiStream({
         presencePenalty: params.presence_penalty,
         abortSignal: currentAbortController.signal,
         maxRetries: 0,
-        onError: async (error) => {
+        onError: async (error: unknown) => {
           if (
             getTextGenerationState() === "interrupted" ||
             (error instanceof DOMException && error.name === "AbortError")
@@ -159,7 +156,9 @@ export async function generateTextWithOpenAi() {
   await canStartResponding();
   updateTextGenerationState("preparingToGenerate");
 
-  const messages = getDefaultChatMessages(getFormattedSearchResults(true));
+  const messages = getDefaultChatMessages(
+    getFormattedSearchResults(true),
+  ) as ModelMessage[];
 
   await createOpenAiStream({
     messages,
@@ -177,5 +176,22 @@ export async function generateChatWithOpenAi(
   messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
 ) {
-  return createOpenAiStream({ messages, onUpdate });
+  const modelMessages = chatMessagesToModelMessages(messages);
+  return createOpenAiStream({ messages: modelMessages, onUpdate });
+}
+
+function chatMessagesToModelMessages(messages: ChatMessage[]): ModelMessage[] {
+  return messages.map((msg) => {
+    const role = msg.role || "user";
+    const modelRole =
+      role === "developer"
+        ? "system"
+        : role === "system" || role === "user" || role === "assistant"
+          ? role
+          : "user";
+    return {
+      role: modelRole as "system" | "user" | "assistant",
+      content: msg.content,
+    };
+  });
 }
