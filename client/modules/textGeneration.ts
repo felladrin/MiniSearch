@@ -13,6 +13,7 @@ import {
   getSettings,
   getTextGenerationState,
   listenToSettingsChanges,
+  updateChatMessages,
   updateConversationSummary,
   updateImageSearchResults,
   updateImageSearchState,
@@ -187,6 +188,8 @@ export async function searchAndRespond() {
   updateTextSearchResults([]);
 
   updateImageSearchResults([]);
+
+  updateChatMessages([]);
 
   updateSearchPromise(startTextSearch(getQuery()));
 
