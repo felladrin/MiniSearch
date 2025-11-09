@@ -20,6 +20,7 @@ import {
   IconPinFilled,
   IconSearch,
   IconTrash,
+  IconTrashX,
   IconX,
 } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
@@ -28,7 +29,6 @@ import { useSearchHistory } from "../../../hooks/useSearchHistory";
 import type { SearchEntry } from "../../../modules/history";
 import { settingsPubSub } from "../../../modules/pubSub";
 import { formatRelativeTime } from "../../../modules/stringFormatters";
-
 import SearchStats from "../../Analytics/SearchStats";
 
 interface HistoryDrawerProps extends Omit<DrawerProps, "children"> {
@@ -41,6 +41,7 @@ export default function HistoryDrawer({
 }: HistoryDrawerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<string | null>("history");
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [settings] = usePubSub(settingsPubSub);
   const {
     filteredSearches,
@@ -65,9 +66,20 @@ export default function HistoryDrawer({
   };
 
   const handleDelete = (searchId: number) => {
-    if (window.confirm("Delete this search from history?")) {
-      deleteEntry(searchId);
+    deleteEntry(searchId);
+    setPendingDeleteId(null);
+  };
+
+  const handleDeleteClick = (searchId: number) => {
+    if (pendingDeleteId === searchId) {
+      handleDelete(searchId);
+    } else {
+      setPendingDeleteId(searchId);
     }
+  };
+
+  const cancelDelete = () => {
+    setPendingDeleteId(null);
   };
 
   const renderSearchItem = (search: SearchEntry, index: number) => (
@@ -126,15 +138,31 @@ export default function HistoryDrawer({
 
           <ActionIcon
             variant="subtle"
-            color="default"
+            color={pendingDeleteId === search.id ? "red" : "default"}
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              if (search.id) handleDelete(search.id);
+              if (search.id) handleDeleteClick(search.id);
             }}
-            aria-label="Delete search"
+            onMouseLeave={() => {
+              if (pendingDeleteId === search.id) {
+                cancelDelete();
+              }
+            }}
+            aria-label={
+              pendingDeleteId === search.id
+                ? "Click again to confirm delete"
+                : "Delete search"
+            }
+            style={{
+              transition: "all 0.2s ease",
+            }}
           >
-            <IconTrash size={14} />
+            {pendingDeleteId === search.id ? (
+              <IconTrashX size={14} />
+            ) : (
+              <IconTrash size={14} />
+            )}
           </ActionIcon>
         </Group>
       </Group>
