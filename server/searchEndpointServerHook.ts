@@ -2,6 +2,7 @@ import axios from "axios";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { handleTokenVerification } from "./handleTokenVerification";
 import { rankSearchResults } from "./rankSearchResults";
+import { getRerankerStatus } from "./rerankerService";
 import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
@@ -45,7 +46,28 @@ export function searchEndpointServerHook<
 
       if (isTextSearch) {
         const results = searxngResults as TextResult[];
-        const rankedResults = await rankSearchResults(query, results, true);
+        let rankedResults: [title: string, content: string, url: string][];
+
+        const isRerankerHealthy = await getRerankerStatus();
+        if (!isRerankerHealthy) {
+          console.warn(
+            "Reranker service is not healthy, using unranked results",
+          );
+        }
+
+        try {
+          if (isRerankerHealthy) {
+            rankedResults = await rankSearchResults(query, results, true);
+          } else {
+            rankedResults = results;
+          }
+        } catch (error) {
+          console.error(
+            "Error ranking search results:",
+            error instanceof Error ? error.message : error,
+          );
+          rankedResults = results;
+        }
 
         incrementTextualSearchesSinceLastRestart();
 
@@ -53,24 +75,30 @@ export function searchEndpointServerHook<
         response.end(JSON.stringify(rankedResults));
       } else {
         const results = searxngResults as ImageResult[];
-
+        const resultsText = results.map(
+          ([title, url]) => [title.slice(0, 100), "", url] as TextResult,
+        );
         let rankedResults: [title: string, content: string, url: string][];
 
-        try {
-          rankedResults = await rankSearchResults(
-            query,
-            results.map(
-              ([title, url]) => [title.slice(0, 100), "", url] as TextResult,
-            ),
+        const isRerankerHealthy = await getRerankerStatus();
+        if (!isRerankerHealthy) {
+          console.warn(
+            "Reranker service is not healthy, using unranked results",
           );
+        }
+
+        try {
+          if (isRerankerHealthy) {
+            rankedResults = await rankSearchResults(query, resultsText);
+          } else {
+            rankedResults = resultsText;
+          }
         } catch (error) {
           console.error(
             "Error ranking search results:",
             error instanceof Error ? error.message : error,
           );
-          rankedResults = results.map(
-            ([title, url]) => [title, "", url] as TextResult,
-          );
+          rankedResults = resultsText;
         }
 
         const processedResults = (

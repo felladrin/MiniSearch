@@ -15,6 +15,9 @@ const MODEL_HF_REPO = "Felladrin/gguf-jina-reranker-v1-tiny-en";
 const MODEL_HF_FILE = "jina-reranker-v1-tiny-en-Q8_0.gguf";
 
 let isReady = false;
+let serverProcess: ChildProcess | null = null;
+let restartTimeout: NodeJS.Timeout | null = null;
+let shouldRestart = true;
 
 export function getRerankerModelPath() {
   return path.resolve(
@@ -39,9 +42,10 @@ export async function startRerankerService() {
   await ensureModelExists(modelPath);
   printMessage("Starting service...");
 
+  shouldRestart = true;
   const contextSize = 2048;
 
-  const serverProcess = spawn(
+  serverProcess = spawn(
     "llama-server",
     [
       "--model",
@@ -82,6 +86,29 @@ export async function startRerankerService() {
     printMessage(data.toString());
   });
 
+  serverProcess.on("exit", (code, signal) => {
+    printMessage(
+      `Reranker service exited with code: ${code}, signal: ${signal}`,
+    );
+    isReady = false;
+
+    if (!shouldRestart) {
+      printMessage("Reranker service stopped intentionally, not restarting");
+      return;
+    }
+
+    if (restartTimeout) clearTimeout(restartTimeout);
+    restartTimeout = setTimeout(() => {
+      printMessage("Attempting to restart reranker service...");
+      startRerankerService();
+    }, 5000);
+  });
+
+  serverProcess.on("error", (error) => {
+    printMessage(`Reranker service error: ${error.message}`);
+    isReady = false;
+  });
+
   await new Promise<void>((resolve) => {
     const checkReady = async () => {
       try {
@@ -109,9 +136,17 @@ export async function startRerankerService() {
   return serverProcess;
 }
 
-export function stopRerankerService(serverProcess: ChildProcess | null) {
+export function stopRerankerService() {
+  shouldRestart = false;
+
+  if (restartTimeout) {
+    clearTimeout(restartTimeout);
+    restartTimeout = null;
+  }
+
   if (serverProcess) {
     serverProcess.kill();
+    serverProcess = null;
   }
 }
 
@@ -140,46 +175,57 @@ export async function rerank(query: string, documents: string[]) {
     console.time("Time to rerank");
   }
 
-  const response = await fetch(
-    `http://${SERVICE_HOST}:${SERVICE_PORT}/v1/rerank`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+  try {
+    const response = await fetch(
+      `http://${SERVICE_HOST}:${SERVICE_PORT}/v1/rerank`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "rerank",
+          query,
+          documents,
+          top_n: documents.length,
+        }),
       },
-      body: JSON.stringify({
-        model: "rerank",
-        query,
-        documents,
-        top_n: documents.length,
-      }),
-    },
-  );
+    );
 
-  if (!response.ok) {
-    throw new Error(`Reranking failed: ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(`Reranking failed: ${response.statusText}`);
+    }
+
+    const jsonResponse = await response.json();
+
+    const results = jsonResponse.results as {
+      index: number;
+      relevance_score: number;
+    }[];
+
+    if (VERBOSE_MODE) {
+      console.timeEnd("Time to rerank");
+      const sortedResults = results
+        .slice()
+        .sort((a, b) => b.relevance_score - a.relevance_score);
+      const rankedDocuments = results.map(({ index, relevance_score }) => ({
+        document: documents[index],
+        ranking_position:
+          sortedResults.findIndex((result) => result.index === index) + 1,
+        relevance_score,
+      }));
+      printMessage(rankedDocuments);
+    }
+
+    return results;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Reranking failed")) {
+      printMessage("Reranking service error detected, marking as not ready");
+      isReady = false;
+      if (serverProcess) {
+        serverProcess.kill();
+      }
+    }
+    throw error;
   }
-
-  const jsonResponse = await response.json();
-
-  const results = jsonResponse.results as {
-    index: number;
-    relevance_score: number;
-  }[];
-
-  if (VERBOSE_MODE) {
-    console.timeEnd("Time to rerank");
-    const sortedResults = results
-      .slice()
-      .sort((a, b) => b.relevance_score - a.relevance_score);
-    const rankedDocuments = results.map(({ index, relevance_score }) => ({
-      document: documents[index],
-      ranking_position:
-        sortedResults.findIndex((result) => result.index === index) + 1,
-      relevance_score,
-    }));
-    printMessage(rankedDocuments);
-  }
-
-  return results;
 }
