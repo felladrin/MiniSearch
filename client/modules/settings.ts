@@ -15,7 +15,7 @@ export const defaultSettings = {
   searchResultsLimit: 15,
   systemPrompt: `Answer using the search results below as your primary source, supplemented by your own knowledge when needed.
 
-Cite every fact from the search results by placing a link immediately after it in this format: [domain.com](https://full-url). The link text must be the top-level domain only (no "https://", "www.", or paths).
+Cite every fact from the search results by placing a link immediately after it in this format: [domain.com](https://full-url). The link text must be the top-level domain only (no "https://", "www.", or paths). Example: [youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ)
 
 Only cite sources that appear in the search results below. Never fabricate or hallucinate citations.
 
