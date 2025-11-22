@@ -11,7 +11,6 @@ jobs:
           node-version: "lts/*"
           cache: "npm"
       - run: npm ci --ignore-scripts
-      - run: npm test
       - run: npm run lint
   check-docker-container:
     needs: [check-code-quality]

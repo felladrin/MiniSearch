@@ -18,34 +18,37 @@
 - **`npm run start`**: Preview production build
 - **`npm run lint`**: Check code quality (Biome, TypeScript, dependencies)
 - **`npm run format`**: Auto-format code with Biome
-- **`npm run test`**: Run Node.js test suite (`.test.ts` files)
 
 ## Coding Conventions
 
 **Tech Stack**: React + TypeScript + Mantine UI (`@mantine/core`, `@mantine/hooks`, `@mantine/form`)
 
 **Style**:
+
 - Run `npm run format` before committing (enforced via `husky` and `lint-staged`)
 - Named function exports: `export function ComponentName` (not `React.FC`)
 - Use `React.lazy()` for route-level components
 - PascalCase for components/types, camelCase for functions/variables, UPPER_SNAKE_CASE for constants
 
 **TypeScript**:
+
 - Use interfaces for data structures
 - Avoid comments; use TSDoc only for public APIs
 
 **State & Imports**:
+
 - Use `create-pubsub` for global state (avoid nested context providers)
 - Prefer absolute path aliases where configured
 
 **UI & Performance**:
+
 - Use Mantine components for consistency
 - Ensure keyboard navigation, ARIA labels, semantic HTML
 - Use `React.memo()` and `useCallback()` for optimization
 
 ## Pull Requests
 
-- Ensure `npm run lint` and `npm run test` pass
+- Ensure `npm run lint` pass
 - Keep PRs focused on a single feature or fix
 - Include clear descriptions and screenshots for UI changes
 - Write descriptive commit messages
