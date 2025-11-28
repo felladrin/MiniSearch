@@ -17,7 +17,6 @@ const MODEL_HF_FILE = "jina-reranker-v1-tiny-en-Q8_0.gguf";
 let isReady = false;
 let serverProcess: ChildProcess | null = null;
 let restartTimeout: NodeJS.Timeout | null = null;
-let shouldRestart = true;
 
 export function getRerankerModelPath() {
   return path.resolve(
@@ -42,7 +41,6 @@ export async function startRerankerService() {
   await ensureModelExists(modelPath);
   printMessage("Starting service...");
 
-  shouldRestart = true;
   const contextSize = 2048;
 
   serverProcess = spawn(
@@ -57,7 +55,7 @@ export async function startRerankerService() {
       "--ubatch-size",
       contextSize.toString(),
       "--flash-attn",
-      "on",
+      "auto",
       "--host",
       SERVICE_HOST,
       "--port",
@@ -68,7 +66,6 @@ export async function startRerankerService() {
       "1",
       "--parallel",
       "1",
-      "--no-warmup",
       "--reranking",
       "--pooling",
       "rank",
@@ -92,11 +89,6 @@ export async function startRerankerService() {
     );
     isReady = false;
 
-    if (!shouldRestart) {
-      printMessage("Reranker service stopped intentionally, not restarting");
-      return;
-    }
-
     if (restartTimeout) clearTimeout(restartTimeout);
     restartTimeout = setTimeout(() => {
       printMessage("Attempting to restart reranker service...");
@@ -119,8 +111,29 @@ export async function startRerankerService() {
           status: "ok" | string;
         };
         if (responseJson.status === "ok") {
-          isReady = true;
-          resolve();
+          const warmupResponse = await fetch(
+            `http://${SERVICE_HOST}:${SERVICE_PORT}/v1/rerank`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: "rerank",
+                query: "test",
+                documents: ["test document"],
+                top_n: 1,
+              }),
+            },
+          );
+          if (warmupResponse.ok) {
+            isReady = true;
+            resolve();
+          } else {
+            const errorBody = await warmupResponse.text().catch(() => "");
+            printMessage(
+              `Warmup failed: ${warmupResponse.statusText} - ${errorBody}`,
+            );
+            setTimeout(checkReady, 500);
+          }
         } else {
           setTimeout(checkReady, 100);
         }
@@ -137,8 +150,6 @@ export async function startRerankerService() {
 }
 
 export function stopRerankerService() {
-  shouldRestart = false;
-
   if (restartTimeout) {
     clearTimeout(restartTimeout);
     restartTimeout = null;
@@ -193,7 +204,13 @@ export async function rerank(query: string, documents: string[]) {
     );
 
     if (!response.ok) {
-      throw new Error(`Reranking failed: ${response.statusText}`);
+      const errorBody = await response
+        .text()
+        .catch(() => "Unable to read error body");
+      printMessage(`Reranking error response: ${errorBody}`);
+      throw new Error(
+        `Reranking failed: ${response.statusText} - ${errorBody}`,
+      );
     }
 
     const jsonResponse = await response.json();

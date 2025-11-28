@@ -1,13 +1,19 @@
 import { rerank } from "./rerankerService";
 
+const MAX_DOCUMENT_LENGTH = 512;
+
 export async function rankSearchResults(
   query: string,
   searchResults: [title: string, content: string, url: string][],
   preserveTopResults = false,
 ) {
-  const documents = searchResults.map(([title, snippet, url]) =>
-    `[${title}](${url} "${snippet.replaceAll('"', "'")}")`.toLocaleLowerCase(),
-  );
+  const documents = searchResults.map(([title, snippet, url]) => {
+    const doc =
+      `[${title}](${url} "${snippet.replaceAll('"', "'")}")`.toLocaleLowerCase();
+    return doc.length > MAX_DOCUMENT_LENGTH
+      ? doc.slice(0, MAX_DOCUMENT_LENGTH)
+      : doc;
+  });
 
   const results = await rerank(query.toLocaleLowerCase(), documents);
 
