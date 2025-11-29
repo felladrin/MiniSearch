@@ -178,6 +178,10 @@ export async function getRerankerStatus() {
 }
 
 export async function rerank(query: string, documents: string[]) {
+  if (!documents || documents.length === 0) {
+    return [];
+  }
+
   if (!isReady) {
     throw new Error("Reranker service is not ready");
   }
