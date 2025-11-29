@@ -51,7 +51,7 @@
     "postcss-preset-mantine": "^1.17.0",
     "postcss-simple-vars": "^7.0.1",
     "pretty-ms": "^9.1.0",
-    "rate-limiter-flexible": "^8.0.0",
+    "rate-limiter-flexible": "^9.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-error-boundary": "^6.0.0",
