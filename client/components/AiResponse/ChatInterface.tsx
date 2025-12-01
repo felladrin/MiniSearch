@@ -20,12 +20,14 @@ import {
   chatGenerationStatePubSub,
   chatInputPubSub,
   followUpQuestionPubSub,
+  getSettings,
   imageSearchResultsPubSub,
   queryPubSub,
   settingsPubSub,
   suppressNextFollowUpPubSub,
   textSearchResultsPubSub,
   updateImageSearchResults,
+  updateLlmTextSearchResults,
   updateTextSearchResults,
 } from "../../modules/pubSub";
 import { generateRelatedSearchQuery } from "../../modules/relatedSearchQuery";
@@ -288,6 +290,10 @@ export default function ChatInterface({
 
             const uniqueFreshResults = freshResults.filter(
               ([, , url]) => !existingUrls.has(url),
+            );
+
+            updateLlmTextSearchResults(
+              freshResults.slice(0, getSettings().searchResultsToConsider),
             );
 
             if (uniqueFreshResults.length > 0) {
