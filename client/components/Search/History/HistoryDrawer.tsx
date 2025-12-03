@@ -11,6 +11,7 @@ import {
   Tabs,
   Text,
   TextInput,
+  Tooltip,
 } from "@mantine/core";
 import {
   IconChartBar,
@@ -92,30 +93,21 @@ export default function HistoryDrawer({
       onClick={() => handleSearchSelect(search)}
     >
       <Group justify="space-between" align="flex-start" wrap="nowrap">
-        <Stack gap="xs" style={{ flex: 1, minWidth: 0 }}>
-          <Group gap="xs" wrap="nowrap">
-            <Text
-              size="sm"
-              fw={search.isPinned ? 600 : 400}
-              style={{
-                wordBreak: "break-word",
-                lineHeight: 1.3,
-              }}
-            >
+        <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+          <Tooltip label={search.query} multiline withArrow>
+            <Text size="sm" fw={search.isPinned ? 600 : 400} truncate>
               {search.query}
             </Text>
-          </Group>
+          </Tooltip>
 
-          <Group gap="xs" align="center">
-            <Text
-              size="xs"
-              c="dimmed"
-              style={{ display: "flex", alignItems: "center", gap: 4 }}
-            >
-              <IconClock size={12} />
-              {formatRelativeTime(search.timestamp)}
-            </Text>
-          </Group>
+          <Text
+            size="xs"
+            c="dimmed"
+            style={{ display: "flex", alignItems: "center", gap: 4 }}
+          >
+            <IconClock size={12} />
+            {formatRelativeTime(search.timestamp)}
+          </Text>
         </Stack>
 
         <Group gap="xs" style={{ flexShrink: 0 }}>
@@ -285,7 +277,10 @@ export default function HistoryDrawer({
               style={{ flex: 1 }}
             />
 
-            <ScrollArea.Autosize mah="calc(100vh - 280px)">
+            <ScrollArea.Autosize
+              mah="calc(100vh - 190px)"
+              styles={{ content: { minWidth: 0 } }}
+            >
               {filteredSearches.length === 0 ? (
                 <Center py="xl">
                   <Stack align="center" gap="xs">
@@ -310,7 +305,7 @@ export default function HistoryDrawer({
         </Tabs.Panel>
 
         <Tabs.Panel value="analytics" pt="md">
-          <ScrollArea.Autosize mah="calc(100vh - 280px)">
+          <ScrollArea.Autosize mah="calc(100vh - 140px)">
             <SearchStats period="all" compact />
           </ScrollArea.Autosize>
         </Tabs.Panel>
