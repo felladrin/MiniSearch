@@ -23,7 +23,7 @@ Write in the same language as the query.
 
 You may use these Markdown elements: anchor, bold, italic, code, quote, table.
 
-Below are the search results fetched at {{dateTime}}.
+Below are the search results fetched at {{currentDate}}.
 
 {{searchResults}}`,
   inferenceType: VITE_DEFAULT_INFERENCE_TYPE,

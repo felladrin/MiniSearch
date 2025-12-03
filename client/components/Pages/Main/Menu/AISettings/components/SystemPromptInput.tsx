@@ -68,8 +68,8 @@ export const SystemPromptInput = ({ form }: SystemPromptInputProps) => {
 
           <Text size="xs" component="span">
             The special tag <em>{"{{searchResults}}"}</em> will be replaced with
-            the search results, while <em>{"{{dateTime}}"}</em> will be replaced
-            with the current date and time.
+            the search results, while <em>{"{{currentDate}}"}</em> will be
+            replaced with the current date.
           </Text>
 
           {isUsingCustomInstructions && (
