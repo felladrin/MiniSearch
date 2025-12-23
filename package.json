@@ -21,7 +21,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^1.0.0",
+    "@ai-sdk/openai-compatible": "^2.0.0",
     "@huggingface/hub": "^2.0.0",
     "@leeoniya/ufuzzy": "^1.0.19",
     "@mantine/carousel": "^8.0.0",
