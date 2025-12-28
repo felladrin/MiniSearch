@@ -24,7 +24,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^1.0.0",
+    "@ai-sdk/openai-compatible": "^2.0.0",
     "@huggingface/hub": "^2.0.0",
     "@leeoniya/ufuzzy": "^1.0.19",
     "@mantine/carousel": "^8.0.0",
@@ -36,7 +36,7 @@
     "@mlc-ai/web-llm": "^0.2.79",
     "@tabler/icons-react": "^3.16.0",
     "@wllama/wllama": "^2.3.1",
-    "ai": "^5.0.0",
+    "ai": "^6.0.0",
     "country-flag-icons": "^1.5.13",
     "create-pubsub": "^1.6.3",
     "debug": "^4.4.0",
