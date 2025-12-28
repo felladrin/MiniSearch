@@ -92,7 +92,7 @@
     "typescript": "^5.0.2",
     "vite": "^7.0.0",
     "vitest": "^4.0.0",
-    "@testing-library/dom": "^9.0.0"
+    "@testing-library/dom": "^10.0.0"
   },
   "lint-staged": {
     "*": "npx @biomejs/biome check --write --staged --no-errors-on-unmatched"
