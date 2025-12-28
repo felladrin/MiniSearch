@@ -11,15 +11,15 @@ vi.mock("hash-wasm", () => ({
 }));
 
 vi.mock("rate-limiter-flexible", () => ({
-  RateLimiterMemory: vi.fn().mockImplementation(() => ({
-    consume: vi.fn((token: string) => {
+  RateLimiterMemory: class {
+    consume = vi.fn((token: string) => {
       mockConsume(token);
       if (mockRateLimiterShouldFail) {
         return Promise.reject(new Error("Rate limit exceeded"));
       }
       return Promise.resolve(undefined);
-    }),
-  })),
+    });
+  },
 }));
 
 vi.mock("./searchToken", () => ({
