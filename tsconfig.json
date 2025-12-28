@@ -13,7 +13,12 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["client/*"]
+    },
+    "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["client", "shared"]
+  "include": ["client", "shared", "test"]
 }
