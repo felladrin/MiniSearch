@@ -4,7 +4,18 @@ import userEvent from "@testing-library/user-event";
 import SearchForm from "@/components/Search/Form/SearchForm";
 
 vi.mock("create-pubsub/react", () => ({
-  usePubSub: vi.fn((pubSub: any) => [pubSub?.[2]?.() ?? undefined, vi.fn()]),
+  usePubSub: vi.fn((pubSub: unknown) => {
+    if (!Array.isArray(pubSub)) {
+      return [undefined, vi.fn()];
+    }
+
+    const maybeFactory = pubSub[2];
+    if (typeof maybeFactory !== "function") {
+      return [undefined, vi.fn()];
+    }
+
+    return [maybeFactory() ?? undefined, vi.fn()];
+  }),
 }));
 
 vi.mock("wouter", () => ({
