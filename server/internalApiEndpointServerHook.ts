@@ -1,14 +1,18 @@
-import {
-  createOpenAICompatible,
-  type OpenAICompatibleChatModelId,
-} from "@ai-sdk/openai-compatible";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { type ModelMessage, streamText } from "ai";
-import type { Connect, PreviewServer, ViteDevServer } from "vite";
+import type { PreviewServer, ViteDevServer } from "vite";
 import {
   listOpenAiCompatibleModels,
   selectRandomModel,
 } from "../shared/openaiModels";
 import { handleTokenVerification } from "./handleTokenVerification";
+import {
+  calculateBackoffTime,
+  isResponseWritable,
+  safeEndResponse,
+  safeWriteResponse,
+} from "./utils/streamUtils";
 
 interface ChatCompletionRequestBody {
   messages: ModelMessage[];
@@ -37,9 +41,9 @@ function createChunkPayload(
   finish_reason: string | null = null,
 ): ChatCompletionChunk {
   return {
-    id: Date.now().toString(),
+    id: `chatcmpl-${Date.now()}`,
     object: "chat.completion.chunk",
-    created: Date.now(),
+    created: Math.floor(Date.now() / 1000),
     model,
     choices: [
       {
@@ -51,104 +55,226 @@ function createChunkPayload(
   };
 }
 
+function sendJsonError(
+  response: ServerResponse,
+  statusCode: number,
+  payload: Record<string, unknown>,
+): void {
+  if (response.headersSent) {
+    safeEndResponse(response);
+    return;
+  }
+
+  response.statusCode = statusCode;
+  response.setHeader("Content-Type", "application/json");
+  safeEndResponse(response, JSON.stringify(payload));
+}
+
+function sendSseData(response: ServerResponse, data: unknown): void {
+  safeWriteResponse(response, `data: ${JSON.stringify(data)}\n\n`);
+}
+
+function sendSseDone(response: ServerResponse): void {
+  safeWriteResponse(response, "data: [DONE]\n\n");
+  safeEndResponse(response);
+}
+
+function sendSseError(
+  response: ServerResponse,
+  message: string,
+  model?: string,
+): void {
+  if (!response.headersSent) {
+    response.setHeader("Content-Type", "text/event-stream");
+    response.setHeader("Cache-Control", "no-cache");
+    response.setHeader("Connection", "keep-alive");
+  }
+
+  sendSseData(response, {
+    error: message,
+    ...(model ? { model } : {}),
+  });
+  sendSseDone(response);
+}
+
+function hasJsonContentType(request: IncomingMessage): boolean {
+  const contentType = request.headers["content-type"];
+  if (typeof contentType !== "string") return false;
+  return contentType.toLowerCase().includes("application/json");
+}
+
 export function internalApiEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
 >(server: T) {
-  server.middlewares.use(async (request, response, next) => {
-    if (!request.url || !request.url.startsWith("/inference")) return next();
+  server.middlewares.use(
+    async (
+      request: IncomingMessage,
+      response: ServerResponse,
+      next: () => void,
+    ) => {
+      if (!request.url) {
+        sendJsonError(response, 400, { error: "Bad Request: URL is required" });
+        return;
+      }
 
-    const url = new URL(request.url, `http://${request.headers.host}`);
-    const token = url.searchParams.get("token");
-    const { shouldContinue } = await handleTokenVerification(token, response);
-    if (!shouldContinue) return;
+      if (!request.url.startsWith("/inference")) {
+        return next();
+      }
 
-    if (
-      !process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL ||
-      !process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY
-    ) {
-      response.statusCode = 500;
-      response.end(
-        JSON.stringify({ error: "OpenAI API configuration is missing" }),
-      );
-      return;
-    }
+      if (request.method !== "POST") {
+        response.setHeader("Allow", "POST");
+        sendJsonError(response, 405, { error: "Method Not Allowed" });
+        return;
+      }
 
-    const openaiProvider = createOpenAICompatible({
-      baseURL: process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
-      apiKey: process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
-      name: "openai",
-    });
+      if (!hasJsonContentType(request)) {
+        sendJsonError(response, 415, { error: "Unsupported Media Type" });
+        return;
+      }
 
-    try {
-      const requestBody = await getRequestBody(request);
-      let model = process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL;
-      let availableModels: { id: OpenAICompatibleChatModelId }[] = [];
+      const hostHeader = request.headers.host;
+      const baseUrl =
+        typeof hostHeader === "string" && hostHeader.length > 0
+          ? `http://${hostHeader}`
+          : "http://localhost";
+      const url = new URL(request.url, baseUrl);
+      const token = url.searchParams.get("token");
+      const { shouldContinue } = await handleTokenVerification(token, response);
+      if (!shouldContinue) return;
 
-      if (!model) {
+      if (
+        !process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL ||
+        !process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY
+      ) {
+        sendJsonError(response, 500, {
+          error: "OpenAI API configuration is missing",
+        });
+        return;
+      }
+
+      try {
+        let requestBody: ChatCompletionRequestBody;
         try {
-          availableModels = await listOpenAiCompatibleModels(
-            process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
-            process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
-          );
-          const selectedModel = selectRandomModel(availableModels);
-
-          if (selectedModel) {
-            model = selectedModel;
-          } else {
-            throw new Error("No models available from the API");
+          const maxBodyBytes = 1024 * 1024;
+          const chunks: Buffer[] = [];
+          let totalBytes = 0;
+          for await (const chunk of request) {
+            let buf: Buffer;
+            if (typeof chunk === "string") {
+              buf = Buffer.from(chunk);
+            } else if (chunk instanceof Uint8Array) {
+              buf = Buffer.from(chunk);
+            } else {
+              sendJsonError(response, 400, {
+                error: "Invalid request body stream",
+              });
+              return;
+            }
+            totalBytes += buf.length;
+            if (totalBytes > maxBodyBytes) {
+              sendJsonError(response, 413, { error: "Request body too large" });
+              return;
+            }
+            chunks.push(buf);
           }
-        } catch (modelFetchError) {
-          console.error("Error fetching models:", modelFetchError);
-          throw new Error(
-            "Unable to determine model for OpenAI-compatible API",
-          );
-        }
-      }
-
-      if (!model) {
-        throw new Error("OpenAI model configuration is missing");
-      }
-
-      const maxRetries = 5;
-      const attemptedModels = new Set<string>();
-      let currentAttempt = 0;
-      let streamError: unknown = null;
-
-      const tryNextModel = async (): Promise<void> => {
-        if (currentAttempt >= maxRetries) {
-          if (!response.headersSent) {
-            response.statusCode = 503;
-            response.setHeader("Content-Type", "application/json");
-            response.end(
-              JSON.stringify({
-                error: "Service unavailable - all models failed",
-                lastError:
-                  streamError instanceof Error
-                    ? streamError.message
-                    : "Unknown error",
-              }),
-            );
-          }
+          requestBody = JSON.parse(Buffer.concat(chunks).toString());
+        } catch (_error) {
+          sendJsonError(response, 400, { error: "Invalid request body" });
           return;
         }
 
-        if (model) {
-          attemptedModels.add(model);
+        if (!Array.isArray(requestBody.messages)) {
+          sendJsonError(response, 400, {
+            error: "Invalid request body: messages is required",
+          });
+          return;
         }
 
-        currentAttempt++;
+        const openaiProvider = createOpenAICompatible({
+          baseURL: process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
+          apiKey: process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
+          name: "openai",
+        });
 
-        const stream = streamText({
-          model: openaiProvider.chatModel(model as string),
-          messages: requestBody.messages,
-          temperature: requestBody.temperature,
-          topP: requestBody.top_p,
-          frequencyPenalty: requestBody.frequency_penalty,
-          presencePenalty: requestBody.presence_penalty,
-          maxOutputTokens: requestBody.max_tokens,
-          maxRetries: 0,
-          onError: async (error) => {
-            streamError = error;
+        let model = process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL;
+        let availableModels: { id: string }[] = [];
+        const attemptedModels = new Set<string>();
+
+        if (!model) {
+          try {
+            availableModels = await listOpenAiCompatibleModels(
+              process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
+              process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
+            );
+            const selectedModel = selectRandomModel(availableModels);
+            model = selectedModel || undefined;
+          } catch (error) {
+            console.error("Error fetching models:", error);
+            sendJsonError(response, 500, {
+              error: "Failed to fetch available models",
+            });
+            return;
+          }
+        }
+
+        if (!model) {
+          sendJsonError(response, 500, { error: "No model available" });
+          return;
+        }
+
+        const maxAttempts = 5;
+        let lastError: unknown = null;
+        let hasStartedStreaming = false;
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          if (!model) break;
+          attemptedModels.add(model);
+
+          if (!isResponseWritable(response)) {
+            return;
+          }
+
+          if (!hasStartedStreaming) {
+            response.setHeader("Content-Type", "text/event-stream");
+            response.setHeader("Cache-Control", "no-cache");
+            response.setHeader("Connection", "keep-alive");
+            hasStartedStreaming = true;
+          }
+
+          try {
+            const stream = streamText({
+              model: openaiProvider.chatModel(model),
+              messages: requestBody.messages,
+              temperature: requestBody.temperature,
+              topP: requestBody.top_p,
+              frequencyPenalty: requestBody.frequency_penalty,
+              presencePenalty: requestBody.presence_penalty,
+              maxOutputTokens: requestBody.max_tokens,
+              maxRetries: 0,
+            });
+
+            for await (const part of stream.fullStream) {
+              if (!isResponseWritable(response)) return;
+
+              if (part.type === "text-delta") {
+                sendSseData(response, createChunkPayload(model, part.text));
+              } else if (part.type === "finish") {
+                sendSseData(
+                  response,
+                  createChunkPayload(model, undefined, "stop"),
+                );
+                sendSseDone(response);
+                return;
+              }
+            }
+
+            sendSseError(response, "Stream ended unexpectedly", model);
+            return;
+          } catch (error) {
+            lastError = error;
+            console.error("Error during streaming:", error);
+
+            if (attempt >= maxAttempts) break;
 
             if (
               availableModels.length === 0 &&
@@ -156,125 +282,49 @@ export function internalApiEndpointServerHook<
             ) {
               try {
                 availableModels = await listOpenAiCompatibleModels(
-                  process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL as string,
+                  process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
                   process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
                 );
-              } catch (refetchErr) {
-                console.warn("Failed to refetch models:", refetchErr);
+              } catch (refetchError) {
+                console.warn("Failed to refetch models:", refetchError);
               }
             }
 
-            if (availableModels.length > 0 && currentAttempt < maxRetries) {
-              const nextModel = selectRandomModel(
-                availableModels,
-                attemptedModels,
-              );
-              if (nextModel) {
-                console.warn(
-                  `Model "${model}" failed, retrying with "${nextModel}" (Attempt ${currentAttempt}/${maxRetries})`,
-                );
-                model = nextModel;
-                await new Promise((resolve) =>
-                  setTimeout(resolve, 100 * currentAttempt),
-                );
-                await tryNextModel();
-                return;
-              }
-            }
-
-            if (!response.headersSent) {
-              response.statusCode = 503;
-              response.setHeader("Content-Type", "application/json");
-              response.end(
-                JSON.stringify({
-                  error: "Service unavailable - all models failed",
-                }),
-              );
-            }
-          },
-        });
-
-        response.setHeader("Content-Type", "text/event-stream");
-        response.setHeader("Cache-Control", "no-cache");
-        response.setHeader("Connection", "keep-alive");
-
-        try {
-          for await (const part of stream.fullStream) {
-            if (part.type === "text-delta") {
-              const payload = createChunkPayload(model as string, part.text);
-              response.write(`data: ${JSON.stringify(payload)}\n\n`);
-            } else if (part.type === "finish") {
-              const payload = createChunkPayload(
-                model as string,
-                undefined,
-                "stop",
-              );
-              response.write(`data: ${JSON.stringify(payload)}\n\n`);
-              response.write("data: [DONE]\n\n");
-              response.end();
-              return;
-            }
-          }
-        } catch (iterationError) {
-          console.error("Error during stream iteration:", iterationError);
-          if (!response.headersSent) {
-            response.statusCode = 500;
-            response.setHeader("Content-Type", "application/json");
-            response.end(
-              JSON.stringify({
-                error: "Stream iteration error",
-              }),
+            const nextModel = selectRandomModel(
+              availableModels,
+              attemptedModels,
             );
+            if (!nextModel) break;
+            model = nextModel;
+
+            const backoffMs = calculateBackoffTime(attempt);
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
           }
         }
-      };
 
-      await tryNextModel();
+        const lastErrorMessage =
+          lastError instanceof Error ? lastError.message : "Unknown error";
 
-      if (!response.headersSent) {
-        response.statusCode = 503;
-        response.setHeader("Content-Type", "application/json");
-        response.end(
-          JSON.stringify({
-            error:
-              "Failed to generate text after multiple retries with different models",
-          }),
+        if (!hasStartedStreaming) {
+          sendJsonError(response, 503, {
+            error: "Service unavailable - all models failed",
+            lastError: lastErrorMessage,
+          });
+          return;
+        }
+
+        sendSseError(
+          response,
+          `Service unavailable - all models failed: ${lastErrorMessage}`,
+          model,
         );
-      }
-    } catch (error) {
-      console.error("Error in internal API endpoint:", error);
-      response.statusCode = 500;
-      response.end(
-        JSON.stringify({
+      } catch (error) {
+        console.error("Error in internal API endpoint:", error);
+        sendJsonError(response, 500, {
           error: "Internal server error",
           message: error instanceof Error ? error.message : "Unknown error",
-        }),
-      );
-    }
-  });
-}
-
-async function getRequestBody(
-  request: Connect.IncomingMessage,
-): Promise<ChatCompletionRequestBody> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-
-    request.on("data", (chunk: Buffer) => {
-      chunks.push(chunk);
-    });
-
-    request.on("end", () => {
-      try {
-        const body = Buffer.concat(chunks).toString();
-        resolve(JSON.parse(body));
-      } catch (_) {
-        reject(new Error("Failed to parse request body"));
+        });
       }
-    });
-
-    request.on("error", (error) => {
-      reject(new Error(`Request stream error: ${error.message}`));
-    });
-  });
+    },
+  );
 }
