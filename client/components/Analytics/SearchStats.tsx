@@ -269,7 +269,7 @@ export default function SearchStats({
         <Card withBorder>
           <Card.Section p="md">
             <Title order={4} mb="md">
-              Daily search activity
+              Recent activity
             </Title>
             <Stack gap="xs" mt="md">
               {stats.searchTrends.slice(-7).map((trend) => {
