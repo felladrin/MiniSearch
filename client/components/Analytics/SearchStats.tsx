@@ -269,12 +269,8 @@ export default function SearchStats({
         <Card withBorder>
           <Card.Section p="md">
             <Title order={4} mb="md">
-              Search Trends
+              Daily search activity
             </Title>
-            <Text size="sm" c="dimmed">
-              Daily search activity over the selected period
-            </Text>
-
             <Stack gap="xs" mt="md">
               {stats.searchTrends.slice(-7).map((trend) => {
                 const maxCount = Math.max(
