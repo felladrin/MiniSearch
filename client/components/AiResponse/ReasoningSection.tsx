@@ -8,7 +8,7 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { IconChevronDown, IconChevronRight } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import MarkdownRenderer from "./MarkdownRenderer";
 
 interface ReasoningSectionProps {
@@ -20,7 +20,15 @@ export default function ReasoningSection({
   content,
   isGenerating = false,
 }: ReasoningSectionProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(isGenerating);
+
+  useEffect(() => {
+    if (isGenerating) {
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  }, [isGenerating]);
 
   return (
     <Box mb="xs">

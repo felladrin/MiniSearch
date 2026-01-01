@@ -2,7 +2,10 @@ import { usePubSub } from "create-pubsub/react";
 import { useCallback } from "react";
 import { settingsPubSub } from "../../../modules/pubSub";
 
-export function useReasoningContent(text: string) {
+export function useReasoningContent(
+  text: string,
+  externalReasoningContent?: string,
+) {
   const [settings] = usePubSub(settingsPubSub);
 
   const extractReasoningAndMainContent = useCallback(
@@ -31,6 +34,33 @@ export function useReasoningContent(text: string) {
     },
     [],
   );
+
+  if (externalReasoningContent) {
+    const normalizedText = text?.trim() ?? "";
+    const normalizedExternal = externalReasoningContent?.trim() ?? "";
+
+    return {
+      reasoningContent: normalizedExternal,
+      mainContent: normalizedText,
+      isGenerating: normalizedText === "",
+    };
+  }
+
+  if (text && text.trim() === "") {
+    return {
+      reasoningContent: "",
+      mainContent: "",
+      isGenerating: false,
+    };
+  }
+
+  if (!text) {
+    return {
+      reasoningContent: "",
+      mainContent: "",
+      isGenerating: false,
+    };
+  }
 
   const result = extractReasoningAndMainContent(
     text,

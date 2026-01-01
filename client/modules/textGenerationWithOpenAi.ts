@@ -8,6 +8,7 @@ import { addLogEntry } from "./logEntries";
 import {
   getSettings,
   getTextGenerationState,
+  updateReasoningContent,
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
@@ -24,7 +25,7 @@ let currentAbortController: AbortController | null = null;
 
 interface StreamOptions {
   messages: ChatMessage[];
-  onUpdate: (text: string) => void;
+  onUpdate: (text: string, reasoningContent?: string) => void;
 }
 
 async function createOpenAiStream({
@@ -118,15 +119,19 @@ async function createOpenAiStream({
       });
 
       let text = "";
+      let reasoning = "";
       for await (const part of stream.fullStream) {
         if (getTextGenerationState() === "interrupted") {
           currentAbortController.abort();
           throw new Error("Chat generation interrupted");
         }
 
-        if (part.type === "text-delta") {
+        if (part.type === "reasoning-delta") {
+          reasoning += part.text;
+          onUpdate(text, reasoning);
+        } else if (part.type === "text-delta") {
           text += part.text;
-          onUpdate(text);
+          onUpdate(text, reasoning);
         }
       }
 
@@ -160,12 +165,15 @@ export async function generateTextWithOpenAi() {
 
   await createOpenAiStream({
     messages,
-    onUpdate: (text) => {
+    onUpdate: (text, reasoningContent) => {
       if (getTextGenerationState() !== "generating") {
         updateTextGenerationState("generating");
       }
 
       updateResponse(text);
+      if (reasoningContent) {
+        updateReasoningContent(reasoningContent);
+      }
     },
   });
 }

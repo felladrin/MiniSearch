@@ -52,6 +52,14 @@ export const responsePubSub = createPubSub("");
 export const updateResponse = throttle(responsePubSub[0], 1000 / 12);
 export const [, , getResponse] = responsePubSub;
 
+export const reasoningContentPubSub = createPubSub("");
+
+export const updateReasoningContent = throttle(
+  reasoningContentPubSub[0],
+  1000 / 12,
+);
+export const [, , getReasoningContent] = reasoningContentPubSub;
+
 export const [updateSearchPromise, , getSearchPromise] = createPubSub<
   Promise<SearchResults>
 >(Promise.resolve({ textResults: [], imageResults: [] }));
