@@ -81,7 +81,7 @@
     "@vitejs/plugin-basic-ssl": "^2.0.0",
     "@vitejs/plugin-react": "^5.0.0",
     "dpdm-fast": "^1.0.14",
-    "globals": "^16.0.0",
+    "globals": "^17.0.0",
     "husky": "^9.1.7",
     "jscpd": "^4.0.5",
     "jsdom": "^27.2.0",
