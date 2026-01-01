@@ -71,11 +71,15 @@ export default function SearchStats({
 
     const totalSearches = filteredSearches.length;
 
-    const daysDiff = Math.max(
-      1,
-      Math.ceil((now.getTime() - filterDate.getTime()) / (1000 * 60 * 60 * 24)),
-    );
-    const avgPerDay = Math.round(totalSearches / daysDiff);
+    const dateCounts = new Map<string, number>();
+    filteredSearches.forEach((search) => {
+      const date = new Date(search.timestamp).toISOString().split("T")[0];
+      dateCounts.set(date, (dateCounts.get(date) || 0) + 1);
+    });
+
+    const uniqueDays = dateCounts.size;
+    const avgPerDay =
+      uniqueDays > 0 ? Math.round(totalSearches / uniqueDays) : 0;
 
     const hourCounts = new Array(24).fill(0);
     filteredSearches.forEach((search) => {
@@ -112,13 +116,7 @@ export default function SearchStats({
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 10);
 
-    const trends = new Map<string, number>();
-    filteredSearches.forEach((search) => {
-      const date = new Date(search.timestamp).toISOString().split("T")[0];
-      trends.set(date, (trends.get(date) || 0) + 1);
-    });
-
-    const searchTrends = Array.from(trends.entries())
+    const searchTrends = Array.from(dateCounts.entries())
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
