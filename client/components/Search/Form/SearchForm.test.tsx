@@ -48,34 +48,38 @@ vi.mock("../../../modules/querySuggestions", () => ({
   getRandomQuerySuggestion: vi.fn(async () => "Anything you need!"),
 }));
 
+const renderSearchForm = (
+  query: string,
+  updateQuery: (query: string) => void,
+) => {
+  return render(
+    <MantineProvider>
+      <SearchForm query={query} updateQuery={updateQuery} />
+    </MantineProvider>,
+  );
+};
+
+const waitForPlaceholder = async () => {
+  const textarea = await screen.findByRole("textbox");
+  await waitFor(() => {
+    expect(textarea).toHaveAttribute("placeholder", "Anything you need!");
+  });
+  return textarea;
+};
+
 describe("SearchForm component", () => {
   it("renders textarea with placeholder when empty", async () => {
     const mockUpdate = vi.fn();
-    render(
-      <MantineProvider>
-        <SearchForm query="" updateQuery={mockUpdate} />
-      </MantineProvider>,
-    );
-
-    const textarea = await screen.findByRole("textbox");
-    await waitFor(() => {
-      expect(textarea).toHaveAttribute("placeholder", "Anything you need!");
-    });
+    renderSearchForm("", mockUpdate);
+    await waitForPlaceholder();
   });
 
   it("calls updateQuery on submit", async () => {
     const mockUpdate = vi.fn();
     const user = userEvent.setup();
-    render(
-      <MantineProvider>
-        <SearchForm query="" updateQuery={mockUpdate} />
-      </MantineProvider>,
-    );
+    renderSearchForm("", mockUpdate);
 
-    const textarea = await screen.findByRole("textbox");
-    await waitFor(() => {
-      expect(textarea).toHaveAttribute("placeholder", "Anything you need!");
-    });
+    const textarea = await waitForPlaceholder();
     await user.type(textarea, "test query");
     const button = screen.getByRole("button", { name: /search/i });
     await user.click(button);
