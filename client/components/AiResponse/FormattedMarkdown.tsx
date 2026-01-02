@@ -1,6 +1,4 @@
 import { TypographyStylesProvider } from "@mantine/core";
-import { usePubSub } from "create-pubsub/react";
-import { reasoningContentPubSub } from "../../modules/pubSub";
 import { useReasoningContent } from "./hooks/useReasoningContent";
 import MarkdownRenderer from "./MarkdownRenderer";
 import ReasoningSection from "./ReasoningSection";
@@ -16,11 +14,8 @@ export default function FormattedMarkdown({
   className = "",
   enableCopy = true,
 }: FormattedMarkdownProps) {
-  const [externalReasoningContent] = usePubSub(reasoningContentPubSub);
-  const { reasoningContent, mainContent, isGenerating } = useReasoningContent(
-    children,
-    externalReasoningContent,
-  );
+  const { reasoningContent, mainContent, isGenerating } =
+    useReasoningContent(children);
 
   if (!children && !reasoningContent) {
     return null;

@@ -2,10 +2,7 @@ import { usePubSub } from "create-pubsub/react";
 import { useCallback } from "react";
 import { settingsPubSub } from "../../../modules/pubSub";
 
-export function useReasoningContent(
-  text: string,
-  externalReasoningContent?: string,
-) {
+export function useReasoningContent(text: string) {
   const [settings] = usePubSub(settingsPubSub);
 
   const extractReasoningAndMainContent = useCallback(
@@ -13,38 +10,33 @@ export function useReasoningContent(
       if (!text)
         return { reasoningContent: "", mainContent: "", isGenerating: false };
 
-      if (!text.trim().startsWith(startMarker))
+      const trimmedText = text.trim();
+
+      if (!trimmedText.startsWith(startMarker))
         return { reasoningContent: "", mainContent: text, isGenerating: false };
 
-      const endIndex = text.indexOf(endMarker);
+      const startIndex = trimmedText.indexOf(startMarker);
+      const endIndex = trimmedText.indexOf(endMarker);
 
       if (endIndex === -1) {
         return {
-          reasoningContent: text.slice(startMarker.length),
+          reasoningContent: trimmedText.slice(startIndex + startMarker.length),
           mainContent: "",
           isGenerating: true,
         };
       }
 
       return {
-        reasoningContent: text.slice(startMarker.length, endIndex),
-        mainContent: text.slice(endIndex + endMarker.length),
+        reasoningContent: trimmedText.slice(
+          startIndex + startMarker.length,
+          endIndex,
+        ),
+        mainContent: trimmedText.slice(endIndex + endMarker.length),
         isGenerating: false,
       };
     },
     [],
   );
-
-  if (externalReasoningContent) {
-    const normalizedText = text?.trim() ?? "";
-    const normalizedExternal = externalReasoningContent?.trim() ?? "";
-
-    return {
-      reasoningContent: normalizedExternal,
-      mainContent: normalizedText,
-      isGenerating: normalizedText === "",
-    };
-  }
 
   if (text && text.trim() === "") {
     return {

@@ -8,7 +8,6 @@ import { addLogEntry } from "./logEntries";
 import {
   getSettings,
   getTextGenerationState,
-  updateReasoningContent,
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
@@ -28,10 +27,15 @@ interface StreamOptions {
   onUpdate: (text: string, reasoningContent?: string) => void;
 }
 
+interface StreamResult {
+  text: string;
+  reasoningContent?: string;
+}
+
 async function createOpenAiStream({
   messages,
   onUpdate,
-}: StreamOptions): Promise<string> {
+}: StreamOptions): Promise<StreamResult> {
   const settings = getSettings();
   const openaiProvider = createOpenAICompatible({
     name: settings.openAiApiBaseUrl,
@@ -63,7 +67,7 @@ async function createOpenAiStream({
   const attemptedModels = new Set<string>();
   let currentAttempt = 0;
 
-  const tryNextModel = async (): Promise<string> => {
+  const tryNextModel = async (): Promise<StreamResult> => {
     if (currentAttempt >= maxRetries) {
       throw new Error(
         `Failed to generate text after ${maxRetries} retries with different models`,
@@ -135,7 +139,7 @@ async function createOpenAiStream({
         }
       }
 
-      return text;
+      return { text, reasoningContent: reasoning };
     } catch (error) {
       if (
         getTextGenerationState() === "interrupted" ||
@@ -162,6 +166,7 @@ export async function generateTextWithOpenAi() {
   updateTextGenerationState("preparingToGenerate");
 
   const messages = getDefaultChatMessages(getFormattedSearchResults(true));
+  const settings = getSettings();
 
   await createOpenAiStream({
     messages,
@@ -170,9 +175,16 @@ export async function generateTextWithOpenAi() {
         updateTextGenerationState("generating");
       }
 
-      updateResponse(text);
-      if (reasoningContent) {
-        updateReasoningContent(reasoningContent);
+      if (reasoningContent && reasoningContent.length > 0) {
+        if (text && text.length > 0) {
+          updateResponse(
+            `${settings.reasoningStartMarker}${reasoningContent}${settings.reasoningEndMarker}${text}`,
+          );
+        } else {
+          updateResponse(`${settings.reasoningStartMarker}${reasoningContent}`);
+        }
+      } else {
+        updateResponse(text);
       }
     },
   });
@@ -182,5 +194,27 @@ export async function generateChatWithOpenAi(
   messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
 ) {
-  return createOpenAiStream({ messages, onUpdate });
+  const settings = getSettings();
+  const result = await createOpenAiStream({
+    messages,
+    onUpdate: (text, reasoningContent) => {
+      if (reasoningContent && reasoningContent.length > 0) {
+        if (text && text.length > 0) {
+          onUpdate(
+            `${settings.reasoningStartMarker}${reasoningContent}${settings.reasoningEndMarker}${text}`,
+          );
+        } else {
+          onUpdate(`${settings.reasoningStartMarker}${reasoningContent}`);
+        }
+      } else {
+        onUpdate(text);
+      }
+    },
+  });
+
+  if (result.reasoningContent && result.reasoningContent.length > 0) {
+    return `${settings.reasoningStartMarker}${result.reasoningContent}${settings.reasoningEndMarker}${result.text}`;
+  }
+
+  return result.text;
 }
