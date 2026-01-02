@@ -6,11 +6,13 @@ describe("useReasoningContent hook", () => {
   describe("parsing reasoning content from markdown markers", () => {
     it("should extract reasoning content between start and end markers", () => {
       const { result } = renderHook(() =>
-        useReasoningContent("Let me think about this\nHere is the answer."),
+        useReasoningContent(
+          "<think>Let me think about this</think>\nHere is the answer.",
+        ),
       );
 
       expect(result.current.reasoningContent).toBe("Let me think about this");
-      expect(result.current.mainContent).toBe("Here is the answer.");
+      expect(result.current.mainContent).toBe("\nHere is the answer.");
       expect(result.current.isGenerating).toBe(false);
     });
 
@@ -34,7 +36,7 @@ describe("useReasoningContent hook", () => {
 
     it("should detect generating state when end marker is missing", () => {
       const { result } = renderHook(() =>
-        useReasoningContent("I'm still thinking"),
+        useReasoningContent("<think>I'm still thinking"),
       );
 
       expect(result.current.reasoningContent).toBe("I'm still thinking");
@@ -64,13 +66,15 @@ describe("useReasoningContent hook", () => {
   describe("UI state management for reasoning section", () => {
     it("should provide correct isGenerating state for accordion title", () => {
       const streamingState = renderHook(() =>
-        useReasoningContent("Currently thinking..."),
+        useReasoningContent("<think>Currently thinking..."),
       );
 
       expect(streamingState.result.current.isGenerating).toBe(true);
 
       const completedState = renderHook(() =>
-        useReasoningContent("Thought process completed\nHere is the answer."),
+        useReasoningContent(
+          "<think>Thought process completed</think>\nHere is the answer.",
+        ),
       );
 
       expect(completedState.result.current.isGenerating).toBe(false);
@@ -78,14 +82,16 @@ describe("useReasoningContent hook", () => {
 
     it("should handle transition from streaming to completed state", () => {
       const initial = renderHook(() =>
-        useReasoningContent("Building response..."),
+        useReasoningContent("<think>Building response..."),
       );
       expect(initial.result.current.isGenerating).toBe(true);
 
       const transitioned = renderHook(() =>
-        useReasoningContent("Response built.\nFinal answer here."),
+        useReasoningContent(
+          "<think>Response built.</think>\nFinal answer here.",
+        ),
       );
       expect(transitioned.result.current.isGenerating).toBe(false);
     });
-
+  });
 });
