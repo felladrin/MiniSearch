@@ -178,7 +178,7 @@ export async function generateTextWithOpenAi() {
       if (reasoningContent && reasoningContent.length > 0) {
         if (text && text.length > 0) {
           updateResponse(
-            `${settings.reasoningStartMarker}${reasoningContent}${settings.reasoningEndMarker}${text}`,
+            `${settings.reasoningStartMarker}${reasoningContent}${settings.reasoningEndMarker}\n\n${text}`,
           );
         } else {
           updateResponse(`${settings.reasoningStartMarker}${reasoningContent}`);
@@ -201,7 +201,7 @@ export async function generateChatWithOpenAi(
       if (reasoningContent && reasoningContent.length > 0) {
         if (text && text.length > 0) {
           onUpdate(
-            `${settings.reasoningStartMarker}${reasoningContent}${settings.reasoningEndMarker}${text}`,
+            `${settings.reasoningStartMarker}${reasoningContent}${settings.reasoningEndMarker}\n\n${text}`,
           );
         } else {
           onUpdate(`${settings.reasoningStartMarker}${reasoningContent}`);
@@ -213,7 +213,7 @@ export async function generateChatWithOpenAi(
   });
 
   if (result.reasoningContent && result.reasoningContent.length > 0) {
-    return `${settings.reasoningStartMarker}${result.reasoningContent}${settings.reasoningEndMarker}${result.text}`;
+    return `${settings.reasoningStartMarker}${result.reasoningContent}${settings.reasoningEndMarker}\n\n${result.text}`;
   }
 
   return result.text;
