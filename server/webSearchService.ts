@@ -42,8 +42,6 @@ export async function startWebSearchService() {
   }
 }
 
-
-
 export async function getWebSearchStatus() {
   try {
     const response = await fetch(

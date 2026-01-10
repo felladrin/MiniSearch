@@ -1,4 +1,4 @@
-import { Group, Select, Text, TextInput, NumberInput } from "@mantine/core";
+import { Group, NumberInput, Select, Text, TextInput } from "@mantine/core";
 import type { UseFormReturnType } from "@mantine/form";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { defaultSettings } from "../../../../../../modules/settings";
