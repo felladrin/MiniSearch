@@ -31,6 +31,7 @@ Below are the search results fetched at {{currentDate}}.
   openAiApiBaseUrl: "",
   openAiApiKey: "",
   openAiApiModel: "",
+  openAiContextLength: 4096,
   hordeApiKey: "0000000000",
   hordeModel: "",
   enterToSubmit: true,

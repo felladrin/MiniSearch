@@ -46,7 +46,7 @@ export function getDefaultChatCompletionCreateParamsStreaming() {
   const settings = getSettings();
   return {
     stream: true,
-    max_tokens: defaultContextSize,
+    max_tokens: settings.openAiContextLength ?? defaultContextSize,
     temperature: settings.inferenceTemperature,
     top_p: settings.inferenceTopP,
     min_p: settings.minP,

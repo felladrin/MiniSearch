@@ -20,13 +20,29 @@ const searxng = new SearxngService({
   },
 });
 
-getWebSearchStatus().then((isReady) => {
-  if (isReady) {
-    printMessage("Service ready!");
-  } else {
-    printMessage("Service not available!");
+export async function startWebSearchService() {
+  printMessage("Preparing service...");
+
+  const maxAttempts = 30;
+  const checkInterval = 1000;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const isReady = await getWebSearchStatus();
+    if (isReady) {
+      printMessage("Service ready!");
+      return;
+    }
+
+    if (attempt === maxAttempts) {
+      printMessage("Service not available!");
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, checkInterval));
   }
-});
+}
+
+
 
 export async function getWebSearchStatus() {
   try {

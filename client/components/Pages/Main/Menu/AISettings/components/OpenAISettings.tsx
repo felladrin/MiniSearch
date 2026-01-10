@@ -1,7 +1,7 @@
-import { Group, Select, Text, TextInput } from "@mantine/core";
+import { Group, Select, Text, TextInput, NumberInput } from "@mantine/core";
 import type { UseFormReturnType } from "@mantine/form";
 import { IconInfoCircle } from "@tabler/icons-react";
-import type { defaultSettings } from "../../../../../../modules/settings";
+import { defaultSettings } from "../../../../../../modules/settings";
 import type { ModelOption } from "../types";
 
 interface OpenAISettingsProps {
@@ -54,5 +54,13 @@ export const OpenAISettings = ({
         clearable
       />
     )}
+    <NumberInput
+      label="Context Length"
+      description={`Maximum number of tokens the model can consider. Defaults to ${defaultSettings.openAiContextLength}.`}
+      defaultValue={defaultSettings.openAiContextLength}
+      {...form.getInputProps("openAiContextLength")}
+      step={defaultSettings.openAiContextLength}
+      min={defaultSettings.openAiContextLength}
+    />
   </>
 );
