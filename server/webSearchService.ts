@@ -11,7 +11,7 @@ printMessage.enabled = true;
 const SERVICE_HOST = "127.0.0.1";
 const SERVICE_PORT = 8888;
 
-const searxng = new SearxngService({
+let searxng = new SearxngService({
   baseURL: `http://${SERVICE_HOST}:${SERVICE_PORT}`,
   defaultSearchParams: {
     lang: "auto",
@@ -19,6 +19,31 @@ const searxng = new SearxngService({
     format: "json",
   },
 });
+
+let reinitializePromise: Promise<void> | null = null;
+
+function reinitializeService() {
+  if (reinitializePromise) return reinitializePromise;
+
+  reinitializePromise = (async () => {
+    try {
+      printMessage("Reinitializing service...");
+      searxng = new SearxngService({
+        baseURL: `http://${SERVICE_HOST}:${SERVICE_PORT}`,
+        defaultSearchParams: {
+          lang: "auto",
+          safesearch: 1,
+          format: "json",
+        },
+      });
+      printMessage("Service reinitialized!");
+    } finally {
+      reinitializePromise = null;
+    }
+  })();
+
+  return reinitializePromise;
+}
 
 export async function startWebSearchService() {
   printMessage("Preparing service...");
@@ -42,16 +67,66 @@ export async function startWebSearchService() {
   }
 }
 
+async function testSearch(): Promise<boolean> {
+  try {
+    const { results } = await searxng.search("test", {
+      categories: ["general"],
+    });
+    return Array.isArray(results) && results.length > 0;
+  } catch (error) {
+    printMessage(
+      "Test search failed:",
+      error instanceof Error ? error.message : error,
+    );
+    return false;
+  }
+}
+
 export async function getWebSearchStatus() {
   try {
     const response = await fetch(
       `http://${SERVICE_HOST}:${SERVICE_PORT}/healthz`,
     );
     const responseText = await response.text();
-    return responseText.trim() === "OK";
+    if (responseText.trim() !== "OK") return false;
+
+    return await testSearch();
   } catch {
     return false;
   }
+}
+
+async function performSearch(query: string, searchType: "text" | "images") {
+  if (searchType === "text") {
+    return await searxng.search(query, {
+      categories: ["general"],
+    });
+  }
+
+  return await searxng.search(query, {
+    categories: ["images", "videos"],
+  });
+}
+
+async function processSearchResults(
+  query: string,
+  searchType: "text" | "images",
+  limit: number,
+) {
+  const { results } = await performSearch(query, searchType);
+  const deduplicatedResults = deduplicateResults(results);
+
+  if (searchType === "text") {
+    const textualResults = await Promise.all(
+      deduplicatedResults.slice(0, limit).map(processTextualResult),
+    );
+    return filterNullResults(textualResults);
+  }
+
+  const graphicalResults = await Promise.all(
+    deduplicatedResults.slice(0, limit).map(processGraphicalResult),
+  );
+  return filterNullResults(graphicalResults);
 }
 
 export async function fetchSearXNG(
@@ -60,37 +135,24 @@ export async function fetchSearXNG(
   limit = 30,
 ) {
   try {
-    if (searchType === "text") {
-      const { results } = await searxng.search(query, {
-        categories: ["general"],
-      });
-
-      const deduplicatedResults = deduplicateResults(results);
-
-      const textualResults = await Promise.all(
-        deduplicatedResults.slice(0, limit).map(processTextualResult),
-      );
-
-      return filterNullResults(textualResults);
-    }
-
-    const { results } = await searxng.search(query, {
-      categories: ["images", "videos"],
-    });
-
-    const deduplicatedResults = deduplicateResults(results);
-
-    const graphicalResults = await Promise.all(
-      deduplicatedResults.slice(0, limit).map(processGraphicalResult),
-    );
-
-    return filterNullResults(graphicalResults);
+    return await processSearchResults(query, searchType, limit);
   } catch (error) {
-    console.error(
-      "Error fetching search results:",
+    printMessage(
+      `Search failed, reinitializing service...`,
       error instanceof Error ? error.message : error,
     );
-    return [];
+
+    await reinitializeService();
+
+    try {
+      return await processSearchResults(query, searchType, limit);
+    } catch (retryError) {
+      printMessage(
+        "Error fetching search results after retry:",
+        retryError instanceof Error ? retryError.message : retryError,
+      );
+      return [];
+    }
   }
 }
 
