@@ -65,8 +65,38 @@ describe("WebSearchService", () => {
     (global.fetch as MockedFunction<typeof fetch>).mockResolvedValue(
       createMockResponse("OK"),
     );
+
+    const { SearxngService } = await import("searxng");
+    const mockedSearxngService = vi
+      .spyOn(SearxngService.prototype, "search")
+      .mockResolvedValue({
+        results: [
+          {
+            title: "example",
+            url: "https://example.com",
+            content: "example content",
+            engine: "brave",
+            parsed_url: ["https://example.com"],
+            template: "default.html",
+            engines: [],
+            category: "general",
+            positions: [],
+            score: 0,
+          },
+        ],
+        query: "test",
+        number_of_results: 1,
+        answers: [],
+        corrections: [],
+        infoboxes: [],
+        suggestions: [],
+        unresponsive_engines: [],
+      });
+
     const status = await getWebSearchStatus();
     expect(status).toBe(true);
+
+    mockedSearxngService.mockRestore();
   });
 
   it("should return empty array on fetchSearXNG error", async () => {
