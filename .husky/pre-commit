@@ -1,1 +1,1 @@
-npx lint-staged
+npm install --no-save @biomejs/biome && npx @biomejs/biome check --write --staged --no-errors-on-unmatched
