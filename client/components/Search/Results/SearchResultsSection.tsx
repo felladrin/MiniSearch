@@ -5,9 +5,11 @@ import { settingsPubSub } from "../../../modules/pubSub";
 import ImageSearchResults from "./Graphical/ImageSearchResults";
 import TextSearchResults from "./Textual/TextSearchResults";
 
-const ErrorFallback = ({ error }: { error: Error }) => (
+const ErrorFallback = ({ error }: { error: unknown }) => (
   <Alert color="red" title="Error loading search results">
-    <Text size="sm">{error.message}</Text>
+    <Text size="sm">
+      {error instanceof Error ? error.message : "An unknown error occurred"}
+    </Text>
     <Text size="xs" c="dimmed">
       Please try refreshing the page.
     </Text>
