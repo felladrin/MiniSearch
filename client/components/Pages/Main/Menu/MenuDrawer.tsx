@@ -54,7 +54,6 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
             </HoverCard.Target>
             <HoverCard.Dropdown>
               <Stack gap="xs">
-                <Center>{appName}</Center>
                 <Center>{`v${appVersion}`}</Center>
                 <Center>
                   Released{" "}
