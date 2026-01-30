@@ -164,6 +164,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00004.gguf",
     fileSizeInMegabytes: 221,
   },
+  "granite-4.0-350m": {
+    ...createDefaultModelConfig(),
+    label: "Granite 4.0 350M",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-4.0-350m",
+    hfFilePath: "granite-4.0-350m-Q4_K_S-00001-of-00003.gguf",
+    fileSizeInMegabytes: 229,
+  },
   "gemma-3-270m": {
     ...createDefaultModelConfig(),
     label: "Gemma 3 270M",
@@ -247,6 +254,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-OLMo-2-0425-1B-Instruct",
     hfFilePath: "model.shard-00001-of-00006.gguf",
     fileSizeInMegabytes: 967,
+  },
+  "granite-4.0-1b": {
+    ...createDefaultModelConfig(),
+    label: "Granite 4.0 1B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-4.0-1b",
+    hfFilePath: "granite-4.0-1b-Q4_K_S-00001-of-00006.gguf",
+    fileSizeInMegabytes: 981,
   },
   "stablelm-2-zephyr-1.6b": {
     ...createDefaultModelConfig(),
