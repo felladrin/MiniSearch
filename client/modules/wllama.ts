@@ -220,6 +220,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00007.gguf",
     fileSizeInMegabytes: 700,
   },
+  "lfm2.5-1.2b-instruct": {
+    ...createDefaultModelConfig(),
+    label: "LFM2.5 1.2B Instruct",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-LFM2.5-1.2B-Instruct",
+    hfFilePath: "LFM2.5-1.2B-Instruct-i1-Q4_K_S-00001-of-00007.gguf",
+    fileSizeInMegabytes: 700,
+  },
   "granite-3.1-1b": {
     ...createDefaultModelConfig(),
     label: "Granite 3.1 1B [400M]",
