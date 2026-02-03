@@ -18,7 +18,7 @@ let isReady = false;
 let serverProcess: ChildProcess | null = null;
 let restartTimeout: NodeJS.Timeout | null = null;
 
-function sanitizeUnicodeSurrogates(input: string) {
+export function sanitizeUnicodeSurrogates(input: string) {
   let output = "";
 
   for (let i = 0; i < input.length; i += 1) {
