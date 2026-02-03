@@ -18,6 +18,40 @@ let isReady = false;
 let serverProcess: ChildProcess | null = null;
 let restartTimeout: NodeJS.Timeout | null = null;
 
+function sanitizeUnicodeSurrogates(input: string) {
+  let output = "";
+
+  for (let i = 0; i < input.length; i += 1) {
+    const codeUnit = input.charCodeAt(i);
+
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const nextCodeUnit =
+        i + 1 < input.length ? input.charCodeAt(i + 1) : undefined;
+      if (
+        nextCodeUnit !== undefined &&
+        nextCodeUnit >= 0xdc00 &&
+        nextCodeUnit <= 0xdfff
+      ) {
+        output += input[i];
+        output += input[i + 1];
+        i += 1;
+      } else {
+        output += "\ufffd";
+      }
+      continue;
+    }
+
+    if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+      output += "\ufffd";
+      continue;
+    }
+
+    output += input[i];
+  }
+
+  return output;
+}
+
 export function getRerankerModelPath() {
   return path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
@@ -191,6 +225,23 @@ export async function rerank(query: string, documents: string[]) {
   }
 
   try {
+    const sanitizedQuery = sanitizeUnicodeSurrogates(query);
+    const sanitizedDocuments = documents.map((document) =>
+      sanitizeUnicodeSurrogates(document),
+    );
+
+    if (sanitizedQuery !== query) {
+      printMessage(
+        "Rerank query contained invalid Unicode surrogates; sanitized",
+      );
+    }
+
+    if (sanitizedDocuments.some((doc, index) => doc !== documents[index])) {
+      printMessage(
+        "One or more rerank documents contained invalid Unicode surrogates; sanitized",
+      );
+    }
+
     const response = await fetch(
       `http://${SERVICE_HOST}:${SERVICE_PORT}/v1/rerank`,
       {
@@ -200,9 +251,9 @@ export async function rerank(query: string, documents: string[]) {
         },
         body: JSON.stringify({
           model: "rerank",
-          query,
-          documents,
-          top_n: documents.length,
+          query: sanitizedQuery,
+          documents: sanitizedDocuments,
+          top_n: sanitizedDocuments.length,
         }),
       },
     );
@@ -230,7 +281,7 @@ export async function rerank(query: string, documents: string[]) {
         .slice()
         .sort((a, b) => b.relevance_score - a.relevance_score);
       const rankedDocuments = results.map(({ index, relevance_score }) => ({
-        document: documents[index],
+        document: sanitizedDocuments[index],
         ranking_position:
           sortedResults.findIndex((result) => result.index === index) + 1,
         relevance_score,
@@ -243,9 +294,7 @@ export async function rerank(query: string, documents: string[]) {
     if (error instanceof Error && error.message.includes("Reranking failed")) {
       printMessage("Reranking service error detected, marking as not ready");
       isReady = false;
-      if (serverProcess) {
-        serverProcess.kill();
-      }
+      serverProcess?.kill();
     }
     throw error;
   }
