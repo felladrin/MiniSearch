@@ -73,7 +73,9 @@ export async function startRerankerService() {
   printMessage("Preparing model...");
   const modelPath = getRerankerModelPath();
   await ensureModelExists(modelPath);
-  printMessage("Starting service...");
+  printMessage(
+    `Starting service (arch: ${process.arch}, platform: ${process.platform})...`,
+  );
 
   const contextSize = 2048;
 
@@ -121,6 +123,11 @@ export async function startRerankerService() {
     printMessage(
       `Reranker service exited with code: ${code}, signal: ${signal}`,
     );
+    if (signal === "SIGTRAP" || signal === "SIGILL") {
+      printMessage(
+        `Binary compatibility issue detected (${signal}). The llama-server binary may not match the current CPU architecture (${process.arch}).`,
+      );
+    }
     isReady = false;
 
     if (restartTimeout) clearTimeout(restartTimeout);
