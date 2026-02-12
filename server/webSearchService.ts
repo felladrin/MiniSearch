@@ -2,7 +2,6 @@ import { basename } from "node:path";
 import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
-import { type SearxngSearchResult, SearxngService } from "searxng";
 
 const fileName = basename(import.meta.url);
 const printMessage = debug(fileName);
@@ -10,40 +9,32 @@ printMessage.enabled = true;
 
 const SERVICE_HOST = "127.0.0.1";
 const SERVICE_PORT = 8888;
+const SERVICE_BASE_URL = `http://${SERVICE_HOST}:${SERVICE_PORT}`;
 
-let searxng = new SearxngService({
-  baseURL: `http://${SERVICE_HOST}:${SERVICE_PORT}`,
-  defaultSearchParams: {
-    lang: "auto",
-    safesearch: 1,
-    format: "json",
-  },
-});
+type SearchType = "text" | "images";
 
-let reinitializePromise: Promise<void> | null = null;
-
-function reinitializeService() {
-  if (reinitializePromise) return reinitializePromise;
-
-  reinitializePromise = (async () => {
-    try {
-      printMessage("Reinitializing service...");
-      searxng = new SearxngService({
-        baseURL: `http://${SERVICE_HOST}:${SERVICE_PORT}`,
-        defaultSearchParams: {
-          lang: "auto",
-          safesearch: 1,
-          format: "json",
-        },
-      });
-      printMessage("Service reinitialized!");
-    } finally {
-      reinitializePromise = null;
-    }
-  })();
-
-  return reinitializePromise;
+interface SearxngSearchResult {
+  title: string;
+  url: string;
+  content?: string;
+  category?: string;
+  template?: string;
+  engine?: string;
+  img_src?: string;
+  iframe_src?: string;
+  thumbnail?: string;
+  thumbnail_src?: string;
 }
+
+interface SearxngSearchResponse {
+  results?: SearxngSearchResult[];
+}
+
+const defaultSearchParams = {
+  lang: "auto",
+  safesearch: "1",
+  format: "json",
+} as const;
 
 export async function startWebSearchService() {
   printMessage("Preparing service...");
@@ -69,9 +60,7 @@ export async function startWebSearchService() {
 
 async function testSearch(): Promise<boolean> {
   try {
-    const { results } = await searxng.search("test", {
-      categories: ["general"],
-    });
+    const results = await performSearch("test", "text");
     return Array.isArray(results) && results.length > 0;
   } catch (error) {
     printMessage(
@@ -84,9 +73,7 @@ async function testSearch(): Promise<boolean> {
 
 export async function getWebSearchStatus() {
   try {
-    const response = await fetch(
-      `http://${SERVICE_HOST}:${SERVICE_PORT}/healthz`,
-    );
+    const response = await fetch(`${SERVICE_BASE_URL}/healthz`);
     const responseText = await response.text();
     if (responseText.trim() !== "OK") return false;
 
@@ -96,24 +83,35 @@ export async function getWebSearchStatus() {
   }
 }
 
-async function performSearch(query: string, searchType: "text" | "images") {
-  if (searchType === "text") {
-    return await searxng.search(query, {
-      categories: ["general"],
-    });
+function buildSearchUrl(query: string, searchType: SearchType) {
+  const params = new URLSearchParams(defaultSearchParams);
+  params.set("q", query);
+  params.set("categories", searchType === "text" ? "general" : "images,videos");
+  return `${SERVICE_BASE_URL}/search?${params.toString()}`;
+}
+
+async function performSearch(query: string, searchType: SearchType) {
+  const searchUrl = buildSearchUrl(query, searchType);
+  const response = await fetch(searchUrl, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`SearXNG request failed with status ${response.status}`);
   }
 
-  return await searxng.search(query, {
-    categories: ["images", "videos"],
-  });
+  const data = (await response.json()) as SearxngSearchResponse;
+  return Array.isArray(data.results) ? data.results : [];
 }
 
 async function processSearchResults(
   query: string,
-  searchType: "text" | "images",
+  searchType: SearchType,
   limit: number,
 ) {
-  const { results } = await performSearch(query, searchType);
+  const results = await performSearch(query, searchType);
   const deduplicatedResults = deduplicateResults(results);
 
   if (searchType === "text") {
@@ -131,28 +129,17 @@ async function processSearchResults(
 
 export async function fetchSearXNG(
   query: string,
-  searchType: "text" | "images",
+  searchType: SearchType,
   limit = 30,
 ) {
   try {
     return await processSearchResults(query, searchType, limit);
   } catch (error) {
     printMessage(
-      `Search failed, reinitializing service...`,
+      `Search failed`,
       error instanceof Error ? error.message : error,
     );
-
-    await reinitializeService();
-
-    try {
-      return await processSearchResults(query, searchType, limit);
-    } catch (retryError) {
-      printMessage(
-        "Error fetching search results after retry:",
-        retryError instanceof Error ? retryError.message : retryError,
-      );
-      return [];
-    }
+    return [];
   }
 }
 
@@ -230,7 +217,5 @@ function deduplicateResults(
 }
 
 function filterNullResults<T>(results: (T | null)[]): T[] {
-  return results.filter(
-    (result): result is NonNullable<typeof result> => result !== null,
-  );
+  return results.filter((result): result is T => result !== null);
 }

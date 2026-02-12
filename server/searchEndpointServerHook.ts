@@ -1,4 +1,3 @@
-import axios from "axios";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { handleTokenVerification } from "./handleTokenVerification";
 import { rankSearchResults } from "./rankSearchResults";
@@ -8,6 +7,32 @@ import {
   incrementTextualSearchesSinceLastRestart,
 } from "./searchesSinceLastRestart";
 import { fetchSearXNG } from "./webSearchService";
+
+const THUMBNAIL_TIMEOUT_MS = 1000;
+
+async function fetchThumbnailAsDataUrl(thumbnailSource: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), THUMBNAIL_TIMEOUT_MS);
+  try {
+    const response = await fetch(thumbnailSource, {
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Thumbnail request failed with status ${response.status}`,
+      );
+    }
+
+    const contentType =
+      response.headers.get("content-type") ?? "application/octet-stream";
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+
+    return `data:${contentType};base64,${base64}`;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 async function handleRanking(
   query: string,
@@ -92,22 +117,10 @@ export function searchEndpointServerHook<
               if (!result) return null;
               const [_, url, thumbnailSource, sourceUrl] = result;
               try {
-                const axiosResponse = await axios.get(thumbnailSource, {
-                  responseType: "arraybuffer",
-                  timeout: 1000,
-                });
+                const thumbnail =
+                  await fetchThumbnailAsDataUrl(thumbnailSource);
 
-                const contentType = axiosResponse.headers["content-type"];
-                const base64 = Buffer.from(axiosResponse.data).toString(
-                  "base64",
-                );
-
-                return [
-                  title,
-                  url,
-                  `data:${contentType};base64,${base64}`,
-                  sourceUrl,
-                ] as ImageResult;
+                return [title, url, thumbnail, sourceUrl] as ImageResult;
               } catch {
                 return null;
               }

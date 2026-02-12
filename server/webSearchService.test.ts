@@ -62,41 +62,27 @@ describe("WebSearchService", () => {
   });
 
   it("should return true when health endpoint returns OK", async () => {
-    (global.fetch as MockedFunction<typeof fetch>).mockResolvedValue(
-      createMockResponse("OK"),
-    );
-
-    const { SearxngService } = await import("searxng");
-    const mockedSearxngService = vi
-      .spyOn(SearxngService.prototype, "search")
-      .mockResolvedValue({
-        results: [
-          {
-            title: "example",
-            url: "https://example.com",
-            content: "example content",
-            engine: "brave",
-            parsed_url: ["https://example.com"],
-            template: "default.html",
-            engines: [],
-            category: "general",
-            positions: [],
-            score: 0,
-          },
-        ],
-        query: "test",
-        number_of_results: 1,
-        answers: [],
-        corrections: [],
-        infoboxes: [],
-        suggestions: [],
-        unresponsive_engines: [],
-      });
+    (global.fetch as MockedFunction<typeof fetch>)
+      .mockResolvedValueOnce(createMockResponse("OK"))
+      .mockResolvedValueOnce(
+        createMockResponse(
+          JSON.stringify({
+            results: [
+              {
+                title: "example",
+                url: "https://example.com",
+                content: "example content",
+                category: "general",
+              },
+            ],
+          }),
+        ),
+      );
 
     const status = await getWebSearchStatus();
     expect(status).toBe(true);
-
-    mockedSearxngService.mockRestore();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("/search?");
   });
 
   it("should return empty array on fetchSearXNG error", async () => {
