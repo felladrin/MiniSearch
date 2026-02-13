@@ -1,6 +1,6 @@
 import { Button } from "@mantine/core";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { addLogEntry } from "../../../../modules/logEntries";
+import { addLogEntry } from "@/modules/logEntries";
 
 const MenuDrawer = lazy(() => import("./MenuDrawer"));
 

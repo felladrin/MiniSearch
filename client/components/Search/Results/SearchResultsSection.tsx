@@ -1,7 +1,7 @@
 import { Alert, Box, Divider, Stack, Text } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import { ErrorBoundary } from "react-error-boundary";
-import { settingsPubSub } from "../../../modules/pubSub";
+import { settingsPubSub } from "@/modules/pubSub";
 import ImageSearchResults from "./Graphical/ImageSearchResults";
 import TextSearchResults from "./Textual/TextSearchResults";
 

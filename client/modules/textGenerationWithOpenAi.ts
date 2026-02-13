@@ -1,24 +1,24 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { streamText } from "ai";
 import {
   listOpenAiCompatibleModels,
   selectRandomModel,
-} from "../../shared/openaiModels";
-import { addLogEntry } from "./logEntries";
+} from "@shared/openaiModels";
+import { streamText } from "ai";
+import { addLogEntry } from "@/modules/logEntries";
 import {
   getSettings,
   getTextGenerationState,
   updateResponse,
   updateTextGenerationState,
-} from "./pubSub";
-import { sleep } from "./sleep";
+} from "@/modules/pubSub";
+import { sleep } from "@/modules/sleep";
 import {
   canStartResponding,
   getDefaultChatCompletionCreateParamsStreaming,
   getDefaultChatMessages,
   getFormattedSearchResults,
-} from "./textGenerationUtilities";
-import type { ChatMessage } from "./types";
+} from "@/modules/textGenerationUtilities";
+import type { ChatMessage } from "@/modules/types";
 
 let currentAbortController: AbortController | null = null;
 

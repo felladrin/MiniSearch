@@ -1,5 +1,5 @@
 import { Group, Text } from "@mantine/core";
-import type { ChatMessage } from "../../modules/types";
+import type { ChatMessage } from "@/modules/types";
 import CopyIconButton from "./CopyIconButton";
 
 interface ChatHeaderProps {

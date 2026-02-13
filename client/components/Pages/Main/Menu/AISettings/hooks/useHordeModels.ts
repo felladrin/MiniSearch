@@ -1,15 +1,26 @@
 import { useEffect, useState } from "react";
-import { addLogEntry } from "../../../../../../modules/logEntries";
-import type { defaultSettings } from "../../../../../../modules/settings";
-import { fetchHordeModels } from "../../../../../../modules/textGenerationWithHorde";
+import { addLogEntry } from "@/modules/logEntries";
+import type { defaultSettings } from "@/modules/settings";
+import { fetchHordeModels } from "@/modules/textGenerationWithHorde";
 import type { ModelOption } from "../types";
 
+/**
+ * Type alias for the settings object
+ */
 type Settings = typeof defaultSettings;
 
+/**
+ * Hook for fetching and managing AI Horde models
+ * @param settings - Application settings object
+ * @returns Array of available AI Horde models formatted as ModelOption[]
+ */
 export const useHordeModels = (settings: Settings) => {
   const [hordeModels, setHordeModels] = useState<ModelOption[]>([]);
 
   useEffect(() => {
+    /**
+     * Fetches available models from AI Horde and formats them for UI
+     */
     async function fetchAvailableHordeModels() {
       try {
         const models = await fetchHordeModels();

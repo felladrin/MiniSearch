@@ -1,7 +1,7 @@
 import { Button, Container, Stack, TextInput, Title } from "@mantine/core";
 import { type FormEvent, useState } from "react";
-import { validateAccessKey } from "../../modules/accessKey";
-import { addLogEntry } from "../../modules/logEntries";
+import { validateAccessKey } from "@/modules/accessKey";
+import { addLogEntry } from "@/modules/logEntries";
 
 interface AccessPageState {
   accessKey: string;

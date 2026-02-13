@@ -1,7 +1,7 @@
 import { type ComboboxItem, Select } from "@mantine/core";
 import { prebuiltAppConfig } from "@mlc-ai/web-llm";
 import { useCallback, useEffect, useState } from "react";
-import { isF16Supported } from "../../modules/webGpu";
+import { isF16Supported } from "@/modules/webGpu";
 
 export default function WebLlmModelSelect({
   value,

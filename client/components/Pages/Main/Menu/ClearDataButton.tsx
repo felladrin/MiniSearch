@@ -2,7 +2,7 @@ import { Button, Stack, Text } from "@mantine/core";
 import Dexie from "dexie";
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { addLogEntry } from "../../../../modules/logEntries";
+import { addLogEntry } from "@/modules/logEntries";
 
 interface ClearDataState {
   isClearingData: boolean;

@@ -7,6 +7,10 @@ function generateSearchRunId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
+/**
+ * Gets the current search run ID, generating one if it doesn't exist
+ * @returns The current search run ID
+ */
 export function getCurrentSearchRunId(): string {
   if (!currentSearchRunId) {
     currentSearchRunId = generateSearchRunId();
@@ -14,10 +18,17 @@ export function getCurrentSearchRunId(): string {
   return currentSearchRunId;
 }
 
+/**
+ * Sets the current search run ID
+ * @param id - The search run ID to set
+ */
 export function setCurrentSearchRunId(id: string): void {
   currentSearchRunId = id;
 }
 
+/**
+ * Resets the current search run ID to null
+ */
 export function resetSearchRunId(): void {
   currentSearchRunId = null;
 }
@@ -47,6 +58,9 @@ function measurePerformance<T>(
   );
 }
 
+/**
+ * Text search results structure
+ */
 export interface TextResults {
   type: "text";
   items: Array<{
@@ -56,28 +70,37 @@ export interface TextResults {
   }>;
 }
 
+/**
+ * Image search results structure
+ */
 export interface ImageResults {
   type: "image";
   items: Array<{
     title: string;
     url: string;
-    thumbnailUrl: string;
-    sourceUrl: string;
+    thumbnail: string;
+    sourceUrl?: string;
   }>;
 }
 
+/**
+ * Search history entry structure
+ */
 export interface SearchEntry {
   id?: number;
   searchRunId?: string;
   query: string;
-  results: TextResults | ImageResults;
+  timestamp: number;
+  results?: TextResults | ImageResults; // Legacy field for backward compatibility
   textResults?: TextResults;
   imageResults?: ImageResults;
-  timestamp: number;
-  resultCount: number;
-  source: "user" | "followup" | "suggestion";
-  isPinned?: boolean;
-  tags?: string[];
+  llmResponse?: string;
+  chatMessages?: Array<{
+    role: string;
+    content: string;
+  }>;
+  pinned?: boolean;
+  source?: string;
 }
 
 interface LLMResponse {
@@ -109,7 +132,7 @@ class HistoryDatabase extends Dexie {
     super("History");
 
     this.version(1).stores({
-      searches: "++id, searchRunId, query, timestamp, source, isPinned",
+      searches: "++id, searchRunId, query, timestamp, source, pinned, results",
       llmResponses: "++id, searchId, searchRunId, timestamp, model",
       chatHistory:
         "++id, conversationId, timestamp, [conversationId+timestamp]",
@@ -140,7 +163,7 @@ class HistoryDatabase extends Dexie {
         const oldSearches = await this.searches
           .where("timestamp")
           .below(cutoffTime)
-          .and((search) => !search.isPinned)
+          .and((search) => !search.pinned)
           .limit(100)
           .toArray();
 
@@ -160,7 +183,7 @@ class HistoryDatabase extends Dexie {
           .orderBy("timestamp")
           .reverse()
           .offset(settings.maxEntries)
-          .filter((search) => !search.isPinned)
+          .filter((search) => !search.pinned)
           .toArray();
 
         if (excess.length > 0) {
@@ -178,36 +201,89 @@ class HistoryDatabase extends Dexie {
   }
 }
 
+/**
+ * History database instance for search history management
+ */
 export const historyDatabase = new HistoryDatabase();
 
+/**
+ * Helper function to get results from a search entry with backward compatibility
+ * @param entry - The search entry
+ * @returns The appropriate results object (text or image) or null
+ */
+export function getResultsFromEntry(
+  entry: SearchEntry,
+): TextResults | ImageResults | null {
+  // First try new structure
+  if (entry.textResults) return entry.textResults;
+  if (entry.imageResults) return entry.imageResults;
+
+  // Fallback to legacy structure
+  return entry.results || null;
+}
+
+/**
+ * Helper function to check if an entry has text results
+ * @param entry - The search entry
+ * @returns True if the entry has text results
+ */
+export function hasTextResults(entry: SearchEntry): boolean {
+  return !!(
+    entry.textResults ||
+    (entry.results && entry.results.type === "text")
+  );
+}
+
+/**
+ * Helper function to check if an entry has image results
+ * @param entry - The search entry
+ * @returns True if the entry has image results
+ */
+export function hasImageResults(entry: SearchEntry): boolean {
+  return !!(
+    entry.imageResults ||
+    (entry.results && entry.results.type === "image")
+  );
+}
+
+/**
+ * Updates search results for a given search run ID
+ * @param searchRunId - The search run ID to update
+ * @param results - The search results to update (text or image)
+ */
 export async function updateSearchResults(
   searchRunId: string,
-  results: Partial<SearchEntry>,
+  results: TextResults | ImageResults,
 ): Promise<void> {
   try {
-    await historyDatabase.transaction(
-      "rw",
-      historyDatabase.searches,
-      async () => {
-        const latest = await historyDatabase.searches
-          .where("searchRunId")
-          .equals(searchRunId)
-          .first();
+    await measurePerformance("Update search results", async () => {
+      const latest = await historyDatabase.searches
+        .where("searchRunId")
+        .equals(searchRunId)
+        .first();
 
-        if (latest?.id !== undefined) {
-          const updatedEntry = { ...latest, ...results };
-          if (results.textResults) {
-            updatedEntry.results = results.textResults;
-          }
-          await historyDatabase.searches.update(latest.id, updatedEntry);
+      if (latest?.id !== undefined) {
+        const updatedEntry = { ...latest };
+        if (results.type === "text") {
+          updatedEntry.textResults = results;
+        } else {
+          updatedEntry.imageResults = results;
         }
-      },
-    );
+        await historyDatabase.searches.update(latest.id, updatedEntry);
+      }
+    });
   } catch (error) {
     addLogEntry(`Error updating search results: ${error}`);
   }
 }
 
+/**
+ * Adds a search entry to the history
+ * @param query - The search query
+ * @param results - The search results (text or image)
+ * @param source - The source of the search (user, followup, or suggestion)
+ * @returns Promise resolving to the ID of the added entry
+ */
 export async function addSearchToHistory(
   query: string,
   results: TextResults | ImageResults,
@@ -217,11 +293,13 @@ export async function addSearchToHistory(
     return await historyDatabase.searches.add({
       searchRunId: getCurrentSearchRunId(),
       query,
-      results,
+      results, // Store in legacy field for backward compatibility
+      ...(results.type === "text"
+        ? { textResults: results }
+        : { imageResults: results }),
       timestamp: Date.now(),
-      resultCount: results.items.length,
       source,
-      isPinned: false,
+      pinned: false,
     });
   }).catch((error) => {
     addLogEntry(`Error adding search to history: ${error}`);
@@ -229,6 +307,11 @@ export async function addSearchToHistory(
   });
 }
 
+/**
+ * Gets recent searches from history
+ * @param limit - Maximum number of searches to retrieve
+ * @returns Promise resolving to array of recent search entries
+ */
 export async function getRecentSearches(
   limit: number = 10,
 ): Promise<SearchEntry[]> {

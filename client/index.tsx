@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client";
-import { App } from "./components/App/App";
+import App from "./components/App/App";
 import { historyDatabase } from "./modules/history";
 import { addLogEntry } from "./modules/logEntries";
 import { getSettings, listenToSettingsChanges } from "./modules/pubSub";

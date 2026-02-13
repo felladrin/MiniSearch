@@ -10,9 +10,9 @@ import {
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { useEffect, useState } from "react";
-import { addLogEntry } from "../../../../modules/logEntries";
-import { getHostname } from "../../../../modules/stringFormatters";
-import type { TextSearchResult } from "../../../../modules/types";
+import { addLogEntry } from "@/modules/logEntries";
+import { getHostname } from "@/modules/stringFormatters";
+import type { TextSearchResult } from "@/modules/types";
 
 export default function SearchResultsList({
   searchResults,

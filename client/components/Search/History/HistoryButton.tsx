@@ -1,9 +1,9 @@
 import { Button } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import { lazy, Suspense, useCallback, useState } from "react";
-import type { SearchEntry } from "../../../modules/history";
-import { addLogEntry } from "../../../modules/logEntries";
-import { settingsPubSub } from "../../../modules/pubSub";
+import type { SearchEntry } from "@/modules/history";
+import { addLogEntry } from "@/modules/logEntries";
+import { settingsPubSub } from "@/modules/pubSub";
 
 const HistoryDrawer = lazy(() => import("./HistoryDrawer"));
 

@@ -13,7 +13,7 @@ import {
 import { IconInfoCircle, IconSearch } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { logEntriesPubSub } from "../../modules/logEntries";
+import { logEntriesPubSub } from "@/modules/logEntries";
 
 export default function LogsModal({
   opened,

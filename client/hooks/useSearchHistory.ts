@@ -14,28 +14,50 @@ import {
   searchWithFuzzy,
 } from "../modules/stringFormatters";
 
+/**
+ * Options for configuring search history behavior
+ */
 interface UseSearchHistoryOptions {
+  /** Maximum number of searches to retrieve */
   limit?: number;
+  /** Fuzzy search threshold for filtering */
   threshold?: number;
+  /** Whether to group searches by date */
   enableGrouping?: boolean;
+  /** Whether to enable pagination */
   enablePagination?: boolean;
+  /** Number of items per page */
   pageSize?: number;
 }
 
+/**
+ * Return value for useSearchHistory hook
+ */
 interface UseSearchHistoryReturn {
+  /** All recent searches from history */
   recentSearches: SearchEntry[];
+  /** Searches filtered by current query */
   filteredSearches: SearchEntry[];
+  /** Searches grouped by date (if enabled) */
   groupedSearches: Record<string, SearchEntry[]>;
 
+  /** Loading state for operations */
   isLoading: boolean;
+  /** Error message if operation failed */
   error: string | null;
 
+  /** Current page number */
   currentPage: number;
+  /** Total number of pages */
   totalPages: number;
+  /** Whether there's a next page */
   hasNextPage: boolean;
+  /** Whether there's a previous page */
   hasPreviousPage: boolean;
 
+  /** Function to retry last failed operation */
   retryLastOperation: () => Promise<void>;
+  /** Function to clear current error */
   clearError: () => void;
 
   searchHistory: (query: string) => void;
@@ -54,6 +76,11 @@ interface UseSearchHistoryReturn {
   goToPage: (page: number) => void;
 }
 
+/**
+ * Hook for managing search history with filtering, grouping, and pagination
+ * @param options - Configuration options for search history behavior
+ * @returns Object containing search history state and management functions
+ */
 export function useSearchHistory(
   options: UseSearchHistoryOptions = {},
 ): UseSearchHistoryReturn {
@@ -177,11 +204,11 @@ export function useSearchHistory(
         const search = await historyDatabase.searches.get(searchId);
         if (search) {
           await historyDatabase.searches.update(searchId, {
-            isPinned: !search.isPinned,
+            pinned: !search.pinned,
           });
           await refreshHistory();
           addLogEntry(
-            `${search.isPinned ? "Unpinned" : "Pinned"} search: ${search.query}`,
+            `${search.pinned ? "Unpinned" : "Pinned"} search: ${search.query}`,
           );
         }
       } catch (err) {

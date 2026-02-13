@@ -1,6 +1,6 @@
 import { type ComboboxItem, Select } from "@mantine/core";
 import { useEffect, useState } from "react";
-import { wllamaModels } from "../../modules/wllama";
+import { wllamaModels } from "@/modules/wllama";
 
 export default function WllamaModelSelect({
   value,

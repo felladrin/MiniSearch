@@ -3,28 +3,48 @@ import { addLogEntry } from "./logEntries";
 import { getSearchTokenHash } from "./searchTokenHash";
 import type { ImageSearchResults, TextSearchResults } from "./types";
 
+/**
+ * Configuration for search caching
+ */
 const cacheConfig = {
+  /** Time to live for cache entries in milliseconds */
   ttl: 15 * 60 * 1000,
+  /** Maximum number of entries to cache */
   maxEntries: 100,
+  /** Whether caching is enabled */
   enabled: true,
 };
 
+/**
+ * Metrics for tracking cache performance
+ */
 const cacheMetrics = {
   textHits: 0,
   textMisses: 0,
   imageHits: 0,
   imageMisses: 0,
 
+  /**
+   * Calculates the text search cache hit rate
+   * @returns Hit rate as a percentage between 0 and 1
+   */
   getTextHitRate(): number {
     const total = this.textHits + this.textMisses;
     return total > 0 ? this.textHits / total : 0;
   },
 
+  /**
+   * Calculates the image search cache hit rate
+   * @returns Hit rate as a percentage between 0 and 1
+   */
   getImageHitRate(): number {
     const total = this.imageHits + this.imageMisses;
     return total > 0 ? this.imageHits / total : 0;
   },
 
+  /**
+   * Logs current cache performance metrics
+   */
   logPerformance(): void {
     addLogEntry(
       `Cache performance - Text: ${(this.getTextHitRate() * 100).toFixed(1)}% hits, ` +
@@ -33,19 +53,35 @@ const cacheMetrics = {
   },
 };
 
+/**
+ * Base interface for search cache entries
+ */
 interface SearchCacheEntry {
+  /** Unique key for the cache entry */
   key: string;
+  /** Timestamp when the entry was created */
   timestamp: number;
 }
 
+/**
+ * Interface for text search cache entries
+ */
 interface TextSearchCache extends SearchCacheEntry {
+  /** Cached text search results */
   results: TextSearchResults;
 }
 
+/**
+ * Interface for image search cache entries
+ */
 interface ImageSearchCache extends SearchCacheEntry {
+  /** Cached image search results */
   results: ImageSearchResults;
 }
 
+/**
+ * IndexedDB database for search cache management
+ */
 class SearchCacheDatabase extends Dexie {
   textSearchHistory!: Table<TextSearchCache, string>;
   imageSearchHistory!: Table<ImageSearchCache, string>;

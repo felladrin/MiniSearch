@@ -1,25 +1,25 @@
 import { Container, Stack } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import { lazy, Suspense } from "react";
+import SearchForm from "@/components/Search/Form/SearchForm";
 import {
   imageSearchStatePubSub,
   queryPubSub,
   settingsPubSub,
   textGenerationStatePubSub,
   textSearchStatePubSub,
-} from "../../../modules/pubSub";
-import { searchAndRespond } from "../../../modules/textGeneration";
-import SearchForm from "../../Search/Form/SearchForm";
+} from "@/modules/pubSub";
+import { searchAndRespond } from "@/modules/textGeneration";
 import MenuButton from "./Menu/MenuButton";
 
 const AiResponseSection = lazy(
-  () => import("../../AiResponse/AiResponseSection"),
+  () => import("@/components/AiResponse/AiResponseSection"),
 );
 const SearchResultsSection = lazy(
-  () => import("../../Search/Results/SearchResultsSection"),
+  () => import("@/components/Search/Results/SearchResultsSection"),
 );
 const EnableAiResponsePrompt = lazy(
-  () => import("../../AiResponse/EnableAiResponsePrompt"),
+  () => import("@/components/AiResponse/EnableAiResponsePrompt"),
 );
 
 export default function MainPage() {

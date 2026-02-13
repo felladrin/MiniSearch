@@ -4,6 +4,9 @@ import type { SearchEntry } from "../modules/history";
 import {
   getChatMessagesForQuery,
   getLatestLlmResponseForEntry,
+  getResultsFromEntry,
+  hasImageResults,
+  hasTextResults,
   setCurrentSearchRunId,
 } from "../modules/history";
 import { postMessageToParentWindow } from "../modules/parentWindow";
@@ -23,6 +26,12 @@ import {
 } from "../modules/pubSub";
 import type { ImageSearchResults, TextSearchResults } from "../modules/types";
 
+/**
+ * Hook for restoring search history and navigating to previous searches
+ * @param updateQuery - Function to update the query state
+ * @param textAreaRef - Optional ref to the textarea element
+ * @returns Object containing restoreSearch function
+ */
 export function useHistoryRestore(
   updateQuery: (query: string) => void,
   textAreaRef?: React.RefObject<HTMLTextAreaElement | null>,
@@ -48,25 +57,43 @@ export function useHistoryRestore(
 
       document.title = selectedQuery;
 
-      if (entry.textResults) {
-        const textTuples: TextSearchResults = entry.textResults.items.map(
-          (it) => [it.title, it.snippet, it.url],
-        );
-        updateTextSearchResults(textTuples);
-        updateTextSearchState("completed");
-        updateLlmTextSearchResults(textTuples);
+      if (hasTextResults(entry)) {
+        const results = getResultsFromEntry(entry);
+        if (results && results.type === "text") {
+          const textTuples: TextSearchResults = results.items.map((it) => [
+            it.title,
+            it.snippet,
+            it.url,
+          ]);
+          updateTextSearchResults(textTuples);
+          updateTextSearchState("completed");
+          updateLlmTextSearchResults(textTuples);
+        } else {
+          updateTextSearchResults([]);
+          updateTextSearchState("completed");
+          updateLlmTextSearchResults([]);
+        }
       } else {
         updateTextSearchResults([]);
         updateTextSearchState("completed");
         updateLlmTextSearchResults([]);
       }
 
-      if (entry.imageResults) {
-        const imageTuples: ImageSearchResults = entry.imageResults.items.map(
-          (it) => [it.title, it.url, it.thumbnailUrl, it.sourceUrl],
-        );
-        updateImageSearchResults(imageTuples);
-        updateImageSearchState("completed");
+      if (hasImageResults(entry)) {
+        const results = getResultsFromEntry(entry);
+        if (results && results.type === "image") {
+          const imageTuples: ImageSearchResults = results.items.map((it) => [
+            it.title,
+            it.url,
+            it.thumbnail,
+            it.sourceUrl || "",
+          ]);
+          updateImageSearchResults(imageTuples);
+          updateImageSearchState("completed");
+        } else {
+          updateImageSearchResults([]);
+          updateImageSearchState("completed");
+        }
       } else {
         updateImageSearchResults([]);
         updateImageSearchState("completed");

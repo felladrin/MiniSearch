@@ -7,7 +7,7 @@ import {
   followUpQuestionPubSub,
   isRestoringFromHistoryPubSub,
   suppressNextFollowUpPubSub,
-} from "../../modules/pubSub";
+} from "@/modules/pubSub";
 
 interface ChatInputAreaProps {
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;

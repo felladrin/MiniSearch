@@ -1,5 +1,5 @@
 import { Stack } from "@mantine/core";
-import ShowLogsButton from "../../../Logs/ShowLogsButton";
+import ShowLogsButton from "@/components/Logs/ShowLogsButton";
 import ClearDataButton from "./ClearDataButton";
 
 export default function ActionsForm() {

@@ -1,7 +1,7 @@
 import { ActionIcon, Group, Paper, Stack, Tooltip } from "@mantine/core";
 import { IconPencil, IconRefresh } from "@tabler/icons-react";
 import { memo } from "react";
-import type { ChatMessage } from "../../modules/types";
+import type { ChatMessage } from "@/modules/types";
 import FormattedMarkdown from "./FormattedMarkdown";
 
 interface MessageListProps {

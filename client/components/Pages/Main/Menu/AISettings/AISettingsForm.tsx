@@ -2,12 +2,9 @@ import { Select, Slider, Stack, Switch, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { usePubSub } from "create-pubsub/react";
 import { useMemo } from "react";
-import { settingsPubSub } from "../../../../../modules/pubSub";
-import {
-  defaultSettings,
-  inferenceTypes,
-} from "../../../../../modules/settings";
-import { isWebGPUAvailable } from "../../../../../modules/webGpu";
+import { settingsPubSub } from "@/modules/pubSub";
+import { defaultSettings, inferenceTypes } from "@/modules/settings";
+import { isWebGPUAvailable } from "@/modules/webGpu";
 import { AIParameterSlider } from "./components/AIParameterSlider";
 import { BrowserSettings } from "./components/BrowserSettings";
 import { HordeSettings } from "./components/HordeSettings";

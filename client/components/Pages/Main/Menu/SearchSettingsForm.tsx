@@ -1,7 +1,7 @@
 import { Slider, Stack, Switch, Text } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "../../../../modules/pubSub";
+import { settingsPubSub } from "@/modules/pubSub";
 
 export default function SearchSettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);

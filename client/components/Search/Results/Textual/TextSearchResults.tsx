@@ -4,7 +4,7 @@ import { usePubSub } from "create-pubsub/react";
 import {
   textSearchResultsPubSub,
   textSearchStatePubSub,
-} from "../../../../modules/pubSub";
+} from "@/modules/pubSub";
 
 import SearchResultsList from "./SearchResultsList";
 import TextResultsLoadingState from "./TextResultsLoadingState";

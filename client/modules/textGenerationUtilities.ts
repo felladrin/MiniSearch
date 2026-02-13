@@ -10,8 +10,14 @@ import {
 import { getSystemPrompt } from "./systemPrompt";
 import type { ChatMessage } from "./types";
 
+/**
+ * Default context size for text generation in tokens
+ */
 export const defaultContextSize = 4096;
 
+/**
+ * Custom error class for chat generation failures
+ */
 export class ChatGenerationError extends Error {
   constructor(message: string) {
     super(message);
@@ -19,6 +25,11 @@ export class ChatGenerationError extends Error {
   }
 }
 
+/**
+ * Formats search results for inclusion in chat prompts
+ * @param shouldIncludeUrl - Whether to include URLs in the formatted output
+ * @returns Formatted search results string
+ */
 export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
   const searchResults = getLlmTextSearchResults();
 
@@ -35,6 +46,9 @@ export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
     .join("\n");
 }
 
+/**
+ * Waits for search results if they are required before starting response generation
+ */
 export async function canStartResponding() {
   if (getSettings().searchResultsToConsider > 0) {
     updateTextGenerationState("awaitingSearchResults");
@@ -42,6 +56,10 @@ export async function canStartResponding() {
   }
 }
 
+/**
+ * Gets default parameters for streaming chat completion requests
+ * @returns Default chat completion parameters
+ */
 export function getDefaultChatCompletionCreateParamsStreaming() {
   const settings = getSettings();
   return {

@@ -1,16 +1,27 @@
+import { listOpenAiCompatibleModels } from "@shared/openaiModels";
 import { useEffect, useState } from "react";
-import { listOpenAiCompatibleModels } from "../../../../../../../shared/openaiModels";
-import { addLogEntry } from "../../../../../../modules/logEntries";
-import type { defaultSettings } from "../../../../../../modules/settings";
+import { addLogEntry } from "@/modules/logEntries";
+import type { defaultSettings } from "@/modules/settings";
 import type { ModelOption } from "../types";
 
+/**
+ * Type alias for the settings object
+ */
 type Settings = typeof defaultSettings;
 
+/**
+ * Hook for fetching and managing OpenAI-compatible models
+ * @param settings - Application settings object
+ * @returns Object containing available models and whether to use text input
+ */
 export const useOpenAiModels = (settings: Settings) => {
   const [openAiModels, setOpenAiModels] = useState<ModelOption[]>([]);
   const [useTextInput, setUseTextInput] = useState(false);
 
   useEffect(() => {
+    /**
+     * Fetches available models from OpenAI-compatible API
+     */
     async function fetchOpenAiModels() {
       try {
         const models = await listOpenAiCompatibleModels(

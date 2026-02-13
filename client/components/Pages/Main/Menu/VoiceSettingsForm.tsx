@@ -3,7 +3,7 @@ import { useForm } from "@mantine/form";
 import getUnicodeFlagIcon from "country-flag-icons/unicode";
 import { usePubSub } from "create-pubsub/react";
 import { useCallback, useEffect, useState } from "react";
-import { settingsPubSub } from "../../../../modules/pubSub";
+import { settingsPubSub } from "@/modules/pubSub";
 
 export default function VoiceSettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);

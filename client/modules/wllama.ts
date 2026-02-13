@@ -11,11 +11,21 @@ import { addLogEntry } from "./logEntries";
 import { getSettings } from "./pubSub";
 import { defaultContextSize } from "./textGenerationUtilities";
 
+/**
+ * Configuration for Wllama initialization
+ */
 interface WllamaInitConfig {
+  /** Wllama configuration options */
   wllama?: WllamaConfig;
+  /** Model loading and download options */
   model?: LoadModelConfig & DownloadOptions;
 }
 
+/**
+ * Creates a new Wllama instance with configured WASM URLs
+ * @param config - Optional Wllama configuration
+ * @returns Promise resolving to a Wllama instance
+ */
 async function createWllamaInstance(config?: WllamaConfig): Promise<Wllama> {
   try {
     return new Wllama(
@@ -35,6 +45,13 @@ async function createWllamaInstance(config?: WllamaConfig): Promise<Wllama> {
   }
 }
 
+/**
+ * Initializes Wllama with a specific model from HuggingFace
+ * @param hfRepoId - HuggingFace repository ID
+ * @param hfFilePath - File path within the repository
+ * @param config - Optional initialization configuration
+ * @returns Promise resolving to initialized Wllama instance
+ */
 export async function initializeWllama(
   hfRepoId: string,
   hfFilePath: string,

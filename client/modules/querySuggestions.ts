@@ -1,6 +1,10 @@
 import { addLogEntry } from "./logEntries";
 import { getQuerySuggestions, updateQuerySuggestions } from "./pubSub";
 
+/**
+ * Gets a random query suggestion from the available suggestions
+ * @returns Promise<string> - A random query suggestion
+ */
 export async function getRandomQuerySuggestion() {
   if (getQuerySuggestions().length === 0) await refillQuerySuggestions(25);
 

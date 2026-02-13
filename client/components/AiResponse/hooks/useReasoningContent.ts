@@ -1,7 +1,12 @@
 import { usePubSub } from "create-pubsub/react";
 import { useCallback } from "react";
-import { settingsPubSub } from "../../../modules/pubSub";
+import { settingsPubSub } from "@/modules/pubSub";
 
+/**
+ * Hook for extracting reasoning content from AI responses
+ * @param text - The full text response from the AI
+ * @returns Object containing separated reasoning and main content
+ */
 export function useReasoningContent(text: string) {
   const [settings] = usePubSub(settingsPubSub);
 

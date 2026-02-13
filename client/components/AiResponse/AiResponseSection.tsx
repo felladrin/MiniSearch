@@ -10,8 +10,8 @@ import {
   responsePubSub,
   settingsPubSub,
   textGenerationStatePubSub,
-} from "../../modules/pubSub";
-import { shikiAdapter } from "../../modules/shiki";
+} from "@/modules/pubSub";
+import { shikiAdapter } from "@/modules/shiki";
 import "@mantine/code-highlight/styles.css";
 import AiModelDownloadAllowanceContent from "./AiModelDownloadAllowanceContent";
 import AiResponseContent from "./AiResponseContent";

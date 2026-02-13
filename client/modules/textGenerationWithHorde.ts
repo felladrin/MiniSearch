@@ -16,52 +16,108 @@ import {
 } from "./textGenerationUtilities";
 import type { ChatMessage } from "./types";
 
+/**
+ * Response from AI Horde API
+ */
 interface HordeResponse {
+  /** Request ID */
   id: string;
+  /** Kudos cost for the request */
   kudos: number;
 }
 
+/**
+ * Status response from AI Horde API
+ */
 interface HordeStatusResponse {
+  /** Generated text results */
   generations?: { text: string; model: string }[];
+  /** Whether generation is complete */
   done?: boolean;
+  /** Whether generation failed */
   faulted?: boolean;
+  /** Whether generation is still possible */
   is_possible?: boolean;
 }
 
+/**
+ * Model information from AI Horde
+ */
 interface HordeModelInfo {
+  /** Model performance rating */
   performance: number;
+  /** Number of queued requests */
   queued: number;
+  /** Number of active jobs */
   jobs: number;
+  /** Estimated time to completion */
   eta: number;
+  /** Model type */
   type: string;
+  /** Model name */
   name: string;
+  /** Number of available instances */
   count: number;
 }
 
+/**
+ * User information from AI Horde
+ */
 interface HordeUserInfo {
+  /** Username */
   username: string;
+  /** Available kudos */
   kudos: number;
 }
 
-const aiHordeApiBaseUrl = "https://aihorde.net/api/v2";
+/**
+ * Base URL for the public AI Horde API (browser-safe)
+ */
+const AI_HORDE_BASE_URL = "https://aihorde.net/api/v2";
+
+/**
+ * Client agent identifier for AI Horde API
+ */
 const aiHordeClientAgent = `${appName}:${appVersion}:${appRepository}`;
+/**
+ * Marker for user messages in chat history */
 const userMarker = "**USER**:";
+/**
+ * Marker for assistant messages in chat history */
 const assistantMarker = "**ASSISTANT**:";
+
+// HTTP header constants for consistency
+const HTTP_HEADERS = {
+  CONTENT_TYPE: "Content-Type",
+  CLIENT_AGENT: "Client-Agent",
+  ACCEPT: "accept",
+  API_KEY: "apikey",
+} as const;
+
+function buildHordeUrl(path: string) {
+  return `${AI_HORDE_BASE_URL}${path}`;
+}
 
 export const aiHordeDefaultApiKey = "0000000000";
 
+function getEffectiveHordeApiKey(
+  settings: ReturnType<typeof getSettings> = getSettings(),
+) {
+  return settings.hordeApiKey || aiHordeDefaultApiKey;
+}
+
 async function startGeneration(messages: ChatMessage[], signal?: AbortSignal) {
   const settings = getSettings();
-  const aiHordeApiKey = settings.hordeApiKey || aiHordeDefaultApiKey;
+  const aiHordeApiKey = getEffectiveHordeApiKey(settings);
   const aiHordeMaxResponseLengthInTokens =
     aiHordeApiKey === aiHordeDefaultApiKey ? 512 : 1024;
-  const response = await fetch(`${aiHordeApiBaseUrl}/generate/text/async`, {
+  const response = await fetch(buildHordeUrl("/generate/text/async"), {
     method: "POST",
     signal,
     headers: {
-      apikey: aiHordeApiKey,
-      "client-agent": aiHordeClientAgent,
-      "content-type": "application/json",
+      [HTTP_HEADERS.CONTENT_TYPE]: "application/json",
+      [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
+      [HTTP_HEADERS.API_KEY]: aiHordeApiKey,
     },
     body: JSON.stringify({
       prompt: formatPrompt(messages),
@@ -94,6 +150,7 @@ async function handleGenerationStatus(
   onUpdate: (text: string) => void,
   signal?: AbortSignal,
 ): Promise<string> {
+  const aiHordeApiKey = getEffectiveHordeApiKey();
   let lastText = "";
 
   try {
@@ -105,13 +162,14 @@ async function handleGenerationStatus(
       }
 
       const response = await fetch(
-        `${aiHordeApiBaseUrl}/generate/text/status/${generationId}`,
+        buildHordeUrl(`/generate/text/status/${generationId}`),
         {
           method: "GET",
           signal,
           headers: {
-            "client-agent": aiHordeClientAgent,
-            "content-type": "application/json",
+            [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
+            [HTTP_HEADERS.CONTENT_TYPE]: "application/json",
+            [HTTP_HEADERS.API_KEY]: aiHordeApiKey,
           },
         },
       );
@@ -178,27 +236,42 @@ async function handleGenerationStatus(
 }
 
 async function cancelGeneration(generationId: string): Promise<void> {
+  const aiHordeApiKey = getEffectiveHordeApiKey();
   try {
-    await fetch(`${aiHordeApiBaseUrl}/generate/text/status/${generationId}`, {
-      method: "DELETE",
-      headers: {
-        "client-agent": aiHordeClientAgent,
-        "content-type": "application/json",
+    const response = await fetch(
+      buildHordeUrl(`/generate/text/status/${generationId}`),
+      {
+        method: "DELETE",
+        headers: {
+          [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
+          [HTTP_HEADERS.CONTENT_TYPE]: "application/json",
+          [HTTP_HEADERS.API_KEY]: aiHordeApiKey,
+        },
       },
-    });
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Cancel request failed: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    addLogEntry(`Successfully cancelled generation ${generationId}`);
   } catch (error) {
-    addLogEntry(`Failed to cancel generation ${generationId}: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    addLogEntry(`Failed to cancel generation ${generationId}: ${errorMessage}`);
+    throw new Error(`Failed to cancel generation: ${errorMessage}`);
   }
 }
 
 export async function fetchHordeModels(): Promise<HordeModelInfo[]> {
   const response = await fetch(
-    `${aiHordeApiBaseUrl}/status/models?type=text&model_state=all`,
+    buildHordeUrl("/status/models?type=text&model_state=all"),
     {
       method: "GET",
       headers: {
-        "client-agent": aiHordeClientAgent,
-        accept: "application/json",
+        [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
+        [HTTP_HEADERS.ACCEPT]: "application/json",
       },
     },
   );
@@ -213,10 +286,10 @@ export async function fetchHordeModels(): Promise<HordeModelInfo[]> {
 export async function fetchHordeUserInfo(
   apiKey: string,
 ): Promise<HordeUserInfo> {
-  const response = await fetch(`${aiHordeApiBaseUrl}/find_user`, {
+  const response = await fetch(buildHordeUrl("/find_user"), {
     headers: {
-      apikey: apiKey,
-      "Client-Agent": aiHordeClientAgent,
+      [HTTP_HEADERS.API_KEY]: apiKey,
+      [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
     },
   });
 
@@ -285,14 +358,17 @@ async function executeHordeGeneration(
       throw new Error("Failed to start any AI Horde generation");
     }
 
-    const raceState = { winnerId: null as string | null };
+    const raceState = { winnerId: null as string | null, hasWinner: false };
     const statusPromises = generations.map((generation) =>
       handleGenerationStatus(
         generation.id,
         (text: string) => {
-          if (raceState.winnerId === null) {
+          // Atomic check and set to prevent race conditions
+          if (!raceState.hasWinner) {
             raceState.winnerId = generation.id;
+            raceState.hasWinner = true;
           }
+          // Only update if this generation is the winner
           if (raceState.winnerId === generation.id) {
             onUpdate(text);
           }
@@ -308,10 +384,18 @@ async function executeHordeGeneration(
         if (generation.id !== winner.generationId) {
           try {
             generation.ctrl.abort();
-          } catch {}
+          } catch (abortError) {
+            addLogEntry(
+              `Failed to abort generation ${generation.id}: ${abortError}`,
+            );
+          }
           try {
             await cancelGeneration(generation.id);
-          } catch {}
+          } catch (cancelError) {
+            addLogEntry(
+              `Failed to cancel generation ${generation.id}: ${cancelError}`,
+            );
+          }
         }
       }),
     );
@@ -321,7 +405,9 @@ async function executeHordeGeneration(
     controllers.forEach((controller) => {
       try {
         controller.abort();
-      } catch {}
+      } catch (abortError) {
+        addLogEntry(`Failed to abort controller: ${abortError}`);
+      }
     });
     throw error;
   }

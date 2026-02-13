@@ -13,9 +13,9 @@ import { notifications } from "@mantine/notifications";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import { useState } from "react";
-import { useSearchHistory } from "../../hooks/useSearchHistory";
-import { addLogEntry } from "../../modules/logEntries";
-import { settingsPubSub } from "../../modules/pubSub";
+import { useSearchHistory } from "@/hooks/useSearchHistory";
+import { addLogEntry } from "@/modules/logEntries";
+import { settingsPubSub } from "@/modules/pubSub";
 
 interface HistorySettingsProps {
   onClose?: () => void;

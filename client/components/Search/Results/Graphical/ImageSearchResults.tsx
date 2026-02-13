@@ -4,7 +4,7 @@ import { usePubSub } from "create-pubsub/react";
 import {
   imageSearchResultsPubSub,
   imageSearchStatePubSub,
-} from "../../../../modules/pubSub";
+} from "@/modules/pubSub";
 
 import ImageResultsList from "./ImageResultsList";
 import ImageResultsLoadingState from "./ImageResultsLoadingState";

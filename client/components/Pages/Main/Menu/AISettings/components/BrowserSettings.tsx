@@ -1,20 +1,29 @@
 import { NumberInput, Skeleton, Switch } from "@mantine/core";
 import type { UseFormReturnType } from "@mantine/form";
 import { lazy, Suspense } from "react";
-import type { defaultSettings } from "../../../../../../modules/settings";
+import type { defaultSettings } from "@/modules/settings";
 
 const WebLlmModelSelect = lazy(
-  () => import("../../../../../../components/AiResponse/WebLlmModelSelect"),
+  () => import("@/components/AiResponse/WebLlmModelSelect"),
 );
 const WllamaModelSelect = lazy(
-  () => import("../../../../../../components/AiResponse/WllamaModelSelect"),
+  () => import("@/components/AiResponse/WllamaModelSelect"),
 );
 
+/**
+ * Props for the BrowserSettings component
+ */
 interface BrowserSettingsProps {
+  /** Form instance for managing browser AI settings */
   form: UseFormReturnType<typeof defaultSettings>;
+  /** Whether WebGPU is available in the current browser */
   isWebGPUAvailable: boolean;
 }
 
+/**
+ * Component for managing browser-based AI settings.
+ * Provides controls for WebGPU/CPU selection, model selection, and CPU thread configuration.
+ */
 export const BrowserSettings = ({
   form,
   isWebGPUAvailable,

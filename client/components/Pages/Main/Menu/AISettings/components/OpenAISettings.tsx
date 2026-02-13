@@ -1,15 +1,25 @@
 import { Group, NumberInput, Select, Text, TextInput } from "@mantine/core";
 import type { UseFormReturnType } from "@mantine/form";
 import { IconInfoCircle } from "@tabler/icons-react";
-import { defaultSettings } from "../../../../../../modules/settings";
+import { defaultSettings } from "@/modules/settings";
 import type { ModelOption } from "../types";
 
+/**
+ * Props for the OpenAISettings component
+ */
 interface OpenAISettingsProps {
+  /** Form instance for managing OpenAI API settings */
   form: UseFormReturnType<typeof defaultSettings>;
+  /** Available OpenAI-compatible models */
   openAiModels: ModelOption[];
+  /** Whether to use text input instead of select for model */
   useTextInput: boolean;
 }
 
+/**
+ * Component for managing OpenAI API settings.
+ * Provides controls for API base URL, API key, model selection, and context length.
+ */
 export const OpenAISettings = ({
   form,
   openAiModels,

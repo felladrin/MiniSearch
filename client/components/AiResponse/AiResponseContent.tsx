@@ -20,9 +20,9 @@ import {
 import type { PublishFunction } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
 import { type ReactNode, useMemo, useState } from "react";
-import { addLogEntry } from "../../modules/logEntries";
-import { settingsPubSub } from "../../modules/pubSub";
-import { searchAndRespond } from "../../modules/textGeneration";
+import { addLogEntry } from "@/modules/logEntries";
+import { settingsPubSub } from "@/modules/pubSub";
+import { searchAndRespond } from "@/modules/textGeneration";
 import CopyIconButton from "./CopyIconButton";
 import FormattedMarkdown from "./FormattedMarkdown";
 

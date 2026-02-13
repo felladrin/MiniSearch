@@ -1,15 +1,26 @@
 import { Text, Textarea } from "@mantine/core";
 import type { UseFormReturnType } from "@mantine/form";
-import { defaultSettings } from "../../../../../../modules/settings";
+import { defaultSettings } from "@/modules/settings";
 
+/**
+ * Props for the SystemPromptInput component
+ */
 interface SystemPromptInputProps {
+  /** Form instance for managing system prompt settings */
   form: UseFormReturnType<typeof defaultSettings>;
 }
 
+/**
+ * Component for managing system prompt/instructions for AI.
+ * Provides a textarea for customizing AI behavior with examples and restore functionality.
+ */
 export const SystemPromptInput = ({ form }: SystemPromptInputProps) => {
   const isUsingCustomInstructions =
     form.values.systemPrompt !== defaultSettings.systemPrompt;
 
+  /**
+   * Handles restoring the default system prompt instructions
+   */
   const handleRestoreDefaultInstructions = () => {
     form.setFieldValue("systemPrompt", defaultSettings.systemPrompt);
   };

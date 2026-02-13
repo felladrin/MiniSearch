@@ -26,11 +26,11 @@ import {
 } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import { useEffect, useState } from "react";
-import { useSearchHistory } from "../../../hooks/useSearchHistory";
-import type { SearchEntry } from "../../../modules/history";
-import { settingsPubSub } from "../../../modules/pubSub";
-import { formatRelativeTime } from "../../../modules/stringFormatters";
-import SearchStats from "../../Analytics/SearchStats";
+import SearchStats from "@/components/Analytics/SearchStats";
+import { useSearchHistory } from "@/hooks/useSearchHistory";
+import type { SearchEntry } from "@/modules/history";
+import { settingsPubSub } from "@/modules/pubSub";
+import { formatRelativeTime } from "@/modules/stringFormatters";
 
 interface HistoryDrawerProps extends Omit<DrawerProps, "children"> {
   onSearchSelect?: (entry: SearchEntry) => void;
@@ -95,7 +95,7 @@ export default function HistoryDrawer({
       <Group justify="space-between" align="flex-start" wrap="nowrap">
         <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
           <Tooltip label={search.query} multiline withArrow>
-            <Text size="sm" fw={search.isPinned ? 600 : 400} truncate>
+            <Text size="sm" fw={search.pinned ? 600 : 400} truncate>
               {search.query}
             </Text>
           </Tooltip>
@@ -113,15 +113,15 @@ export default function HistoryDrawer({
         <Group gap="xs" style={{ flexShrink: 0 }}>
           <ActionIcon
             variant="subtle"
-            color={search.isPinned ? "blue" : "gray"}
+            color={search.pinned ? "blue" : "gray"}
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
               if (search.id) handlePin(search.id);
             }}
-            aria-label={search.isPinned ? "Unpin search" : "Pin search"}
+            aria-label={search.pinned ? "Unpin search" : "Pin search"}
           >
-            {search.isPinned ? (
+            {search.pinned ? (
               <IconPinFilled size={14} />
             ) : (
               <IconPin size={14} />
@@ -162,9 +162,9 @@ export default function HistoryDrawer({
   );
 
   const renderGroupedSearches = () => {
-    const pinnedSearches = filteredSearches.filter((search) => search.isPinned);
+    const pinnedSearches = filteredSearches.filter((search) => search.pinned);
     const unpinnedSearches = filteredSearches.filter(
-      (search) => !search.isPinned,
+      (search) => !search.pinned,
     );
 
     const content = [];

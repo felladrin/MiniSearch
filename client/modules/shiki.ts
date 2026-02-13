@@ -1,5 +1,9 @@
 import { createShikiAdapter } from "@mantine/code-highlight";
 
+/**
+ * Loads and configures Shiki syntax highlighter
+ * @returns Promise resolving to a configured Shiki highlighter
+ */
 async function loadShiki() {
   const { createHighlighter, bundledLanguages } = await import(
     "shiki/bundle/full"
@@ -11,4 +15,7 @@ async function loadShiki() {
   });
 }
 
+/**
+ * Mantine adapter for Shiki syntax highlighting
+ */
 export const shikiAdapter = createShikiAdapter(loadShiki);

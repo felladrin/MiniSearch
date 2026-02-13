@@ -10,22 +10,22 @@ import {
   useState,
 } from "react";
 import { useLocation } from "wouter";
-import { useHistoryRestore } from "../../../hooks/useHistoryRestore";
-import { useSearchHistory } from "../../../hooks/useSearchHistory";
-import { resetSearchRunId } from "../../../modules/history";
-import { handleEnterKeyDown } from "../../../modules/keyboard";
-import { addLogEntry } from "../../../modules/logEntries";
-import { postMessageToParentWindow } from "../../../modules/parentWindow";
+import { useHistoryRestore } from "@/hooks/useHistoryRestore";
+import { useSearchHistory } from "@/hooks/useSearchHistory";
+import { resetSearchRunId } from "@/modules/history";
+import { handleEnterKeyDown } from "@/modules/keyboard";
+import { addLogEntry } from "@/modules/logEntries";
+import { postMessageToParentWindow } from "@/modules/parentWindow";
 import {
   imageSearchResultsPubSub,
   isRestoringFromHistoryPubSub,
   responsePubSub,
   settingsPubSub,
   textSearchResultsPubSub,
-} from "../../../modules/pubSub";
-import { getRandomQuerySuggestion } from "../../../modules/querySuggestions";
-import { sleepUntilIdle } from "../../../modules/sleep";
-import { searchAndRespond } from "../../../modules/textGeneration";
+} from "@/modules/pubSub";
+import { getRandomQuerySuggestion } from "@/modules/querySuggestions";
+import { sleepUntilIdle } from "@/modules/sleep";
+import { searchAndRespond } from "@/modules/textGeneration";
 import HistoryButton from "../History/HistoryButton";
 
 interface SearchFormState {

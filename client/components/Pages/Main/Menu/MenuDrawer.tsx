@@ -10,14 +10,14 @@ import {
   Stack,
   Tooltip,
 } from "@mantine/core";
+import { repository } from "@root/package.json";
 import { IconBrandGithub } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import prettyMilliseconds from "pretty-ms";
-import { repository } from "../../../../../package.json";
-import { appName, appVersion } from "../../../../modules/appInfo";
-import { addLogEntry } from "../../../../modules/logEntries";
-import { menuExpandedAccordionsPubSub } from "../../../../modules/pubSub";
-import HistorySettings from "../../../Settings/HistorySettings";
+import HistorySettings from "@/components/Settings/HistorySettings";
+import { appName, appVersion } from "@/modules/appInfo";
+import { addLogEntry } from "@/modules/logEntries";
+import { menuExpandedAccordionsPubSub } from "@/modules/pubSub";
 import ActionsForm from "./ActionsForm";
 import AISettingsForm from "./AISettings/AISettingsForm";
 import InterfaceSettingsForm from "./InterfaceSettingsForm";

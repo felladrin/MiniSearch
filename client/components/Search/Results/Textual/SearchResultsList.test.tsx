@@ -1,6 +1,6 @@
 import { MantineProvider } from "@mantine/core";
 import { render, screen, waitFor } from "@testing-library/react";
-import type { TextSearchResult } from "../../../../modules/types";
+import type { TextSearchResult } from "@/modules/types";
 import SearchResultsList from "./SearchResultsList";
 
 describe("SearchResultsList", () => {
