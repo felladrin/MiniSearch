@@ -1,15 +1,15 @@
 import { Carousel } from "@mantine/carousel";
 import { Button, Group, rem, Stack, Text, Transition } from "@mantine/core";
 import { useEffect, useState } from "react";
-import type { ImageSearchResult } from "../../../../modules/types";
+import type { ImageSearchResult } from "@/modules/types";
 import "@mantine/carousel/styles.css";
 import Lightbox from "yet-another-react-lightbox";
 import Captions from "yet-another-react-lightbox/plugins/captions";
 import carouselClassNames from "./ImageResultsList.module.css";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/captions.css";
-import { addLogEntry } from "../../../../modules/logEntries";
-import { getHostname } from "../../../../modules/stringFormatters";
+import { addLogEntry } from "@/modules/logEntries";
+import { getHostname } from "@/modules/stringFormatters";
 
 interface ImageResultsState {
   isLightboxOpen: boolean;
@@ -61,7 +61,7 @@ export default function ImageResultsList({
           loop: true,
         }}
       >
-        {imageResults.map(([title, url, thumbnailUrl], index) => (
+        {imageResults.map(([title, url, thumbnail], index) => (
           <Transition
             key={url}
             mounted={state.canStartTransition}
@@ -74,11 +74,11 @@ export default function ImageResultsList({
               <Carousel.Slide style={styles}>
                 <img
                   alt={title}
-                  src={thumbnailUrl}
+                  src={thumbnail}
                   loading="lazy"
                   onClick={() => handleImageClick(index)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === "Enter" || e.key === " ") {
                       handleImageClick(index);
                     }
                   }}
@@ -94,14 +94,19 @@ export default function ImageResultsList({
         close={() => setState((prev) => ({ ...prev, isLightboxOpen: false }))}
         plugins={[Captions]}
         index={state.lightboxIndex}
-        slides={imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
-          src: thumbnailUrl,
+        slides={imageResults.map(([title, url, thumbnail, sourceUrl]) => ({
+          src: thumbnail,
           alt: title,
           description: (
             <Stack align="center" gap="md">
               {title && (
                 <Text component="cite" ta="center">
                   {title}
+                </Text>
+              )}
+              {sourceUrl && (
+                <Text size="xs" c="dimmed">
+                  Source: {new URL(sourceUrl).hostname}
                 </Text>
               )}
               <Group align="center" justify="center" gap="xs">
