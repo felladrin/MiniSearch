@@ -42,3 +42,10 @@ Because the hook writes via Dexie directly, any component can call `addToHistory
 
 ## Analytics Integration
 The History Drawer Analytics tab renders the compact `SearchStats` cards scoped to `period="all"`, giving total searches, daily averages, and most active hours pulled from the same IndexedDB data. Keeping analytics co-located ensures the metrics share the hook filtering and cleanup guarantees.
+
+## Related Topics
+
+- **Overview**: `docs/overview.md` - System architecture and data flow
+- **UI Components**: `docs/ui-components.md` - History drawer and components
+- **Conversation Memory**: `docs/conversation-memory.md` - Chat persistence
+- **Configuration**: `docs/configuration.md` - History settings

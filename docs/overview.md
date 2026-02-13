@@ -92,3 +92,16 @@ The build pipeline uses Biome for linting and formatting, TypeScript for type ch
 MiniSearch supports optional access key authentication for restricting usage. When the ACCESS_KEYS environment variable is set, the server validates incoming requests against the configured keys. Rate limiting is applied to search and inference endpoints to prevent abuse.
 
 Access keys are verified server-side before proxying requests to SearXNG or processing inference requests. The ACCESS_KEY_TIMEOUT_HOURS variable controls how long a valid access key remains cached.
+
+For complete security details, see `docs/security.md`.
+
+## Related Topics
+
+- **Quick Start**: `docs/quick-start.md` - Installation and first run
+- **Configuration**: `docs/configuration.md` - All environment variables and settings
+- **AI Integration**: `docs/ai-integration.md` - Detailed AI inference options
+- **UI Components**: `docs/ui-components.md` - Component architecture and state management
+- **Search History**: `docs/search-history.md` - History database and management
+- **Conversation Memory**: `docs/conversation-memory.md` - Token budgeting and summaries
+- **Security**: `docs/security.md` - Access control and privacy model
+- **Development**: `docs/development-commands.md` - Available commands

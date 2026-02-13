@@ -32,3 +32,9 @@ Components are organized by feature domain. Each component folder contains:
 - Tests
 
 This self-contained structure makes it easy for agents to understand and modify components without navigating across the codebase.
+
+## Related Topics
+
+- **Overview**: `docs/overview.md` - System architecture and data flow
+- **UI Components**: `docs/ui-components.md` - Component architecture and PubSub patterns
+- **Quick Start**: `docs/quick-start.md` - Installation and setup

@@ -37,3 +37,9 @@
 - **Network Requests**: All external requests go through SearXNG proxy
 - **AI Models**: Models run locally or through trusted providers
 - **Data Exfiltration**: Prevented by local-first architecture
+
+## Related Topics
+
+- **Configuration**: `docs/configuration.md` - Environment variables for access control
+- **Overview**: `docs/overview.md` - Security architecture and data flow
+- **AI Integration**: `docs/ai-integration.md` - Privacy implications of inference types

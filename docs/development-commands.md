@@ -22,3 +22,9 @@
 
 - **`docker compose exec development-server npm run lint`**: Biome linting, TypeScript checking, and dependency validation
 - **`docker compose exec development-server npm run format`**: Format code with Biome (enforced via pre-commit hooks)
+
+## Related Topics
+
+- **Quick Start**: `docs/quick-start.md` - Installation and first run
+- **Configuration**: `docs/configuration.md` - Environment variables
+- **Pull Requests**: `docs/pull-requests.md` - Contribution workflow

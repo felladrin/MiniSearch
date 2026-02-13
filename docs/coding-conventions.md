@@ -40,3 +40,10 @@ React + TypeScript + Mantine UI (`@mantine/core`, `@mantine/hooks`, `@mantine/fo
 - Use error boundaries for React components
 - Proper TypeScript error types
 - Graceful degradation for AI features
+
+## Related Topics
+
+- **Project Structure**: `docs/project-structure.md` - Directory organization
+- **Design**: `docs/design.md` - UI/UX principles
+- **UI Components**: `docs/ui-components.md` - Component architecture
+- **Pull Requests**: `docs/pull-requests.md` - Contribution workflow

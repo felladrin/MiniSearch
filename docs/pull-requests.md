@@ -32,3 +32,9 @@ Use conventional commits:
 - `refactor:` for code refactoring
 - `test:` for test changes
 - `chore:` for maintenance tasks
+
+## Related Topics
+
+- **Development Commands**: `docs/development-commands.md` - Available npm commands
+- **Coding Conventions**: `docs/coding-conventions.md` - Code style guidelines
+- **Quick Start**: `docs/quick-start.md` - Setting up the project

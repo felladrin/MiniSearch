@@ -29,3 +29,10 @@ Long-running chats can easily exceed the model context window. MiniSearch addres
 ## Reset Rules
 - Starting a new top-level search clears the summary, chat history, and cached results to avoid context leakage across unrelated conversations. @client/modules/textGeneration.ts#179-207
 - Restoring a run from history repopulates chat state from IndexedDB; the memory system will rebuild summaries on demand once the user resumes chatting. @client/modules/history.ts#335-365 @client/hooks/useHistoryRestore.ts#32-105
+
+## Related Topics
+
+- **AI Integration**: `docs/ai-integration.md` - Detailed inference options
+- **Search History**: `docs/search-history.md` - History and persistence
+- **Overview**: `docs/overview.md` - System architecture
+- **Configuration**: `docs/configuration.md` - Settings for context window

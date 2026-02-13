@@ -3,7 +3,7 @@
 ## Frontend
 
 - **React + TypeScript**: Strict mode enabled for type safety
-- **Mantine UI v7**: Component library (`@mantine/core`, `@mantine/hooks`, `@mantine/form`, `@mantine/carousel`)
+- **Mantine UI v8**: Component library (`@mantine/core`, `@mantine/hooks`, `@mantine/form`, `@mantine/carousel`)
 - **Vite**: Build tool with React plugin and HMR
 - **AI SDK**: `@ai-sdk/openai-compatible` for unified AI interface
 

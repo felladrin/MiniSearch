@@ -44,3 +44,9 @@
 - High contrast for readability
 - Dark mode support
 - Consistent spacing and sizing
+
+## Related Topics
+
+- **UI Components**: `docs/ui-components.md` - Component implementation details
+- **Project Structure**: `docs/project-structure.md` - Directory organization
+- **Coding Conventions**: `docs/coding-conventions.md` - Code style guidelines
