@@ -1,42 +1,65 @@
-import { MantineProvider } from "@mantine/core";
+import {
+  Center,
+  Container,
+  Loader,
+  MantineProvider,
+  Stack,
+  Text,
+} from "@mantine/core";
 import { Route, Switch } from "wouter";
 import "@mantine/core/styles.css";
 import { Notifications } from "@mantine/notifications";
 import { usePubSub } from "create-pubsub/react";
 import { lazy, useEffect, useState } from "react";
-import { addLogEntry } from "../../modules/logEntries";
-import { settingsPubSub } from "../../modules/pubSub";
-import { defaultSettings } from "../../modules/settings";
+import { addLogEntry } from "@/modules/logEntries";
+import { settingsPubSub } from "@/modules/pubSub";
+import { defaultSettings } from "@/modules/settings";
 import "@mantine/notifications/styles.css";
-import { verifyStoredAccessKey } from "../../modules/accessKey";
+import { verifyStoredAccessKey } from "@/modules/accessKey";
 import MainPage from "../Pages/Main/MainPage";
 
 const AccessPage = lazy(() => import("../Pages/AccessPage"));
 
-export function App() {
+/**
+ * Main application component with access key validation and routing
+ */
+function App() {
   useInitializeSettings();
   const { hasValidatedAccessKey, isCheckingStoredKey, setValidatedAccessKey } =
     useAccessKeyValidation();
 
-  if (isCheckingStoredKey) {
-    return null;
-  }
-
   return (
     <MantineProvider defaultColorScheme="dark">
-      <Notifications />
-      <Switch>
-        <Route path="/">
-          {VITE_ACCESS_KEYS_ENABLED && !hasValidatedAccessKey ? (
-            <AccessPage onAccessKeyValid={() => setValidatedAccessKey(true)} />
-          ) : (
-            <MainPage />
-          )}
-        </Route>
-      </Switch>
+      {isCheckingStoredKey ? (
+        <Container h="100vh">
+          <Center h="100vh">
+            <Stack align="center">
+              <Loader />
+              <Text>Verifying access...</Text>
+            </Stack>
+          </Center>
+        </Container>
+      ) : (
+        <>
+          <Notifications />
+          <Switch>
+            <Route path="/">
+              {hasValidatedAccessKey ? (
+                <MainPage />
+              ) : (
+                <AccessPage
+                  onAccessKeyValid={() => setValidatedAccessKey(true)}
+                />
+              )}
+            </Route>
+          </Switch>
+        </>
+      )}
     </MantineProvider>
   );
 }
+
+export default App;
 
 /**
  * A custom React hook that initializes the application settings.
@@ -73,18 +96,18 @@ function useInitializeSettings() {
  * @returns An object containing the validation state and loading state
  */
 function useAccessKeyValidation() {
-  const [state, setState] = useState({
-    hasValidatedAccessKey: false,
-    isCheckingStoredKey: true,
-  });
+  const [state, setState] = useState(() => ({
+    hasValidatedAccessKey: !VITE_ACCESS_KEYS_ENABLED,
+    isCheckingStoredKey: VITE_ACCESS_KEYS_ENABLED,
+  }));
 
   useEffect(() => {
+    if (!VITE_ACCESS_KEYS_ENABLED) return;
+
     async function checkStoredAccessKey() {
-      if (VITE_ACCESS_KEYS_ENABLED) {
-        const isValid = await verifyStoredAccessKey();
-        if (isValid)
-          setState((prev) => ({ ...prev, hasValidatedAccessKey: true }));
-      }
+      const isValid = await verifyStoredAccessKey();
+      if (isValid)
+        setState((prev) => ({ ...prev, hasValidatedAccessKey: true }));
       setState((prev) => ({ ...prev, isCheckingStoredKey: false }));
     }
 
