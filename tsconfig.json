@@ -16,7 +16,12 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": "./",
     "paths": {
-      "@/*": ["client/*"]
+      "@/*": ["client/*"],
+      "@/modules/*": ["client/modules/*"],
+      "@/components/*": ["client/components/*"],
+      "@/hooks/*": ["client/hooks/*"],
+      "@shared/*": ["shared/*"],
+      "@root/*": ["./*"]
     },
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },

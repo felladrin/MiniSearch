@@ -14,27 +14,54 @@ import {
   safeWriteResponse,
 } from "./utils/streamUtils";
 
+/**
+ * Request body interface for chat completion
+ */
 interface ChatCompletionRequestBody {
+  /** Array of chat messages */
   messages: ModelMessage[];
+  /** Sampling temperature */
   temperature?: number;
+  /** Top-p sampling parameter */
   top_p?: number;
+  /** Frequency penalty */
   frequency_penalty?: number;
+  /** Presence penalty */
   presence_penalty?: number;
+  /** Maximum tokens to generate */
   max_tokens?: number;
 }
 
+/**
+ * Chat completion chunk for streaming responses
+ */
 interface ChatCompletionChunk {
+  /** Chunk ID */
   id: string;
+  /** Object type */
   object: string;
+  /** Creation timestamp */
   created: number;
+  /** Model name */
   model?: string;
+  /** Array of choices */
   choices: Array<{
+    /** Choice index */
     index: number;
+    /** Delta content */
     delta: { content?: string };
+    /** Finish reason */
     finish_reason: string | null;
   }>;
 }
 
+/**
+ * Creates a chat completion chunk payload
+ * @param model - Model name
+ * @param content - Chunk content
+ * @param finish_reason - Finish reason
+ * @returns Chat completion chunk
+ */
 function createChunkPayload(
   model: string,
   content?: string,

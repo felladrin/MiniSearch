@@ -8,8 +8,16 @@ import {
 } from "./searchesSinceLastRestart";
 import { fetchSearXNG } from "./webSearchService";
 
+/**
+ * Timeout for thumbnail fetching in milliseconds
+ */
 const THUMBNAIL_TIMEOUT_MS = 1000;
 
+/**
+ * Fetches a thumbnail and converts it to a data URL
+ * @param thumbnailSource - URL of the thumbnail image
+ * @returns Promise resolving to data URL string
+ */
 async function fetchThumbnailAsDataUrl(thumbnailSource: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), THUMBNAIL_TIMEOUT_MS);
@@ -34,6 +42,13 @@ async function fetchThumbnailAsDataUrl(thumbnailSource: string) {
   }
 }
 
+/**
+ * Handles search result ranking using the reranker service
+ * @param query - Search query
+ * @param results - Search results to rank
+ * @param isTextSearch - Whether this is a text search
+ * @returns Promise resolving to ranked results
+ */
 async function handleRanking(
   query: string,
   results: [title: string, content: string, url: string][],

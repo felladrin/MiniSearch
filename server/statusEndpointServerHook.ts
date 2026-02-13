@@ -8,13 +8,20 @@ import {
 import { getVerifiedTokensAmount } from "./verifiedTokens";
 import { getWebSearchStatus } from "./webSearchService";
 
+/**
+ * Server start time for uptime calculation
+ */
 const serverStartTime = Date.now();
 
+/**
+ * Vite server hook for providing status endpoint
+ * @param server - Vite dev server or preview server instance
+ */
 export function statusEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
 >(server: T) {
   server.middlewares.use(async (request, response, next) => {
-    if (!request.url.startsWith("/status")) return next();
+    if (!request.url?.startsWith("/status")) return next();
 
     const sessions = getVerifiedTokensAmount();
     const textualSearches = getTextualSearchesSinceLastRestart();
@@ -45,9 +52,11 @@ export function statusEndpointServerHook<
       webSearchServiceStatus,
       build: {
         timestamp: new Date(
-          server.config.define.VITE_BUILD_DATE_TIME,
+          server.config.define?.VITE_BUILD_DATE_TIME || "",
         ).toISOString(),
-        gitCommit: JSON.parse(server.config.define.VITE_COMMIT_SHORT_HASH),
+        gitCommit: JSON.parse(
+          server.config.define?.VITE_COMMIT_SHORT_HASH || '""',
+        ),
       },
     };
 

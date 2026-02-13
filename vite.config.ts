@@ -55,6 +55,16 @@ export default defineConfig(({ command }) => {
         process.env.DEFAULT_INFERENCE_TYPE,
       ),
     },
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "client"),
+        "@/modules": path.resolve(__dirname, "client/modules"),
+        "@/components": path.resolve(__dirname, "client/components"),
+        "@/hooks": path.resolve(__dirname, "client/hooks"),
+        "@shared": path.resolve(__dirname, "shared"),
+        "@root": path.resolve(__dirname),
+      },
+    },
     server: {
       host: process.env.HOST,
       port: process.env.PORT ? Number(process.env.PORT) : undefined,
@@ -65,6 +75,7 @@ export default defineConfig(({ command }) => {
         allow: [
           path.resolve(__dirname, "shared"),
           path.resolve(__dirname, "client"),
+          path.resolve(__dirname),
         ],
       },
     },

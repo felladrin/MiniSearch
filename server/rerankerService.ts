@@ -18,6 +18,11 @@ let isReady = false;
 let serverProcess: ChildProcess | null = null;
 let restartTimeout: NodeJS.Timeout | null = null;
 
+/**
+ * Sanitizes Unicode surrogate pairs in input string
+ * @param input - String to sanitize
+ * @returns Sanitized string with valid Unicode surrogates
+ */
 export function sanitizeUnicodeSurrogates(input: string) {
   let output = "";
 
@@ -119,7 +124,7 @@ export async function startRerankerService() {
     printMessage(data.toString());
   });
 
-  serverProcess.on("exit", (code, signal) => {
+  serverProcess.on("exit", (code: number | null, signal: string | null) => {
     printMessage(
       `Reranker service exited with code: ${code}, signal: ${signal}`,
     );
@@ -137,7 +142,7 @@ export async function startRerankerService() {
     }, 5000);
   });
 
-  serverProcess.on("error", (error) => {
+  serverProcess.on("error", (error: Error) => {
     printMessage(`Reranker service error: ${error.message}`);
     isReady = false;
   });
