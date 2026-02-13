@@ -416,14 +416,12 @@ async function startTextSearch(query: string) {
     );
 
     updateSearchResults(getCurrentSearchRunId(), {
-      textResults: {
-        type: "text",
-        items: textResults.map(([title, snippet, url]) => ({
-          title,
-          url,
-          snippet,
-        })),
-      },
+      type: "text",
+      items: textResults.map(([title, snippet, url]) => ({
+        title,
+        url,
+        snippet,
+      })),
     });
   }
 
@@ -449,15 +447,13 @@ async function startImageSearch(
   updateImageSearchResults(imageResults);
 
   updateSearchResults(getCurrentSearchRunId(), {
-    imageResults: {
-      type: "image",
-      items: imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
-        title,
-        url,
-        thumbnailUrl,
-        sourceUrl,
-      })),
-    },
+    type: "image",
+    items: imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
+      title,
+      url,
+      thumbnail: thumbnailUrl,
+      sourceUrl,
+    })),
   });
 }
 

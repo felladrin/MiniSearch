@@ -8,14 +8,14 @@ import {
   useState,
 } from "react";
 import throttle from "throttleit";
-import { generateFollowUpQuestion } from "../../modules/followUpQuestions";
+import { generateFollowUpQuestion } from "@/modules/followUpQuestions";
 import {
   getCurrentSearchRunId,
   saveChatMessageForQuery,
   updateSearchResults,
-} from "../../modules/history";
-import { handleEnterKeyDown } from "../../modules/keyboard";
-import { addLogEntry } from "../../modules/logEntries";
+} from "@/modules/history";
+import { handleEnterKeyDown } from "@/modules/keyboard";
+import { addLogEntry } from "@/modules/logEntries";
 import {
   chatGenerationStatePubSub,
   chatInputPubSub,
@@ -29,11 +29,11 @@ import {
   updateImageSearchResults,
   updateLlmTextSearchResults,
   updateTextSearchResults,
-} from "../../modules/pubSub";
-import { generateRelatedSearchQuery } from "../../modules/relatedSearchQuery";
-import { searchImages, searchText } from "../../modules/search";
-import { generateChatResponse } from "../../modules/textGeneration";
-import type { ChatMessage } from "../../modules/types";
+} from "@/modules/pubSub";
+import { generateRelatedSearchQuery } from "@/modules/relatedSearchQuery";
+import { searchImages, searchText } from "@/modules/search";
+import { generateChatResponse } from "@/modules/textGeneration";
+import type { ChatMessage } from "@/modules/types";
 import ChatHeader from "./ChatHeader";
 import ChatInputArea from "./ChatInputArea";
 import MessageList from "./MessageList";
@@ -304,14 +304,12 @@ export default function ChatInterface({
               updateTextSearchResults(updatedResults);
 
               updateSearchResults(getCurrentSearchRunId(), {
-                textResults: {
-                  type: "text",
-                  items: updatedResults.map(([title, snippet, url]) => ({
-                    title,
-                    url,
-                    snippet,
-                  })),
-                },
+                type: "text",
+                items: updatedResults.map(([title, snippet, url]) => ({
+                  title,
+                  url,
+                  snippet,
+                })),
               });
             }
           }
@@ -337,17 +335,15 @@ export default function ChatInterface({
                   updateImageSearchResults(updatedImageResults);
 
                   updateSearchResults(getCurrentSearchRunId(), {
-                    imageResults: {
-                      type: "image",
-                      items: updatedImageResults.map(
-                        ([title, url, thumbnailUrl, sourceUrl]) => ({
-                          title,
-                          url,
-                          thumbnailUrl,
-                          sourceUrl,
-                        }),
-                      ),
-                    },
+                    type: "image",
+                    items: updatedImageResults.map(
+                      ([title, url, thumbnailUrl, sourceUrl]) => ({
+                        title,
+                        url,
+                        thumbnail: thumbnailUrl,
+                        sourceUrl,
+                      }),
+                    ),
                   });
                 }
               }
