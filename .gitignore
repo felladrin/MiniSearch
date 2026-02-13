@@ -5,3 +5,5 @@ node_modules
 .vscode
 /vite-build-stats.html
 .env
+/coverage
+.playwright-cli
