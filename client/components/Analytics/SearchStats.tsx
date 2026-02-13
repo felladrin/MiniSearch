@@ -12,9 +12,9 @@ import {
 } from "@mantine/core";
 import { IconSearch } from "@tabler/icons-react";
 import { useMemo } from "react";
-import { useSearchHistory } from "../../hooks/useSearchHistory";
-import type { SearchEntry } from "../../modules/history";
-import { formatRelativeTime } from "../../modules/stringFormatters";
+import { useSearchHistory } from "@/hooks/useSearchHistory";
+import type { SearchEntry } from "@/modules/history";
+import { formatRelativeTime } from "@/modules/stringFormatters";
 
 interface SearchStatsProps {
   period?: "today" | "week" | "month" | "all";
@@ -90,10 +90,11 @@ export default function SearchStats({
 
     const sourceCounts = filteredSearches.reduce(
       (acc, search) => {
-        if (compact && search.source.toLowerCase() === "user") {
+        if (compact && search.source?.toLowerCase() === "user") {
           return acc;
         }
-        acc[search.source] = (acc[search.source] || 0) + 1;
+        const source = search.source || "unknown";
+        acc[source] = (acc[source] || 0) + 1;
         return acc;
       },
       {} as Record<string, number>,
@@ -135,6 +136,7 @@ export default function SearchStats({
       User: "blue",
       Followup: "green",
       Suggestion: "orange",
+      Unknown: "gray",
     };
     return colors[source as keyof typeof colors] || "gray";
   };
