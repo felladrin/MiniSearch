@@ -112,6 +112,11 @@ Need to:
 2. Verify component subscriptions in `docs/ui-components.md`
 3. Ensure proper state updates in business logic modules
 
+### Analyze test coverage
+1. Run `npm run test:coverage` to generate reports
+2. Check `coverage/coverage-summary.json` for quick metrics
+3. See `docs/development-commands.md` for full coverage analysis guide
+
 ## Quality Gates
 
 Before any change:

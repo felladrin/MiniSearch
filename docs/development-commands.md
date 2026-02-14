@@ -17,6 +17,34 @@
 
 - **`docker compose exec development-server npm run test`**: Run Vitest tests
 - **`docker compose exec development-server npm run test:ui`**: Run tests with UI
+- **`docker compose exec development-server npm run test:coverage`**: Run tests with coverage report
+
+### Coverage Reports for AI Analysis
+
+After running `test:coverage`, AI agents can analyze these JSON files:
+
+- **`coverage/coverage-summary.json`**: Quick metrics view - overall percentages per file
+  ```json
+  {
+    "total": {
+      "lines": { "total": 100, "covered": 85, "pct": 85 },
+      "statements": { "total": 120, "covered": 100, "pct": 83.33 },
+      "functions": { "total": 30, "covered": 25, "pct": 83.33 },
+      "branches": { "total": 50, "covered": 40, "pct": 80 }
+    },
+    "/path/to/file.ts": { ... }
+  }
+  ```
+
+- **`coverage/coverage-final.json`**: Detailed per-file coverage with line-by-line mapping
+  - Use this to identify specific uncovered lines, branches, and functions
+  - Maps statement/branch/function IDs to source locations
+
+AI agents can parse these to identify:
+- Files with coverage below thresholds
+- Uncovered lines and branches
+- Functions without tests
+- Coverage gaps across the codebase
 
 ## Quality Assurance
 
