@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const createTestEntry = (overrides: Record<string, unknown> = {}) => ({
+  id: 1,
+  searchRunId: "test-1",
+  query: "test",
+  timestamp: Date.now(),
+  ...overrides,
+});
+
 describe("History Module - Search Run ID Management", () => {
   beforeEach(async () => {
     vi.resetModules();
@@ -71,59 +79,37 @@ describe("History Module - Entry Helper Functions", () => {
 
   it("should detect text results in legacy structure", async () => {
     const { hasTextResults } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
+    const entry = createTestEntry({
       results: { type: "text" as const, items: [] },
-    };
+    });
     expect(hasTextResults(entry)).toBe(true);
   });
 
   it("should return false when no text results exist", async () => {
     const { hasTextResults } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-    };
+    const entry = createTestEntry();
     expect(hasTextResults(entry)).toBe(false);
   });
 
   it("should detect image results in new structure", async () => {
     const { hasImageResults } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
+    const entry = createTestEntry({
       imageResults: { type: "image" as const, items: [] },
-    };
+    });
     expect(hasImageResults(entry)).toBe(true);
   });
 
   it("should detect image results in legacy structure", async () => {
     const { hasImageResults } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
+    const entry = createTestEntry({
       results: { type: "image" as const, items: [] },
-    };
+    });
     expect(hasImageResults(entry)).toBe(true);
   });
 
   it("should return false when no image results exist", async () => {
     const { hasImageResults } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-    };
+    const entry = createTestEntry();
     expect(hasImageResults(entry)).toBe(false);
   });
 
@@ -135,13 +121,7 @@ describe("History Module - Entry Helper Functions", () => {
         { title: "Test", url: "https://test.com", snippet: "Test snippet" },
       ],
     };
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-      textResults,
-    };
+    const entry = createTestEntry({ textResults });
     expect(getResultsFromEntry(entry)).toBe(textResults);
   });
 
@@ -157,13 +137,7 @@ describe("History Module - Entry Helper Functions", () => {
         },
       ],
     };
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-      imageResults,
-    };
+    const entry = createTestEntry({ imageResults });
     expect(getResultsFromEntry(entry)).toBe(imageResults);
   });
 
@@ -179,155 +153,13 @@ describe("History Module - Entry Helper Functions", () => {
         },
       ],
     };
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-      results: legacyResults,
-    };
+    const entry = createTestEntry({ results: legacyResults });
     expect(getResultsFromEntry(entry)).toBe(legacyResults);
   });
 
   it("should return null when no results exist", async () => {
     const { getResultsFromEntry } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-    };
-    expect(getResultsFromEntry(entry)).toBeNull();
-  });
-
-  it("should detect text results in legacy structure", async () => {
-    const { hasTextResults } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-      results: { type: "text" as const, items: [] },
-    };
-    expect(hasTextResults(entry)).toBe(true);
-  });
-
-  it("should return false when no text results exist", async () => {
-    const { hasTextResults } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-    };
-    expect(hasTextResults(entry)).toBe(false);
-  });
-
-  it("should detect image results in new structure", async () => {
-    const { hasImageResults } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-      imageResults: { type: "image" as const, items: [] },
-    };
-    expect(hasImageResults(entry)).toBe(true);
-  });
-
-  it("should detect image results in legacy structure", async () => {
-    const { hasImageResults } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-      results: { type: "image" as const, items: [] },
-    };
-    expect(hasImageResults(entry)).toBe(true);
-  });
-
-  it("should return false when no image results exist", async () => {
-    const { hasImageResults } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-    };
-    expect(hasImageResults(entry)).toBe(false);
-  });
-
-  it("should get results from new textResults field", async () => {
-    const { getResultsFromEntry } = await import("./history");
-    const textResults = {
-      type: "text" as const,
-      items: [
-        { title: "Test", url: "https://test.com", snippet: "Test snippet" },
-      ],
-    };
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-      textResults,
-    };
-    expect(getResultsFromEntry(entry)).toBe(textResults);
-  });
-
-  it("should get results from new imageResults field", async () => {
-    const { getResultsFromEntry } = await import("./history");
-    const imageResults = {
-      type: "image" as const,
-      items: [
-        {
-          title: "Image",
-          url: "https://img.com/img.jpg",
-          thumbnail: "https://img.com/thumb.jpg",
-        },
-      ],
-    };
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-      imageResults,
-    };
-    expect(getResultsFromEntry(entry)).toBe(imageResults);
-  });
-
-  it("should fallback to legacy results field", async () => {
-    const { getResultsFromEntry } = await import("./history");
-    const legacyResults = {
-      type: "text" as const,
-      items: [
-        {
-          title: "Legacy",
-          url: "https://legacy.com",
-          snippet: "Legacy snippet",
-        },
-      ],
-    };
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-      results: legacyResults,
-    };
-    expect(getResultsFromEntry(entry)).toBe(legacyResults);
-  });
-
-  it("should return null when no results exist", async () => {
-    const { getResultsFromEntry } = await import("./history");
-    const entry = {
-      id: 1,
-      searchRunId: "test-1",
-      query: "test",
-      timestamp: Date.now(),
-    };
+    const entry = createTestEntry();
     expect(getResultsFromEntry(entry)).toBeNull();
   });
 });
