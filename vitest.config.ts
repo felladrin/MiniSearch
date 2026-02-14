@@ -13,6 +13,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html", "json", "json-summary"],
       include: ["client/**/*.{tsx,ts,jsx,js}"],
+      exclude: ["client/dist/**"],
     },
   },
   define: {
