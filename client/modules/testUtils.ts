@@ -22,6 +22,16 @@ const createCommonMocks = () => ({
 });
 
 /**
+ * Setup common vi.mocks for text generation tests
+ */
+export const setupCommonTextGenerationMocks = () => {
+  vi.mock("@root/package.json", () => ({
+    repository: { url: "https://github.com/owner/repo" },
+    version: "1.0.0",
+  }));
+};
+
+/**
  * Mock pubSub module with specific settings
  */
 export const mockPubSub = (settings: Record<string, unknown> = {}) => {

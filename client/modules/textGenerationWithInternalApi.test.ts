@@ -30,7 +30,6 @@ describe("generateTextWithInternalApi", () => {
       .fn()
       .mockResolvedValue("streamed message");
 
-    // Mock fetch response
     const mockResponse = {
       ok: true,
       body: {

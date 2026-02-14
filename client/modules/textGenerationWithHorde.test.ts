@@ -2,14 +2,11 @@ import { beforeEach, describe, it, vi } from "vitest";
 import {
   mockPubSub,
   mockTextGenerationUtilities,
+  setupCommonTextGenerationMocks,
   testTextGenerationBehavior,
 } from "./testUtils";
 
-// Mock dependencies
-vi.mock("@root/package.json", () => ({
-  repository: { url: "https://github.com/owner/repo" },
-  version: "1.0.0",
-}));
+setupCommonTextGenerationMocks();
 vi.mock("./pubSub", () => mockPubSub({ hordeModel: null }));
 vi.mock("./textGenerationUtilities", () =>
   mockTextGenerationUtilities({
@@ -23,7 +20,6 @@ describe("generateTextWithHorde", () => {
   });
 
   it("calls helpers and updates state", async () => {
-    // Mock the module before importing
     vi.doMock("./textGenerationWithHorde", () => ({
       generateTextWithHorde: vi.fn().mockImplementation(async () => {
         const pubSub = await import("./pubSub");

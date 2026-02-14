@@ -2,13 +2,11 @@ import { beforeEach, describe, it, vi } from "vitest";
 import {
   mockPubSub,
   mockTextGenerationUtilities,
+  setupCommonTextGenerationMocks,
   testTextGenerationBehavior,
 } from "./testUtils";
 
-vi.mock("@root/package.json", () => ({
-  repository: { url: "https://github.com/owner/repo" },
-  version: "1.0.0",
-}));
+setupCommonTextGenerationMocks();
 vi.mock("@shared/openaiModels", () => ({
   listOpenAiCompatibleModels: vi
     .fn()

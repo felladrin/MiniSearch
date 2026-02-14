@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 interface MockNavigatorWithGpu {
   gpu?: {
@@ -11,12 +11,11 @@ function importFresh() {
   return import("./webGpu");
 }
 
-describe("webGpu module", () => {
-  beforeEach(() => {
-    // biome-ignore lint/suspicious/noExplicitAny: Necessary for test mocking
-    delete (global as any).navigator;
-  });
+function setupMockNavigator(mockNavigator: MockNavigatorWithGpu) {
+  global.navigator = { ...global.navigator, ...mockNavigator };
+}
 
+describe("webGpu module", () => {
   it("detects WebGPU availability and F16 support when adapter resolves", async () => {
     const mockNavigator: MockNavigatorWithGpu = {
       gpu: {
@@ -25,8 +24,7 @@ describe("webGpu module", () => {
         }),
       },
     };
-    // biome-ignore lint/suspicious/noExplicitAny: Necessary for test mocking
-    (global as any).navigator = mockNavigator;
+    setupMockNavigator(mockNavigator);
 
     const mod = await importFresh();
     expect(mod.isWebGPUAvailable).toBe(true);
@@ -34,14 +32,12 @@ describe("webGpu module", () => {
   });
 
   it("sets isWebGPUAvailable false when requestAdapter rejects", async () => {
-    // Mock requestAdapter to reject
     const mockNavigator: MockNavigatorWithGpu = {
       gpu: {
         requestAdapter: vi.fn().mockRejectedValue(new Error("fail")),
       },
     };
-    // biome-ignore lint/suspicious/noExplicitAny: Necessary for test mocking
-    (global as any).navigator = mockNavigator;
+    setupMockNavigator(mockNavigator);
 
     const mod = await importFresh();
     expect(mod.isWebGPUAvailable).toBe(false);
@@ -50,8 +46,7 @@ describe("webGpu module", () => {
 
   it("sets isWebGPUAvailable false when navigator has no gpu", async () => {
     const mockNavigator: MockNavigatorWithGpu = {};
-    // biome-ignore lint/suspicious/noExplicitAny: Necessary for test mocking
-    (global as any).navigator = mockNavigator;
+    setupMockNavigator(mockNavigator);
 
     const mod = await importFresh();
     expect(mod.isWebGPUAvailable).toBe(false);
