@@ -1,0 +1,15 @@
+{
+  "include": ["dependencies"],
+  "ignoreDependencies": [
+    "@mantine/code-highlight",
+    "country-flag-icons",
+    "postcss",
+    "postcss-preset-mantine",
+    "postcss-simple-vars",
+    "react-markdown",
+    "rehype-external-links",
+    "remark-gfm",
+    "shiki",
+    "globals"
+  ]
+}
