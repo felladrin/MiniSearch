@@ -17,8 +17,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "json", "json-summary"],
-      include: ["client/**/*.{tsx,ts,jsx,js}"],
-      exclude: ["client/dist/**"],
+      include: ["client/**/*.{tsx,ts,jsx,js}", "server/**/*.{ts,js}"],
+      exclude: ["client/dist/**", "server/**/*.test.ts"],
     },
   },
   define: {
