@@ -66,29 +66,38 @@ Need to:
 ## Key Files Reference
 
 ### Entry Points
-- `client/main.tsx` - React app initialization
+- `client/index.tsx` - React app initialization
 - `vite.config.ts` - Vite dev server with hooks
 - `Dockerfile` - Multi-stage container build
 
-### Core Modules (Business Logic)
+### Business Logic Modules
 - `client/modules/search.ts` - Search orchestration and caching
 - `client/modules/textGeneration.ts` - AI response flow
 - `client/modules/pubSub.ts` - All PubSub channels
 - `client/modules/settings.ts` - Settings management
 - `client/modules/history.ts` - Search history database
 
-### Server-Side
+### Server-Side Modules
 - `server/searchEndpointServerHook.ts` - `/search` endpoints
 - `server/internalApiEndpointServerHook.ts` - `/inference` proxy
 - `server/webSearchService.ts` - SearXNG integration
 - `server/rerankerService.ts` - Local result reranking
 
-### Components (Key)
+### Key Components
 - `client/components/App/` - Application shell
 - `client/components/Search/Form/` - Search input
 - `client/components/Search/Results/` - Results display
 - `client/components/AiResponse/` - AI response + chat
 - `client/components/Pages/Main/Menu/` - Settings drawers
+- `client/modules/webGpu.ts` - Detects WebGPU availability and F16 shader support for WebLLM
+- `client/modules/querySuggestions.ts` - Provides search suggestion UI, stored in IndexedDB
+- `client/modules/relatedSearchQuery.ts` - Generates related search queries
+- `client/modules/followUpQuestions.ts` - Generates suggested follow-up questions, uses `followUpQuestionPubSub`
+- `client/modules/accessKey.ts` - Validates and stores access keys, uses `accessKeyValidatedPubSub`
+- `client/modules/parentWindow.ts` - PostMessage API for embedding in parent windows
+- `client/hooks/` - Reusable React hooks
+- `server/searchToken.ts` - Generates CSRF protection tokens for search requests
+- `server/downloadFileFromHuggingFaceRepository.ts` - Downloads GGUF models from HuggingFace using `@huggingface/hub` package
 
 ## Common Tasks Quick Reference
 

@@ -32,7 +32,7 @@ MiniSearch integrates multiple technology stacks within a unified deployment con
 
 The application has three primary entry points:
 
-1. **Browser Entry**: `client/main.tsx` initializes the React application, mounting the root component and setting up error boundaries.
+1. **Browser Entry**: `client/index.tsx` initializes the React application, mounting the root component and setting up error boundaries.
 
 2. **Server Entry**: `vite.config.ts` configures the Vite development and preview servers, registering server hooks for search and inference endpoints.
 
