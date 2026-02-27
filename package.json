@@ -61,7 +61,7 @@
     "react-markdown": "^10.0.0",
     "rehype-external-links": "^3.0.0",
     "remark-gfm": "^4.0.0",
-    "shiki": "^3.4.2",
+    "shiki": "^4.0.0",
     "temp-dir": "^3.0.0",
     "throttleit": "^2.1.0",
     "wouter": "^3.3.0",
