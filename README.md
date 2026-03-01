@@ -107,7 +107,23 @@ Once the container is running, open http://localhost:7860 in your browser and st
 
 <details>
   <summary>How can I contribute to the development of this tool?</summary>
-  <p>Fork this repository and clone it. Then, start the development server by running the following command:</p>
-  <p><code>docker compose up</code></p>
-  <p>Make your changes, push them to your fork, and open a pull request! All contributions are welcome!</p>
+  <p>We welcome contributions! Please read our <a href=".github/CONTRIBUTING.md">Contributing Guidelines</a> for detailed information on how to get started.</p>
+  <p>Quick start:</p>
+  <ol>
+    <li>Fork this repository and clone it</li>
+    <li>Start the development server: <code>docker compose up</code></li>
+    <li>Make your changes and test them</li>
+    <li>Push to your fork and open a pull request</li>
+  </ol>
+  <p>All contributions are welcome! 🎉</p>
+</details>
+
+<details>
+  <summary>Where can I find more information?</summary>
+  <ul>
+    <li><a href=".github/CONTRIBUTING.md">Contributing Guidelines</a> - How to contribute to MiniSearch</li>
+    <li><a href=".github/CODE_OF_CONDUCT.md">Code of Conduct</a> - Our community guidelines</li>
+    <li><a href=".github/SECURITY.md">Security Policy</a> - How to report security vulnerabilities</li>
+    <li><a href="docs/">Documentation</a> - Detailed project documentation</li>
+  </ul>
 </details>

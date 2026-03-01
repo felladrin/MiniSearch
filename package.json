@@ -16,7 +16,7 @@
     "start": "vite preview",
     "build": "vite build",
     "dev": "vite",
-    "lint": "biome check && tsc && knip && jscpd client server --ignore \"**/dist/**\" && node scripts/architectural-linter.cjs && node scripts/doc-gardening.cjs",
+    "lint": "biome check && tsc && knip && jscpd client server --ignore \"**/dist/**\" && node scripts/architectural-linter.cjs && node scripts/doc-gardening.cjs && node scripts/documentation-validator.cjs",
     "format": "biome check --write",
     "prepare": "husky",
     "test": "vitest run",
