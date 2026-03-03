@@ -7,8 +7,8 @@
  * It checks markdown files for internal links and verifies the targets exist.
  */
 
-const fs = require("fs");
-const path = require("path");
+const fs = require("node:fs");
+const path = require("node:path");
 
 // Configuration
 const docsDir = path.join(__dirname, "..");
