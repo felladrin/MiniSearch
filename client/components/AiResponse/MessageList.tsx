@@ -110,7 +110,7 @@ const MessageList = memo(function MessageList({
             message.role === "assistant";
           return (
             <Message
-              key={`${message.role}-${index}`}
+              key={`${message.role}-${message.content.slice(0, 50)}`}
               message={message}
               index={index}
               absoluteIndex={absoluteIndex}
