@@ -8,16 +8,16 @@ import {
 } from "./searchesSinceLastRestart";
 import { fetchSearXNG } from "./webSearchService";
 
-/**
- * Timeout for thumbnail fetching in milliseconds
- */
 const THUMBNAIL_TIMEOUT_MS = 1000;
 
-/**
- * Fetches a thumbnail and converts it to a data URL
- * @param thumbnailSource - URL of the thumbnail image
- * @returns Promise resolving to data URL string
- */
+type TextResult = [title: string, content: string, url: string];
+type ImageResult = [
+  title: string,
+  url: string,
+  thumbnailSource: string,
+  sourceUrl: string,
+];
+
 async function fetchThumbnailAsDataUrl(thumbnailSource: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), THUMBNAIL_TIMEOUT_MS);
@@ -42,13 +42,6 @@ async function fetchThumbnailAsDataUrl(thumbnailSource: string) {
   }
 }
 
-/**
- * Handles search result ranking using the reranker service
- * @param query - Search query
- * @param results - Search results to rank
- * @param isTextSearch - Whether this is a text search
- * @returns Promise resolving to ranked results
- */
 async function handleRanking(
   query: string,
   results: [title: string, content: string, url: string][],
@@ -73,14 +66,13 @@ async function handleRanking(
   }
 }
 
-type TextResult = [title: string, content: string, url: string];
-type ImageResult = [
-  title: string,
-  url: string,
-  thumbnailSource: string,
-  sourceUrl: string,
-];
-
+/**
+ * Sets up search endpoint middleware for the Vite server.
+ * Handles both text and image search requests with token verification, result ranking, and thumbnail processing.
+ *
+ * @param server - The Vite dev server or preview server instance
+ * @returns void - Modifies the server middleware in place
+ */
 export function searchEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
 >(server: T) {
@@ -106,6 +98,7 @@ export function searchEndpointServerHook<
     try {
       const isTextSearch = request.url?.startsWith("/search/text");
       const searchType = isTextSearch ? "text" : "images";
+
       const searxngResults = await fetchSearXNG(query, searchType, limit);
 
       if (isTextSearch) {
@@ -119,7 +112,7 @@ export function searchEndpointServerHook<
       } else {
         const results = searxngResults as ImageResult[];
         const resultsText = results.map(
-          ([title, url]) => [title.slice(0, 100), "", url] as TextResult,
+          ([title, url]) => [title?.slice(0, 100) || "", "", url] as TextResult,
         );
         const rankedResults = await handleRanking(query, resultsText);
 

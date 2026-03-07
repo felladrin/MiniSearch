@@ -73,6 +73,26 @@ export default function SearchForm({
     const initializeComponent = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const urlQuery = urlParams.get("q");
+
+      if (urlQuery && !autoInitializedQueriesRef.current.has(urlQuery)) {
+        autoInitializedQueriesRef.current.add(urlQuery);
+        updateQuery(urlQuery);
+        setState((prevState) => ({
+          ...prevState,
+          textAreaValue: urlQuery,
+        }));
+        await sleepUntilIdle();
+        searchAndRespond();
+      }
+    };
+
+    initializeComponent();
+  }, [updateQuery]);
+
+  useEffect(() => {
+    const initializeComponent = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlQuery = urlParams.get("q");
       const normalizedUrlQuery = urlQuery?.trim();
 
       const hasRestoredResults =

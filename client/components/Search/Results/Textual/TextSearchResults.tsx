@@ -1,10 +1,11 @@
-import { Alert } from "@mantine/core";
-import { IconInfoCircle } from "@tabler/icons-react";
+import { Alert, Button, Group } from "@mantine/core";
+import { IconInfoCircle, IconRefresh } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import {
   textSearchResultsPubSub,
   textSearchStatePubSub,
 } from "@/modules/pubSub";
+import { searchAndRespond } from "@/modules/textGeneration";
 
 import SearchResultsList from "./SearchResultsList";
 import TextResultsLoadingState from "./TextResultsLoadingState";
@@ -42,7 +43,17 @@ export default function TextSearchResults() {
         title="Search failed"
         icon={<IconInfoCircle />}
       >
-        Failed to fetch text results. Please try refreshing the page.
+        Failed to fetch text results. Please try again.
+        <Group mt="sm">
+          <Button
+            onClick={searchAndRespond}
+            variant="light"
+            size="sm"
+            leftSection={<IconRefresh size={16} />}
+          >
+            Retry Search
+          </Button>
+        </Group>
       </Alert>
     );
   }

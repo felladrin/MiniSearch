@@ -9,11 +9,16 @@ import {
 } from "vitest";
 import { fetchSearXNG, getWebSearchStatus } from "./webSearchService";
 
-function createMockResponse(text: string, ok = true): Response {
+function createMockResponse(
+  text: string,
+  ok = true,
+  status?: number,
+): Response {
+  const resolvedStatus = status ?? (ok ? 200 : 503);
   return {
     ok,
-    status: ok ? 200 : 500,
-    statusText: ok ? "OK" : "Internal Server Error",
+    status: resolvedStatus,
+    statusText: ok ? "OK" : "Error",
     headers: new Headers(),
     redirected: false,
     type: "basic" as ResponseType,
@@ -30,6 +35,20 @@ function createMockResponse(text: string, ok = true): Response {
     text: () => Promise.resolve(text),
   } as unknown as Response;
 }
+
+const successResponse = () =>
+  createMockResponse(
+    JSON.stringify({
+      results: [
+        {
+          title: "example",
+          url: "https://example.com",
+          content: "example content",
+          category: "general",
+        },
+      ],
+    }),
+  );
 
 let originalFetch: typeof fetch;
 let fetchMock: MockedFunction<typeof fetch>;
@@ -64,20 +83,7 @@ describe("WebSearchService", () => {
   it("should return true when health endpoint returns OK", async () => {
     (global.fetch as MockedFunction<typeof fetch>)
       .mockResolvedValueOnce(createMockResponse("OK"))
-      .mockResolvedValueOnce(
-        createMockResponse(
-          JSON.stringify({
-            results: [
-              {
-                title: "example",
-                url: "https://example.com",
-                content: "example content",
-                category: "general",
-              },
-            ],
-          }),
-        ),
-      );
+      .mockResolvedValueOnce(successResponse());
 
     const status = await getWebSearchStatus();
     expect(status).toBe(true);
@@ -92,5 +98,76 @@ describe("WebSearchService", () => {
     const results = await fetchSearXNG("test query", "text");
     expect(Array.isArray(results)).toBe(true);
     expect(results).toHaveLength(0);
+  });
+});
+
+describe("retry logic", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("retries on 500 and returns results on eventual success", async () => {
+    fetchMock
+      .mockResolvedValueOnce(createMockResponse("", false, 500))
+      .mockResolvedValueOnce(createMockResponse("", false, 500))
+      .mockResolvedValueOnce(successResponse());
+
+    const promise = fetchSearXNG("test", "text");
+    await vi.runAllTimersAsync();
+    const results = await promise;
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(results).toHaveLength(1);
+  });
+
+  it("returns empty array when all retries return 500", async () => {
+    fetchMock.mockResolvedValue(createMockResponse("", false, 500));
+
+    const promise = fetchSearXNG("test", "text");
+    await vi.runAllTimersAsync();
+    const results = await promise;
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(results).toHaveLength(0);
+  });
+});
+
+describe("circuit breaker", () => {
+  let isolatedFetchSearXNG: typeof fetchSearXNG;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    const module = await import("./webSearchService");
+    isolatedFetchSearXNG = module.fetchSearXNG;
+  });
+
+  it("opens after exactly 5 non-retriable failures", async () => {
+    fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+
+    for (let i = 0; i < 5; i++) {
+      await isolatedFetchSearXNG("test", "text");
+    }
+
+    const callsBeforeBreak = fetchMock.mock.calls.length;
+    await isolatedFetchSearXNG("test", "text");
+
+    expect(fetchMock.mock.calls.length).toBe(callsBeforeBreak);
+  });
+
+  it("does not open before 5 failures", async () => {
+    fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+
+    for (let i = 0; i < 4; i++) {
+      await isolatedFetchSearXNG("test", "text");
+    }
+
+    const callsBefore = fetchMock.mock.calls.length;
+    await isolatedFetchSearXNG("test", "text");
+
+    expect(fetchMock.mock.calls.length).toBe(callsBefore + 1);
   });
 });
