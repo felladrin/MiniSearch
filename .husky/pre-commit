@@ -1,1 +1,2 @@
-npm install --no-save @biomejs/biome && npx @biomejs/biome check --write --staged --no-errors-on-unmatched
+#!/usr/bin/env sh
+npm install --no-save @biomejs/biome && npx @biomejs/biome check --write --staged --no-errors-on-unmatched && git diff --name-only --cached | while read -r file; do git add "$file"; done
