@@ -8,6 +8,8 @@ type LogEntry = {
   timestamp: string;
   /** The log message content */
   message: string;
+  /** Unique identifier for the log entry */
+  id: string;
 };
 
 /**
@@ -27,6 +29,7 @@ export function addLogEntry(message: string) {
     {
       timestamp: new Date().toISOString(),
       message,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
     },
   ]);
 }

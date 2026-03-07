@@ -113,7 +113,7 @@ export default function LogsModal({
         </Table.Thead>
         <Table.Tbody>
           {logEntriesFromCurrentPage.map((entry) => (
-            <Table.Tr key={entry.timestamp}>
+            <Table.Tr key={entry.id}>
               <Table.Td>
                 {new Date(entry.timestamp).toLocaleTimeString()}
               </Table.Td>
