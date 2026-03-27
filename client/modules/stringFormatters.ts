@@ -19,8 +19,11 @@ export function getHostname(url: string) {
  * @returns Semantic version string
  */
 export function getSemanticVersion(date: number | string | Date) {
-  const targetDate = new Date(date);
-  return `${targetDate.getFullYear()}.${targetDate.getMonth() + 1}.${targetDate.getDate()}`;
+  const targetDate =
+    typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? new Date(`${date}T00:00:00Z`)
+      : new Date(date);
+  return `${targetDate.getUTCFullYear()}.${targetDate.getUTCMonth() + 1}.${targetDate.getUTCDate()}`;
 }
 
 /**
