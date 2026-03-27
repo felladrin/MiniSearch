@@ -16,7 +16,7 @@
 
 ## Data Protection
 
-- **Encrypted Storage**: Optional encryption for sensitive data
+- **Access Key Hashing**: Access keys hashed using argon2id before storage (via hash-wasm)
 - **TTL-based Cleanup**: Automatic cleanup of cached data
 - **No PII Collection**: No personally identifiable information stored
 - **User Control**: Users can export and delete all their data
@@ -28,8 +28,9 @@
 - Secure random token generation
 - HTTPS enforcement in production
 - Regular dependency updates via Renovate
-- **Argon2 Hashing**: Access keys hashed using argon2id for secure storage
+- **Argon2 Hashing**: Access keys hashed using argon2id for secure validation (not storage encryption)
 - **Cross-Origin Isolation**: COOP/COEP headers for SharedArrayBuffer security
+- **CSRF Protection**: Search tokens validated via argon2 hash comparison
 
 ## Threat Model
 

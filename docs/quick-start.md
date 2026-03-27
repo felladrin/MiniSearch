@@ -3,8 +3,9 @@
 ## Prerequisites
 
 - Docker Desktop or Docker Engine
-- Node.js 22+ (for local development only)
+- Node.js LTS (for local development only)
 - Git
+- Modern browser with WebGPU support (for optimal AI performance)
 
 ## Installation & Running
 
@@ -15,16 +16,18 @@
 git clone https://github.com/felladrin/MiniSearch.git
 cd MiniSearch
 
-# Start all services (SearXNG, llama-server, Node.js app)
+# Start all services (SearXNG, Node.js app with HMR)
 docker compose up
 ```
 
-Access the application at `http://localhost:7861`
+Access the application at `http://localhost:7861` (HMR) or `http://localhost:7860` (main)
 
 The development server includes:
-- Hot Module Replacement (HMR) for instant code changes
+- Hot Module Replacement (HMR) on port 7861 for instant code changes
 - Full dev tools and source maps
 - Live code watching with volume mounts
+- Integrated SearXNG search service
+- Biome formatting and linting on save
 
 ### Production
 
@@ -51,8 +54,12 @@ MiniSearch works out of the box with browser-based AI inference. Search works im
 1. Open the application
 2. Click **Settings** (gear icon)
 3. Toggle **Enable AI Response**
-4. The app will download ~300MB-1GB model files on first use
-5. Subsequent loads are instant (cached in IndexedDB)
+4. Choose inference type:
+   - **Browser** (recommended): Uses WebLLM with WebGPU or Wllama for local processing
+   - **Internal API**: Configure OpenAI-compatible endpoint
+   - **AI Horde**: Pre-configured distributed computing
+5. The app will download ~300MB-1GB model files on first use (browser mode)
+6. Subsequent loads are instant (cached in IndexedDB)
 
 ### Optional: Restrict Access
 
@@ -83,6 +90,8 @@ npm run dev
 
 Access at `http://localhost:7860`
 
+**Note**: Running without Docker requires manual SearXNG setup and environment configuration.
+
 ## Verification
 
 ### Test Search
@@ -110,9 +119,11 @@ docker compose logs searxng
 
 ### Issue: AI response never loads
 **Solution**: Check browser console for errors. Common causes:
-- WebGPU not supported (use Wllama inference instead)
-- Model download blocked by firewall
+- WebGPU not supported (app will automatically fall back to Wllama)
+- Model download blocked by firewall or CORS
 - Insufficient disk space for model caching
+- Browser extensions blocking WebAssembly
+- Try switching inference types in Settings
 
 ### Issue: Access key not working
 **Solution**: Ensure `ACCESS_KEYS` is set in `.env` file and containers were rebuilt with `--build` flag.

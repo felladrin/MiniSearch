@@ -11,17 +11,20 @@
 ## Design Principles
 
 ### User Interface
-- Minimal visual clutter
+- Minimal visual clutter with Mantine v8 components
 - Clear hierarchy and information architecture
-- Keyboard-first navigation
-- Semantic HTML and ARIA labels
+- Keyboard-first navigation with comprehensive shortcuts
+- Semantic HTML and ARIA labels for WCAG 2.1 AA compliance
 - Responsive design for desktop and mobile
+- Dark mode support with high contrast options
 
 ### Performance
-- Lazy loading for routes and components
-- Optimized bundle size
-- Efficient state management with PubSub
+- Lazy loading for routes and components with React.lazy()
+- Optimized bundle size using Vite 8 build optimizations
+- Efficient state management with create-pubsub
 - Caching strategies for search results and AI responses
+- WebGPU detection and F16 shader support for optimal AI inference
+- Bundle analysis with rollup-plugin-visualizer
 
 ### Accessibility
 - WCAG 2.1 AA compliance
@@ -32,18 +35,27 @@
 
 ## Component Design
 
-- Feature-based component organization
-- Self-contained component folders
-- Consistent use of Mantine UI components
-- Custom hooks for reusable logic
-- Proper TypeScript typing throughout
+- Feature-based component organization in `client/components/`
+- Self-contained component folders with co-located tests
+- Consistent use of Mantine UI v8 components and hooks
+- Custom hooks for reusable logic in `client/hooks/`
+- Business logic separated into `client/modules/`
+- Proper TypeScript typing throughout with strict mode
+- React 19 patterns with function components (no React.FC)
 
-## Color Scheme
+## Technology Integration
 
-- Neutral, professional palette
-- High contrast for readability
-- Dark mode support
-- Consistent spacing and sizing
+### AI & Search
+- Multiple inference engines: WebLLM (WebGPU), Wllama, OpenAI-compatible APIs
+- Privacy-first local processing when possible
+- SearXNG integration for web search
+- Graceful fallbacks for unsupported browsers
+
+### Development Experience
+- Hot Module Replacement with Vite
+- Biome for consistent formatting and linting
+- Comprehensive testing with Vitest and Testing Library
+- Docker-based development environment
 
 ## Related Topics
 

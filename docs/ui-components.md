@@ -30,13 +30,27 @@ All state channels are defined in `client/modules/pubSub.ts`:
 |---------|------|-------------|-------------------|
 | `queryPubSub` | `string` | Current search query | SearchForm, SearchButton |
 | `responsePubSub` | `string` | AI response content (throttled: 12/sec) | AiResponseSection |
+| `reasoningContentPubSub` | `string` | AI reasoning/thinking content (throttled: 12/sec) | AiResponseSection |
 | `settingsPubSub` | `Settings` | Application settings | SettingsForm, various components |
 | `textSearchResultsPubSub` | `TextSearchResults` | Text search results | SearchResultsSection |
+| `llmTextSearchResultsPubSub` | `TextSearchResults` | LLM-reranked text results | Internal use |
 | `imageSearchResultsPubSub` | `ImageSearchResults` | Image search results | ImageResultsSection |
+| `textSearchStatePubSub` | `SearchState` | Text search loading/error state | SearchResultsSection, LoadingIndicators |
+| `imageSearchStatePubSub` | `SearchState` | Image search loading/error state | ImageResultsSection |
 | `textGenerationStatePubSub` | `TextGenerationState` | AI generation state | AiResponseSection, StatusIndicators |
+| `modelLoadingProgressPubSub` | `number` | Model download progress (0-100) | AiResponseSection |
+| `modelSizeInMegabytesPubSub` | `number` | Model size in MB for progress calc | AiResponseSection |
 | `chatMessagesPubSub` | `ChatMessage[]` | Chat conversation | ChatSection, ChatInput |
+| `chatInputPubSub` | `string` | Current chat input content | ChatInput |
+| `chatGenerationStatePubSub` | `{isGeneratingResponse, isGeneratingFollowUpQuestion}` | Chat generation states | ChatSection |
 | `conversationSummaryPubSub` | `{id, summary}` | Rolling conversation summary | TextGeneration module |
-| `textSearchStatePubSub` | `SearchState` | Search loading/error state | SearchResultsSection, LoadingIndicators |
+| `followUpQuestionPubSub` | `string` | Generated follow-up question | AiResponseSection |
+| `suppressNextFollowUpPubSub` | `boolean` | Flag to skip next follow-up | FollowUpQuestions module |
+| `isRestoringFromHistoryPubSub` | `boolean` | History restoration in progress | SearchForm, components |
+| `menuExpandedAccordionsPubSub` | `string[]` | Expanded menu accordion IDs | SettingsDrawer |
+| `querySuggestionsPubSub` | `string[]` | Query suggestions history | SearchForm |
+| `lastSearchTokenHashPubSub` | `string` | Hash of last search token | Security/validation |
+| `logEntriesPubSub` | `LogEntry[]` | Application log entries | LogsModal, ShowLogsButton |
 
 ## Component Hierarchy
 

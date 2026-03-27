@@ -11,7 +11,7 @@ The `HistoryDatabase` Dexie instance stores three related tables:
 2. `llmResponses` – snapshot of every AI answer tied to its originating search run, enabling restoration of the assistant output.
 3. `chatHistory` – chronological record of chat turns (user/assistant roles) scoped by `conversationId` (the `searchRunId`).
 
-All three tables share a `searchRunId` foreign key so restoring a specific run can bring back the search results, saved AI response, and chat transcript atomically. @client/modules/history.ts#86-367
+All three tables share a `searchRunId` foreign key so restoring a specific run can bring back the search results, saved AI response, and chat transcript atomically. @client/modules/history.ts#86-409
 
 ## Cleanup Guarantees
 To keep IndexedDB lean, inserts trigger `performCleanup()`, which enforces:
@@ -20,7 +20,7 @@ To keep IndexedDB lean, inserts trigger `performCleanup()`, which enforces:
 - **Max entries** – if the total exceeds `historyMaxEntries`, the oldest unpinned rows past the limit are removed.
 - **Pin protection** – pinned entries are skipped by both retention and max-entry sweeps.
 
-Cleanup is gated by `historyAutoCleanup`, so advanced users can opt out. These knobs come from the settings store and can be updated at runtime. @client/modules/history.ts#147-200 @client/modules/settings.ts#7-52
+Cleanup is gated by `historyAutoCleanup`, so advanced users can opt out. These knobs come from the settings store and can be updated at runtime. @client/modules/history.ts#148-201 @client/modules/settings.ts#44-48
 
 ## Hook API
 `useSearchHistory` exposes the canonical API surface for components:
@@ -30,7 +30,7 @@ Cleanup is gated by `historyAutoCleanup`, so advanced users can opt out. These k
 - Keeps derived state such as grouped sections (Today/Yesterday/etc.) in sync with the settings flag `historyGroupByDate`.
 - Refreshes itself on an interval so the History UI stays live even if other tabs mutate the DB.
 
-Because the hook writes via Dexie directly, any component can call `addToHistory` to persist new runs immediately after text or image searches resolve. @client/hooks/useSearchHistory.ts#1-372
+Because the hook writes via Dexie directly, any component can call `addSearchToHistory` to persist new runs immediately after text or image searches resolve. @client/hooks/useSearchHistory.ts
 
 ## UI Surfaces
 - **History Drawer** – wraps the hook data in a drawer with filtering, pin/delete affordances, grouped stacks, and an Analytics tab powered by `SearchStats` in compact mode. The drawer guards against disabled history settings and mirrors the hook filtered list in real time. @client/components/Search/History/HistoryDrawer.tsx#35-315

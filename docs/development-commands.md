@@ -5,7 +5,7 @@
 - **`docker compose up`**: Start development server with HMR on port 7861
 - **`docker compose up --build`**: Compile for production
 - **`docker compose exec development-server npm run start`**: Preview production build
-- **`docker compose exec development-server npm run lint`**: Check code quality (Biome, TypeScript, dependencies)
+- **`docker compose exec development-server npm run lint`**: Check code quality (Biome, TypeScript, knip, jscpd, architectural linter, documentation validator)
 - **`docker compose exec development-server npm run format`**: Auto-format code with Biome
 
 ## Docker
@@ -48,7 +48,7 @@ AI agents can parse these to identify:
 
 ## Quality Assurance
 
-- **`docker compose exec development-server npm run lint`**: Biome linting, TypeScript checking, and dependency validation
+- **`docker compose exec development-server npm run lint`**: Biome linting, TypeScript checking, dependency validation, copy-paste detection, architectural validation, and documentation checks
 - **`docker compose exec development-server npm run format`**: Format code with Biome (enforced via pre-commit hooks)
 
 ## Related Topics

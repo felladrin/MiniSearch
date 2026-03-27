@@ -66,11 +66,15 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `enableAiResponse` | boolean | `false` | Enable AI-generated responses for searches |
+| `showEnableAiResponsePrompt` | boolean | `true` | Show prompt to enable AI response on first use |
 | `enableWebGpu` | boolean | `true` | Use WebGPU acceleration when available |
 | `enableImageSearch` | boolean | `true` | Include image results in searches |
+| `enableTextSearch` | boolean | `true` | Include text results in searches |
 | `searchResultsToConsider` | number | `3` | Number of top search results to include in AI context |
 | `searchResultsLimit` | number | `15` | Maximum search results to fetch |
 | `systemPrompt` | string | (template) | Custom system prompt template for AI |
+| `enterToSubmit` | boolean | `true` | Press Enter to submit query (vs Shift+Enter for new line) |
+| `enableAiResponseScrolling` | boolean | `true` | Auto-scroll AI response as it generates |
 
 ### Inference Settings
 
@@ -82,7 +86,11 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `inferenceMaxTokens` | number | `4096` | Maximum tokens per generation |
 | `inferenceTopK` | number | `40` | Top-K sampling parameter (browser only) |
 | `minP` | number | `0.1` | Min-p sampling threshold |
+| `inferenceFrequencyPenalty` | number | `0` | Penalty for token frequency |
+| `inferencePresencePenalty` | number | `0` | Penalty for token presence |
 | `repeatPenalty` | number | `1.1` | Penalty for token repetition |
+| `cpuThreads` | number | (auto) | Number of CPU threads for inference (Wllama) |
+| `allowAiModelDownload` | boolean | `false` | Allow automatic AI model downloads |
 
 ### Model Selection
 
@@ -111,16 +119,19 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
+| `enableHistory` | boolean | `true` | Enable search history persistence |
 | `historyRetentionDays` | number | `30` | Days to keep search history |
 | `historyMaxEntries` | number | `1000` | Maximum history entries before cleanup |
-| `enableHistorySync` | boolean | `true` | Save history to IndexedDB |
+| `historyAutoCleanup` | boolean | `true` | Automatically clean old history entries |
+| `historyGroupByDate` | boolean | `true` | Group history entries by date in UI |
 
 ### Privacy Settings
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `enableTelemetry` | boolean | `false` | Enable anonymous usage analytics |
-| `shareModelDownloads` | boolean | `true` | Share model downloads via WebRTC (peer-to-peer) |
+| `selectedVoiceId` | string | `""` | Voice ID for text-to-speech |
+| `reasoningStartMarker` | string | `"<think>"` | Marker for start of reasoning content |
+| `reasoningEndMarker` | string | `"</think>"` | Marker for end of reasoning content |
 
 ## Docker Configuration
 
