@@ -12,7 +12,10 @@ function importFresh() {
 }
 
 function setupMockNavigator(mockNavigator: MockNavigatorWithGpu) {
-  global.navigator = { ...global.navigator, ...mockNavigator };
+  global.navigator = {
+    ...global.navigator,
+    ...mockNavigator,
+  } as typeof global.navigator;
 }
 
 describe("webGpu module", () => {
