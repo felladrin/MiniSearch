@@ -84,7 +84,7 @@
     "husky": "^9.1.7",
     "jscpd": "^4.0.5",
     "jsdom": "^29.0.0",
-    "knip": "^5.84.1",
+    "knip": "^6.0.0",
     "less": "^4.2.0",
     "rollup-plugin-visualizer": "^7.0.0",
     "typescript": "^5.0.2",
