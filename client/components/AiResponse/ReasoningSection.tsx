@@ -62,7 +62,7 @@ export default function ReasoningSection({
           </Flex>
         </Group>
       </UnstyledButton>
-      <Collapse in={isOpen}>
+      <Collapse expanded={isOpen}>
         <Box
           style={(theme) => ({
             backgroundColor: theme.colors.dark[8],

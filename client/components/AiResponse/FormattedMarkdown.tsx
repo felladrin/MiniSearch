@@ -1,4 +1,4 @@
-import { TypographyStylesProvider } from "@mantine/core";
+import { Typography } from "@mantine/core";
 import { useReasoningContent } from "./hooks/useReasoningContent";
 import MarkdownRenderer from "./MarkdownRenderer";
 import ReasoningSection from "./ReasoningSection";
@@ -22,7 +22,7 @@ export default function FormattedMarkdown({
   }
 
   return (
-    <TypographyStylesProvider p="lg">
+    <Typography p="lg">
       {reasoningContent && (
         <ReasoningSection
           content={reasoningContent}
@@ -36,6 +36,6 @@ export default function FormattedMarkdown({
           className={className}
         />
       )}
-    </TypographyStylesProvider>
+    </Typography>
   );
 }

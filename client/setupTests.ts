@@ -34,3 +34,11 @@ class IntersectionObserverMock {
 }
 
 vi.stubGlobal("IntersectionObserver", IntersectionObserverMock);
+
+Object.defineProperty(document, "fonts", {
+  writable: true,
+  value: {
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  },
+});
