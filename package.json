@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.0",
+    "@tavily/core": "^0.6.0",
     "@huggingface/hub": "^2.0.0",
     "@leeoniya/ufuzzy": "^1.0.19",
     "@mantine/carousel": "^9.0.0",

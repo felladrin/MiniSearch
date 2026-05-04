@@ -1,4 +1,5 @@
 import { basename } from "node:path";
+import { tavily } from "@tavily/core";
 import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
@@ -10,6 +11,9 @@ printMessage.enabled = true;
 const SERVICE_HOST = "127.0.0.1";
 const SERVICE_PORT = 8888;
 const SERVICE_BASE_URL = `http://${SERVICE_HOST}:${SERVICE_PORT}`;
+
+const SEARCH_PROVIDER = process.env.SEARCH_PROVIDER ?? "searxng";
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY ?? "";
 
 interface CircuitBreakerState {
   failures: number;
@@ -200,12 +204,35 @@ async function processSearchResults(
   return filterNullResults(graphicalResults);
 }
 
+async function fetchTavily(
+  query: string,
+  limit: number,
+): Promise<[title: string, content: string, url: string][]> {
+  const client = tavily({ apiKey: TAVILY_API_KEY });
+  const response = await client.search(query, {
+    maxResults: Math.min(limit, 20),
+    searchDepth: "basic",
+    topic: "general",
+  });
+
+  const results: [title: string, content: string, url: string][] = [];
+  for (const result of response.results) {
+    if (result.title && result.content && result.url) {
+      results.push([result.title, result.content, result.url]);
+    }
+  }
+  return results;
+}
+
 export async function fetchSearXNG(
   query: string,
   searchType: SearchType,
   limit = 30,
 ) {
   try {
+    if (SEARCH_PROVIDER === "tavily" && searchType === "text") {
+      return await fetchTavily(query, limit);
+    }
     return await processSearchResults(query, searchType, limit);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
