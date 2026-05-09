@@ -110,12 +110,13 @@ async function generateWithWllama({
 
     let streamedMessage = "";
 
-    const stream = await wllama.createChatCompletion(messages, {
-      nPredict: defaultContextSize,
-      stopTokens: model.stopTokens,
-      sampling: model.getSampling(),
+    const stream = await wllama.createChatCompletion({
+      messages,
+      max_tokens: defaultContextSize,
       stream: true,
+      onData: () => {},
       abortSignal: abortController.signal,
+      ...model.getSampling(),
     });
 
     for await (const chunk of stream) {
@@ -130,9 +131,12 @@ async function generateWithWllama({
         }
       }
 
+      const delta = chunk.choices[0]?.delta?.content ?? "";
+      if (!delta) continue;
+      streamedMessage += delta;
       streamedMessage = handleWllamaCompletion(
         model,
-        chunk.currentText,
+        streamedMessage,
         () => abortController.abort(),
         onUpdate,
       );

@@ -1,6 +1,6 @@
 import {
-  type LoadModelConfig,
-  type SamplingConfig,
+  type LoadModelParams,
+  type SamplingParams,
   Wllama,
   type WllamaConfig,
 } from "@wllama/wllama";
@@ -11,21 +11,11 @@ import { addLogEntry } from "./logEntries";
 import { getSettings } from "./pubSub";
 import { defaultContextSize } from "./textGenerationUtilities";
 
-/**
- * Configuration for Wllama initialization
- */
 interface WllamaInitConfig {
-  /** Wllama configuration options */
   wllama?: WllamaConfig;
-  /** Model loading and download options */
-  model?: LoadModelConfig & DownloadOptions;
+  model?: LoadModelParams & DownloadOptions;
 }
 
-/**
- * Creates a new Wllama instance with configured WASM URLs
- * @param config - Optional Wllama configuration
- * @returns Promise resolving to a Wllama instance
- */
 async function createWllamaInstance(config?: WllamaConfig): Promise<Wllama> {
   try {
     return new Wllama(
@@ -45,13 +35,6 @@ async function createWllamaInstance(config?: WllamaConfig): Promise<Wllama> {
   }
 }
 
-/**
- * Initializes Wllama with a specific model from HuggingFace
- * @param hfRepoId - HuggingFace repository ID
- * @param hfFilePath - File path within the repository
- * @param config - Optional initialization configuration
- * @returns Promise resolving to initialized Wllama instance
- */
 export async function initializeWllama(
   hfRepoId: string,
   hfFilePath: string,
@@ -62,26 +45,27 @@ export async function initializeWllama(
   try {
     const wllama = await createWllamaInstance(config?.wllama);
 
-    await wllama.loadModelFromHF(hfRepoId, hfFilePath, {
-      ...config?.model,
-      n_threads: 1,
-    });
+    await wllama.loadModelFromHF(
+      { repo: hfRepoId, file: hfFilePath },
+      {
+        ...config?.model,
+        n_threads: 1,
+      },
+    );
 
     const randomDigitOrLetter = Math.random().toString(36).charAt(2);
 
-    const warmupResponse = await wllama.createChatCompletion(
-      [
+    const warmupResponse = await wllama.createChatCompletion({
+      messages: [
         {
           role: "user",
           content: randomDigitOrLetter,
         },
       ],
-      {
-        nPredict: 1,
-      },
-    );
+      max_tokens: 1,
+    });
 
-    const hasWarmupSucceeded = warmupResponse.length > 0;
+    const hasWarmupSucceeded = !!warmupResponse.choices[0]?.message?.content;
 
     addLogEntry(
       `Wllama warmup ${hasWarmupSucceeded ? "succeeded" : "failed"}.`,
@@ -89,7 +73,10 @@ export async function initializeWllama(
 
     await wllama.exit();
 
-    await wllama.loadModelFromHF(hfRepoId, hfFilePath, config?.model);
+    await wllama.loadModelFromHF(
+      { repo: hfRepoId, file: hfFilePath },
+      config?.model,
+    );
 
     addLogEntry("Wllama initialized successfully");
 
@@ -126,15 +113,14 @@ export interface WllamaModel {
   readonly label: string;
   readonly hfRepoId: string;
   readonly hfFilePath: string;
-  readonly cacheTypeK: LoadModelConfig["cache_type_k"];
-  readonly cacheTypeV: LoadModelConfig["cache_type_v"];
+  readonly cacheTypeK: LoadModelParams["cache_type_k"];
+  readonly cacheTypeV: LoadModelParams["cache_type_v"];
   readonly contextSize: number;
   readonly fileSizeInMegabytes: number;
   readonly shouldIncludeUrlsOnPrompt: boolean;
   readonly stopStrings?: string[];
-  readonly stopTokens?: number[];
   readonly flash_attn?: boolean;
-  getSampling: () => SamplingConfig;
+  getSampling: () => SamplingParams;
 }
 
 const createDefaultModelConfig = (): Omit<
@@ -158,11 +144,7 @@ const createDefaultModelConfig = (): Omit<
       top_k: 0,
       penalty_repeat: 1,
       penalty_last_n: defaultContextSize,
-      dry_base: 1.75,
-      dry_multiplier: 0.25,
-      dry_allowed_length: 3,
-      dry_penalty_last_n: defaultContextSize,
-    } as SamplingConfig;
+    };
   },
 });
 
