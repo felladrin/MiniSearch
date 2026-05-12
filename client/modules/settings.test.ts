@@ -5,7 +5,6 @@ describe("Settings Module", () => {
   it("should have correct default settings values", () => {
     expect(defaultSettings.showEnableAiResponsePrompt).toBe(true);
     expect(defaultSettings.enableAiResponse).toBe(false);
-    expect(defaultSettings.enableWebGpu).toBe(true);
     expect(defaultSettings.enableImageSearch).toBe(true);
     expect(defaultSettings.searchResultsToConsider).toBe(3);
     expect(defaultSettings.searchResultsLimit).toBe(15);

@@ -36,7 +36,6 @@ import type {
   ImageSearchResults,
   TextSearchResults,
 } from "./types";
-import { isWebGPUAvailable } from "./webGpu";
 
 const SUMMARY_TOKEN_LIMIT = 800;
 
@@ -50,9 +49,7 @@ function getCurrentModelName(): string {
     case "internal":
       return "Internal API";
     case "browser":
-      return settings.enableWebGpu
-        ? settings.webLlmModelId || "WebLLM"
-        : settings.wllamaModelId || "Wllama";
+      return settings.wllamaModelId || "Wllama";
     default:
       return "Unknown";
   }
@@ -117,12 +114,6 @@ async function createLlmSummary(
       return (await generateChatWithHorde(chat, () => {})).trim();
     }
 
-    if (isWebGPUAvailable && settings.enableWebGpu) {
-      const { generateChatWithWebLlm } = await import(
-        "./textGenerationWithWebLlm"
-      );
-      return (await generateChatWithWebLlm(chat, () => {})).trim();
-    }
     const { generateChatWithWllama } = await import(
       "./textGenerationWithWllama"
     );
@@ -223,17 +214,10 @@ export async function searchAndRespond() {
       await canDownloadModels();
       updateTextGenerationState("loadingModel");
 
-      if (isWebGPUAvailable && settings.enableWebGpu) {
-        const { generateTextWithWebLlm } = await import(
-          "./textGenerationWithWebLlm"
-        );
-        await generateTextWithWebLlm();
-      } else {
-        const { generateTextWithWllama } = await import(
-          "./textGenerationWithWllama"
-        );
-        await generateTextWithWllama();
-      }
+      const { generateTextWithWllama } = await import(
+        "./textGenerationWithWllama"
+      );
+      await generateTextWithWllama();
     }
 
     try {
@@ -355,17 +339,10 @@ export async function generateChatResponse(
       );
       response = await generateChatWithHorde(lastMessages, onUpdate);
     } else {
-      if (isWebGPUAvailable && settings.enableWebGpu) {
-        const { generateChatWithWebLlm } = await import(
-          "./textGenerationWithWebLlm"
-        );
-        response = await generateChatWithWebLlm(lastMessages, onUpdate);
-      } else {
-        const { generateChatWithWllama } = await import(
-          "./textGenerationWithWllama"
-        );
-        response = await generateChatWithWllama(lastMessages, onUpdate);
-      }
+      const { generateChatWithWllama } = await import(
+        "./textGenerationWithWllama"
+      );
+      response = await generateChatWithWllama(lastMessages, onUpdate);
     }
   } catch (error) {
     if (error instanceof ChatGenerationError) {

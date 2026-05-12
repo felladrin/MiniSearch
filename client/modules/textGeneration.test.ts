@@ -51,10 +51,6 @@ vi.mock("gpt-tokenizer", () => ({
   },
 }));
 
-vi.mock("./webGpu", () => ({
-  isWebGPUAvailable: false,
-}));
-
 vi.mock("./textGenerationUtilities", () => ({
   ChatGenerationError: class ChatGenerationError extends Error {
     constructor(message: string) {
@@ -109,22 +105,10 @@ describe("textGenerationFunctions", () => {
       expect(result).toBe("Internal API");
     });
 
-    it("should return WebLLM when inferenceType is browser and enableWebGpu is true", () => {
+    it("should return wllama model id when inferenceType is browser", () => {
       const { getCurrentModelName } = textGenerationFunctions;
       mockGetSettings.mockReturnValue({
         inferenceType: "browser",
-        enableWebGpu: true,
-        webLlmModelId: "web-llm-model",
-      });
-      const result = getCurrentModelName();
-      expect(result).toBe("web-llm-model");
-    });
-
-    it("should return Wllama when inferenceType is browser and enableWebGpu is false", () => {
-      const { getCurrentModelName } = textGenerationFunctions;
-      mockGetSettings.mockReturnValue({
-        inferenceType: "browser",
-        enableWebGpu: false,
         wllamaModelId: "wllama-model",
       });
       const result = getCurrentModelName();

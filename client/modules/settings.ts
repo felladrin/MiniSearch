@@ -1,5 +1,4 @@
 import { addLogEntry } from "./logEntries";
-import { isF16Supported } from "./webGpu";
 
 /**
  * Default application settings configuration
@@ -7,11 +6,7 @@ import { isF16Supported } from "./webGpu";
 export const defaultSettings = {
   showEnableAiResponsePrompt: true,
   enableAiResponse: false,
-  enableWebGpu: true,
   enableImageSearch: true,
-  webLlmModelId: isF16Supported
-    ? VITE_WEBLLM_DEFAULT_F16_MODEL_ID
-    : VITE_WEBLLM_DEFAULT_F32_MODEL_ID,
   wllamaModelId: VITE_WLLAMA_DEFAULT_MODEL_ID,
   cpuThreads: Math.max(1, (navigator.hardwareConcurrency ?? 1) - 2),
   searchResultsToConsider: 3,

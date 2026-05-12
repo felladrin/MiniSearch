@@ -17,6 +17,7 @@ import {
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
 import type { ChatMessage } from "./types";
+import { isWebGPUAvailable } from "./webGpu";
 import { type WllamaModel, wllamaModels } from "./wllama";
 
 type ProgressCallback = ({
@@ -187,6 +188,7 @@ async function initializeWllamaInstance(progressCallback?: ProgressCallback) {
       cache_type_v: model.cacheTypeV,
       flash_attn: model.flash_attn,
       embeddings: false,
+      n_gpu_layers: isWebGPUAvailable ? 99999 : 0,
       progressCallback,
     },
   });

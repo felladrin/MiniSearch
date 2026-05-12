@@ -4,7 +4,6 @@ import { usePubSub } from "create-pubsub/react";
 import { useMemo } from "react";
 import { settingsPubSub } from "@/modules/pubSub";
 import { defaultSettings, inferenceTypes } from "@/modules/settings";
-import { isWebGPUAvailable } from "@/modules/webGpu";
 import { AIParameterSlider } from "./components/AIParameterSlider";
 import { BrowserSettings } from "./components/BrowserSettings";
 import { HordeSettings } from "./components/HordeSettings";
@@ -26,8 +25,7 @@ export default function AISettingsForm() {
   });
 
   const inferenceTypeSupportsMinP =
-    (form.values.inferenceType === "browser" &&
-      (!isWebGPUAvailable || !form.values.enableWebGpu)) ||
+    form.values.inferenceType === "browser" ||
     form.values.inferenceType === "horde";
 
   const penaltySliderMarks = useMemo(
@@ -116,10 +114,7 @@ export default function AISettingsForm() {
           )}
 
           {form.values.inferenceType === "browser" && (
-            <BrowserSettings
-              form={form}
-              isWebGPUAvailable={isWebGPUAvailable}
-            />
+            <BrowserSettings form={form} />
           )}
 
           <SystemPromptInput form={form} />
