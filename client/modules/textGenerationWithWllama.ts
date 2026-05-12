@@ -33,7 +33,7 @@ export async function generateTextWithWllama(): Promise<void> {
 
   try {
     const response = await generateWithWllama({
-      buildMessages: () => {
+      messages: () => {
         const settings = getSettings();
         const modelConfig = wllamaModels[settings.wllamaModelId];
         return [
@@ -77,15 +77,13 @@ export async function generateChatWithWllama(
 }
 
 interface WllamaConfig {
-  messages?: ChatMessage[];
-  buildMessages?: () => ChatMessage[];
+  messages: ChatMessage[] | (() => ChatMessage[]);
   onUpdate: (text: string) => void;
   shouldCheckCanRespond?: boolean;
 }
 
 async function generateWithWllama({
-  messages: prebuiltMessages,
-  buildMessages,
+  messages: messagesOrBuilder,
   onUpdate,
   shouldCheckCanRespond = false,
 }: WllamaConfig): Promise<string> {
@@ -112,7 +110,10 @@ async function generateWithWllama({
       updateTextGenerationState("preparingToGenerate");
     }
 
-    const messages = buildMessages ? buildMessages() : prebuiltMessages!;
+    const messages =
+      typeof messagesOrBuilder === "function"
+        ? messagesOrBuilder()
+        : messagesOrBuilder;
 
     let streamedMessage = "";
 
