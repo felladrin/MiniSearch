@@ -31,20 +31,21 @@ export async function generateTextWithWllama(): Promise<void> {
   if (!getSettings().enableAiResponse) return;
 
   try {
-    const settings = getSettings();
-    const modelConfig = wllamaModels[settings.wllamaModelId];
-    const messages: ChatMessage[] = [
-      {
-        role: "user",
-        content: getSystemPrompt(
-          getFormattedSearchResults(modelConfig.shouldIncludeUrlsOnPrompt),
-        ),
-      },
-      { role: "assistant", content: "Ok!" },
-      { role: "user", content: getQuery() },
-    ];
     const response = await generateWithWllama({
-      messages,
+      buildMessages: () => {
+        const settings = getSettings();
+        const modelConfig = wllamaModels[settings.wllamaModelId];
+        return [
+          {
+            role: "user",
+            content: getSystemPrompt(
+              getFormattedSearchResults(modelConfig.shouldIncludeUrlsOnPrompt),
+            ),
+          },
+          { role: "assistant", content: "Ok!" },
+          { role: "user", content: getQuery() },
+        ];
+      },
       onUpdate: updateResponse,
       shouldCheckCanRespond: true,
     });
@@ -75,13 +76,15 @@ export async function generateChatWithWllama(
 }
 
 interface WllamaConfig {
-  messages: ChatMessage[];
+  messages?: ChatMessage[];
+  buildMessages?: () => ChatMessage[];
   onUpdate: (text: string) => void;
   shouldCheckCanRespond?: boolean;
 }
 
 async function generateWithWllama({
-  messages,
+  messages: prebuiltMessages,
+  buildMessages,
   onUpdate,
   shouldCheckCanRespond = false,
 }: WllamaConfig): Promise<string> {
@@ -107,6 +110,8 @@ async function generateWithWllama({
       await canStartResponding();
       updateTextGenerationState("preparingToGenerate");
     }
+
+    const messages = buildMessages ? buildMessages() : prebuiltMessages!;
 
     let streamedMessage = "";
 
