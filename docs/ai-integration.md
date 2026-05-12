@@ -6,7 +6,7 @@ MiniSearch supports four AI inference backends, each with different trade-offs b
 
 | Type | Privacy | Speed | Setup | Best For |
 |------|---------|-------|-------|----------|
-| **Browser** (WebLLM/Wllama) | Maximum (no data leaves device) | Fast (WebGPU) / Slow (CPU) | None | Personal use, privacy-critical scenarios |
+| **Browser** (Wllama) | Maximum (no data leaves device) | Fast (WebGPU) / Slow (CPU) | None | Personal use, privacy-critical scenarios |
 | **OpenAI** | Low (data sent to OpenAI) | Very Fast | API Key | Maximum quality, convenience |
 | **AI Horde** | Medium (distributed volunteers) | Variable | Anonymous | Free GPU access, no setup |
 | **Internal** | High (your infrastructure) | Depends on hardware | Self-hosted API | Teams, compliance requirements |
@@ -15,55 +15,21 @@ MiniSearch supports four AI inference backends, each with different trade-offs b
 
 Runs AI models entirely in the browser using WebAssembly or WebGPU. No data leaves the user's device.
 
-### WebLLM (WebGPU Accelerated)
+### Wllama
 
-Uses `@mlc-ai/web-llm` for GPU-accelerated inference.
-
-**Requirements:**
-- Modern browser with WebGPU support (Chrome 113+, Edge 113+, Firefox Nightly)
-- ~500MB-2GB free RAM
-- GPU with F16 shader support (for optimal models)
-
-**How It Works:**
-1. User searches with "Enable AI Response" on
-2. Library checks WebGPU availability and F16 shader support
-3. Downloads model weights from HuggingFace (cached in IndexedDB)
-4. Loads model into GPU memory
-5. Generates response streaming tokens
-
-**Model Selection:**
-```typescript
-// WebLLM model IDs from MLC registry
-const models = {
-  fast: 'Qwen3-0.6B-q4f16_1-MLC',      // 600M params, ~400MB
-  balanced: 'SmolLM2-1.7B-q4f16_1-MLC', // 1.7B params, ~1GB
-  capable: 'Llama-3.2-1B-q4f16_1-MLC'   // 1B params, ~600MB
-};
-```
-
-**Configuration:**
-- Settings → Inference Type: `Browser`
-- Settings → Browser Model: Select from dropdown
-- Settings → Enable WebGPU: Toggle (auto-detected)
-
-**Limitations:**
-- First load requires model download (progressive via sharded files)
-- Limited to smaller models (3B params max due to browser memory)
-- Requires modern browser with WebGPU
-
-### Wllama (CPU-Based)
-
-Uses `@wllama/wllama` for CPU inference via WebAssembly.
+Uses `@wllama/wllama` for browser-based inference. Automatically uses WebGPU when available, falling back to CPU via WebAssembly.
 
 **Requirements:**
 - Any modern browser
-- ~300MB-1GB free RAM
-- No WebGPU required
+- ~300MB-2GB free RAM
+- WebGPU optional (Chrome 113+, Edge 113+) - enables GPU acceleration
 
 **How It Works:**
-1. Downloads model from HuggingFace (GGUF format)
-2. Runs inference in WebAssembly (slower but universally compatible)
-3. Supports 40+ pre-configured models
+1. Checks WebGPU availability via `"gpu" in navigator`
+2. Downloads model from HuggingFace (GGUF format, cached in the browser's Origin Private File System)
+3. Loads model with `n_gpu_layers: 99999` if WebGPU is present, else `0` for CPU-only
+4. Runs a single-threaded warmup pass, then reloads with full thread count
+5. Streams tokens via the OAI-compatible `createChatCompletion` API
 
 **Pre-configured Models:**
 All stored at `Felladrin/gguf-sharded-*` on HuggingFace:
@@ -78,40 +44,20 @@ All stored at `Felladrin/gguf-sharded-*` on HuggingFace:
 
 **Configuration:**
 - Settings → Inference Type: `Browser`
-- Settings → Use WebGPU: OFF
 - Settings → Wllama Model: Select from dropdown
+- Settings → CPU threads: Relevant only when WebGPU is unavailable
 
-**Limitations:**
-- Slower than WebGPU (2-5x slower)
-- Same memory constraints
-- No GPU acceleration
-
-### WebLLM vs Wllama Decision Matrix
-
-```
-WebGPU Available?
-├── Yes → WebLLM (F16 if supported, else F32)
-└── No  → Wllama (CPU inference)
-```
-
-**Code Detection:**
+**WebGPU Detection:**
 ```typescript
 // client/modules/webGpu.ts
-export async function isWebGpuAvailable(): Promise<boolean> {
-  if (!navigator.gpu) return false;
-  try {
-    const adapter = await navigator.gpu.requestAdapter();
-    return !!adapter;
-  } catch {
-    return false;
-  }
-}
-
-export async function isF16ShaderSupported(): Promise<boolean> {
-  const adapter = await navigator.gpu?.requestAdapter();
-  return adapter?.features.has('shader-f16') ?? false;
-}
+/** Whether the browser supports the WebGPU API. */
+export const isWebGPUAvailable = "gpu" in navigator;
 ```
+
+**Limitations:**
+- First load requires model download (progressive via sharded files)
+- Limited to smaller models (3B params max due to browser memory)
+- CPU mode is 2-5x slower than WebGPU
 
 ## OpenAI API Integration
 
@@ -315,18 +261,7 @@ and user intent. Be concise but informative.
 
 ### Browser Inference Failures
 
-```typescript
-// If WebLLM fails, fallback to Wllama
-try {
-  await generateWithWebLLM();
-} catch (error) {
-  if (error.message.includes('WebGPU')) {
-    // Auto-switch to Wllama
-    settings.enableWebGpu = false;
-    await generateWithWllama();
-  }
-}
-```
+Wllama handles both WebGPU and CPU paths internally. If the model fails to load or generation is interrupted, the error propagates to `textGeneration.ts`, which sets `textGenerationState` to `failed` and surfaces a retry option to the user. There is no separate fallback engine to switch to.
 
 ### API Failures
 
@@ -345,10 +280,7 @@ If generation fails mid-stream:
 
 ### Model Caching
 
-All browser-based models cached in IndexedDB:
-- WebLLM: `webllm/model-cache`
-- Wllama: `wllama/model-cache`
-- Subsequent loads: Instant (no re-download)
+Wllama model shards are cached in the browser's Origin Private File System after the first download. Subsequent loads are instant with no re-download required.
 
 ### Streaming Strategy
 
@@ -367,7 +299,7 @@ Wllama models are sharded (split into chunks):
 ## Best Practices
 
 ### For Privacy-Critical Use
-- Use Browser inference (WebLLM/Wllama)
+- Use Browser inference (Wllama)
 - Disable `shareModelDownloads`
 - Set `historyRetentionDays: 0` (no persistence)
 
@@ -377,7 +309,7 @@ Wllama models are sharded (split into chunks):
 - Adjust temperature: 0.5-0.7 for factual, 0.8-1.0 for creative
 
 ### For Cost Efficiency
-- Use AI Horde (free) or Browser inference (one-time download)
+- Use AI Horde (free) or Browser inference - Wllama (one-time download)
 - Set `searchResultsToConsider: 3` (default)
 - Limit `inferenceMaxTokens: 2048`
 

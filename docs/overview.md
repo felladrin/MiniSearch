@@ -18,8 +18,7 @@ MiniSearch integrates multiple technology stacks within a unified deployment con
 - **TypeScript** - Type safety
 
 ### AI & Search
-- **@mlc-ai/web-llm** - Client-side AI inference
-- **@wllama/wllama** - Alternative client-side inference
+- **@wllama/wllama** - Client-side AI inference (WebGPU-accelerated or CPU via WebAssembly)
 - **AI SDK** - AI integration layer
 - **@ai-sdk/openai-compatible** - Unified AI interface
 

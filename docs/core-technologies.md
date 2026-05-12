@@ -9,8 +9,7 @@
 
 ## AI & Search
 
-- **`@mlc-ai/web-llm`**: Client-side AI inference
-- **`@wllama/wllama`**: Alternative client-side inference
+- **`@wllama/wllama`**: Client-side AI inference (WebGPU-accelerated or CPU via WebAssembly)
 - **`ai` package**: AI integration layer
 - **SearXNG**: Privacy-focused metasearch engine
 
