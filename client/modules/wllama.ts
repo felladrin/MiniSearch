@@ -5,8 +5,7 @@ import {
   type WllamaConfig,
 } from "@wllama/wllama";
 import type { DownloadOptions } from "@wllama/wllama/esm/cache-manager";
-import multiThreadWllamaWasmUrl from "@wllama/wllama/esm/multi-thread/wllama.wasm?url";
-import singleThreadWllamaWasmUrl from "@wllama/wllama/esm/single-thread/wllama.wasm?url";
+import wllamaWasmUrl from "@wllama/wllama/esm/wasm/wllama.wasm?url";
 import { addLogEntry } from "./logEntries";
 import { getSettings } from "./pubSub";
 import { defaultContextSize } from "./textGenerationUtilities";
@@ -20,8 +19,7 @@ async function createWllamaInstance(config?: WllamaConfig): Promise<Wllama> {
   try {
     return new Wllama(
       {
-        "single-thread/wllama.wasm": singleThreadWllamaWasmUrl,
-        "multi-thread/wllama.wasm": multiThreadWllamaWasmUrl,
+        default: wllamaWasmUrl,
       },
       config,
     );
