@@ -23,14 +23,7 @@ Configure default models for different inference types:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WEBLLM_DEFAULT_F16_MODEL_ID` | `Qwen3-0.6B-q4f16_1-MLC` | Default WebLLM model with F16 shaders (requires WebGPU) |
-| `WEBLLM_DEFAULT_F32_MODEL_ID` | `Qwen3-0.6B-q4f32_1-MLC` | Default WebLLM model with F32 shaders (CPU fallback) |
-| `WLLAMA_DEFAULT_MODEL_ID` | `qwen-3-0.6b` | Default Wllama model (CPU-based, no WebGPU required) |
-
-**Model Selection Notes:**
-- F16 models are faster but require WebGPU with F16 shader support
-- F32 models work on all WebGPU-capable devices
-- Wllama models run on CPU via WebAssembly (slower but most compatible)
+| `WLLAMA_DEFAULT_MODEL_ID` | `qwen-3-0.6b` | Default Wllama model ID (used for both WebGPU-accelerated and CPU inference) |
 
 ### Internal API Configuration
 
@@ -67,7 +60,6 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 |---------|------|---------|-------------|
 | `enableAiResponse` | boolean | `false` | Enable AI-generated responses for searches |
 | `showEnableAiResponsePrompt` | boolean | `true` | Show prompt to enable AI response on first use |
-| `enableWebGpu` | boolean | `true` | Use WebGPU acceleration when available |
 | `enableImageSearch` | boolean | `true` | Include image results in searches |
 | `enableTextSearch` | boolean | `true` | Include text results in searches |
 | `searchResultsToConsider` | number | `3` | Number of top search results to include in AI context |
@@ -93,11 +85,6 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `allowAiModelDownload` | boolean | `false` | Allow automatic AI model downloads |
 
 ### Model Selection
-
-**WebLLM Models:**
-- Uses MLC LLM model registry
-- Models loaded from HuggingFace
-- Common options: `Qwen3-0.6B`, `SmolLM2-1.7B`, `Llama-3.2-1B`
 
 **Wllama Models:**
 - 40+ pre-configured models
@@ -149,7 +136,6 @@ services:
     environment:
       - ACCESS_KEYS=${ACCESS_KEYS:-}
       - ACCESS_KEY_TIMEOUT_HOURS=${ACCESS_KEY_TIMEOUT_HOURS:-24}
-      - WEBLLM_DEFAULT_F16_MODEL_ID=${WEBLLM_DEFAULT_F16_MODEL_ID:-Qwen3-0.6B-q4f16_1-MLC}
       # ... more env vars
     volumes:
       - .:/home/user/app  # Live code mounting
@@ -179,8 +165,6 @@ Environment variables are injected at build time via `vite.config.ts`:
 // Injected into import.meta.env
 VITE_SEARCH_TOKEN
 VITE_ACCESS_KEYS_ENABLED
-VITE_WEBLLM_DEFAULT_F16_MODEL_ID
-VITE_WEBLLM_DEFAULT_F32_MODEL_ID
 VITE_WLLAMA_DEFAULT_MODEL_ID
 VITE_INTERNAL_API_ENABLED
 VITE_DEFAULT_INFERENCE_TYPE
@@ -216,7 +200,7 @@ INTERNAL_OPENAI_COMPATIBLE_API_MODEL="llama-3.1-70b"
 
 ```bash
 # .env - minimal or empty
-# Users choose WebLLM or Wllama in settings
+# Users choose the Wllama model in settings (WebGPU used automatically when available)
 # Models download to user's browser (no server AI)
 ```
 

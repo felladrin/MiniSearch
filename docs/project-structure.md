@@ -42,13 +42,13 @@ The `client/modules/` directory contains core business logic organized by domain
 | `pubSub.ts` | All PubSub channels for state management |
 | `search.ts` | Search orchestration, caching, and reranking |
 | `textGeneration.ts` | AI response generation and chat handling |
-| `textGenerationWith*.ts` | Provider-specific inference implementations (WebLLM, Wllama, OpenAI, Horde, Internal API) |
+| `textGenerationWith*.ts` | Provider-specific inference implementations (Wllama, OpenAI, Horde, Internal API) |
 | `history.ts` | IndexedDB persistence for searches and chat |
 | `settings.ts` | Default settings and inference type definitions |
 | `followUpQuestions.ts` | Generates contextual follow-up questions |
 | `relatedSearchQuery.ts` | Creates related search queries from conversation |
 | `querySuggestions.ts` | Query suggestion UI data management |
-| `webGpu.ts` | WebGPU availability and F16 shader detection |
+| `webGpu.ts` | WebGPU availability detection |
 | `wllama.ts` | Wllama model configuration and management |
 | `accessKey.ts` | Access key validation and storage |
 | `searchTokenHash.ts` | CSRF protection token generation |

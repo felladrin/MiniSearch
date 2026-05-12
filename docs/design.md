@@ -23,7 +23,7 @@
 - Optimized bundle size using Vite 8 build optimizations
 - Efficient state management with create-pubsub
 - Caching strategies for search results and AI responses
-- WebGPU detection and F16 shader support for optimal AI inference
+- WebGPU detection for automatic GPU-accelerated inference
 - Bundle analysis with rollup-plugin-visualizer
 
 ### Accessibility
@@ -46,7 +46,7 @@
 ## Technology Integration
 
 ### AI & Search
-- Multiple inference engines: WebLLM (WebGPU), Wllama, OpenAI-compatible APIs
+- Multiple inference engines: Wllama (WebGPU or CPU), OpenAI-compatible APIs
 - Privacy-first local processing when possible
 - SearXNG integration for web search
 - Graceful fallbacks for unsupported browsers

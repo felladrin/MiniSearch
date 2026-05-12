@@ -9,7 +9,7 @@ React 19 + TypeScript + Mantine UI v8 (`@mantine/core`, `@mantine/hooks`, `@mant
 - **Testing**: Vitest 4 + Testing Library
 - **State Management**: create-pubsub
 - **Routing**: Wouter 3
-- **AI Integration**: WebLLM, Wllama, OpenAI-compatible APIs
+- **AI Integration**: Wllama, OpenAI-compatible APIs
 - **Search**: SearXNG integration
 - **Package Manager**: npm
 

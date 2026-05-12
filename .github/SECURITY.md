@@ -69,7 +69,7 @@ MiniSearch is designed as a privacy-focused search application with the followin
 
 **Data Flow:**
 - User queries are sent to SearXNG instances (configurable)
-- AI processing can be local (WebLLM/Wllama) or remote (API endpoints)
+- AI processing can be local (Wllama) or remote (API endpoints)
 - Search history is stored locally in the browser
 - No tracking or analytics by default
 

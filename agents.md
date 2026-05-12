@@ -26,7 +26,7 @@ This is your navigation hub. Start here, follow the links, and return when you n
 - **`docs/security.md`** - Access control, privacy, and security model
 
 ### Core Functionality
-- **`docs/ai-integration.md`** - AI inference types (WebLLM, Wllama, OpenAI, AI Horde, Internal)
+- **`docs/ai-integration.md`** - AI inference types (Wllama, OpenAI, AI Horde, Internal)
 - **`docs/ui-components.md`** - Component architecture and PubSub patterns
 - **`docs/search-history.md`** - History database schema and management
 - **`docs/conversation-memory.md`** - Token budgeting and rolling summaries
@@ -89,7 +89,7 @@ Need to:
 - `client/components/Search/Results/` - Results display
 - `client/components/AiResponse/` - AI response + chat
 - `client/components/Pages/Main/Menu/` - Settings drawers
-- `client/modules/webGpu.ts` - Detects WebGPU availability and F16 shader support for WebLLM
+- `client/modules/webGpu.ts` - Detects WebGPU availability (`"gpu" in navigator`)
 - `client/modules/querySuggestions.ts` - Provides search suggestion UI, stored in IndexedDB
 - `client/modules/relatedSearchQuery.ts` - Generates related search queries
 - `client/modules/followUpQuestions.ts` - Generates suggested follow-up questions, uses `followUpQuestionPubSub`
@@ -102,7 +102,7 @@ Need to:
 ## Common Tasks Quick Reference
 
 ### Add a new AI model
-1. Add to `client/modules/wllama.ts` or WebLLM registry
+1. Add to `client/modules/wllama.ts`
 2. Update `docs/ai-integration.md`
 3. Update `docs/configuration.md` defaults
 

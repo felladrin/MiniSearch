@@ -47,7 +47,7 @@ Production mode:
 
 ### No Configuration Required (Default)
 
-MiniSearch works out of the box with browser-based AI inference. Search works immediately, and AI responses use on-device models via WebLLM (WebGPU).
+MiniSearch works out of the box with browser-based AI inference. Search works immediately, and AI responses use on-device models via Wllama (WebGPU-accelerated when available, CPU otherwise).
 
 ### Optional: Enable AI Response
 
@@ -55,7 +55,7 @@ MiniSearch works out of the box with browser-based AI inference. Search works im
 2. Click **Settings** (gear icon)
 3. Toggle **Enable AI Response**
 4. Choose inference type:
-   - **Browser** (recommended): Uses WebLLM with WebGPU or Wllama for local processing
+   - **Browser** (recommended): Uses Wllama for local processing (WebGPU-accelerated when available)
    - **Internal API**: Configure OpenAI-compatible endpoint
    - **AI Horde**: Pre-configured distributed computing
 5. The app will download ~300MB-1GB model files on first use (browser mode)
