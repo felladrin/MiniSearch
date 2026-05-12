@@ -1,4 +1,3 @@
----
 # Search History System
 
 ## Overview

@@ -331,11 +331,14 @@ Manages search history from IndexedDB:
 const { searches, groupedSearches, deleteSearch, restoreSearch } = useSearchHistory();
 ```
 
-### useLocalStorage
+### useDrawerState
 
-Syncs state with localStorage:
+Manages open/close state for a drawer with log entry tracking:
 ```typescript
-const [value, setValue] = useLocalStorage('key', defaultValue);
+const { isDrawerOpen, openDrawer, closeDrawer } = useDrawerState(
+  "User opened the menu",
+  "User closed the menu",
+);
 ```
 
 ## Styling
