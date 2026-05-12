@@ -62,7 +62,7 @@ export default function SearchResultsList({
                   >
                     <Text
                       fw="bold"
-                      c="var(--mantine-color-blue-light-color)"
+                      c="var(--mantine-color-blue-3)"
                       style={{
                         whiteSpace: "nowrap",
                         overflow: "hidden",
