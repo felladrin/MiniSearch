@@ -2,6 +2,7 @@ import { beforeEach, describe, it, vi } from "vitest";
 import {
   mockPubSub,
   mockTextGenerationUtilities,
+  runCommonTextGenerationSteps,
   setupCommonTextGenerationMocks,
   testTextGenerationBehavior,
 } from "./testUtils";
@@ -22,11 +23,7 @@ describe("generateTextWithHorde", () => {
   it("calls helpers and updates state", async () => {
     vi.doMock("./textGenerationWithHorde", () => ({
       generateTextWithHorde: vi.fn().mockImplementation(async () => {
-        const pubSub = await import("./pubSub");
-        const utils = await import("./textGenerationUtilities");
-
-        await utils.canStartResponding();
-        pubSub.updateTextGenerationState("preparingToGenerate");
+        const { pubSub } = await runCommonTextGenerationSteps();
         pubSub.updateResponse("generated text");
       }),
       generateChatWithHorde: vi.fn(),

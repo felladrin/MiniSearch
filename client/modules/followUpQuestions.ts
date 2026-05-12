@@ -4,6 +4,22 @@ import { getSuppressNextFollowUp } from "./pubSub";
 import { generateChatResponse } from "./textGeneration";
 import type { ChatMessage } from "./types";
 
+async function saveChatHistoryEntry(
+  role: "user" | "assistant",
+  content: string,
+) {
+  await historyDatabase.chatHistory
+    .add({
+      role,
+      content,
+      timestamp: Date.now(),
+      conversationId: `follow-up-${Date.now()}`,
+    })
+    .catch((error) => {
+      addLogEntry(`Error saving chat history: ${error}`);
+    });
+}
+
 interface FollowUpQuestionParams {
   topic: string;
   currentContent: string;
@@ -22,16 +38,7 @@ export async function generateFollowUpQuestion({
 
     addLogEntry("Generating a follow-up question");
 
-    await historyDatabase.chatHistory
-      .add({
-        role: "user",
-        content: topic,
-        timestamp: Date.now(),
-        conversationId: `follow-up-${Date.now()}`,
-      })
-      .catch((error) => {
-        addLogEntry(`Error saving chat history: ${error}`);
-      });
+    await saveChatHistoryEntry("user", topic);
 
     const promptMessages: ChatMessage[] = [
       {
@@ -77,16 +84,7 @@ Respond with just the question, no additional text or explanations.`,
 
     const response = await generateChatResponse(promptMessages, () => {});
 
-    await historyDatabase.chatHistory
-      .add({
-        role: "assistant",
-        content: response,
-        timestamp: Date.now(),
-        conversationId: `follow-up-${Date.now()}`,
-      })
-      .catch((error) => {
-        addLogEntry(`Error saving chat history: ${error}`);
-      });
+    await saveChatHistoryEntry("assistant", response);
 
     const lines = response
       .trim()
@@ -106,16 +104,7 @@ Respond with just the question, no additional text or explanations.`,
 
     addLogEntry("Generated follow-up question successfully");
 
-    await historyDatabase.chatHistory
-      .add({
-        role: "assistant",
-        content: questionLine,
-        timestamp: Date.now(),
-        conversationId: `follow-up-${Date.now()}`,
-      })
-      .catch((error) => {
-        addLogEntry(`Error saving chat history: ${error}`);
-      });
+    await saveChatHistoryEntry("assistant", questionLine);
 
     return questionLine;
   } catch (error) {

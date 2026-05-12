@@ -2,6 +2,7 @@ import { beforeEach, describe, it, vi } from "vitest";
 import {
   mockPubSub,
   mockTextGenerationUtilities,
+  runCommonTextGenerationSteps,
   setupCommonTextGenerationMocks,
   testTextGenerationBehavior,
 } from "./testUtils";
@@ -41,11 +42,7 @@ describe("generateTextWithOpenAi", () => {
   it("calls helpers and updates state", async () => {
     vi.doMock("./textGenerationWithOpenAi", () => ({
       generateTextWithOpenAi: vi.fn().mockImplementation(async () => {
-        const pubSub = await import("./pubSub");
-        const utils = await import("./textGenerationUtilities");
-
-        await utils.canStartResponding();
-        pubSub.updateTextGenerationState("preparingToGenerate");
+        const { pubSub } = await runCommonTextGenerationSteps();
         const settings = pubSub.getSettings?.() || {};
         const expectedResponse = `${settings.reasoningStartMarker ?? ""}reasoning${settings.reasoningEndMarker ?? ""}\n\ngenerated text`;
         pubSub.updateResponse(expectedResponse);

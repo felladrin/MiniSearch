@@ -63,6 +63,19 @@ export const mockTextGenerationUtilities = (
 };
 
 /**
+ * Runs the shared setup steps common to all text generation mock implementations.
+ */
+export const runCommonTextGenerationSteps = async () => {
+  const pubSub = await import("./pubSub");
+  const utils = await import("./textGenerationUtilities");
+
+  await utils.canStartResponding();
+  pubSub.updateTextGenerationState("preparingToGenerate");
+
+  return { pubSub, utils };
+};
+
+/**
  * Helper function to test common text generation behavior
  */
 export const testTextGenerationBehavior = async (

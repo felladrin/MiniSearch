@@ -28,6 +28,10 @@ import { sleepUntilIdle } from "@/modules/sleep";
 import { searchAndRespond } from "@/modules/textGeneration";
 import HistoryButton from "../History/HistoryButton";
 
+function getUrlQuery() {
+  return new URLSearchParams(window.location.search).get("q");
+}
+
 interface SearchFormState {
   textAreaValue: string;
   suggestedQuery: string;
@@ -71,8 +75,7 @@ export default function SearchForm({
 
   useEffect(() => {
     const initializeComponent = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlQuery = urlParams.get("q");
+      const urlQuery = getUrlQuery();
 
       if (urlQuery && !autoInitializedQueriesRef.current.has(urlQuery)) {
         autoInitializedQueriesRef.current.add(urlQuery);
@@ -91,8 +94,7 @@ export default function SearchForm({
 
   useEffect(() => {
     const initializeComponent = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlQuery = urlParams.get("q");
+      const urlQuery = getUrlQuery();
       const normalizedUrlQuery = urlQuery?.trim();
 
       const hasRestoredResults =

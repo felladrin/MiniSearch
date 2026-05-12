@@ -1,36 +1,23 @@
 import { Button } from "@mantine/core";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { useDrawerState } from "@/hooks/useDrawerState";
 import { addLogEntry } from "@/modules/logEntries";
 
 const MenuDrawer = lazy(() => import("./MenuDrawer"));
 
-interface MenuState {
-  isDrawerOpen: boolean;
-  isDrawerLoaded: boolean;
-}
-
 export default function MenuButton() {
-  const [state, setState] = useState<MenuState>({
-    isDrawerOpen: false,
-    isDrawerLoaded: false,
-  });
-
-  const openDrawer = useCallback(() => {
-    setState((prev) => ({ ...prev, isDrawerOpen: true }));
-    addLogEntry("User opened the menu");
-  }, []);
-
-  const closeDrawer = useCallback(() => {
-    setState((prev) => ({ ...prev, isDrawerOpen: false }));
-    addLogEntry("User closed the menu");
-  }, []);
+  const { isDrawerOpen, openDrawer, closeDrawer } = useDrawerState(
+    "User opened the menu",
+    "User closed the menu",
+  );
+  const [isDrawerLoaded, setIsDrawerLoaded] = useState(false);
 
   const handleDrawerLoad = useCallback(() => {
-    if (!state.isDrawerLoaded) {
+    if (!isDrawerLoaded) {
       addLogEntry("Menu drawer loaded");
-      setState((prev) => ({ ...prev, isDrawerLoaded: true }));
+      setIsDrawerLoaded(true);
     }
-  }, [state.isDrawerLoaded]);
+  }, [isDrawerLoaded]);
 
   return (
     <>
@@ -38,13 +25,13 @@ export default function MenuButton() {
         size="xs"
         onClick={openDrawer}
         variant="default"
-        loading={state.isDrawerOpen && !state.isDrawerLoaded}
+        loading={isDrawerOpen && !isDrawerLoaded}
       >
         Menu
       </Button>
-      {(state.isDrawerOpen || state.isDrawerLoaded) && (
+      {(isDrawerOpen || isDrawerLoaded) && (
         <Suspense fallback={<SuspenseListener onUnload={handleDrawerLoad} />}>
-          <MenuDrawer onClose={closeDrawer} opened={state.isDrawerOpen} />
+          <MenuDrawer onClose={closeDrawer} opened={isDrawerOpen} />
         </Suspense>
       )}
     </>
