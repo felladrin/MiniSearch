@@ -42,9 +42,44 @@ Because the hook writes via Dexie directly, any component can call `addSearchToH
 ## Analytics Integration
 The History Drawer Analytics tab renders the compact `SearchStats` cards scoped to `period="all"`, giving total searches, daily averages, and most active hours pulled from the same IndexedDB data. Keeping analytics co-located ensures the metrics share the hook filtering and cleanup guarantees.
 
+## Search Cache System
+
+Alongside the history database, MiniSearch uses a separate `SearchCacheDatabase` for temporary result caching:
+
+**Schema:**
+| Store | Key | Index | Entry Type |
+|-------|-----|-------|------------|
+| `textSearchHistory` | hashed query | timestamp | `TextSearchCache` |
+| `imageSearchHistory` | hashed query | timestamp | `ImageSearchCache` |
+
+**Configuration:**
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| TTL | 15 minutes | Cache entry lifetime |
+| MAX_ENTRIES | 100 | Maximum cached queries per store |
+| PRUNE_INTERVAL | 10 writes | Cache writes between LRU prune passes |
+| REQUEST_TIMEOUT | 30,000 ms | Search request timeout |
+
+**Performance Metrics:** The `cacheMetrics` object tracks hits/misses per search type and logs hit rates every 10 operations. Query hashing produces deterministic cache keys for reliable lookups.
+
+## localStorage Persistence
+
+Lightweight state persisted via `createLocalStoragePubSub`:
+
+| Key | Type | Default | Purpose |
+|-----|------|---------|---------|
+| `settings` | `Settings` | `defaultSettings` | App configuration |
+| `querySuggestions` | `string[]` | `[]` | Search suggestion pool |
+| `lastSearchTokenHash` | `string` | `""` | Cached security token hash |
+| `menuExpandedAccordions` | `string[]` | `[]` | Menu UI state |
+
+## Performance Measurement
+
+Database operations are wrapped in `measurePerformance(operation, fn)` which uses `performance.now()` to track execution time and logs warnings via `addLogEntry()` if operations exceed 100ms.
+
 ## Related Topics
 
-- **Overview**: `docs/overview.md` - System architecture and data flow
+- **Overview**: `docs/overview.md` - System architecture and data persistence
 - **UI Components**: `docs/ui-components.md` - History drawer and components
 - **Conversation Memory**: `docs/conversation-memory.md` - Chat persistence
 - **Configuration**: `docs/configuration.md` - History settings

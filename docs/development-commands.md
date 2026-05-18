@@ -46,6 +46,41 @@ AI agents can parse these to identify:
 - Functions without tests
 - Coverage gaps across the codebase
 
+## CI/CD Pipeline
+
+The repository uses six GitHub Actions workflows for continuous integration, deployment, and release management:
+
+### Workflow Files
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| `ci.yml` | Push/PR to `main` or `master` | Full lint (`npm run lint`), format check (`npm run format`), and Vitest test suite |
+| `on-push-to-main.yml` | Push to `main` | Delegates to `reusable-test-lint-ping.yml` |
+| `on-pull-request-to-main.yml` | PR opened/synced/reopened to `main` | Delegates to `reusable-test-lint-ping.yml`; skippable via `skip-test-lint-ping` label |
+| `publish-docker-image.yml` | Manual (`workflow_dispatch`) | Builds multi-platform Docker image (linux/amd64, linux/arm64) and pushes to `ghcr.io` |
+| `deploy-to-hugging-face.yml` | Manual (`workflow_dispatch`) | Syncs repository to Hugging Face Spaces using `JacobLinCool/huggingface-sync` |
+| `reusable-test-lint-ping.yml` | Called by other workflows | Two-job pipeline: (1) `npm ci --ignore-scripts && npm run lint`, (2) Docker compose production build + health check via `curl localhost:7860` |
+
+### Reusable Workflow (`reusable-test-lint-ping.yml`)
+
+Used by both `on-push-to-main` and `on-pull-request-to-main` to avoid duplication:
+
+1. **check-code-quality** - Installs dependencies (skipping postinstall scripts) and runs `npm run lint`
+2. **check-docker-container** (depends on check-code-quality) - Builds and starts the production container with `docker compose -f docker-compose.production.yml up -d`, then verifies the main page returns HTTP 200 within 60 seconds
+
+### Docker Image Builds
+
+The Docker image uses a multi-stage build:
+1. **Builder stage** (`llama-builder`): Compiles llama-server from llama.cpp source, extracts shared libraries (`libllama.so`, `libmtmd.so`, `libggml.so`, etc.)
+2. **Runtime stage**: Installs Python/SearXNG, copies llama-server binaries, builds the Vite frontend, runs SearXNG and Node.js in a single container via shell process composition
+
+The production image is published to `ghcr.io` with multi-platform support (linux/amd64, linux/arm64). Tags and labels are auto-generated from Git metadata via `docker/metadata-action`.
+
+### Manual Deployments
+
+- **Publish Docker Image**: Triggered via GitHub UI — builds and pushes to GitHub Container Registry
+- **Deploy to Hugging Face**: Triggered via GitHub UI — syncs the repository to a Hugging Face Space using configuration from `.github/hf-space-config.yml`
+
 ## Quality Assurance
 
 - **`docker compose exec development-server npm run lint`**: Biome linting, TypeScript checking, dependency validation, copy-paste detection, architectural validation, and documentation checks

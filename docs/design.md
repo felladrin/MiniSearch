@@ -11,7 +11,7 @@
 ## Design Principles
 
 ### User Interface
-- Minimal visual clutter with Mantine v8 components
+- Minimal visual clutter with Mantine v9 components
 - Clear hierarchy and information architecture
 - Keyboard-first navigation with comprehensive shortcuts
 - Semantic HTML and ARIA labels for WCAG 2.1 AA compliance
@@ -37,7 +37,7 @@
 
 - Feature-based component organization in `client/components/`
 - Self-contained component folders with co-located tests
-- Consistent use of Mantine UI v8 components and hooks
+- Consistent use of Mantine UI v9 components and hooks
 - Custom hooks for reusable logic in `client/hooks/`
 - Business logic separated into `client/modules/`
 - Proper TypeScript typing throughout with strict mode

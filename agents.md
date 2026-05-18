@@ -30,6 +30,8 @@ This is your navigation hub. Start here, follow the links, and return when you n
 - **`docs/ui-components.md`** - Component architecture and PubSub patterns
 - **`docs/search-history.md`** - History database schema and management
 - **`docs/conversation-memory.md`** - Token budgeting and rolling summaries
+- **`docs/reranking.md`** - Reranker subsystem and llama-server lifecycle
+- **`docs/glossary.md`** - Codebase-specific terms and domain concepts
 
 ### Development
 - **`docs/development-commands.md`** - Docker, npm, and testing commands
@@ -83,21 +85,67 @@ Need to:
 - `server/webSearchService.ts` - SearXNG integration
 - `server/rerankerService.ts` - Local result reranking
 
-### Key Components
-- `client/components/App/` - Application shell
-- `client/components/Search/Form/` - Search input
-- `client/components/Search/Results/` - Results display
-- `client/components/AiResponse/` - AI response + chat
-- `client/components/Pages/Main/Menu/` - Settings drawers
-- `client/modules/webGpu.ts` - Detects WebGPU availability (`"gpu" in navigator`)
-- `client/modules/querySuggestions.ts` - Provides search suggestion UI, stored in IndexedDB
+### UI Components
+- `client/components/App/` - Application shell with error boundaries
+- `client/components/Search/Form/` - Search input and form
+- `client/components/Search/Results/` - Textual and graphical results display
+- `client/components/Search/History/` - History drawer and button
+- `client/components/AiResponse/` - AI response display and chat interface
+- `client/components/Pages/Main/` - Main page layout
+- `client/components/Pages/Main/Menu/` - Settings drawers (AI, Search, Interface, Voice, Actions)
+- `client/components/Pages/AccessPage.tsx` - Access key validation page
+- `client/components/Analytics/SearchStats.tsx` - Search analytics cards
+- `client/components/Logs/` - Application logging modal
+- `client/components/Settings/HistorySettings.tsx` - History configuration UI
+
+### Client Modules
+- `client/modules/pubSub.ts` - All PubSub channels for state management
+- `client/modules/search.ts` - Search orchestration and IndexedDB caching
+- `client/modules/textGeneration.ts` - AI response generation and chat handling
+- `client/modules/textGenerationWithWllama.ts` - Browser-based inference
+- `client/modules/textGenerationWithOpenAi.ts` - OpenAI-compatible API inference
+- `client/modules/textGenerationWithHorde.ts` - AI Horde distributed inference
+- `client/modules/textGenerationWithInternalApi.ts` - Internal API proxy inference
+- `client/modules/settings.ts` - Default settings and inference type definitions
+- `client/modules/history.ts` - IndexedDB persistence for searches and chat
+- `client/modules/wllama.ts` - Wllama model configuration and management
+- `client/modules/webGpu.ts` - WebGPU availability detection (`"gpu" in navigator`)
+- `client/modules/querySuggestions.ts` - Search suggestion UI, stored in IndexedDB
 - `client/modules/relatedSearchQuery.ts` - Generates related search queries
-- `client/modules/followUpQuestions.ts` - Generates suggested follow-up questions, uses `followUpQuestionPubSub`
-- `client/modules/accessKey.ts` - Validates and stores access keys, uses `accessKeyValidatedPubSub`
+- `client/modules/followUpQuestions.ts` - Generates follow-up questions via `followUpQuestionPubSub`
+- `client/modules/accessKey.ts` - Validates and stores access keys using argon2id hashing and localStorage
 - `client/modules/parentWindow.ts` - PostMessage API for embedding in parent windows
-- `client/hooks/` - Reusable React hooks
-- `server/searchToken.ts` - Generates CSRF protection tokens for search requests
-- `server/downloadFileFromHuggingFaceRepository.ts` - Downloads GGUF models from HuggingFace using `@huggingface/hub` package
+- `client/modules/searchTokenHash.ts` - CSRF protection token generation
+- `client/modules/systemPrompt.ts` - System prompt templates
+- `client/modules/logEntries.ts` - Application logging with unique IDs
+- `client/modules/appInfo.ts` - Application metadata and version info
+- `client/modules/keyboard.ts` - Keyboard shortcut handling
+- `client/modules/stringFormatters.ts` - Text formatting utilities
+- `client/modules/types.ts` - Shared TypeScript type definitions
+
+### Server Modules
+- `server/searchEndpointServerHook.ts` - `/search/text` and `/search/images` endpoints
+- `server/internalApiEndpointServerHook.ts` - `/inference` proxy to self-hosted API
+- `server/validateAccessKeyServerHook.ts` - Access key validation endpoint
+- `server/statusEndpointServerHook.ts` - `/status` health check endpoint
+- `server/rerankerServiceHook.ts` - llama-server lifecycle management for reranking
+- `server/compressionServerHook.ts` - gzip/brotli compression for responses
+- `server/crossOriginServerHook.ts` - COOP/COEP headers for SharedArrayBuffer
+- `server/cacheServerHook.ts` - Cache-Control headers (preview server only)
+- `server/webSearchService.ts` - SearXNG integration with circuit breaker and retry logic
+- `server/rerankerService.ts` - Reranker service (llama-server process management)
+- `server/rankSearchResults.ts` - Score-based filtering and result reordering
+- `server/searchToken.ts` - CSRF token generation and storage
+- `server/verifiedTokens.ts` - In-memory `Set<string>` of verified session tokens
+- `server/verifyTokenAndRateLimit.ts` - Token verification and rate limiting
+- `server/handleTokenVerification.ts` - Search token validation logic
+- `server/searchesSinceLastRestart.ts` - In-memory search counters for analytics
+- `server/downloadFileFromHuggingFaceRepository.ts` - Downloads GGUF models from HuggingFace
+
+### Hooks
+- `client/hooks/useSearchHistory.ts` - Search history management from IndexedDB
+- `client/hooks/useHistoryRestore.ts` - Restores full search state from history
+- `client/hooks/useDrawerState.ts` - Drawer open/close state with logging
 
 ## Common Tasks Quick Reference
 
@@ -136,7 +184,7 @@ docker compose exec development-server npm run lint
 This runs:
 - Biome (formatting/linting)
 - TypeScript (type checking)
-- ts-prune (dead code detection)
+- knip (dead code detection)
 - jscpd (copy-paste detection)
 - dpdm (circular dependency detection)
 - Custom architectural linter
@@ -165,7 +213,7 @@ This runs:
 
 ## Technology Stack
 
-React + TypeScript + Mantine UI v8, with privacy-first architecture.
+React + TypeScript + Mantine UI v9, with privacy-first architecture.
 See `docs/core-technologies.md` for complete dependency list and selection criteria.
 
 ## Need Help?

@@ -7,6 +7,25 @@
 - **Server-side Validation**: Access keys verified before proxying to SearXNG
 - **Key Timeout**: `ACCESS_KEY_TIMEOUT_HOURS` controls cache duration
 
+### Access Key Validation Flow
+
+1. User enters access key on the **AccessPage** UI
+2. Client hashes the key client-side using argon2id
+3. Server validates the hash against configured `ACCESS_KEYS` via `validateAccessKeyServerHook`
+4. On success: key hash is stored in localStorage with timestamp
+5. On subsequent loads, `useAccessKeyValidation` in `App.tsx` calls `verifyStoredAccessKey()` to check if the cached key is still valid
+6. If expired (based on `ACCESS_KEY_TIMEOUT_HOURS`), user is prompted to re-enter
+
+### Search Token Lifecycle
+
+Every HTTP request from client to backend carries a `token` query parameter for CSRF protection:
+
+1. **Token Generation**: On build/startup, `regenerateSearchToken()` writes a random token to `{os.tempdir()}/minisearch-token`
+2. **Client Injection**: The token is injected as `VITE_SEARCH_TOKEN` compile-time constant via Vite's `define` option
+3. **Per-Request Auth**: Client includes token as `?token=` parameter on all `/search/text` and `/search/images` requests
+4. **Server Verification**: `handleTokenVerification()` in `searchEndpointServerHook.ts` validates the token before proxying to SearXNG
+5. **Session Tracking**: Validated tokens are stored in an in-memory `Set<string>` (`verifiedTokens.ts`) for session counting
+
 ## Privacy
 
 - **Local-First Storage**: All data stored in IndexedDB, no cloud sync
@@ -31,6 +50,15 @@
 - **Argon2 Hashing**: Access keys hashed using argon2id for secure validation (not storage encryption)
 - **Cross-Origin Isolation**: COOP/COEP headers for SharedArrayBuffer security
 - **CSRF Protection**: Search tokens validated via argon2 hash comparison
+
+## Server-Side Security Modules
+
+| Module | Purpose |
+|--------|---------|
+| `server/searchToken.ts` | Reads/writes the CSRF token from `{tempdir}/minisearch-token` |
+| `server/verifiedTokens.ts` | In-memory `Set<string>` of verified session tokens |
+| `server/searchesSinceLastRestart.ts` | In-memory counters for abuse monitoring |
+| `server/searchEndpointServerHook.ts` | Token verification before proxying to SearXNG |
 
 ## Threat Model
 

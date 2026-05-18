@@ -6,21 +6,61 @@ MiniSearch uses a **PubSub-based reactive architecture**. Components subscribe t
 
 ### PubSub Pattern
 
+Each PubSub channel is a three-element tuple returned by `createPubSub`:
+
+| Index | Name | Role |
+|-------|------|------|
+| `[0]` | `update*` | Setter — publishes a new value to all subscribers |
+| `[1]` | `onValueChange` / `subscribe*` / `listen*` | Subscription registration — receives every future value |
+| `[2]` | `get*` | Getter — reads the current value synchronously |
+
+These are destructured at module level in `pubSub.ts` and exported under descriptive names (e.g., `updateTextGenerationState`, `listenToSettingsChanges`, `getQuery`).
+
 ```typescript
 // Component subscribes to state
 const query = usePubSub(queryPubSub);
 
 // Any module can update state
-queryPubSub.set('new query');
+updateQuery('new query');
 
 // All subscribers automatically re-render
 ```
 
 **Benefits:**
-- No prop drilling
-- Decoupled components
-- Easy to add new subscribers
-- Performance: Only subscribers to changed channel re-render
+- **Decoupling** — Modules (text generation, search, React components) read and write shared state without importing each other directly
+- **No provider boilerplate** — Unlike React Context or Redux, no `Provider` wrapper needed; any module imports a channel from `pubSub.ts`
+- **Selective subscriptions** — Components subscribe only to channels they use; a streaming token update throttling `responsePubSub` does not trigger re-renders in unrelated components
+- **Persistence as a decorator** — `createLocalStoragePubSub` layers persistence transparently onto the same interface; consumers don't need to know whether a channel is persisted or ephemeral
+
+### localStorage Persistence
+
+Some state must survive page reloads. The `createLocalStoragePubSub` helper wraps `createPubSub` with two behaviors:
+
+1. **Hydration** — On first call, reads existing value from `localStorage` via `localStorage.getItem(key)`. If a stored JSON string is found, it is parsed and used as the initial value; otherwise the default value is used
+2. **Persistence** — A subscriber is immediately registered on the inner PubSub that calls `localStorage.setItem` with the JSON-serialized new value on every state change
+
+Channels using this pattern: `settingsPubSub`, `querySuggestionsPubSub`, `lastSearchTokenHashPubSub`, `menuExpandedAccordionsPubSub`.
+
+### Throttling High-Frequency Updates
+
+Streaming LLM output produces token-by-token state changes that would overwhelm React's rendering pipeline. Two channels apply `throttle` from `throttleit` to cap subscriber notification rate to ~12 updates/sec (83.3ms interval):
+
+| Export | Raw Updater | Throttle Interval |
+|--------|-------------|-------------------|
+| `updateResponse` | `responsePubSub[0]` | 1000 / 12 ms |
+| `updateReasoningContent` | `reasoningContentPubSub[0]` | 1000 / 12 ms |
+
+Callers write streaming token output directly to these exports without awareness of internal throttling.
+
+### Side Effects
+
+Three channels register built-in side-effect subscribers at module load time, independently of any React component lifecycle, for automatic logging via `addLogEntry`:
+
+| Channel | Side Effect |
+|---------|-------------|
+| `textGenerationStatePubSub` | Logs state transitions |
+| `textSearchStatePubSub` | Logs state transitions |
+| `imageSearchStatePubSub` | Logs state transitions |
 
 ## PubSub Channel Reference
 
@@ -80,7 +120,6 @@ App
     │   ├── HistoryList
     │   ├── SearchStats
     │   └── HistoryActions
-    └── AnalyticsPanel
 ```
 
 ## Key Components
@@ -92,20 +131,12 @@ App
 **Logic:**
 ```typescript
 // App.tsx
-const accessKeyValidated = usePubSub(accessKeyValidatedPubSub);
-
-if (!accessKeyValidated) {
-  return <AccessPage />;
-}
-
-return (
-  <MantineProvider>
-    <MainPage />
-  </MantineProvider>
-);
+// Access key validation is handled via useAccessKeyValidation hook
+// which checks localStorage for a stored key hash and verifies it server-side
+// Renders <AccessPage /> if validation fails, <MainPage /> otherwise
 ```
 
-**Subscribes to:** `accessKeyValidatedPubSub`
+**Subscribes to:** None directly; validation state managed by `useAccessKeyValidation` hook
 
 ### SearchForm (`client/components/Search/Form/`)
 
@@ -117,7 +148,7 @@ return (
 
 **Logic:**
 ```typescript
-const SearchForm: React.FC = () => {
+function SearchForm() {
   const [query, setQuery] = usePubSub(queryPubSub);
   const searchState = usePubSub(textSearchStatePubSub);
   
@@ -133,7 +164,7 @@ const SearchForm: React.FC = () => {
       </button>
     </form>
   );
-};
+}
 ```
 
 ### SearchResultsSection (`client/components/Search/Results/`)
@@ -145,7 +176,7 @@ const SearchForm: React.FC = () => {
 
 **Logic:**
 ```typescript
-const SearchResultsSection: React.FC = () => {
+function SearchResultsSection() {
   const textResults = usePubSub(textSearchResultsPubSub);
   const imageResults = usePubSub(imageSearchResultsPubSub);
   const searchState = usePubSub(textSearchStatePubSub);
@@ -159,7 +190,7 @@ const SearchResultsSection: React.FC = () => {
       {settings.enableImageSearch && <ImageResultsGrid results={imageResults} />}
     </>
   );
-};
+}
 ```
 
 ### AiResponseSection (`client/components/AiResponse/`)
@@ -169,17 +200,24 @@ const SearchResultsSection: React.FC = () => {
 **PubSub:**
 - **Subscribes:** `responsePubSub`, `textGenerationStatePubSub`, `chatMessagesPubSub`
 
-**States:**
-- `idle`: No response yet
-- `loadingModel`: Downloading/loading AI model
-- `awaitingSearchResults`: Waiting for search before generating
-- `generating`: Streaming response
-- `completed`: Full response received
-- `failed`: Error occurred
+**State Machine (`textGenerationStatePubSub`):**
+
+| State | Description | UI Display |
+|-------|-------------|------------|
+| `idle` | No active generation | Hidden or empty |
+| `loadingModel` | Downloading or initializing AI model | "Loading AI model..." with progress |
+| `awaitingSearchResults` | Waiting for search to complete | "Searching..." indicator |
+| `generating` | Streaming response tokens | Active response with streaming text |
+| `completed` | Full response received | Complete response with chat interface |
+| `failed` | Error occurred | Error message with retry option |
+
+**Reasoning Content Extraction:**
+
+When models output internal thought processes, the UI extracts reasoning content bounded by `reasoningStartMarker` and `reasoningEndMarker` markers. Reasoning is displayed separately from the final response in a collapsible section.
 
 **Logic:**
 ```typescript
-const AiResponseSection: React.FC = () => {
+function AiResponseSection() {
   const response = usePubSub(responsePubSub);
   const state = usePubSub(textGenerationStatePubSub);
   const messages = usePubSub(chatMessagesPubSub);
@@ -192,7 +230,7 @@ const AiResponseSection: React.FC = () => {
       <ChatSection messages={messages} />
     </section>
   );
-};
+}
 ```
 
 ### SettingsDrawer (`client/components/Pages/Main/Menu/`)
@@ -343,30 +381,16 @@ const { isDrawerOpen, openDrawer, closeDrawer } = useDrawerState(
 
 ## Styling
 
-**Framework:** Mantine UI v8
+**Framework:** Mantine UI v9
 
 **Theme Configuration:**
 ```typescript
-// client/main.tsx
-<MantineProvider
-  theme={{
-    primaryColor: 'blue',
-    defaultRadius: 'md',
-    fontFamily: 'system-ui, sans-serif',
-  }}
->
+// client/components/App/App.tsx
+<MantineProvider defaultColorScheme="dark">
 ```
 
-**Responsive Breakpoints:**
-- `xs`: 0-576px
-- `sm`: 576-768px
-- `md`: 768-992px
-- `lg`: 992-1200px
-- `xl`: 1200px+
-
 **Dark Mode:**
-- Automatic based on system preference
-- Toggle available in settings
+- Default color scheme is dark
 - All components support dark mode via Mantine
 
 ## Accessibility

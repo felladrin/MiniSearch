@@ -50,6 +50,18 @@ INTERNAL_OPENAI_COMPATIBLE_API_NAME="Company LLM"
 |----------|---------|-------------|
 | `DEFAULT_INFERENCE_TYPE` | `browser` | Default AI inference type (`browser`, `openai`, `horde`, `internal`) |
 
+### Server Configuration
+
+These variables control the Vite development/preview server behavior:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HOST` | `0.0.0.0` | Host address for the Vite server to bind to |
+| `PORT` | `7860` | Port number for the main server |
+| `HMR_PORT` | `7861` | Port for Hot Module Replacement during development |
+| `ALLOWED_HOSTS` | `true` | Comma-separated list of allowed hostnames for the preview server |
+| `BASIC_SSL` | `false` | Enable basic SSL for HTTPS support during development |
+
 ## Application Settings
 
 Settings are stored in browser localStorage and can be changed via the Settings UI.
@@ -73,16 +85,18 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `inferenceType` | enum | `'browser'` | AI provider: `browser`, `openai`, `horde`, `internal` |
-| `inferenceTemperature` | number | `0.7` | Sampling temperature (0.0-1.0) |
+| `inferenceTemperature` | number | `0.7` | Sampling temperature (0.0-2.0) |
 | `inferenceTopP` | number | `0.9` | Nucleus sampling parameter |
 | `inferenceMaxTokens` | number | `4096` | Maximum tokens per generation |
-| `inferenceTopK` | number | `40` | Top-K sampling parameter (browser only) |
 | `minP` | number | `0.1` | Min-p sampling threshold |
 | `inferenceFrequencyPenalty` | number | `0` | Penalty for token frequency |
 | `inferencePresencePenalty` | number | `0` | Penalty for token presence |
-| `repeatPenalty` | number | `1.1` | Penalty for token repetition |
-| `cpuThreads` | number | (auto) | Number of CPU threads for inference (Wllama) |
+| `cpuThreads` | number | (auto) | Number of CPU threads for inference (Wllama), defaults to `navigator.hardwareConcurrency - 2` |
 | `allowAiModelDownload` | boolean | `false` | Allow automatic AI model downloads |
+| `wllamaModelId` | string | `VITE_WLLAMA_DEFAULT_MODEL_ID` | Default Wllama model ID |
+| `hordeApiKey` | string | `'0000000000'` | AI Horde API key (default is anonymous) |
+| `hordeModel` | string | `''` | Specific AI Horde model to request |
+| `openAiContextLength` | number | `4096` | Context window size for OpenAI-compatible models |
 
 ### Model Selection
 
@@ -111,6 +125,32 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `historyMaxEntries` | number | `1000` | Maximum history entries before cleanup |
 | `historyAutoCleanup` | boolean | `true` | Automatically clean old history entries |
 | `historyGroupByDate` | boolean | `true` | Group history entries by date in UI |
+
+### System Prompt Configuration
+
+The default system prompt supports template placeholders populated at runtime:
+
+```typescript
+{
+  systemPrompt: `Answer using the search results below as your primary source, supplemented by your own knowledge when needed. Write your response in the same language as the query.
+
+Cite every fact from the search results by placing the referred website link immediately after it. Format the link exactly as Markdown does: the domain inside square brackets, then the full URL in parentheses, like [example.com](https://example.com/year/month/title). Note the text inside the square brackets is only the top-level domain, without "https://", "www.", or paths. Here is a citation link example: [youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ).
+
+You are allowed to use these Markdown elements: anchor, bold, italic, code, quote, table.
+
+Below are the search results fetched at {{currentDate}}.
+
+{{searchResults}}`,
+  reasoningStartMarker: '<think>',
+  reasoningEndMarker: '</think>'
+}
+```
+
+**Placeholders:**
+- `{{currentDate}}`: Current date and time injected at generation time
+- `{{searchResults}}`: Formatted search results from the web search
+
+**Reasoning Markers:** Models that output internal thought processes use `<think>` and `</think>` markers. The UI extracts and separately displays reasoning content from the final response.
 
 ### Privacy Settings
 
@@ -159,21 +199,40 @@ The Dockerfile sets up:
 
 ## Vite Environment Injection
 
-Environment variables are injected at build time via `vite.config.ts`:
+Environment variables are loaded via `dotenv` at application startup and injected at build time via `vite.config.ts` using Vite's `define` feature. Variables are replaced at build time with their actual values, appearing as global constants in the client code.
 
-```typescript
-// Injected into import.meta.env
-VITE_SEARCH_TOKEN
-VITE_ACCESS_KEYS_ENABLED
-VITE_WLLAMA_DEFAULT_MODEL_ID
-VITE_INTERNAL_API_ENABLED
-VITE_DEFAULT_INFERENCE_TYPE
-```
+### Injected Constants
+
+| Constant | Source | Description |
+|----------|--------|-------------|
+| `VITE_SEARCH_TOKEN` | Generated at build time | CSRF protection token |
+| `VITE_ACCESS_KEYS_ENABLED` | `ACCESS_KEYS` | Boolean indicating if access control is active |
+| `VITE_ACCESS_KEY_TIMEOUT_HOURS` | `ACCESS_KEY_TIMEOUT_HOURS` | Hours to cache validated access keys |
+| `VITE_WLLAMA_DEFAULT_MODEL_ID` | `WLLAMA_DEFAULT_MODEL_ID` | Default Wllama model identifier |
+| `VITE_INTERNAL_API_ENABLED` | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` | Boolean indicating if internal API is configured |
+| `VITE_DEFAULT_INFERENCE_TYPE` | `DEFAULT_INFERENCE_TYPE` | Default AI provider |
+| `VITE_INTERNAL_API_NAME` | `INTERNAL_OPENAI_COMPATIBLE_API_NAME` | Display name for internal API |
+
+### Build-Time Metadata
+
+These constants are generated during the build process:
+
+| Constant | Description |
+|----------|-------------|
+| `VITE_BUILD_DATE_TIME` | ISO timestamp of when the build occurred |
+| `VITE_COMMIT_SHORT_HASH` | Git commit hash at build time (if available) |
 
 These are accessed in client code as:
 ```typescript
 const token = import.meta.env.VITE_SEARCH_TOKEN;
+const buildDate = import.meta.env.VITE_BUILD_DATE_TIME;
 ```
+
+### Security Considerations
+
+- Variables with `VITE_` prefix are bundled into the client JavaScript and visible in browser dev tools
+- Non-prefixed variables remain server-side only (e.g., `INTERNAL_OPENAI_COMPATIBLE_API_KEY` is NOT injected)
+- The search token is hashed client-side before transmission; the raw token is never sent over the network
 
 ## Configuration Patterns
 

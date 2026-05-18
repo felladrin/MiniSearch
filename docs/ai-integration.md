@@ -227,6 +227,41 @@ Update PubSub (chatMessages, response)
 Save to history database
 ```
 
+### Text Generation State Machine
+
+`textGenerationStatePubSub` drives the AI response UI through these states:
+
+| State | Description |
+|-------|-------------|
+| `idle` | No response yet, waiting for user input |
+| `loadingModel` | Downloading/loading the AI model (browser inference only) |
+| `awaitingSearchResults` | Waiting for search results before generating |
+| `generating` | Streaming response tokens |
+| `completed` | Full response received |
+| `failed` | Error occurred during generation |
+
+For non-browser inference types (`openai`, `internal`, `horde`), the state skips `loadingModel` and transitions directly to `generating` or `failed`.
+
+### Response Throttling
+
+Two PubSub update functions are throttled to 12 updates per second to ensure UI performance during high-frequency streaming:
+- `updateResponse` &rarr; `responsePubSub`
+- `updateReasoningContent` &rarr; `reasoningContentPubSub`
+
+### Inference Backend Dispatch
+
+When search results are ready, `searchAndRespond()` selects the inference backend based on `settings.inferenceType`:
+
+```
+settings.inferenceType
+  ├── 'browser'  → generateTextWithBrowser()    [client/modules/textGenerationWithWllama.ts]
+  ├── 'openai'   → generateTextWithOpenAi()     [client/modules/textGenerationWithOpenAi.ts]
+  ├── 'horde'    → generateTextWithHorde()      [client/modules/textGenerationWithHorde.ts]
+  └── 'internal' → generateTextWithInternalApi() [client/modules/textGenerationWithInternalApi.ts]
+```
+
+For browser inference, the system first loads the model from HuggingFace with a warmup pass, then streams tokens via the OAI-compatible `createChatCompletion` API. Each backend module implements the same contract: build context from search results + system prompt, call the inference API, stream tokens via PubSub updates.
+
 ## Conversation Memory
 
 ### Token Budget Management
@@ -300,7 +335,6 @@ Wllama models are sharded (split into chunks):
 
 ### For Privacy-Critical Use
 - Use Browser inference (Wllama)
-- Disable `shareModelDownloads`
 - Set `historyRetentionDays: 0` (no persistence)
 
 ### For Maximum Quality

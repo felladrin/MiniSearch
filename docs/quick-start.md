@@ -43,6 +43,28 @@ Production mode:
 - No dev tools or HMR
 - Optimized Docker layer caching
 
+## Container Internals
+
+The Docker container runs three services concurrently:
+- **SearXNG** - Privacy-focused metasearch engine (starts in background)
+- **llama-server** - Local AI inference server (for result reranking)
+- **Node.js (Vite)** - Main application server
+
+### Startup Sequence
+
+1. SearXNG webapp launches in background from `/usr/local/searxng/searxng-src`
+2. Node.js server starts (dev: `npm run dev` with HMR; production: `npm start -- --host`)
+
+Development mode overrides the container command to run `npm install && npm run dev` before starting.
+
+### Port Configuration
+
+| Port | Service | Variable | Notes |
+|------|---------|----------|-------|
+| 7860 | Node.js (Vite) | `PORT` | Main application (both dev and production) |
+| 7861 | HMR | `HMR_PORT` | Vite HMR server (development only) |
+| 8888 | SearXNG | - | Internal metasearch engine (not exposed) |
+
 ## First Configuration
 
 ### No Configuration Required (Default)

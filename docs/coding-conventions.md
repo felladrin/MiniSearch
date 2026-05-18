@@ -2,7 +2,7 @@
 
 ## Tech Stack
 
-React 19 + TypeScript + Mantine UI v8 (`@mantine/core`, `@mantine/hooks`, `@mantine/form`, `@mantine/notifications`, `@mantine/code-highlight`, `@mantine/carousel`)
+React 19 + TypeScript + Mantine UI v9 (`@mantine/core`, `@mantine/hooks`, `@mantine/form`, `@mantine/notifications`, `@mantine/code-highlight`, `@mantine/carousel`)
 
 - **Build Tool**: Vite 8
 - **Linting/Formatting**: Biome 2
@@ -38,7 +38,7 @@ React 19 + TypeScript + Mantine UI v8 (`@mantine/core`, `@mantine/hooks`, `@mant
 
 ## UI & Performance
 
-- Use Mantine v8 components for consistency
+- Use Mantine v9 components for consistency
 - Ensure keyboard navigation, ARIA labels, semantic HTML
 - Use `React.memo()` and `useCallback()` for optimization
 - Lazy loading with Vite's dynamic imports
