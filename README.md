@@ -53,21 +53,6 @@ Once the container is running, open http://localhost:7860 in your browser and st
 ## Frequently asked questions [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/felladrin/MiniSearch)
 
 <details>
-  <summary>How do I search via the browser's address bar?</summary>
-  <p>
-    You can set MiniSearch as your browser's address-bar search engine using the pattern <code>http://localhost:7860/?q=%s</code>, in which your search term replaces <code>%s</code>.
-  </p>
-</details>
-
-<details>
-  <summary>How do I search via Raycast?</summary>
-  <p>
-    You can add <a href="https://ray.so/quicklinks/shared?quicklinks=%7B%22link%22:%22https:%5C/%5C/felladrin-minisearch.hf.space%5C/?q%3D%7BQuery%7D%22,%22name%22:%22MiniSearch%22%7D" target="_blank">this Quicklink</a> to Raycast, so typing your query will open MiniSearch with the search results. You can also edit it to point to your own domain.
-  </p>
-  <img width="744" alt="image" src="https://github.com/user-attachments/assets/521dca22-c77b-42de-8cc8-9feb06f9a97e">
-</details>
-
-<details>
   <summary>Can I use custom models via OpenAI-Compatible API?</summary>
   <p>
     Yes! For this, open the Menu and change the "AI Processing Location" to <code>Remote server (API)</code>. Then configure the Base URL, and optionally set an API Key and a Model to use.
@@ -103,6 +88,21 @@ Once the container is running, open http://localhost:7860 in your browser and st
     <li>Restart MiniSearch server.</li>
     <li>In the MiniSearch menu, select the new option (named as per your <code>INTERNAL_OPENAI_COMPATIBLE_API_NAME</code> setting) from the "AI Processing Location" dropdown.</li>
   </ol>
+</details>
+
+<details>
+  <summary>How do I search via the browser's address bar?</summary>
+  <p>
+    You can set MiniSearch as your browser's address-bar search engine using the pattern <code>http://localhost:7860/?q=%s</code>, in which your search term replaces <code>%s</code>.
+  </p>
+</details>
+
+<details>
+  <summary>How do I search via Raycast?</summary>
+  <p>
+    You can add <a href="https://ray.so/quicklinks/shared?quicklinks=%7B%22link%22:%22https:%5C/%5C/felladrin-minisearch.hf.space%5C/?q%3D%7BQuery%7D%22,%22name%22:%22MiniSearch%22%7D" target="_blank">this Quicklink</a> to Raycast, so typing your query will open MiniSearch with the search results. You can also edit it to point to your own domain.
+  </p>
+  <img width="744" alt="image" src="https://github.com/user-attachments/assets/521dca22-c77b-42de-8cc8-9feb06f9a97e">
 </details>
 
 <details>
