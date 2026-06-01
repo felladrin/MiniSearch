@@ -121,7 +121,6 @@ async function generateWithWllama({
       messages,
       max_tokens: defaultContextSize,
       stream: true,
-      onData: () => {},
       abortSignal: abortController.signal,
       ...model.getSampling(),
     });

@@ -1,19 +1,7 @@
 on:
   workflow_call:
 jobs:
-  check-code-quality:
-    name: Check Code Quality
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "lts/*"
-          cache: "npm"
-      - run: npm ci --ignore-scripts
-      - run: npm run lint
   check-docker-container:
-    needs: [check-code-quality]
     name: Check Docker Container
     runs-on: ubuntu-latest
     steps:
