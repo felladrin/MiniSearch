@@ -123,7 +123,7 @@ export interface WllamaModel {
   readonly shouldIncludeUrlsOnPrompt: boolean;
   readonly stopStrings?: string[];
   readonly flash_attn?: boolean;
-  getSampling: () => SamplingParams;
+  getSampling: () => Omit<SamplingParams, "logit_bias">;
 }
 
 const createDefaultModelConfig = (): Omit<
