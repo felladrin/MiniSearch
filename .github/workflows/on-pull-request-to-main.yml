@@ -4,6 +4,6 @@ on:
     types: [opened, synchronize, reopened]
     branches: ["main"]
 jobs:
-  test-lint-ping:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-test-lint-ping') }}
-    uses: ./.github/workflows/reusable-test-lint-ping.yml
+  check-docker:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-check-docker') }}
+    uses: ./.github/workflows/reusable-check-docker.yml

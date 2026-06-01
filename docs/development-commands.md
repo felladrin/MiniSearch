@@ -55,18 +55,17 @@ The repository uses six GitHub Actions workflows for continuous integration, dep
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `ci.yml` | Push/PR to `main` or `master` | Full lint (`npm run lint`), format check (`npm run format`), and Vitest test suite |
-| `on-push-to-main.yml` | Push to `main` | Delegates to `reusable-test-lint-ping.yml` |
-| `on-pull-request-to-main.yml` | PR opened/synced/reopened to `main` | Delegates to `reusable-test-lint-ping.yml`; skippable via `skip-test-lint-ping` label |
+| `on-push-to-main.yml` | Push to `main` | Delegates to `reusable-check-docker.yml` |
+| `on-pull-request-to-main.yml` | PR opened/synced/reopened to `main` | Delegates to `reusable-check-docker.yml`; skippable via `skip-check-docker` label |
 | `publish-docker-image.yml` | Manual (`workflow_dispatch`) | Builds multi-platform Docker image (linux/amd64, linux/arm64) and pushes to `ghcr.io` |
 | `deploy-to-hugging-face.yml` | Manual (`workflow_dispatch`) | Syncs repository to Hugging Face Spaces using `JacobLinCool/huggingface-sync` |
-| `reusable-test-lint-ping.yml` | Called by other workflows | Two-job pipeline: (1) `npm ci --ignore-scripts && npm run lint`, (2) Docker compose production build + health check via `curl localhost:7860` |
+| `reusable-check-docker.yml` | Called by other workflows | Docker compose production build + health check via `curl localhost:7860` (lint/format/test are covered by `ci.yml`) |
 
-### Reusable Workflow (`reusable-test-lint-ping.yml`)
+### Reusable Workflow (`reusable-check-docker.yml`)
 
-Used by both `on-push-to-main` and `on-pull-request-to-main` to avoid duplication:
+Used by both `on-push-to-main` and `on-pull-request-to-main` to run the production container smoke test:
 
-1. **check-code-quality** - Installs dependencies (skipping postinstall scripts) and runs `npm run lint`
-2. **check-docker-container** (depends on check-code-quality) - Builds and starts the production container with `docker compose -f docker-compose.production.yml up -d`, then verifies the main page returns HTTP 200 within 60 seconds
+1. **check-docker-container** - Builds and starts the production container with `docker compose -f docker-compose.production.yml up -d`, then verifies the main page returns HTTP 200 within 60 seconds
 
 ### Docker Image Builds
 
