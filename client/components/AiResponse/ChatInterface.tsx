@@ -201,7 +201,7 @@ export default function ChatInterface({
   const handleEditMessage = useCallback(
     (absoluteIndex: number) => {
       const target = messages[absoluteIndex];
-      if (!target || target.role !== "user") return;
+      if (target?.role !== "user") return;
       setInput(target.content);
       setMessages(messages.slice(0, absoluteIndex));
       setFollowUpQuestion("");
