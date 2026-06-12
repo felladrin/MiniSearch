@@ -13,11 +13,15 @@ export const defaultSettings = {
   searchResultsLimit: 15,
   systemPrompt: `Answer using the search results below as your primary source, supplemented by your own knowledge when needed. Write your response in the same language as the query.
 
-Cite every fact from the search results by placing the referred website link immediately after it. Format the link exactly as Markdown does: the domain inside square brackets, then the full URL in parentheses, like [example.com](https://example.com/year/month/title). Note the text inside the square brackets is only the top-level domain, without "https://", "www.", or paths. Here is a citation link example: [youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ).
+Cite every fact taken from the search results with an inline Markdown link immediately after it. Format: [domain.com](https://full-url). Use only the top-level domain (no https://, www., or paths) as link text. Example: [youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ).
+
+When the search results disagree with each other, point out the conflict. When you rely on your own knowledge because the results don't cover something, make that clear rather than presenting it as sourced.
+
+Today's date is {{currentDate}}. Use it to resolve relative date references in both the question and the results.
 
 You are allowed to use these Markdown elements: anchor, bold, italic, code, quote, table.
 
-Below are the search results fetched at {{currentDate}}.
+Search results:
 
 {{searchResults}}`,
   inferenceType: VITE_DEFAULT_INFERENCE_TYPE,
