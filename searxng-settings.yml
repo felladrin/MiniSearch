@@ -1,0 +1,29 @@
+# SearXNG settings for MiniSearch.
+#
+# Built on top of SearXNG's upstream defaults via `use_default_settings`, so this
+# file only declares what MiniSearch overrides:
+#   - JSON output format (consumed by server/webSearchService.ts)
+#   - an explicit, resilient set of general-web engines
+#
+# Docs: https://docs.searxng.org/admin/settings/settings_use_default_settings.html
+use_default_settings: true
+
+server:
+  # Placeholder replaced with a random value at image build time (see Dockerfile).
+  secret_key: "ultrasecretkey"
+
+search:
+  formats:
+    - json
+
+# Engines are merged into the upstream defaults by name; only the keys below are
+# overridden. Engines left unlisted keep their upstream default.
+engines:
+  - name: bing
+    disabled: false
+  - name: mojeek
+    disabled: false
+  - name: marginalia
+    disabled: false
+  - name: mwmbl
+    disabled: false

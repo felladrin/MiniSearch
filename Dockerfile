@@ -49,12 +49,11 @@ RUN git clone https://github.com/searxng/searxng.git /usr/local/searxng/searxng-
 
 ARG SEARXNG_SETTINGS_PATH="/etc/searxng/settings.yml"
 
+COPY --chown=${USERNAME}:${USERNAME} searxng-settings.yml $SEARXNG_SETTINGS_PATH
+
 WORKDIR /usr/local/searxng/searxng-src
-RUN cp searx/settings.yml $SEARXNG_SETTINGS_PATH && \
-  chown ${USERNAME}:${USERNAME} $SEARXNG_SETTINGS_PATH && \
-  chmod 644 $SEARXNG_SETTINGS_PATH && \
+RUN chmod 644 $SEARXNG_SETTINGS_PATH && \
   sed -i 's/ultrasecretkey/'$(openssl rand -hex 32)'/g' $SEARXNG_SETTINGS_PATH && \
-  sed -i 's/- html/- json/' $SEARXNG_SETTINGS_PATH && \
   /usr/local/searxng/searxng-venv/bin/pip install -r requirements.txt && \
   /usr/local/searxng/searxng-venv/bin/pip install --no-build-isolation -e .
 
