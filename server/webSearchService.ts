@@ -45,6 +45,8 @@ interface SearxngSearchResult {
 
 interface SearxngSearchResponse {
   results?: SearxngSearchResult[];
+  number_of_results?: number;
+  unresponsive_engines?: unknown[];
 }
 
 const defaultSearchParams = {
@@ -107,6 +109,33 @@ function buildSearchUrl(query: string, searchType: SearchType) {
   return `${SERVICE_BASE_URL}/search?${params.toString()}`;
 }
 
+/**
+ * Extracts a concise, human-readable reason from SearXNG's `unresponsive_engines`
+ * field. SearXNG reports each failed engine as a `[engine, reason]` pair (e.g.
+ * `["google", "Timeout"]`, `["bing", "Suspended: Access denied"]`). This is the
+ * only failure signal available to MiniSearch, since SearXNG's own (very verbose)
+ * stdout/stderr is intentionally discarded to keep the server logs clean.
+ *
+ * @returns A summary string, or null when no engine errors were reported.
+ */
+export function describeUnresponsiveEngines(
+  unresponsiveEngines: unknown,
+): string | null {
+  if (!Array.isArray(unresponsiveEngines) || unresponsiveEngines.length === 0) {
+    return null;
+  }
+
+  return unresponsiveEngines
+    .map((entry) => {
+      if (Array.isArray(entry)) {
+        const [engine, reason] = entry;
+        return reason ? `${engine} (${reason})` : String(engine);
+      }
+      return String(entry);
+    })
+    .join(", ");
+}
+
 function recordFailure() {
   circuitBreaker.failures++;
   circuitBreaker.lastFailureTime = Date.now();
@@ -167,7 +196,12 @@ async function performSearch(
     const results = Array.isArray(data.results) ? data.results : [];
 
     if (results.length === 0) {
-      printMessage(`No results returned from SearXNG for query: ${query}`);
+      const reason = describeUnresponsiveEngines(data.unresponsive_engines);
+      printMessage(
+        reason
+          ? `No results returned from SearXNG for query: ${query}. Unresponsive engines: ${reason}`
+          : `No results returned from SearXNG for query: ${query}. No engine errors were reported; all engines returned zero results.`,
+      );
     }
 
     return results;
@@ -191,13 +225,43 @@ async function processSearchResults(
     const textualResults = await Promise.all(
       deduplicatedResults.slice(0, limit).map(processTextualResult),
     );
-    return filterNullResults(textualResults);
+    return reportDiscardedResults(
+      filterNullResults(textualResults),
+      results.length,
+      query,
+      searchType,
+    );
   }
 
   const graphicalResults = await Promise.all(
     deduplicatedResults.slice(0, limit).map(processGraphicalResult),
   );
-  return filterNullResults(graphicalResults);
+  return reportDiscardedResults(
+    filterNullResults(graphicalResults),
+    results.length,
+    query,
+    searchType,
+  );
+}
+
+/**
+ * Logs when SearXNG returned results but every one was dropped during processing
+ * (e.g. missing title, snippet, or media source). Without this, the discarded
+ * batch surfaces to the user as an opaque "Search failed" with no server-side
+ * trace of why the non-empty response yielded nothing usable.
+ */
+function reportDiscardedResults<T>(
+  filteredResults: T[],
+  rawResultCount: number,
+  query: string,
+  searchType: SearchType,
+): T[] {
+  if (rawResultCount > 0 && filteredResults.length === 0) {
+    printMessage(
+      `All ${rawResultCount} ${searchType} result(s) from SearXNG for query: ${query} were discarded during processing (missing title, snippet, or media source).`,
+    );
+  }
+  return filteredResults;
 }
 
 export async function fetchSearXNG(

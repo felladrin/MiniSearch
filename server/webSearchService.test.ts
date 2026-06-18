@@ -7,7 +7,11 @@ import {
   type MockedFunction,
   vi,
 } from "vitest";
-import { fetchSearXNG, getWebSearchStatus } from "./webSearchService";
+import {
+  describeUnresponsiveEngines,
+  fetchSearXNG,
+  getWebSearchStatus,
+} from "./webSearchService";
 
 function createMockResponse(
   text: string,
@@ -98,6 +102,31 @@ describe("WebSearchService", () => {
     const results = await fetchSearXNG("test query", "text");
     expect(Array.isArray(results)).toBe(true);
     expect(results).toHaveLength(0);
+  });
+});
+
+describe("describeUnresponsiveEngines", () => {
+  it("returns null when there are no unresponsive engines", () => {
+    expect(describeUnresponsiveEngines(undefined)).toBeNull();
+    expect(describeUnresponsiveEngines([])).toBeNull();
+    expect(describeUnresponsiveEngines("not-an-array")).toBeNull();
+  });
+
+  it("formats engine/reason pairs from SearXNG", () => {
+    expect(
+      describeUnresponsiveEngines([
+        ["google", "Timeout"],
+        ["bing", "Suspended: Access denied"],
+      ]),
+    ).toBe("google (Timeout), bing (Suspended: Access denied)");
+  });
+
+  it("handles entries without a reason", () => {
+    expect(describeUnresponsiveEngines([["duckduckgo"]])).toBe("duckduckgo");
+  });
+
+  it("falls back to string conversion for unexpected shapes", () => {
+    expect(describeUnresponsiveEngines(["qwant"])).toBe("qwant");
   });
 });
 
