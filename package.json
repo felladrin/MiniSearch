@@ -24,7 +24,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^2.0.0",
+    "@ai-sdk/openai-compatible": "^3.0.0",
     "@huggingface/hub": "^2.0.0",
     "@leeoniya/ufuzzy": "^1.0.19",
     "@mantine/carousel": "^9.0.0",
