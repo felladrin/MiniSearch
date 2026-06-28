@@ -7,7 +7,6 @@ import {
 import type { DownloadOptions } from "@wllama/wllama/esm/cache-manager";
 import wllamaWasmUrl from "@wllama/wllama/esm/wasm/wllama.wasm?url";
 import { addLogEntry } from "./logEntries";
-import { getSettings } from "./pubSub";
 import { defaultContextSize } from "./textGenerationUtilities";
 
 interface WllamaInitConfig {
@@ -135,20 +134,12 @@ const createDefaultModelConfig = (): Omit<
   flash_attn: true,
   contextSize: defaultContextSize,
   shouldIncludeUrlsOnPrompt: true,
-  getSampling: () => {
-    const settings = getSettings();
-    return {
-      top_p: settings.inferenceTopP,
-      min_p: settings.minP,
-      temp: settings.inferenceTemperature,
-      dynatemp_range: Math.max(0, settings.inferenceTemperature - 0.2),
-      penalty_freq: settings.inferenceFrequencyPenalty,
-      penalty_present: settings.inferencePresencePenalty,
-      top_k: 0,
-      penalty_repeat: 1,
-      penalty_last_n: defaultContextSize,
-    };
-  },
+  getSampling: () => ({
+    samplers: "top_k;temperature",
+    temperature: 0.35,
+    dynatemp_range: 0.15,
+    top_k: 40,
+  }),
 });
 
 export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
@@ -159,12 +150,12 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00004.gguf",
     fileSizeInMegabytes: 102,
   },
-  "lfm2-350m": {
+  "lfm2.5-230m": {
     ...createDefaultModelConfig(),
-    label: "LFM2 350M",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-LFM2-350M",
-    hfFilePath: "model.shard-00001-of-00004.gguf",
-    fileSizeInMegabytes: 221,
+    label: "LFM2.5 350M",
+    hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-LFM2.5-230M",
+    hfFilePath: "LFM2.5-230M-Q4_K_XL-00001-of-00003.gguf",
+    fileSizeInMegabytes: 160,
   },
   "granite-4.0-350m": {
     ...createDefaultModelConfig(),
@@ -194,33 +185,12 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 267,
   },
-  "falcon-h1-0.5b": {
-    ...createDefaultModelConfig(),
-    label: "Falcon H1 0.5B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Falcon-H1-0.5B-Instruct",
-    hfFilePath: "model.shard-00001-of-00011.gguf",
-    fileSizeInMegabytes: 306,
-  },
   "qwen-3-0.6b": {
     ...createDefaultModelConfig(),
     label: "Qwen 3 0.6B",
     hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-Qwen3-0.6B",
     hfFilePath: "model.shard-00001-of-00004.gguf",
     fileSizeInMegabytes: 406,
-  },
-  "lfm2-700m": {
-    ...createDefaultModelConfig(),
-    label: "LFM2 700M",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-LFM2-700M",
-    hfFilePath: "model.shard-00001-of-00006.gguf",
-    fileSizeInMegabytes: 449,
-  },
-  "lfm2-1.2b": {
-    ...createDefaultModelConfig(),
-    label: "LFM2 1.2B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-LFM2-1.2B",
-    hfFilePath: "model.shard-00001-of-00007.gguf",
-    fileSizeInMegabytes: 700,
   },
   "lfm2.5-1.2b-instruct": {
     ...createDefaultModelConfig(),
