@@ -85,12 +85,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `inferenceType` | enum | `'browser'` | AI provider: `browser`, `openai`, `horde`, `internal` |
-| `inferenceTemperature` | number | `0.7` | Sampling temperature (0.0-2.0) |
-| `inferenceTopP` | number | `0.9` | Nucleus sampling parameter |
 | `inferenceMaxTokens` | number | `4096` | Maximum tokens per generation |
-| `minP` | number | `0.1` | Min-p sampling threshold |
-| `inferenceFrequencyPenalty` | number | `0` | Penalty for token frequency |
-| `inferencePresencePenalty` | number | `0` | Penalty for token presence |
 | `cpuThreads` | number | (auto) | Number of CPU threads for inference (Wllama), defaults to `navigator.hardwareConcurrency - 2` |
 | `allowAiModelDownload` | boolean | `false` | Allow automatic AI model downloads |
 | `wllamaModelId` | string | `VITE_WLLAMA_DEFAULT_MODEL_ID` | Default Wllama model ID |

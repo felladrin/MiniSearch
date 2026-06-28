@@ -63,11 +63,10 @@ export function getDefaultChatCompletionCreateParamsStreaming() {
   return {
     stream: true,
     max_tokens: settings.openAiContextLength ?? defaultContextSize,
-    temperature: settings.inferenceTemperature,
-    top_p: settings.inferenceTopP,
-    min_p: settings.minP,
-    frequency_penalty: settings.inferenceFrequencyPenalty,
-    presence_penalty: settings.inferencePresencePenalty,
+    temperature: 0.35,
+    top_p: 1.0,
+    min_p: 0.0,
+    top_k: 40,
   } as const;
 }
 

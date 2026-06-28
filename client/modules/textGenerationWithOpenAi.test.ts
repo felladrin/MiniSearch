@@ -25,11 +25,10 @@ vi.mock("./textGenerationUtilities", () =>
     getDefaultChatCompletionCreateParamsStreaming: vi.fn(() => ({
       stream: true,
       max_tokens: 1000,
-      temperature: 0.7,
+      temperature: 0.35,
       top_p: 1.0,
       min_p: 0.0,
-      frequency_penalty: 0.0,
-      presence_penalty: 0.0,
+      top_k: 40,
     })),
   }),
 );

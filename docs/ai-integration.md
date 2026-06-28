@@ -87,7 +87,6 @@ Uses OpenAI's API or any OpenAI-compatible service.
   inferenceType: 'openai',
   openaiApiKey: 'sk-xxx',
   openaiModel: 'gpt-4', // Optional: auto-detected if empty
-  inferenceTemperature: 0.7,
   inferenceMaxTokens: 4096
 }
 ```
