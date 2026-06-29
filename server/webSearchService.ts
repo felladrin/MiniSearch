@@ -77,26 +77,11 @@ export async function startWebSearchService() {
   }
 }
 
-async function testSearch(): Promise<boolean> {
-  try {
-    const results = await performSearch("test", "text");
-    return Array.isArray(results) && results.length > 0;
-  } catch (error) {
-    printMessage(
-      "Test search failed:",
-      error instanceof Error ? error.message : error,
-    );
-    return false;
-  }
-}
-
 export async function getWebSearchStatus() {
   try {
     const response = await fetch(`${SERVICE_BASE_URL}/healthz`);
     const responseText = await response.text();
-    if (responseText.trim() !== "OK") return false;
-
-    return await testSearch();
+    return responseText.trim() === "OK";
   } catch {
     return false;
   }

@@ -85,14 +85,13 @@ describe("WebSearchService", () => {
   });
 
   it("should return true when health endpoint returns OK", async () => {
-    (global.fetch as MockedFunction<typeof fetch>)
-      .mockResolvedValueOnce(createMockResponse("OK"))
-      .mockResolvedValueOnce(successResponse());
+    (global.fetch as MockedFunction<typeof fetch>).mockResolvedValueOnce(
+      createMockResponse("OK"),
+    );
 
     const status = await getWebSearchStatus();
     expect(status).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1]?.[0]).toContain("/search?");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("should return empty array on fetchSearXNG error", async () => {
