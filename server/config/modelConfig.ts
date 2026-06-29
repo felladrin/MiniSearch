@@ -7,8 +7,6 @@ export interface ModelConfig {
   defaultMaxTokens: number;
   temperature: number;
   topP: number;
-  frequencyPenalty: number;
-  presencePenalty: number;
 }
 
 export const modelConfig: ModelConfig = {
@@ -20,8 +18,6 @@ export const modelConfig: ModelConfig = {
   defaultMaxTokens: 2048,
   temperature: 0.7,
   topP: 0.9,
-  frequencyPenalty: 0.0,
-  presencePenalty: 0.0,
 };
 
 /**
@@ -54,11 +50,5 @@ export function getModelConfig(): ModelConfig {
     topP: process.env.MODEL_TOP_P
       ? parseFloat(process.env.MODEL_TOP_P)
       : modelConfig.topP,
-    frequencyPenalty: process.env.MODEL_FREQUENCY_PENALTY
-      ? parseFloat(process.env.MODEL_FREQUENCY_PENALTY)
-      : modelConfig.frequencyPenalty,
-    presencePenalty: process.env.MODEL_PRESENCE_PENALTY
-      ? parseFloat(process.env.MODEL_PRESENCE_PENALTY)
-      : modelConfig.presencePenalty,
   };
 }

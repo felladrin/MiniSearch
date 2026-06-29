@@ -24,10 +24,6 @@ interface ChatCompletionRequestBody {
   temperature?: number;
   /** Top-p sampling parameter */
   top_p?: number;
-  /** Frequency penalty */
-  frequency_penalty?: number;
-  /** Presence penalty */
-  presence_penalty?: number;
   /** Maximum tokens to generate */
   max_tokens?: number;
 }
@@ -274,8 +270,6 @@ export function internalApiEndpointServerHook<
               messages: requestBody.messages,
               temperature: requestBody.temperature,
               topP: requestBody.top_p,
-              frequencyPenalty: requestBody.frequency_penalty,
-              presencePenalty: requestBody.presence_penalty,
               maxOutputTokens: requestBody.max_tokens,
               maxRetries: 0,
             });

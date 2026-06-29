@@ -90,8 +90,6 @@ async function createOpenAiStream({
         maxOutputTokens: params.max_tokens,
         temperature: params.temperature,
         topP: params.top_p,
-        frequencyPenalty: params.frequency_penalty,
-        presencePenalty: params.presence_penalty,
         abortSignal: currentAbortController.signal,
         maxRetries: 0,
         onError: async (error: unknown) => {
