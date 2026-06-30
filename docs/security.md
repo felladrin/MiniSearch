@@ -44,7 +44,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 
 - Input validation on all endpoints
 - Sanitization of user-generated content
-- Secure random token generation
+- Search token generation: a per-build/per-startup token written to a temp file (`server/searchToken.ts`); note this currently uses `Math.random()`, not a cryptographically secure random source
 - HTTPS enforcement in production
 - Regular dependency updates via Renovate
 - **Argon2 Hashing**: Access keys hashed using argon2id for secure validation (not storage encryption)
@@ -58,7 +58,9 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 | `server/searchToken.ts` | Reads/writes the CSRF token from `{tempdir}/minisearch-token` |
 | `server/verifiedTokens.ts` | In-memory `Set<string>` of verified session tokens |
 | `server/searchesSinceLastRestart.ts` | In-memory counters for abuse monitoring |
-| `server/searchEndpointServerHook.ts` | Token verification before proxying to SearXNG |
+| `server/searchEndpointServerHook.ts` | Proxies text/image search to SearXNG after token verification (via `handleTokenVerification`) |
+| `server/verifyTokenAndRateLimit.ts` | Verifies the Argon2 token hash and enforces rate limiting (10 requests per 10 seconds) shared by search and inference endpoints |
+| `server/handleTokenVerification.ts` | Middleware bridge that calls `verifyTokenAndRateLimit` and writes 400/401/429 error responses for the search and inference endpoints |
 
 ## Threat Model
 

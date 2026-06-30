@@ -32,15 +32,7 @@ Uses `@wllama/wllama` for browser-based inference. Automatically uses WebGPU whe
 5. Streams tokens via the OAI-compatible `createChatCompletion` API
 
 **Pre-configured Models:**
-All stored at `Felladrin/gguf-sharded-*` on HuggingFace:
-
-| Model | Params | Size | Speed | Quality |
-|-------|--------|------|-------|---------|
-| qwen-3-0.6b | 600M | ~400MB | Fast | Good |
-| smollm2-1.7b | 1.7B | ~1.1GB | Medium | Better |
-| llama-3.2-1b | 1B | ~650MB | Fast | Good |
-| gemma-3-1b | 1B | ~650MB | Fast | Good |
-| phi-4-mini | 3.8B | ~2.2GB | Slow | Best |
+All stored at `Felladrin/gguf-sharded-*` on HuggingFace. MiniSearch currently ships 35 pre-configured models, ranging from SmolLM 2 135M (~100MB) up to Phi 4 Mini Reasoning 3.8B (~2.4GB). The full, authoritative list with HuggingFace repo IDs and sizes lives in `client/modules/wllama.ts` (`wllamaModels`) and is rendered in the Settings dropdown; refer to that file rather than a static table here, since models are added/swapped frequently.
 
 **Configuration:**
 - Settings → Inference Type: `Browser`
@@ -56,7 +48,7 @@ export const isWebGPUAvailable = "gpu" in navigator;
 
 **Limitations:**
 - First load requires model download (progressive via sharded files)
-- Limited to smaller models (3B params max due to browser memory)
+- Limited to smaller models (~4B params max due to browser memory)
 - CPU mode is 2-5x slower than WebGPU
 
 ## OpenAI API Integration
@@ -76,18 +68,18 @@ Uses OpenAI's API or any OpenAI-compatible service.
 - Any custom provider with OpenAI-compatible API
 
 **Features:**
-- Streaming responses
+- Streaming responses, built on the Vercel AI SDK (`ai` + `@ai-sdk/openai-compatible`)
 - Auto model selection (if blank)
-- Retry logic with fallback models
-- Reasoning content support
+- On a request error, automatically retries up to 5 times, switching to a different model fetched from the provider's `/models` endpoint each time (100ms × attempt backoff between retries)
+- Reasoning content support: reasoning/thinking output is wrapped between configurable `reasoningStartMarker`/`reasoningEndMarker` settings (default `<think>` / `</think>`)
 
 **Configuration:**
 ```typescript
 {
   inferenceType: 'openai',
-  openaiApiKey: 'sk-xxx',
-  openaiModel: 'gpt-4', // Optional: auto-detected if empty
-  inferenceMaxTokens: 4096
+  openAiApiKey: 'sk-xxx',
+  openAiApiModel: 'gpt-4', // Optional: auto-detected if empty
+  openAiContextLength: 4096
 }
 ```
 
@@ -122,8 +114,8 @@ Uses aihorde.net, a distributed volunteer GPU network.
 ```typescript
 {
   inferenceType: 'horde',
-  aiHordeApiKey: '', // Optional
-  aiHordeModel: 'koboldcpp/LLaMA2-70B-Psyfighter2' // Optional
+  hordeApiKey: '0000000000', // Default anonymous key; set your own for priority
+  hordeModel: '' // Optional; empty races two random workers and uses the first response
 }
 ```
 
@@ -159,16 +151,19 @@ The internal API uses a server-side proxy to:
 
 **Endpoint:**
 ```
-POST /inference
+POST /inference?token=<argon2-hashed-search-token>
 Content-Type: application/json
-Authorization: Bearer <VITE_SEARCH_TOKEN>
 
 {
   "messages": [...],
-  "model": "llama-3.1-8b",
+  "temperature": 0.35,
+  "top_p": 1.0,
+  "max_tokens": 4096,
   "stream": true
 }
 ```
+
+The token is passed as a URL query parameter (`?token=`), verified server-side with Argon2 against the build-time `VITE_SEARCH_TOKEN`, not as an `Authorization: Bearer` header. The model field is optional; if `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` is unset, the server fetches and randomly selects from the upstream's available models.
 
 **Features:**
 - Private data stays in your infrastructure
@@ -233,13 +228,16 @@ Save to history database
 | State | Description |
 |-------|-------------|
 | `idle` | No response yet, waiting for user input |
+| `awaitingModelDownloadAllowance` | Browser inference only: waiting for user consent to download the model (when `allowAiModelDownload` is off) |
 | `loadingModel` | Downloading/loading the AI model (browser inference only) |
 | `awaitingSearchResults` | Waiting for search results before generating |
+| `preparingToGenerate` | Search results ready, request being sent to the inference backend |
 | `generating` | Streaming response tokens |
+| `interrupted` | User clicked Stop; generation aborts without overwriting the partial response |
 | `completed` | Full response received |
 | `failed` | Error occurred during generation |
 
-For non-browser inference types (`openai`, `internal`, `horde`), the state skips `loadingModel` and transitions directly to `generating` or `failed`.
+For non-browser inference types (`openai`, `internal`, `horde`), the state skips `loadingModel` and `awaitingModelDownloadAllowance`, going from `awaitingSearchResults` straight to `preparingToGenerate` then `generating` or `failed`.
 
 ### Response Throttling
 

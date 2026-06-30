@@ -92,7 +92,7 @@ Need to:
 - `client/components/Search/History/` - History drawer and button
 - `client/components/AiResponse/` - AI response display and chat interface
 - `client/components/Pages/Main/` - Main page layout
-- `client/components/Pages/Main/Menu/` - Settings drawers (AI, Search, Interface, Voice, Actions)
+- `client/components/Pages/Main/Menu/` - Settings drawers (AI, Search, Interface, History, Voice, Actions)
 - `client/components/Pages/AccessPage.tsx` - Access key validation page
 - `client/components/Analytics/SearchStats.tsx` - Search analytics cards
 - `client/components/Logs/` - Application logging modal
@@ -186,8 +186,8 @@ This runs:
 - TypeScript (type checking)
 - knip (dead code detection)
 - jscpd (copy-paste detection)
-- dpdm (circular dependency detection)
 - Custom architectural linter
+- Doc gardening and documentation validator scripts
 
 ## Agent-First Principles
 

@@ -11,7 +11,7 @@
 
 ## Review Process
 
-- Automated checks run on all PRs (Biome formatting/linting, TypeScript type checking, knip dead code detection, jscpd copy-paste detection, dpdm circular dependency detection, architectural linter, documentation validation)
+- Automated checks run on all PRs (Biome formatting/linting, TypeScript type checking, knip dead code detection, jscpd copy-paste detection, architectural linter, documentation validation)
 - Human review optional but encouraged for complex changes
 - Agent-to-agent review is primary mechanism
 - Short-lived PRs preferred
@@ -30,7 +30,6 @@ This comprehensive check includes:
 - **TypeScript**: Type checking with strict mode
 - **knip**: Dead code detection
 - **jscpd**: Copy-paste detection
-- **dpdm**: Circular dependency detection
 - **Custom architectural linter**: Project-specific rules
 - **Documentation validator**: Ensures docs stay current
 

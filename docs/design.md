@@ -16,7 +16,7 @@
 - Keyboard-first navigation with comprehensive shortcuts
 - Semantic HTML and ARIA labels for WCAG 2.1 AA compliance
 - Responsive design for desktop and mobile
-- Dark mode support with high contrast options
+- Dark mode by default (via Mantine's `MantineProvider`)
 
 ### Performance
 - Lazy loading for routes and components with React.lazy()
@@ -27,16 +27,16 @@
 - Bundle analysis with rollup-plugin-visualizer
 
 ### Accessibility
-- WCAG 2.1 AA compliance
+- WCAG-aligned where implemented
 - Screen reader support
 - Keyboard navigation
-- High contrast mode support
+- ARIA labels on select interactive elements (e.g. chat input, history actions)
 - Focus indicators
 
 ## Component Design
 
 - Feature-based component organization in `client/components/`
-- Self-contained component folders with co-located tests
+- Tests co-located for select components (e.g. SearchForm, MainPage, SearchResultsSection); broader test coverage is still being built out
 - Consistent use of Mantine UI v9 components and hooks
 - Custom hooks for reusable logic in `client/hooks/`
 - Business logic separated into `client/modules/`

@@ -75,19 +75,19 @@ All state channels are defined in `client/modules/pubSub.ts`:
 | `textSearchResultsPubSub` | `TextSearchResults` | Text search results | SearchResultsSection |
 | `llmTextSearchResultsPubSub` | `TextSearchResults` | LLM-reranked text results | Internal use |
 | `imageSearchResultsPubSub` | `ImageSearchResults` | Image search results | ImageResultsSection |
-| `textSearchStatePubSub` | `SearchState` | Text search loading/error state | SearchResultsSection, LoadingIndicators |
-| `imageSearchStatePubSub` | `SearchState` | Image search loading/error state | ImageResultsSection |
+| `textSearchStatePubSub` | `SearchState` | Text search state: `"idle" \| "running" \| "failed" \| "completed"` | SearchResultsSection, LoadingIndicators |
+| `imageSearchStatePubSub` | `SearchState` | Image search state: `"idle" \| "running" \| "failed" \| "completed"` | ImageResultsSection |
 | `textGenerationStatePubSub` | `TextGenerationState` | AI generation state | AiResponseSection, StatusIndicators |
 | `modelLoadingProgressPubSub` | `number` | Model download progress (0-100) | AiResponseSection |
 | `modelSizeInMegabytesPubSub` | `number` | Model size in MB for progress calc | AiResponseSection |
-| `chatMessagesPubSub` | `ChatMessage[]` | Chat conversation | ChatSection, ChatInput |
-| `chatInputPubSub` | `string` | Current chat input content | ChatInput |
-| `chatGenerationStatePubSub` | `{isGeneratingResponse, isGeneratingFollowUpQuestion}` | Chat generation states | ChatSection |
+| `chatMessagesPubSub` | `ChatMessage[]` | Chat conversation | ChatInterface |
+| `chatInputPubSub` | `string` | Current chat input content | ChatInputArea |
+| `chatGenerationStatePubSub` | `{isGeneratingResponse, isGeneratingFollowUpQuestion}` | Chat generation states | ChatInterface |
 | `conversationSummaryPubSub` | `{id, summary}` | Rolling conversation summary | TextGeneration module |
 | `followUpQuestionPubSub` | `string` | Generated follow-up question | AiResponseSection |
 | `suppressNextFollowUpPubSub` | `boolean` | Flag to skip next follow-up | FollowUpQuestions module |
 | `isRestoringFromHistoryPubSub` | `boolean` | History restoration in progress | SearchForm, components |
-| `menuExpandedAccordionsPubSub` | `string[]` | Expanded menu accordion IDs | SettingsDrawer |
+| `menuExpandedAccordionsPubSub` | `string[]` | Expanded menu accordion IDs | MenuDrawer |
 | `querySuggestionsPubSub` | `string[]` | Query suggestions history | SearchForm |
 | `lastSearchTokenHashPubSub` | `string` | Hash of last search token | Security/validation |
 | `logEntriesPubSub` | `LogEntry[]` | Application log entries | LogsModal, ShowLogsButton |
@@ -99,27 +99,28 @@ App
 ├── AccessPage (if access keys enabled)
 └── MainPage
     ├── SearchForm
-    │   ├── SearchInput
-    │   └── SearchButton
-    ├── SettingsDrawer
-    │   ├── AISettings
-    │   ├── SearchSettings
-    │   └── HistorySettings
+    │   ├── HistoryButton
+    │   │   └── HistoryDrawer (lazy-loaded)
+    │   └── MenuButton
+    │       └── MenuDrawer
+    │           ├── AISettingsForm
+    │           ├── SearchSettingsForm
+    │           ├── InterfaceSettingsForm
+    │           ├── HistorySettings
+    │           ├── VoiceSettingsForm
+    │           └── ActionsForm
     ├── SearchResultsSection
-    │   ├── TextResultsList
-    │   │   └── SearchResultCard (×N)
-    │   └── ImageResultsGrid
-    │       └── ImageResultCard (×N)
-    ├── AiResponseSection
-    │   ├── ResponseContent
-    │   ├── CitationsPanel
-    │   └── ChatSection
-    │       ├── ChatMessages
-    │       └── ChatInput
-    ├── HistoryDrawer
-    │   ├── HistoryList
-    │   ├── SearchStats
-    │   └── HistoryActions
+    │   ├── TextSearchResults
+    │   │   └── SearchResultsList
+    │   └── ImageSearchResults
+    │       └── ImageResultsList
+    └── AiResponseSection
+        ├── AiResponseContent
+        │   └── FormattedMarkdown
+        └── ChatInterface (shown once generation is completed)
+            ├── ChatHeader
+            ├── MessageList
+            └── ChatInputArea
 ```
 
 ## Key Components
@@ -150,7 +151,7 @@ App
 ```typescript
 function SearchForm() {
   const [query, setQuery] = usePubSub(queryPubSub);
-  const searchState = usePubSub(textSearchStatePubSub);
+  const [searchState] = usePubSub(textSearchStatePubSub);
   
   const handleSubmit = () => {
     searchAndRespond();
@@ -159,8 +160,8 @@ function SearchForm() {
   return (
     <form onSubmit={handleSubmit}>
       <input value={query} onChange={e => setQuery(e.target.value)} />
-      <button disabled={searchState.loading}>
-        {searchState.loading ? 'Searching...' : 'Search'}
+      <button disabled={searchState === 'running'}>
+        {searchState === 'running' ? 'Searching...' : 'Search'}
       </button>
     </form>
   );
@@ -177,17 +178,17 @@ function SearchForm() {
 **Logic:**
 ```typescript
 function SearchResultsSection() {
-  const textResults = usePubSub(textSearchResultsPubSub);
-  const imageResults = usePubSub(imageSearchResultsPubSub);
-  const searchState = usePubSub(textSearchStatePubSub);
+  const [textResults] = usePubSub(textSearchResultsPubSub);
+  const [imageResults] = usePubSub(imageSearchResultsPubSub);
+  const [searchState] = usePubSub(textSearchStatePubSub);
   
-  if (searchState.loading) return <LoadingSkeleton />;
-  if (searchState.error) return <ErrorMessage error={searchState.error} />;
+  if (searchState === 'running') return <LoadingSkeleton />;
+  if (searchState === 'failed') return <ErrorMessage />;
   
   return (
     <>
-      <TextResultsList results={textResults} />
-      {settings.enableImageSearch && <ImageResultsGrid results={imageResults} />}
+      <SearchResultsList searchResults={textResults} />
+      {settings.enableImageSearch && <ImageResultsList searchResults={imageResults} />}
     </>
   );
 }
@@ -205,9 +206,12 @@ function SearchResultsSection() {
 | State | Description | UI Display |
 |-------|-------------|------------|
 | `idle` | No active generation | Hidden or empty |
-| `loadingModel` | Downloading or initializing AI model | "Loading AI model..." with progress |
-| `awaitingSearchResults` | Waiting for search to complete | "Searching..." indicator |
+| `awaitingModelDownloadAllowance` | Waiting for user to confirm model download | `AiModelDownloadAllowanceContent` confirmation prompt |
+| `loadingModel` | Downloading or initializing AI model | `LoadingModelContent` with progress |
+| `awaitingSearchResults` | Waiting for search to complete | `PreparingContent` indicator |
+| `preparingToGenerate` | Search done, response not yet started | `PreparingContent` indicator |
 | `generating` | Streaming response tokens | Active response with streaming text |
+| `interrupted` | Generation manually stopped by user | Response retained, with a yellow "Interrupted" badge |
 | `completed` | Full response received | Complete response with chat interface |
 | `failed` | Error occurred | Error message with retry option |
 
@@ -218,40 +222,55 @@ When models output internal thought processes, the UI extracts reasoning content
 **Logic:**
 ```typescript
 function AiResponseSection() {
-  const response = usePubSub(responsePubSub);
-  const state = usePubSub(textGenerationStatePubSub);
-  const messages = usePubSub(chatMessagesPubSub);
-  
-  return (
-    <section>
-      <ResponseContent content={response} />
-      <GenerationStatus state={state} />
-      <CitationsPanel results={textResults} />
-      <ChatSection messages={messages} />
-    </section>
-  );
+  const [response] = usePubSub(responsePubSub);
+  const [textGenerationState] = usePubSub(textGenerationStatePubSub);
+  const [chatMessages] = usePubSub(chatMessagesPubSub);
+
+  if (["generating", "interrupted", "completed", "failed"].includes(textGenerationState)) {
+    return (
+      <>
+        <AiResponseContent textGenerationState={textGenerationState} response={response} />
+        {textGenerationState === "completed" && (
+          <ChatInterface initialResponse={response} initialMessages={chatMessages} />
+        )}
+      </>
+    );
+  }
+
+  if (textGenerationState === "loadingModel") return <LoadingModelContent />;
+  if (["preparingToGenerate", "awaitingSearchResults"].includes(textGenerationState)) {
+    return <PreparingContent textGenerationState={textGenerationState} />;
+  }
+  if (textGenerationState === "awaitingModelDownloadAllowance") {
+    return <AiModelDownloadAllowanceContent />;
+  }
+
+  return null;
 }
 ```
 
-### SettingsDrawer (`client/components/Pages/Main/Menu/`)
+### MenuDrawer (`client/components/Pages/Main/Menu/`)
 
 **Responsibility:** Application settings UI
 
 **Sub-components:**
-- **AISettings:** Model selection, inference type, temperature
-- **SearchSettings:** Result limits, image search toggle
+- **AISettingsForm:** Model selection, inference type, reasoning markers (sampling parameters such as temperature are hardcoded, not user-configurable)
+- **SearchSettingsForm:** Result limits, image search toggle
+- **InterfaceSettingsForm:** UI preferences
 - **HistorySettings:** Retention days, max entries
+- **VoiceSettingsForm:** TTS voice selection
+- **ActionsForm:** Data management actions
 
 **PubSub:**
 - **Subscribes/Updates:** `settingsPubSub` (full settings object)
 
 **Persistence:**
 ```typescript
-// Settings automatically persisted to localStorage
-settingsPubSub.subscribe(newSettings => {
-  localStorage.setItem('settings', JSON.stringify(newSettings));
-});
+// client/modules/pubSub.ts
+export const settingsPubSub = createLocalStoragePubSub('settings', defaultSettings);
 ```
+
+`createLocalStoragePubSub` registers the localStorage-writing subscriber internally, so components just read and write `settingsPubSub` like any other channel.
 
 ### HistoryDrawer (`client/components/Search/History/`)
 
@@ -262,14 +281,18 @@ settingsPubSub.subscribe(newSettings => {
 
 **Hook:** `useSearchHistory()`
 ```typescript
-const { 
-  searches, 
-  groupedSearches, 
-  deleteSearch, 
-  pinSearch, 
-  restoreSearch,
-  searchHistory 
-} = useSearchHistory();
+const {
+  filteredSearches,
+  groupedSearches,
+  togglePin,
+  deleteEntry,
+  searchHistory,
+} = useSearchHistory({ limit: 100, enableGrouping: true });
+```
+
+Restoring a past search (re-running its query) is handled separately by `useHistoryRestore`, used in `SearchForm`:
+```typescript
+const { restoreSearch } = useHistoryRestore(updateQuery, textAreaRef);
 ```
 
 **Features:**
@@ -366,7 +389,7 @@ const [value, setValue] = usePubSub(channel);
 
 Manages search history from IndexedDB:
 ```typescript
-const { searches, groupedSearches, deleteSearch, restoreSearch } = useSearchHistory();
+const { searchHistory, groupedSearches, deleteEntry, togglePin } = useSearchHistory();
 ```
 
 ### useDrawerState
@@ -399,10 +422,9 @@ const { isDrawerOpen, openDrawer, closeDrawer } = useDrawerState(
 
 **Features:**
 - All interactive elements keyboard accessible
-- ARIA labels on all buttons and inputs
+- ARIA labels on select interactive elements (e.g. chat input, message list, history actions, logs modal)
 - Focus management in drawers and modals
 - Screen reader announcements for loading states
-- Reduced motion support
 
 **Implementation:**
 ```typescript
@@ -420,23 +442,14 @@ const { isDrawerOpen, openDrawer, closeDrawer } = useDrawerState(
 
 ## Component Design Principles
 
-1. **Self-Contained:** Each component folder includes component, styles, tests, and types
-2. **Single Responsibility:** Components do one thing well
-3. **PubSub-First:** Use channels for cross-component communication
-4. **Lazy Loading:** Route-level components use `React.lazy()` for code splitting
-5. **Error Boundaries:** Each major section wrapped in error boundary
+1. **Single Responsibility:** Components do one thing well
+2. **PubSub-First:** Use channels for cross-component communication
+3. **Lazy Loading:** Route-level components use `React.lazy()` for code splitting
+4. **Error Boundaries:** Used selectively -- `SearchResultsSection` wraps each result type, and `MarkdownRenderer` wraps syntax-highlighted code blocks (falling back to plain text on failure). AI response and chat components are not currently wrapped in error boundaries.
 
 ## File Organization
 
-```
-client/components/
-├── ComponentName/
-│   ├── index.tsx          # Main component
-│   ├── ComponentName.tsx  # Component implementation
-│   ├── ComponentName.module.css  # Scoped styles
-│   ├── ComponentName.test.tsx    # Unit tests
-│   └── types.ts           # Component-specific types
-```
+Most components are single `.tsx` files directly under their feature directory (e.g. `client/components/AiResponse/ChatInterface.tsx`). There is no `index.tsx` re-export convention. CSS Modules are used only where needed (currently just `ImageResultsList.module.css`). Tests, when present, are co-located as `ComponentName.test.tsx` alongside the component, but not every component has one.
 
 ## Related Topics
 

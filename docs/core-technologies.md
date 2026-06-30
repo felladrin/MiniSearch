@@ -3,7 +3,7 @@
 ## Frontend
 
 - **React + TypeScript**: Strict mode enabled for type safety
-- **Mantine UI v9**: Component library (`@mantine/core`, `@mantine/hooks`, `@mantine/form`, `@mantine/carousel`)
+- **Mantine UI v9**: Component library (`@mantine/core`, `@mantine/hooks`, `@mantine/form`, `@mantine/carousel`, `@mantine/code-highlight`, `@mantine/notifications`)
 - **Vite**: Build tool with React plugin and HMR
 - **AI SDK**: `@ai-sdk/openai-compatible` for unified AI interface
 
@@ -24,7 +24,7 @@
 - **Biome**: Linting and formatting
 - **Vitest**: Testing framework
 - **TypeScript**: Strict mode enabled
-- **Husky + lint-staged**: Pre-commit hooks
+- **Husky**: Pre-commit hooks (runs `biome check --write --staged` directly)
 
 ## Technology Selection Criteria
 

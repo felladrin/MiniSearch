@@ -96,7 +96,7 @@ The system executes two parallel flows when a user submits a query:
 ### AI Generation Flow
 
 1. `textGeneration.ts` orchestrates response generation after search completes
-2. State machine transitions: `idle` -> `loadingModel` -> `awaitingSearchResults` -> `generating` -> `completed`/`failed`
+2. State machine transitions: `idle` -> `loadingModel`/`preparingToGenerate` -> `awaitingSearchResults` -> `generating` -> `completed`/`failed`/`interrupted` (see Text Generation States below; `loadingModel` only occurs on the browser/Wllama path, other backends use `preparingToGenerate`)
 3. Search results are formatted and injected into system prompt via `{{searchResults}}` placeholder
 4. LLM generates response with streaming tokens
 5. Response updates throttled to ~12 updates/sec via `throttleit` to prevent React render overload
@@ -131,15 +131,18 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 
 **Text Generation States:**
 - `idle` - No active generation
-- `loadingModel` - Downloading or initializing AI model
-- `awaitingSearchResults` - Waiting for search to complete before generating
+- `awaitingModelDownloadAllowance` - Waiting for user consent to download a browser model
+- `loadingModel` - Downloading or initializing the browser (Wllama) model
+- `awaitingSearchResults` - Waiting for search to complete before generating (only when `searchResultsToConsider > 0`)
+- `preparingToGenerate` - Building the prompt/request just before calling the inference backend (OpenAI-compatible, Internal API, and AI Horde paths)
 - `generating` - Streaming response tokens
+- `interrupted` - Generation was cancelled by the user
 - `completed` - Full response received
 - `failed` - Error occurred
 
 **Search States:**
 - `idle` - No active search
-- `loading` - Search in progress
+- `running` - Search in progress
 - `completed` - Results received
 - `failed` - Error occurred
 

@@ -16,7 +16,7 @@
 ## Testing
 
 - **`docker compose exec development-server npm run test`**: Run Vitest tests
-- **`docker compose exec development-server npm run test:ui`**: Run tests with UI
+- **`docker compose exec development-server npm run test:watch`**: Run tests in watch mode
 - **`docker compose exec development-server npm run test:coverage`**: Run tests with coverage report
 
 ### Coverage Reports for AI Analysis

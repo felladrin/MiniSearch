@@ -50,7 +50,7 @@ docker compose -f docker-compose.production.yml up --build
 
 Once the container is running, open http://localhost:7860 in your browser and start searching!
 
-## Frequently asked questions [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/felladrin/MiniSearch)
+## Frequently asked questions
 
 <details>
   <summary>Can I use custom models via OpenAI-Compatible API?</summary>

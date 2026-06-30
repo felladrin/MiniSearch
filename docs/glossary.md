@@ -74,7 +74,7 @@ A privacy-respecting metasearch engine that aggregates results from multiple sea
 
 ### GGUF
 
-GGML Universal File format. Binary format for storing LLM weights, optimized for fast loading and inference. Used by Wllama and llama-server.
+GPT-Generated Unified Format. Binary format for storing LLM weights, optimized for fast loading and inference. Used by Wllama and llama-server.
 
 ### Dexie
 

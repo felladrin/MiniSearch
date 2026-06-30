@@ -107,15 +107,14 @@ This mode ensures the original top result is never displaced by the reranker, wh
 The search endpoint coordinates reranking in `searchEndpointServerHook.ts`:
 
 ```
-1. fetchSearXNG(query, searchType, limit)
-2. processSearchResults(rawResults)
-3. Check getRerankerStatus()
-   - If healthy: rankSearchResults(query, results)
+1. fetchSearXNG(query, searchType, limit) - internally fetches from SearXNG, deduplicates, and cleans results
+2. Check getRerankerStatus()
+   - If healthy: rankSearchResults(query, results, preserveTopResults)
    - If unhealthy: return unranked results (fallback)
-4. Return structured JSON response
+3. Return structured JSON response
 ```
 
-Reranking is applied only to text search results, not image results.
+Reranking is applied to both text and image search results. For image results, titles and URLs are reformatted into the same text-tuple shape used for text search before being sent through the reranker, then the original image data (including thumbnails) is re-matched to the reranked order by URL. The only difference is that text search passes `preserveTopResults: true` to keep the original top SearXNG result pinned, while image search does not.
 
 ## Model Details
 

@@ -62,6 +62,8 @@ These variables control the Vite development/preview server behavior:
 | `ALLOWED_HOSTS` | `true` | Comma-separated list of allowed hostnames for the preview server |
 | `BASIC_SSL` | `false` | Enable basic SSL for HTTPS support during development |
 
+These defaults are provided by `docker-compose.yml`/`docker-compose.production.yml` (e.g. `PORT=${PORT:-7860}`), not by the application itself - `vite.config.ts` reads these variables with no fallback, so when running directly via `npm run dev`/`vite preview` without Docker, unset variables fall through to Vite's own built-in defaults.
+
 ## Application Settings
 
 Settings are stored in browser localStorage and can be changed via the Settings UI.
@@ -85,19 +87,21 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `inferenceType` | enum | `'browser'` | AI provider: `browser`, `openai`, `horde`, `internal` |
-| `inferenceMaxTokens` | number | `4096` | Maximum tokens per generation |
 | `cpuThreads` | number | (auto) | Number of CPU threads for inference (Wllama), defaults to `navigator.hardwareConcurrency - 2` |
 | `allowAiModelDownload` | boolean | `false` | Allow automatic AI model downloads |
 | `wllamaModelId` | string | `VITE_WLLAMA_DEFAULT_MODEL_ID` | Default Wllama model ID |
 | `hordeApiKey` | string | `'0000000000'` | AI Horde API key (default is anonymous) |
 | `hordeModel` | string | `''` | Specific AI Horde model to request |
-| `openAiContextLength` | number | `4096` | Context window size for OpenAI-compatible models |
+| `openAiApiBaseUrl` | string | `''` | Base URL for the OpenAI-compatible API |
+| `openAiApiKey` | string | `''` | API key for the OpenAI-compatible API |
+| `openAiApiModel` | string | `''` | Model identifier for the OpenAI-compatible API |
+| `openAiContextLength` | number | `4096` | Context window size for OpenAI-compatible models, sent as `max_tokens` |
 
 ### Model Selection
 
 **Wllama Models:**
-- 40+ pre-configured models
-- Range from 135M to 3.8B parameters
+- 38 pre-configured models
+- Range from 135M to 4B parameters
 - All quantized to Q4_K_S or UD-Q4_K_XL
 - Stored at: `Felladrin/gguf-sharded-*` on HuggingFace
 
@@ -129,11 +133,15 @@ The default system prompt supports template placeholders populated at runtime:
 {
   systemPrompt: `Answer using the search results below as your primary source, supplemented by your own knowledge when needed. Write your response in the same language as the query.
 
-Cite every fact from the search results by placing the referred website link immediately after it. Format the link exactly as Markdown does: the domain inside square brackets, then the full URL in parentheses, like [example.com](https://example.com/year/month/title). Note the text inside the square brackets is only the top-level domain, without "https://", "www.", or paths. Here is a citation link example: [youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ).
+Cite every fact taken from the search results with an inline Markdown link immediately after it. Format: [domain.com](https://full-url). Use only the top-level domain (no https://, www., or paths) as link text. Example: [youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ).
+
+When the search results disagree with each other, point out the conflict. When you rely on your own knowledge because the results don't cover something, make that clear rather than presenting it as sourced.
+
+Today's date is {{currentDate}}. Use it to resolve relative date references in both the question and the results.
 
 You are allowed to use these Markdown elements: anchor, bold, italic, code, quote, table.
 
-Below are the search results fetched at {{currentDate}}.
+Search results:
 
 {{searchResults}}`,
   reasoningStartMarker: '<think>',
@@ -142,7 +150,8 @@ Below are the search results fetched at {{currentDate}}.
 ```
 
 **Placeholders:**
-- `{{currentDate}}`: Current date and time injected at generation time
+- `{{currentDate}}`: Current date injected at generation time
+- `{{dateTime}}`: Alias for `{{currentDate}}` - both are replaced with the same current date value
 - `{{searchResults}}`: Formatted search results from the web search
 
 **Reasoning Markers:** Models that output internal thought processes use `<think>` and `</think>` markers. The UI extracts and separately displays reasoning content from the final response.
@@ -162,19 +171,23 @@ Below are the search results fetched at {{currentDate}}.
 ```yaml
 services:
   development-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "7861:7860"  # App
-      - "8888:8888"  # SearXNG
     environment:
-      - ACCESS_KEYS=${ACCESS_KEYS:-}
-      - ACCESS_KEY_TIMEOUT_HOURS=${ACCESS_KEY_TIMEOUT_HOURS:-24}
-      # ... more env vars
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-7860}
+      - BASIC_SSL=${BASIC_SSL:-false}
+      - HMR_PORT=${HMR_PORT:-7861}
+    ports:
+      - "${PORT:-7860}:7860"
+      - "${HMR_PORT:-7861}:7861"
+    build:
+      dockerfile: Dockerfile
+      context: .
     volumes:
-      - .:/home/user/app  # Live code mounting
-      - /home/user/app/node_modules
+      - .:/home/node/app/  # Live code mounting
+    command:
+      [
+        "(cd /usr/local/searxng/searxng-src && /usr/local/searxng/searxng-venv/bin/python -m searx.webapp > /tmp/searxng.log 2>&1) & (npm install && npm run dev)",
+      ]
 ```
 
 ### docker-compose.production.yml
@@ -189,6 +202,8 @@ The Dockerfile sets up:
    - Node.js LTS
    - Python 3 + SearXNG
    - llama-server binary
+
+The app runs under the `node` user, with the app directory at `/home/node/app`. The production image starts the app with `npm start -- --host` (i.e. `vite preview`), not `npm run dev`.
 
 **Multi-service container** runs all three concurrently via shell process composition.
 
@@ -260,11 +275,9 @@ INTERNAL_OPENAI_COMPATIBLE_API_MODEL="llama-3.1-70b"
 
 ## Debugging Configuration
 
-Enable verbose logging:
-```bash
-# In browser console
-localStorage.setItem('debug', 'minisearch:*');
-```
+MiniSearch logs internal events to an in-app log panel (see the Logs section of the menu), backed by `logEntriesPubSub` in `client/modules/logEntries.ts`. There is no separate browser-console debug flag to enable.
+
+**Diagnosing empty search results:** if a search returns no results, the client only sees a generic failure. The actual reason is printed to the server's console (via `server/webSearchService.ts`, always-on `debug` logging), either the SearXNG engines that failed (timeouts, suspensions, rate limits, from SearXNG's `unresponsive_engines` field) or a note that all returned results were discarded during processing (missing title, snippet, or media source). Check the server logs (`docker compose logs`) when troubleshooting failed searches.
 
 Check effective configuration:
 ```typescript

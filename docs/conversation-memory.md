@@ -2,13 +2,13 @@
 # Conversation Memory System
 
 ## Purpose
-Long-running chats can easily exceed the model context window. MiniSearch addresses this by keeping a rolling, extractive summary of prior turns and only feeding the freshest messages into the model alongside that summary. All context handling happens locally in the browser to preserve privacy. @client/modules/textGeneration.ts#262-370
+Long-running chats can easily exceed the model context window. MiniSearch addresses this by keeping a rolling, extractive summary of prior turns and only feeding the freshest messages into the model alongside that summary. All context handling happens locally in the browser to preserve privacy. @client/modules/textGeneration.ts#256-357
 
 ## Components
 1. **Token Budgeting** – `generateChatResponse` measures the system prompt and a stub "Ok!" assistant reply, then caps the rest of the user/assistant turns at 75% of the default 4096-token window (≈3072 tokens) to leave headroom for the response. A GPT tokenizer keeps count per message before inclusion. @client/modules/textGeneration.ts#292-313 @client/modules/textGenerationUtilities.ts#16
 2. **Rolling Summary Storage** – The latest summary plus a conversation identifier live in a lightweight pub/sub store so any component can read/write without prop drilling. @client/modules/pubSub.ts#252-261
 3. **Summarization Engine** – When older turns must be dropped, `createLlmSummary` asks the configured inference backend (OpenAI, AI Horde, internal API, or Wllama) to condense the removed messages under an 800-token limit. If the LLM call fails, the system falls back to an extractive tokenizer-based summarizer to guarantee progress. @client/modules/textGeneration.ts#72-140
-4. **Persistence Hooks** – After a search run completes, `saveLlmResponseForQuery` stores the assistant reply in IndexedDB so history restores can reload it. The conversation summary itself stays in-memory and resets whenever a new search run begins. @client/modules/history.ts#240-280 @client/modules/textGeneration.ts#191
+4. **Persistence Hooks** – After a search run completes, `saveLlmResponseForQuery` stores the assistant reply in IndexedDB so history restores can reload it. The conversation summary itself stays in-memory and resets whenever a new search run begins. @client/modules/history.ts#330-353 @client/modules/textGeneration.ts#191
 
 ## Flow
 1. User sends a chat message.
@@ -19,12 +19,12 @@ Long-running chats can easily exceed the model context window. MiniSearch addres
 
 ## Settings & Extensibility
 - All inference types share the same summarization contract—no provider-specific logic beyond selecting the backend module at runtime. @client/modules/textGeneration.ts#98-128
-- Changing the global context window (e.g., via OpenAI settings) automatically affects the available budget because the logic derives from the default context size exported by `textGenerationUtilities`. @client/modules/textGenerationUtilities.ts#16
+- The 75%-of-4096 conversation-memory budget in `generateChatResponse` is hardcoded against `defaultContextSize` (4096) from `textGenerationUtilities.ts` and does not currently scale with the user-configurable `openAiContextLength` setting; that setting only caps the `max_tokens` of the outgoing API request, a separate concern from how many prior chat turns are kept in memory. @client/modules/textGeneration.ts#281 @client/modules/textGenerationUtilities.ts#14 @client/modules/textGenerationUtilities.ts#65
 - Future settings (e.g., toggling memory or adjusting the 75% ratio) should hook into the same budgeting helpers to keep behavior predictable.
 
 ## Failure Modes & Logging
 - Every summarization attempt is wrapped in try/catch; failures emit `addLogEntry` notifications and fall back to extractive summaries so the chat loop never stalls. @client/modules/textGeneration.ts#100-138
-- If generation is interrupted (user stop), a custom `ChatGenerationError` ensures the loop exits gracefully without corrupting the stored summary. @client/modules/textGeneration.ts#371-376 @client/modules/textGenerationUtilities.ts#21-26
+- If generation is interrupted (user stop), a custom `ChatGenerationError` ensures the loop exits gracefully without corrupting the stored summary. @client/modules/textGenerationUtilities.ts#19-24 @client/modules/textGeneration.ts#347-353
 
 ## Reset Rules
 - Starting a new top-level search clears the summary, chat history, and cached results to avoid context leakage across unrelated conversations. @client/modules/textGeneration.ts#191
