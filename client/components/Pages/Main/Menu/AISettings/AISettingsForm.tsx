@@ -57,7 +57,7 @@ export default function AISettingsForm() {
       {form.values.enableAiResponse && (
         <>
           <Switch
-            label="Notification on AI Complete"
+            label="Notify me when AI response is ready"
             {...form.getInputProps("enableNotificationOnAiComplete", {
               type: "checkbox",
               onChange: handleNotificationToggle,

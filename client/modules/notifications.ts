@@ -35,7 +35,7 @@ export function showAiCompleteNotification(query: string) {
     return;
   }
 
-  new Notification("MiniSearch - AI Summary Complete", {
+  new Notification("MiniSearch: AI response is ready", {
     body: `Your search for "${query}" has finished generating a summary.`,
     icon: "/favicon.ico",
     tag: "ai-complete",
