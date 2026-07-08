@@ -37,7 +37,8 @@ export default function AISettingsForm() {
   const handleNotificationToggle = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    if (event.target.checked) {
+    const isChecked = event.target.checked;
+    if (isChecked) {
       const permission = await requestNotificationPermission();
       if (permission !== "granted") {
         notifications.show({
@@ -50,7 +51,7 @@ export default function AISettingsForm() {
         return;
       }
     }
-    form.setFieldValue("enableNotificationOnAiComplete", event.target.checked);
+    form.setFieldValue("enableNotificationOnAiComplete", isChecked);
   };
 
   return (
@@ -68,8 +69,8 @@ export default function AISettingsForm() {
             label="Notify me when AI response is ready"
             {...form.getInputProps("enableNotificationOnAiComplete", {
               type: "checkbox",
-              onChange: handleNotificationToggle,
             })}
+            onChange={handleNotificationToggle}
             labelPosition="left"
             description="Show a browser notification when the AI response is ready. Useful for longer queries that take time to process."
           />
