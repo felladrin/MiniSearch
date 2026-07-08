@@ -1,10 +1,11 @@
 import { Select, Slider, Stack, Switch, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
+import { notifications } from "@mantine/notifications";
 import { usePubSub } from "create-pubsub/react";
 import { useMemo } from "react";
+import { requestNotificationPermission } from "@/modules/notifications";
 import { settingsPubSub } from "@/modules/pubSub";
 import { inferenceTypes } from "@/modules/settings";
-import { requestNotificationPermission } from "@/modules/notifications";
 import { BrowserSettings } from "./components/BrowserSettings";
 import { HordeSettings } from "./components/HordeSettings";
 import { OpenAISettings } from "./components/OpenAISettings";
@@ -39,6 +40,13 @@ export default function AISettingsForm() {
     if (event.target.checked) {
       const permission = await requestNotificationPermission();
       if (permission !== "granted") {
+        notifications.show({
+          title: "Couldn't enable notifications",
+          message:
+            "Your browser didn't grant permission. Check your notification settings for this site and try again.",
+          color: "red",
+          position: "top-right",
+        });
         return;
       }
     }

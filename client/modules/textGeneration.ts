@@ -1,11 +1,11 @@
 import gptTokenizer from "gpt-tokenizer";
 import prettyMilliseconds from "pretty-ms";
-import { addLogEntry } from "./logEntries";
 import {
   getCurrentSearchRunId,
   saveLlmResponseForQuery,
   updateSearchResults,
 } from "./history";
+import { addLogEntry } from "./logEntries";
 import { showAiCompleteNotification } from "./notifications";
 import {
   getConversationSummary,

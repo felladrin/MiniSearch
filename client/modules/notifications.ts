@@ -1,6 +1,6 @@
-/**
- * Browser notification module for AI completion alerts
- */
+import { addLogEntry } from "./logEntries";
+
+const MAX_NOTIFICATION_QUERY_LENGTH = 100;
 
 /**
  * Requests permission to show browser notifications
@@ -23,7 +23,8 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 }
 
 /**
- * Shows a browser notification when AI generation is complete
+ * Shows a browser notification when AI generation is complete, unless the
+ * user already has this page focused
  * @param query - The search query that triggered the AI generation
  */
 export function showAiCompleteNotification(query: string) {
@@ -35,10 +36,25 @@ export function showAiCompleteNotification(query: string) {
     return;
   }
 
-  new Notification("MiniSearch: AI response is ready", {
-    body: `Your search for "${query}" has finished generating a summary.`,
-    icon: "/favicon.ico",
-    tag: "ai-complete",
-    requireInteraction: false,
-  });
+  if (document.hasFocus()) {
+    return;
+  }
+
+  const truncatedQuery =
+    query.length > MAX_NOTIFICATION_QUERY_LENGTH
+      ? `${query.slice(0, MAX_NOTIFICATION_QUERY_LENGTH)}…`
+      : query;
+
+  try {
+    new Notification("MiniSearch: AI response is ready", {
+      body: `Your search for "${truncatedQuery}" has finished generating a summary.`,
+      icon: "/favicon.png",
+      tag: "ai-complete",
+      requireInteraction: false,
+    });
+  } catch (error) {
+    addLogEntry(
+      `Failed to show AI-complete notification: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
