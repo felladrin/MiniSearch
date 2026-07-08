@@ -1,7 +1,9 @@
 import { Select, Slider, Stack, Switch, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
+import { notifications } from "@mantine/notifications";
 import { usePubSub } from "create-pubsub/react";
 import { useMemo } from "react";
+import { requestNotificationPermission } from "@/modules/notifications";
 import { settingsPubSub } from "@/modules/pubSub";
 import { inferenceTypes } from "@/modules/settings";
 import { BrowserSettings } from "./components/BrowserSettings";
@@ -32,6 +34,25 @@ export default function AISettingsForm() {
     [],
   );
 
+  const handleNotificationToggle = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    if (event.target.checked) {
+      const permission = await requestNotificationPermission();
+      if (permission !== "granted") {
+        notifications.show({
+          title: "Couldn't enable notifications",
+          message:
+            "Your browser didn't grant permission. Check your notification settings for this site and try again.",
+          color: "red",
+          position: "top-right",
+        });
+        return;
+      }
+    }
+    form.setFieldValue("enableNotificationOnAiComplete", event.target.checked);
+  };
+
   return (
     <Stack gap="md">
       <Switch
@@ -43,6 +64,16 @@ export default function AISettingsForm() {
 
       {form.values.enableAiResponse && (
         <>
+          <Switch
+            label="Notify me when AI response is ready"
+            {...form.getInputProps("enableNotificationOnAiComplete", {
+              type: "checkbox",
+              onChange: handleNotificationToggle,
+            })}
+            labelPosition="left"
+            description="Show a browser notification when the AI response is ready. Useful for longer queries that take time to process."
+          />
+
           <Stack gap="xs" mb="md">
             <Text size="sm">Search results to consider</Text>
             <Text size="xs" c="dimmed">

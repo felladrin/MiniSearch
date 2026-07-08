@@ -16,6 +16,7 @@ import {
 } from "@/modules/history";
 import { handleEnterKeyDown } from "@/modules/keyboard";
 import { addLogEntry } from "@/modules/logEntries";
+import { showAiCompleteNotification } from "@/modules/notifications";
 import {
   chatGenerationStatePubSub,
   chatInputPubSub,
@@ -239,6 +240,9 @@ export default function ChatInterface({
       addLogEntry("AI response re-generated");
 
       if (lastUser?.role === "user") {
+        if (settings.enableNotificationOnAiComplete) {
+          showAiCompleteNotification(lastUser.content);
+        }
         await regenerateFollowUpQuestion(lastUser.content, finalResponse);
       }
     } catch (error) {
@@ -250,6 +254,7 @@ export default function ChatInterface({
     generationState,
     messages,
     regenerateFollowUpQuestion,
+    settings,
     setFollowUpQuestion,
     setGenerationState,
     updateStreamedResponse,
@@ -368,6 +373,10 @@ export default function ChatInterface({
         ]);
 
         addLogEntry("AI response completed");
+
+        if (settings.enableNotificationOnAiComplete) {
+          showAiCompleteNotification(currentInput);
+        }
 
         await saveChatMessageForQuery(currentQuery, "user", currentInput);
         await saveChatMessageForQuery(currentQuery, "assistant", finalResponse);

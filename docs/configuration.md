@@ -81,6 +81,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `systemPrompt` | string | (template) | Custom system prompt template for AI |
 | `enterToSubmit` | boolean | `true` | Press Enter to submit query (vs Shift+Enter for new line) |
 | `enableAiResponseScrolling` | boolean | `true` | Auto-scroll AI response as it generates |
+| `enableNotificationOnAiComplete` | boolean | `false` | Show a browser notification when AI response generation finishes |
 
 ### Inference Settings
 
