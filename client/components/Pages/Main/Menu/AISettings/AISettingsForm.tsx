@@ -4,6 +4,7 @@ import { usePubSub } from "create-pubsub/react";
 import { useMemo } from "react";
 import { settingsPubSub } from "@/modules/pubSub";
 import { inferenceTypes } from "@/modules/settings";
+import { requestNotificationPermission } from "@/modules/notifications";
 import { BrowserSettings } from "./components/BrowserSettings";
 import { HordeSettings } from "./components/HordeSettings";
 import { OpenAISettings } from "./components/OpenAISettings";
@@ -32,6 +33,18 @@ export default function AISettingsForm() {
     [],
   );
 
+  const handleNotificationToggle = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    if (event.target.checked) {
+      const permission = await requestNotificationPermission();
+      if (permission !== "granted") {
+        return;
+      }
+    }
+    form.setFieldValue("enableNotificationOnAiComplete", event.target.checked);
+  };
+
   return (
     <Stack gap="md">
       <Switch
@@ -43,6 +56,16 @@ export default function AISettingsForm() {
 
       {form.values.enableAiResponse && (
         <>
+          <Switch
+            label="Notification on AI Complete"
+            {...form.getInputProps("enableNotificationOnAiComplete", {
+              type: "checkbox",
+              onChange: handleNotificationToggle,
+            })}
+            labelPosition="left"
+            description="Show a browser notification when AI summary generation is complete. Useful for longer queries that take time to process."
+          />
+
           <Stack gap="xs" mb="md">
             <Text size="sm">Search results to consider</Text>
             <Text size="xs" c="dimmed">

@@ -43,6 +43,7 @@ Search results:
   selectedVoiceId: "",
   reasoningStartMarker: "<think>",
   reasoningEndMarker: "</think>",
+  enableNotificationOnAiComplete: false,
 };
 
 addLogEntry(
