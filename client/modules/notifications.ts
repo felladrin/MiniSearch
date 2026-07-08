@@ -61,12 +61,16 @@ export function showAiCompleteNotification(query: string) {
       : query;
 
   try {
-    new Notification(truncatedQuery, {
+    const notification = new Notification(truncatedQuery, {
       body: "AI response is ready on MiniSearch.",
       icon: "/favicon.png",
       tag: "ai-complete",
       requireInteraction: false,
     });
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
   } catch (error) {
     addLogEntry(
       `Failed to show AI-complete notification: ${error instanceof Error ? error.message : String(error)}`,

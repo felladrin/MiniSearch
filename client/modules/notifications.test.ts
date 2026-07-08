@@ -17,6 +17,8 @@ class MockNotification {
   static lastInstance: MockNotification | undefined;
   title: string;
   options?: NotificationOptions;
+  onclick: (() => void) | null = null;
+  close = vi.fn();
 
   constructor(title: string, options?: NotificationOptions) {
     this.title = title;
@@ -143,6 +145,23 @@ describe("notifications module", () => {
 
       const title = MockNotification.lastInstance?.title ?? "";
       expect(title.length).toBeLessThan(longQuery.length);
+    });
+
+    it("focuses the window and closes the notification when clicked", () => {
+      MockNotification.permission = "granted";
+      vi.stubGlobal("Notification", MockNotification);
+      vi.spyOn(document, "hasFocus").mockReturnValue(false);
+      const focusSpy = vi.spyOn(window, "focus").mockImplementation(() => {});
+
+      showAiCompleteNotification("test query");
+
+      const instance = MockNotification.lastInstance;
+      expect(instance?.onclick).toBeTypeOf("function");
+
+      instance?.onclick?.();
+
+      expect(focusSpy).toHaveBeenCalledOnce();
+      expect(instance?.close).toHaveBeenCalledOnce();
     });
 
     it("logs instead of throwing when the browser rejects the constructor", () => {
