@@ -46,8 +46,8 @@ export function showAiCompleteNotification(query: string) {
       : query;
 
   try {
-    new Notification("MiniSearch: AI response is ready", {
-      body: `Your search for "${truncatedQuery}" has finished generating a summary.`,
+    new Notification(truncatedQuery, {
+      body: "AI response is ready on MiniSearch.",
       icon: "/favicon.png",
       tag: "ai-complete",
       requireInteraction: false,

@@ -71,7 +71,7 @@ export default function AISettingsForm() {
               onChange: handleNotificationToggle,
             })}
             labelPosition="left"
-            description="Show a browser notification when AI summary generation is complete. Useful for longer queries that take time to process."
+            description="Show a browser notification when the AI response is ready. Useful for longer queries that take time to process."
           />
 
           <Stack gap="xs" mb="md">

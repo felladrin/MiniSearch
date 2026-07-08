@@ -100,23 +100,21 @@ describe("notifications module", () => {
       expect(MockNotification.lastInstance).toBeUndefined();
     });
 
-    it("shows a notification with the query in the body when granted and unfocused", () => {
+    it("shows a notification with the query as the title when granted and unfocused", () => {
       MockNotification.permission = "granted";
       vi.stubGlobal("Notification", MockNotification);
       vi.spyOn(document, "hasFocus").mockReturnValue(false);
 
       showAiCompleteNotification("capital of France");
 
-      expect(MockNotification.lastInstance?.title).toBe(
-        "MiniSearch: AI response is ready",
-      );
-      expect(MockNotification.lastInstance?.options?.body).toContain(
-        "capital of France",
+      expect(MockNotification.lastInstance?.title).toBe("capital of France");
+      expect(MockNotification.lastInstance?.options?.body).toBe(
+        "AI response is ready on MiniSearch.",
       );
       expect(MockNotification.lastInstance?.options?.icon).toBe("/favicon.png");
     });
 
-    it("truncates very long queries in the notification body", () => {
+    it("truncates very long queries in the notification title", () => {
       MockNotification.permission = "granted";
       vi.stubGlobal("Notification", MockNotification);
       vi.spyOn(document, "hasFocus").mockReturnValue(false);
@@ -124,8 +122,8 @@ describe("notifications module", () => {
 
       showAiCompleteNotification(longQuery);
 
-      const body = MockNotification.lastInstance?.options?.body ?? "";
-      expect(body.length).toBeLessThan(longQuery.length);
+      const title = MockNotification.lastInstance?.title ?? "";
+      expect(title.length).toBeLessThan(longQuery.length);
     });
 
     it("logs instead of throwing when the browser rejects the constructor", () => {
