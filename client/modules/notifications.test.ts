@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  REQUEST_PERMISSION_TIMEOUT_MS,
   requestNotificationPermission,
   showAiCompleteNotification,
 } from "./notifications";
@@ -73,6 +74,24 @@ describe("notifications module", () => {
 
       expect(result).toBe("granted");
       expect(MockNotification.requestPermission).toHaveBeenCalledOnce();
+    });
+
+    it("falls back to default if the browser never responds to the request", async () => {
+      vi.useFakeTimers();
+      try {
+        MockNotification.permission = "default";
+        MockNotification.requestPermission.mockReturnValue(
+          new Promise(() => {}),
+        );
+        vi.stubGlobal("Notification", MockNotification);
+
+        const resultPromise = requestNotificationPermission();
+        await vi.advanceTimersByTimeAsync(REQUEST_PERMISSION_TIMEOUT_MS);
+
+        expect(await resultPromise).toBe("default");
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
