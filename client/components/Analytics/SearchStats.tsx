@@ -14,7 +14,9 @@ import { IconSearch } from "@tabler/icons-react";
 import { useMemo } from "react";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
 import type { SearchEntry } from "@/modules/history";
+import { buildActivity } from "@/modules/searchActivity";
 import { formatRelativeTime } from "@/modules/stringFormatters";
+import ActivityHeatmap from "./ActivityHeatmap";
 
 interface SearchStatsProps {
   period?: "today" | "week" | "month" | "all";
@@ -27,7 +29,6 @@ interface StatsData {
   mostActiveHour: number;
   topSources: { source: string; count: number; percentage: number }[];
   recentActivity: SearchEntry[];
-  searchTrends: { date: string; count: number }[];
 }
 
 export default function SearchStats({
@@ -44,7 +45,6 @@ export default function SearchStats({
         mostActiveHour: 0,
         topSources: [],
         recentActivity: [],
-        searchTrends: [],
       };
     }
 
@@ -117,19 +117,19 @@ export default function SearchStats({
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 10);
 
-    const searchTrends = Array.from(dateCounts.entries())
-      .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-
     return {
       totalSearches,
       avgPerDay,
       mostActiveHour,
       topSources,
       recentActivity,
-      searchTrends,
     };
   }, [recentSearches, period, compact]);
+
+  const activity = useMemo(
+    () => buildActivity(recentSearches.map((search) => search.timestamp)),
+    [recentSearches],
+  );
 
   const getSourceColor = (source: string) => {
     const colors = {
@@ -267,47 +267,14 @@ export default function SearchStats({
         )}
       </SimpleGrid>
 
-      {stats.searchTrends.length > 1 && (
-        <Card withBorder>
-          <Card.Section p="md">
-            <Title order={4} mb="md">
-              Recent activity
-            </Title>
-            <Stack gap="xs" mt="md">
-              {stats.searchTrends.slice(-7).map((trend) => {
-                const maxCount = Math.max(
-                  ...stats.searchTrends.map((t) => t.count),
-                );
-                const percentage =
-                  maxCount > 0 ? (trend.count / maxCount) * 100 : 0;
-
-                return (
-                  <Group key={trend.date} justify="space-between">
-                    <Text size="xs" c="dimmed" w={80}>
-                      {new Date(trend.date).toLocaleDateString("en", {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </Text>
-
-                    <Group gap="xs" style={{ flex: 1 }}>
-                      <Progress
-                        value={percentage}
-                        size="sm"
-                        style={{ flex: 1 }}
-                        color="blue"
-                      />
-                      <Text size="xs" w={20}>
-                        {trend.count}
-                      </Text>
-                    </Group>
-                  </Group>
-                );
-              })}
-            </Stack>
-          </Card.Section>
-        </Card>
-      )}
+      <Card withBorder>
+        <Card.Section p={compact ? "sm" : "md"}>
+          <Title order={compact ? 5 : 4} mb={compact ? "xs" : "md"}>
+            Activity
+          </Title>
+          <ActivityHeatmap data={activity} compact={compact} />
+        </Card.Section>
+      </Card>
     </Stack>
   );
 }
