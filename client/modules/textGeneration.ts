@@ -403,9 +403,7 @@ async function startTextSearch(query: string) {
       results.textResults.length === 0 ? "failed" : "completed",
     );
     updateTextSearchResults(textResults);
-    updateLlmTextSearchResults(
-      textResults.slice(0, getSettings().searchResultsToConsider),
-    );
+    updateLlmTextSearchResults(textResults.slice(0, 6));
 
     updateSearchResults(getCurrentSearchRunId(), {
       type: "text",

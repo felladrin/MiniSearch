@@ -76,7 +76,6 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `showEnableAiResponsePrompt` | boolean | `true` | Show prompt to enable AI response on first use |
 | `enableImageSearch` | boolean | `true` | Include image results in searches |
 | `enableTextSearch` | boolean | `true` | Include text results in searches |
-| `searchResultsToConsider` | number | `3` | Number of top search results to include in AI context |
 | `searchResultsLimit` | number | `15` | Maximum search results to fetch |
 | `systemPrompt` | string | (template) | Custom system prompt template for AI |
 | `enterToSubmit` | boolean | `true` | Press Enter to submit query (vs Shift+Enter for new line) |

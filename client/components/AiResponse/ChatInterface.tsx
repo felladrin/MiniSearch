@@ -21,7 +21,6 @@ import {
   chatGenerationStatePubSub,
   chatInputPubSub,
   followUpQuestionPubSub,
-  getSettings,
   imageSearchResultsPubSub,
   queryPubSub,
   settingsPubSub,
@@ -297,9 +296,7 @@ export default function ChatInterface({
               ([, , url]) => !existingUrls.has(url),
             );
 
-            updateLlmTextSearchResults(
-              freshResults.slice(0, getSettings().searchResultsToConsider),
-            );
+            updateLlmTextSearchResults(freshResults.slice(0, 6));
 
             if (uniqueFreshResults.length > 0) {
               const updatedResults = [

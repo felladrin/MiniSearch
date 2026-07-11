@@ -9,7 +9,6 @@ export const defaultSettings = {
   enableImageSearch: true,
   wllamaModelId: VITE_WLLAMA_DEFAULT_MODEL_ID,
   cpuThreads: Math.max(1, (navigator.hardwareConcurrency ?? 1) - 2),
-  searchResultsToConsider: 3,
   searchResultsLimit: 15,
   systemPrompt: `Answer using the search results below as your primary source, supplemented by your own knowledge when needed. Write your response in the same language as the query.
 

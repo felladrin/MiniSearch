@@ -48,10 +48,8 @@ export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
  * Waits for search results if they are required before starting response generation
  */
 export async function canStartResponding() {
-  if (getSettings().searchResultsToConsider > 0) {
-    updateTextGenerationState("awaitingSearchResults");
-    await getSearchPromise();
-  }
+  updateTextGenerationState("awaitingSearchResults");
+  await getSearchPromise();
 }
 
 /**
