@@ -62,7 +62,7 @@
     "remark-gfm": "^4.0.0",
     "shiki": "^4.0.0",
     "temp-dir": "^3.0.0",
-    "throttleit": "^2.1.0",
+    "throttleit": "^3.0.0",
     "wouter": "^3.3.0",
     "yet-another-react-lightbox": "^3.21.6"
   },
