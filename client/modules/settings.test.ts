@@ -6,7 +6,6 @@ describe("Settings Module", () => {
     expect(defaultSettings.showEnableAiResponsePrompt).toBe(true);
     expect(defaultSettings.enableAiResponse).toBe(false);
     expect(defaultSettings.enableImageSearch).toBe(true);
-    expect(defaultSettings.searchResultsToConsider).toBe(3);
     expect(defaultSettings.searchResultsLimit).toBe(15);
     expect(defaultSettings.inferenceType).toBeDefined();
   });

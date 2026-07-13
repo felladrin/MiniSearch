@@ -21,7 +21,6 @@ import {
   chatGenerationStatePubSub,
   chatInputPubSub,
   followUpQuestionPubSub,
-  getSettings,
   imageSearchResultsPubSub,
   queryPubSub,
   settingsPubSub,
@@ -34,6 +33,7 @@ import {
 import { generateRelatedSearchQuery } from "@/modules/relatedSearchQuery";
 import { searchImages, searchText } from "@/modules/search";
 import { generateChatResponse } from "@/modules/textGeneration";
+import { searchResultsToConsider } from "@/modules/textGenerationUtilities";
 import type { ChatMessage } from "@/modules/types";
 import ChatHeader from "./ChatHeader";
 import ChatInputArea from "./ChatInputArea";
@@ -298,7 +298,7 @@ export default function ChatInterface({
             );
 
             updateLlmTextSearchResults(
-              freshResults.slice(0, getSettings().searchResultsToConsider),
+              freshResults.slice(0, searchResultsToConsider),
             );
 
             if (uniqueFreshResults.length > 0) {

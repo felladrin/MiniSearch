@@ -14,6 +14,11 @@ import type { ChatMessage } from "./types";
 export const defaultContextSize = 4096;
 
 /**
+ * Number of top text search results included in the AI context
+ */
+export const searchResultsToConsider = 6;
+
+/**
  * Custom error class for chat generation failures
  */
 export class ChatGenerationError extends Error {
@@ -48,10 +53,8 @@ export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
  * Waits for search results if they are required before starting response generation
  */
 export async function canStartResponding() {
-  if (getSettings().searchResultsToConsider > 0) {
-    updateTextGenerationState("awaitingSearchResults");
-    await getSearchPromise();
-  }
+  updateTextGenerationState("awaitingSearchResults");
+  await getSearchPromise();
 }
 
 /**

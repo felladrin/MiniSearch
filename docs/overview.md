@@ -133,7 +133,7 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 - `idle` - No active generation
 - `awaitingModelDownloadAllowance` - Waiting for user consent to download a browser model
 - `loadingModel` - Downloading or initializing the browser (Wllama) model
-- `awaitingSearchResults` - Waiting for search to complete before generating (only when `searchResultsToConsider > 0`)
+- `awaitingSearchResults` - Waiting for search to complete before generating
 - `preparingToGenerate` - Building the prompt/request just before calling the inference backend (OpenAI-compatible, Internal API, and AI Horde paths)
 - `generating` - Streaming response tokens
 - `interrupted` - Generation was cancelled by the user

@@ -201,6 +201,8 @@ Stream response via selected inference type
 Update PubSub channels (response, textGenerationState)
 ```
 
+The AI context includes the top 6 text search results (a fixed value, `searchResultsToConsider` in `client/modules/textGenerationUtilities.ts`), not a user-configurable setting.
+
 ### Chat Generation
 
 ```
@@ -336,12 +338,10 @@ Wllama models are sharded (split into chunks):
 
 ### For Maximum Quality
 - Use OpenAI GPT-4 or Internal API with large model
-- Set `searchResultsToConsider: 5-10`
 - Adjust temperature: 0.5-0.7 for factual, 0.8-1.0 for creative
 
 ### For Cost Efficiency
 - Use AI Horde (free) or Browser inference - Wllama (one-time download)
-- Set `searchResultsToConsider: 3` (default)
 - Limit `inferenceMaxTokens: 2048`
 
 ### For Teams/Enterprise

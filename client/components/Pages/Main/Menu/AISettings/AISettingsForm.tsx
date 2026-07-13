@@ -1,8 +1,7 @@
-import { Select, Slider, Stack, Switch, Text, TextInput } from "@mantine/core";
+import { Select, Stack, Switch, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { usePubSub } from "create-pubsub/react";
-import { useMemo } from "react";
 import { requestNotificationPermission } from "@/modules/notifications";
 import { settingsPubSub } from "@/modules/pubSub";
 import { inferenceTypes } from "@/modules/settings";
@@ -24,15 +23,6 @@ export default function AISettingsForm() {
     initialValues: settings,
     onValuesChange: setSettings,
   });
-
-  const searchResultsToConsiderSliderMarks = useMemo(
-    () =>
-      Array.from({ length: 7 }, (_, index) => ({
-        value: index,
-        label: index.toString(),
-      })),
-    [],
-  );
 
   const handleNotificationToggle = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -74,21 +64,6 @@ export default function AISettingsForm() {
             labelPosition="left"
             description="Show a browser notification when the AI response is ready. Useful for longer queries that take time to process."
           />
-
-          <Stack gap="xs" mb="md">
-            <Text size="sm">Search results to consider</Text>
-            <Text size="xs" c="dimmed">
-              Determines the number of search results to consider when
-              generating AI responses. A higher value may enhance accuracy, but
-              it will also increase response time.
-            </Text>
-            <Slider
-              {...form.getInputProps("searchResultsToConsider")}
-              min={0}
-              max={6}
-              marks={searchResultsToConsiderSliderMarks}
-            />
-          </Stack>
 
           <Select
             {...form.getInputProps("inferenceType")}
