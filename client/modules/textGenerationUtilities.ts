@@ -14,6 +14,11 @@ import type { ChatMessage } from "./types";
 export const defaultContextSize = 4096;
 
 /**
+ * Number of top text search results included in the AI context
+ */
+export const searchResultsToConsider = 6;
+
+/**
  * Custom error class for chat generation failures
  */
 export class ChatGenerationError extends Error {

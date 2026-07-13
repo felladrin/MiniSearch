@@ -31,6 +31,7 @@ import {
   ChatGenerationError,
   defaultContextSize,
   getFormattedSearchResults,
+  searchResultsToConsider,
 } from "./textGenerationUtilities";
 import type {
   ChatMessage,
@@ -403,7 +404,7 @@ async function startTextSearch(query: string) {
       results.textResults.length === 0 ? "failed" : "completed",
     );
     updateTextSearchResults(textResults);
-    updateLlmTextSearchResults(textResults.slice(0, 6));
+    updateLlmTextSearchResults(textResults.slice(0, searchResultsToConsider));
 
     updateSearchResults(getCurrentSearchRunId(), {
       type: "text",
