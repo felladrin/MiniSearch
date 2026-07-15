@@ -32,7 +32,7 @@ Uses `@wllama/wllama` for browser-based inference. Automatically uses WebGPU whe
 5. Streams tokens via the OAI-compatible `createChatCompletion` API
 
 **Pre-configured Models:**
-All stored at `Felladrin/gguf-sharded-*` on HuggingFace. MiniSearch currently ships 35 pre-configured models, ranging from SmolLM 2 135M (~100MB) up to Phi 4 Mini Reasoning 3.8B (~2.4GB). The full, authoritative list with HuggingFace repo IDs and sizes lives in `client/modules/wllama.ts` (`wllamaModels`) and is rendered in the Settings dropdown; refer to that file rather than a static table here, since models are added/swapped frequently.
+30+ stored at `Felladrin/gguf-sharded-*` on HuggingFace. MiniSearch currently ships 35 pre-configured models, ranging from SmolLM 2 135M (~100MB) up to Phi 4 Mini Reasoning 3.8B (~2.4GB). The full, authoritative list with HuggingFace repo IDs and sizes lives in `client/modules/wllama.ts` (`wllamaModels`) and is rendered in the Settings dropdown; refer to that file rather than a static table here, since models are added/swapped frequently.
 
 **Configuration:**
 - Settings → Inference Type: `Browser`

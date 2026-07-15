@@ -23,7 +23,7 @@ The AI can run entirely inside your browser tab, on GPU or CPU, so a working set
 ## Features
 
 - **Private by design.** No tracking, no telemetry, no accounts. Search history, cached results, and chats are stored in your browser and never leave your machine.
-- **AI in your browser.** Pick from 38 curated models (135M to 4B parameters) that run on WebGPU where available and on CPU elsewhere. Models are downloaded once and cached by the browser.
+- **AI in your browser.** Pick from 30+ curated models (135M to 4B parameters) that run on WebGPU where available and on CPU elsewhere. Models are downloaded once and cached by the browser.
 - **Any backend you like.** Connect an OpenAI-compatible API (Ollama, LM Studio, vLLM, llama.cpp server, or a hosted provider), use the crowdsourced AI Horde, or let the server proxy your own API without exposing its key.
 - **A real search pipeline.** Text and image results aggregated by SearXNG, reranked locally by a cross-encoder model, cached, and rate-limited; all inside the container.
 - **Answers you can verify.** Responses cite the sources they draw from, support follow-up questions with conversation memory, reveal the model's reasoning on demand, and can be read aloud.

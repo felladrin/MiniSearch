@@ -152,7 +152,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
   },
   "lfm2.5-230m": {
     ...createDefaultModelConfig(),
-    label: "LFM2.5 350M",
+    label: "LFM2.5 230M",
     hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-LFM2.5-230M",
     hfFilePath: "LFM2.5-230M-Q4_K_XL-00001-of-00003.gguf",
     fileSizeInMegabytes: 160,

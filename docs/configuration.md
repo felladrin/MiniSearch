@@ -100,7 +100,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 ### Model Selection
 
 **Wllama Models:**
-- 38 pre-configured models
+- 30+ pre-configured models
 - Range from 135M to 4B parameters
 - All quantized to Q4_K_S or UD-Q4_K_XL
 - Stored at: `Felladrin/gguf-sharded-*` on HuggingFace
@@ -229,13 +229,13 @@ These constants are generated during the build process:
 
 | Constant | Description |
 |----------|-------------|
-| `VITE_BUILD_DATE_TIME` | ISO timestamp of when the build occurred |
+| `VITE_BUILD_DATE_TIME` | Epoch milliseconds when the build occurred (`Date.now()`) |
 | `VITE_COMMIT_SHORT_HASH` | Git commit hash at build time (if available) |
 
 These are accessed in client code as:
 ```typescript
-const token = import.meta.env.VITE_SEARCH_TOKEN;
-const buildDate = import.meta.env.VITE_BUILD_DATE_TIME;
+const token = VITE_SEARCH_TOKEN;
+const buildDate = VITE_BUILD_DATE_TIME;
 ```
 
 ### Security Considerations

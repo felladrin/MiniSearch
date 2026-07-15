@@ -53,9 +53,8 @@ docker compose exec development-server npm run lint
 This runs:
 - Biome (formatting/linting)
 - TypeScript (type checking)
-- ts-prune (dead code detection)
+- knip (dead code detection)
 - jscpd (copy-paste detection)
-- dpdm (circular dependency detection)
 - Custom architectural linter
 
 ## Contribution Guidelines
