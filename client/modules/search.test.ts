@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { addLogEntry } from "./logEntries";
 import * as searchModule from "./search";
 
 vi.mock("./logEntries", () => ({
@@ -272,88 +273,82 @@ describe("Search Module", () => {
   });
 
   describe("Cache Failure Scenarios", () => {
-    it("should handle cache retrieval failure", async () => {
-      const mockCacheFailure = vi
-        .fn()
-        .mockRejectedValue(new Error("Cache read error"));
-      await expect(mockCacheFailure()).rejects.toThrow("Cache read error");
+    it("should return empty results instead of throwing when a text search fails end-to-end", async () => {
+      // getCachedResult/cacheResult swallow their own read/write errors, so a
+      // cache failure surfaces as a miss followed by a real fetch — searchText
+      // must still resolve gracefully instead of throwing.
+      mockFetch.mockRejectedValue(new Error("Cache read error"));
+
+      const results = await searchModule.searchText("test query");
+
+      expect(results).toEqual([]);
+      expect(addLogEntry).toHaveBeenCalledWith(
+        expect.stringContaining("Text search failed"),
+      );
     });
 
-    it("should handle cache storage failure", async () => {
-      const mockCacheStorageFailure = vi
-        .fn()
-        .mockRejectedValue(new Error("Cache write error"));
-      await expect(mockCacheStorageFailure()).rejects.toThrow(
-        "Cache write error",
-      );
+    it("should still return fresh results when the underlying fetch succeeds", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockFetchResponse(mockResults);
+
+      const results = await searchModule.searchText("test query");
+
+      expect(results).toEqual(mockResults);
     });
   });
 
   describe("Database Integrity Failures", () => {
-    it("should handle database corruption gracefully", async () => {
-      const mockDbOperation = vi
-        .fn()
-        .mockRejectedValue(new Error("Database integrity check failed"));
-      await expect(mockDbOperation()).rejects.toThrow(
-        "Database integrity check failed",
+    it("should return empty results instead of throwing when an image search fails end-to-end", async () => {
+      // ensureIntegrity/cleanExpiredCache swallow their own errors, so a
+      // corrupted database surfaces as a miss followed by a real fetch —
+      // searchImages must still resolve gracefully instead of throwing.
+      mockFetch.mockRejectedValue(new Error("Database integrity check failed"));
+
+      const results = await searchModule.searchImages("test query");
+
+      expect(results).toEqual([]);
+      expect(addLogEntry).toHaveBeenCalledWith(
+        expect.stringContaining("Image search failed"),
       );
     });
 
-    it("should attempt database recovery after failure", async () => {
-      const mockRecoveryFailure = vi
-        .fn()
-        .mockRejectedValueOnce(new Error("Recovery failed"));
-      await expect(mockRecoveryFailure()).rejects.toThrow("Recovery failed");
+    it("should recover and return fresh results after a prior failure", async () => {
+      const mockResults: string[][] = [
+        ["Image", "Alt", "https://example.com/img.jpg"],
+      ];
+      mockFetchResponse(mockResults);
+
+      const results = await searchModule.searchImages("test query");
+
+      expect(results).toEqual(mockResults);
     });
   });
 
   describe("URL Construction", () => {
-    it("should construct correct search URL with query parameter", () => {
-      const query = "test query";
-      const searchUrl = new URL("/search/text", "http://localhost:3000");
-      searchUrl.searchParams.set("q", query);
-      searchUrl.searchParams.set("token", "mock-token-hash");
+    it("should include the search token hash in the request URL", async () => {
+      mockFetchResponse([]);
 
-      expect(searchUrl.searchParams.get("q")).toBe("test query");
-      expect(searchUrl.searchParams.get("token")).toBe("mock-token-hash");
-    });
-
-    it("should include limit parameter when provided", () => {
-      const searchUrl = new URL("/search/text", "http://localhost:3000");
-      searchUrl.searchParams.set("q", "test");
-      searchUrl.searchParams.set("limit", "5");
-
-      expect(searchUrl.searchParams.get("limit")).toBe("5");
-    });
-
-    it("should construct correct image search URL", () => {
-      const searchUrl = new URL("/search/images", "http://localhost:3000");
-      searchUrl.searchParams.set("q", "cat photos");
-
-      expect(searchUrl.pathname).toBe("/search/images");
-      expect(searchUrl.searchParams.get("q")).toBe("cat photos");
-    });
-  });
-
-  describe("Cache Configuration", () => {
-    it("should have reasonable default TTL", () => {
-      const defaultTTL = 15 * 60 * 1000;
-      expect(defaultTTL).toBe(900000);
-    });
-
-    it("should have reasonable default max entries", () => {
-      const defaultMaxEntries = 100;
-      expect(defaultMaxEntries).toBe(100);
-    });
-  });
-
-  describe("Network Timeout Scenarios", () => {
-    it("should handle network timeouts gracefully", async () => {
-      mockFetch.mockRejectedValue(
-        new Error("Network timeout after 30 seconds"),
+      await searchModule.searchServiceInstance.performSearch<string[][]>(
+        "text",
+        "test query",
       );
 
-      await expect(mockFetch()).rejects.toThrow("Network timeout");
+      const calledUrl = mockFetch.mock.calls[0][0] as string;
+      expect(calledUrl).toContain("token=mock-token-hash");
+    });
+
+    it("should URL-encode special characters in the query", async () => {
+      mockFetchResponse([]);
+
+      await searchModule.searchServiceInstance.performSearch<string[][]>(
+        "text",
+        "cats & dogs",
+      );
+
+      const calledUrl = mockFetch.mock.calls[0][0] as string;
+      expect(calledUrl).toContain("q=cats+%26+dogs");
     });
   });
 });

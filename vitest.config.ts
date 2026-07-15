@@ -19,6 +19,10 @@ export default defineConfig({
       reporter: ["text", "html", "json", "json-summary"],
       include: ["client/**/*.{tsx,ts,jsx,js}", "server/**/*.{ts,js}"],
       exclude: ["client/dist/**", "server/**/*.test.ts"],
+      thresholds: {
+        lines: 31,
+        functions: 24,
+      },
     },
   },
   define: {
