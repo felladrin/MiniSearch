@@ -1,7 +1,35 @@
 /**
- * Set of verified tokens for session management
+ * Set of verified tokens for session management.
+ * Tokens are cleaned up every 60 seconds to prevent unbounded growth.
  */
 const verifiedTokens = new Set<string>();
+const CLEANUP_INTERVAL_MS = 60_000;
+
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Cleans up old entries from the verified tokens set.
+ * Since tokens are short-lived (used per-request), we simply
+ * clear the set periodically to prevent unbounded growth.
+ */
+function cleanupVerifiedTokens(): void {
+  verifiedTokens.clear();
+}
+
+/**
+ * Starts the periodic cleanup timer if not already running.
+ */
+function startCleanupTimer(): void {
+  if (cleanupTimer) return;
+  cleanupTimer = setInterval(cleanupVerifiedTokens, CLEANUP_INTERVAL_MS);
+  // Prevent the timer from keeping the process alive
+  if (cleanupTimer.unref) {
+    cleanupTimer.unref();
+  }
+}
+
+// Start cleanup on module load
+startCleanupTimer();
 
 /**
  * Gets the number of verified tokens

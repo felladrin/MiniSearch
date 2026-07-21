@@ -91,7 +91,11 @@ export function searchEndpointServerHook<
       return;
     }
 
-    const { shouldContinue } = await handleTokenVerification(token, response);
+    const { shouldContinue } = await handleTokenVerification(
+      token,
+      response,
+      request,
+    );
 
     if (!shouldContinue) return;
 

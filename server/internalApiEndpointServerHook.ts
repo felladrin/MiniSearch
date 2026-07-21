@@ -163,7 +163,11 @@ export function internalApiEndpointServerHook<
           : "http://localhost";
       const url = new URL(request.url, baseUrl);
       const token = url.searchParams.get("token");
-      const { shouldContinue } = await handleTokenVerification(token, response);
+      const { shouldContinue } = await handleTokenVerification(
+        token,
+        response,
+        request,
+      );
       if (!shouldContinue) return;
 
       if (
