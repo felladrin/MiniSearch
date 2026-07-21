@@ -11,7 +11,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - uses: JacobLinCool/huggingface-sync@3e022764ae2defd53d9fed4633f522c0f0f3d116 # v1.3.1
+      - uses: JacobLinCool/huggingface-sync@60850d5a74ea004fc094f77c960c2c8bd9a0f9d1 # v1.3.1
         with:
           github: ${{ secrets.GITHUB_TOKEN }}
           user: ${{ vars.HF_SPACE_OWNER }}
