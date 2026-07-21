@@ -251,7 +251,6 @@ export function internalApiEndpointServerHook<
         let lastError: unknown = null;
         let hasStartedStreaming = false;
 
-        // Clamp sampling params to prevent abuse
         const clampedMaxTokens = requestBody.max_tokens
           ? Math.min(requestBody.max_tokens, config.defaultMaxTokens)
           : undefined;
