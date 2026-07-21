@@ -1,7 +1,6 @@
 FROM node:lts AS llama-builder
 
 ARG LLAMA_CPP_RELEASE_TAG="b6604"
-ARG SEARXNG_RELEASE_TAG="6da6eee265daeb4a62ab638d6921522bf405de69"
 
 RUN apt-get update && apt-get install -y \
   build-essential \
@@ -21,7 +20,7 @@ RUN cd /tmp && \
 
 FROM node:lts
 
-ARG SEARXNG_RELEASE_TAG
+ARG SEARXNG_COMMIT_SHA="6da6eee265daeb4a62ab638d6921522bf405de69"
 
 ENV PORT=7860
 EXPOSE $PORT
@@ -48,9 +47,7 @@ RUN python3 -m venv searxng-venv && \
   /usr/local/searxng/searxng-venv/bin/pip install wheel setuptools pyyaml lxml
 
 RUN git clone https://github.com/searxng/searxng.git /usr/local/searxng/searxng-src && \
-  cd /usr/local/searxng/searxng-src && \
-  git checkout $SEARXNG_RELEASE_TAG && \
-  cd - && \
+  git -C /usr/local/searxng/searxng-src checkout $SEARXNG_COMMIT_SHA && \
   chown -R ${USERNAME}:${USERNAME} /usr/local/searxng/searxng-src
 
 ARG SEARXNG_SETTINGS_PATH="/etc/searxng/settings.yml"
