@@ -10,17 +10,6 @@ const rateLimiter = new RateLimiterMemory({
   duration: 10,
 });
 
-/**
- * Extract the real client IP from the request, handling X-Forwarded-For
- * behind proxies (e.g. Hugging Face Spaces).
- *
- * X-Forwarded-For is appended left-to-right by each proxy hop, so the
- * leftmost entry is the least trustworthy (client-controlled). The
- * rightmost entry is the one our own infrastructure appended — that's
- * the real client IP. We count from the right to find the trusted entry.
- *
- * See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For
- */
 export function getClientIp(request: IncomingMessage): string {
   const forwarded = request.headers["x-forwarded-for"];
   const xff = Array.isArray(forwarded) ? forwarded.join(",") : forwarded;
@@ -29,7 +18,6 @@ export function getClientIp(request: IncomingMessage): string {
       .split(",")
       .map((p) => p.trim())
       .filter(Boolean);
-    // Trust the last entry — the one our proxy appended.
     const ip = parts[parts.length - 1];
     if (ip && isIP(ip)) {
       return ip;

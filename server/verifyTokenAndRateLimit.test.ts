@@ -137,7 +137,6 @@ describe("getClientIp", () => {
         headers: { "x-forwarded-for": "10.0.0.1, 10.0.0.2, 192.168.1.50" },
         socket: { remoteAddress: "127.0.0.1" },
       } as unknown as IncomingMessage;
-      // Last entry is the one our proxy appended — that's the real client.
       expect(getClientIp(req)).toBe("192.168.1.50");
     });
   });
@@ -149,7 +148,6 @@ describe("getClientIp", () => {
         headers: { "x-forwarded-for": "1.2.3.4, 192.168.1.50" },
         socket: { remoteAddress: "127.0.0.1" },
       } as unknown as IncomingMessage;
-      // 1.2.3.4 is spoofed; 192.168.1.50 is the trusted proxy entry.
       expect(getClientIp(req)).toBe("192.168.1.50");
     });
   });
