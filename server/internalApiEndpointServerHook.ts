@@ -6,6 +6,7 @@ import {
   listOpenAiCompatibleModels,
   selectRandomModel,
 } from "../shared/openaiModels";
+import { getModelConfig } from "./config/modelConfig";
 import { handleTokenVerification } from "./handleTokenVerification";
 import {
   calculateBackoffTime,
@@ -245,9 +246,20 @@ export function internalApiEndpointServerHook<
           return;
         }
 
+        const config = getModelConfig();
         const maxAttempts = 5;
         let lastError: unknown = null;
         let hasStartedStreaming = false;
+
+        const clampedMaxTokens = requestBody.max_tokens
+          ? Math.min(requestBody.max_tokens, config.defaultMaxTokens)
+          : undefined;
+        const clampedTemperature = requestBody.temperature
+          ? Math.max(0, Math.min(requestBody.temperature, 2))
+          : undefined;
+        const clampedTopP = requestBody.top_p
+          ? Math.max(0, Math.min(requestBody.top_p, 1))
+          : undefined;
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           if (!model) break;
@@ -268,9 +280,9 @@ export function internalApiEndpointServerHook<
             const stream = streamText({
               model: openaiProvider.chatModel(model),
               messages: requestBody.messages,
-              temperature: requestBody.temperature,
-              topP: requestBody.top_p,
-              maxOutputTokens: requestBody.max_tokens,
+              temperature: clampedTemperature,
+              topP: clampedTopP,
+              maxOutputTokens: clampedMaxTokens,
               maxRetries: 0,
             });
 

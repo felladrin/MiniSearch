@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { rerank } from "./rerankerService";
 
-const mockRerank = vi.fn(() => []);
+const mockRerank = vi.fn<typeof rerank>();
 
 vi.mock("./rerankerService", () => ({
-  rerank: (...args: unknown[]) => mockRerank(...args),
+  rerank: mockRerank,
 }));
 
 beforeEach(() => {
@@ -12,7 +13,9 @@ beforeEach(() => {
 
 describe("rankSearchResults", () => {
   it("should return empty array when no results provided", async () => {
-    mockRerank.mockResolvedValue([]);
+    mockRerank.mockResolvedValue(
+      [] as { index: number; relevance_score: number }[],
+    );
     const { rankSearchResults } = await import("./rankSearchResults");
     const result = await rankSearchResults("test query", []);
     expect(result).toEqual([]);
@@ -23,7 +26,7 @@ describe("rankSearchResults", () => {
     mockRerank.mockResolvedValue([
       { index: 0, relevance_score: 0.9 },
       { index: 1, relevance_score: 0.5 },
-    ]);
+    ] as { index: number; relevance_score: number }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
     await rankSearchResults("Test Query", [
       ["Title A", "Content A", "https://a.com"],
@@ -42,7 +45,7 @@ describe("rankSearchResults", () => {
     mockRerank.mockResolvedValue([
       { index: 0, relevance_score: 0.9 },
       { index: 1, relevance_score: 0.8 },
-    ]);
+    ] as { index: number; relevance_score: number }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
     const result = await rankSearchResults("query", [
       ["A", "a", "https://a.com"],
@@ -56,7 +59,7 @@ describe("rankSearchResults", () => {
     mockRerank.mockResolvedValue([
       { index: 0, relevance_score: 0.95 },
       { index: 1, relevance_score: 0.8 },
-    ]);
+    ] as { index: number; relevance_score: number }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
     const result = await rankSearchResults(
       "query",
@@ -70,7 +73,9 @@ describe("rankSearchResults", () => {
   });
 
   it("should return empty array when rerank returns no results", async () => {
-    mockRerank.mockResolvedValue([]);
+    mockRerank.mockResolvedValue(
+      [] as { index: number; relevance_score: number }[],
+    );
     const { rankSearchResults } = await import("./rankSearchResults");
     const result = await rankSearchResults("query", [
       ["A", "a", "https://a.com"],
@@ -79,7 +84,10 @@ describe("rankSearchResults", () => {
   });
 
   it("should truncate document strings to MAX_DOCUMENT_LENGTH", async () => {
-    mockRerank.mockResolvedValue([{ index: 0, relevance_score: 0.9 }]);
+    mockRerank.mockResolvedValue([{ index: 0, relevance_score: 0.9 }] as {
+      index: number;
+      relevance_score: number;
+    }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
     const longTitle = "A".repeat(600);
     await rankSearchResults("query", [[longTitle, "short", "https://a.com"]]);
@@ -88,7 +96,10 @@ describe("rankSearchResults", () => {
   });
 
   it("should replace double quotes with single quotes in snippet", async () => {
-    mockRerank.mockResolvedValue([{ index: 0, relevance_score: 0.9 }]);
+    mockRerank.mockResolvedValue([{ index: 0, relevance_score: 0.9 }] as {
+      index: number;
+      relevance_score: number;
+    }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
     await rankSearchResults("query", [
       ["Title", 'Content with "quotes"', "https://a.com"],
