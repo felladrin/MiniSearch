@@ -1,3 +1,5 @@
+import type { IncomingMessage } from "node:http";
+import { isIP } from "node:net";
 import { argon2Verify } from "hash-wasm";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { getSearchToken } from "./searchToken";
@@ -8,7 +10,31 @@ const rateLimiter = new RateLimiterMemory({
   duration: 10,
 });
 
-export async function verifyTokenAndRateLimit(token: string | null): Promise<{
+/** Takes the rightmost X-Forwarded-For entry (the one our proxy appended), validated with `net.isIP()`. */
+export function getClientIp(request: IncomingMessage): string {
+  const forwarded = request.headers["x-forwarded-for"];
+  const xff = Array.isArray(forwarded) ? forwarded.join(",") : forwarded;
+  if (typeof xff === "string" && xff.length > 0) {
+    const parts = xff
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    const ip = parts[parts.length - 1];
+    if (ip && isIP(ip)) {
+      return ip;
+    }
+  }
+  const realIp = request.headers["x-real-ip"];
+  if (typeof realIp === "string" && realIp.length > 0 && isIP(realIp)) {
+    return realIp;
+  }
+  return request.socket.remoteAddress || "unknown";
+}
+
+export async function verifyTokenAndRateLimit(
+  token: string | null,
+  request?: IncomingMessage,
+): Promise<{
   isAuthorized: boolean;
   statusCode?: number;
   error?: string;
@@ -44,8 +70,10 @@ export async function verifyTokenAndRateLimit(token: string | null): Promise<{
     }
   }
 
+  const rateLimitKey = request ? getClientIp(request) : token;
+
   try {
-    await rateLimiter.consume(token);
+    await rateLimiter.consume(rateLimitKey);
   } catch {
     return {
       isAuthorized: false,

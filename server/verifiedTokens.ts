@@ -1,30 +1,31 @@
-/**
- * Set of verified tokens for session management
- */
+/** Set of verified tokens for session management. */
 const verifiedTokens = new Set<string>();
+const CLEANUP_INTERVAL_MS = 60_000;
 
-/**
- * Gets the number of verified tokens
- * @returns Number of verified tokens
- */
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
+
+function cleanupVerifiedTokens(): void {
+  verifiedTokens.clear();
+}
+
+function startCleanupTimer(): void {
+  if (cleanupTimer) return;
+  cleanupTimer = setInterval(cleanupVerifiedTokens, CLEANUP_INTERVAL_MS);
+  if (cleanupTimer.unref) {
+    cleanupTimer.unref();
+  }
+}
+
+startCleanupTimer();
+
 export function getVerifiedTokensAmount() {
   return verifiedTokens.size;
 }
 
-/**
- * Checks if a token is verified
- * @param token - Token to check
- * @returns Whether the token is verified
- */
 export function isVerifiedToken(token: string) {
   return verifiedTokens.has(token);
 }
 
-/**
- * Adds a token to the verified tokens set
- * @param token - Token to add
- * @returns The Set.add result
- */
 export function addVerifiedToken(token: string) {
   return verifiedTokens.add(token);
 }
