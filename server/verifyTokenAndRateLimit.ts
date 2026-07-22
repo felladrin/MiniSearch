@@ -10,7 +10,7 @@ const rateLimiter = new RateLimiterMemory({
   duration: 10,
 });
 
-/** Extracts the real client IP from the request, handling X-Forwarded-For behind proxies. */
+/** Takes the rightmost X-Forwarded-For entry (the one our proxy appended), validated with `net.isIP()`. */
 export function getClientIp(request: IncomingMessage): string {
   const forwarded = request.headers["x-forwarded-for"];
   const xff = Array.isArray(forwarded) ? forwarded.join(",") : forwarded;
