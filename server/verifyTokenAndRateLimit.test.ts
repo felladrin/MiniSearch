@@ -105,8 +105,23 @@ describe("verifyTokenAndRateLimit", () => {
     expect(result.error).toBe("Too many requests.");
   });
 
-  it("should key rate limiter on client IP when request is provided", async () => {
+  it("should key rate limiter on the socket address by default (untrusted proxy)", async () => {
     mockRateLimiterShouldFail = false;
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    // makeMockRequest sets a spoofable X-Forwarded-For, but with TRUST_PROXY
+    // off the real TCP peer (socket.remoteAddress) must be used instead.
+    const mockReq = makeMockRequest("192.168.1.100");
+    const result = await verifyTokenAndRateLimit("valid-token", mockReq);
+    expect(result.isAuthorized).toBe(true);
+    expect(mockConsume).toHaveBeenCalledWith("127.0.0.1");
+  });
+
+  it("should key rate limiter on the forwarded client IP when TRUST_PROXY is enabled", async () => {
+    mockRateLimiterShouldFail = false;
+    vi.stubEnv("TRUST_PROXY", "true");
     vi.resetModules();
     const { verifyTokenAndRateLimit } = await import(
       "./verifyTokenAndRateLimit"
@@ -115,6 +130,7 @@ describe("verifyTokenAndRateLimit", () => {
     const result = await verifyTokenAndRateLimit("valid-token", mockReq);
     expect(result.isAuthorized).toBe(true);
     expect(mockConsume).toHaveBeenCalledWith("192.168.1.100");
+    vi.unstubAllEnvs();
   });
 
   it("should fall back to token as rate limit key when no request", async () => {
@@ -130,71 +146,105 @@ describe("verifyTokenAndRateLimit", () => {
 });
 
 describe("getClientIp", () => {
-  it("should extract last (trusted) IP from X-Forwarded-For", () => {
-    vi.resetModules();
-    return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
-      const req = {
-        headers: { "x-forwarded-for": "10.0.0.1, 10.0.0.2, 192.168.1.50" },
-        socket: { remoteAddress: "127.0.0.1" },
-      } as unknown as IncomingMessage;
-      expect(getClientIp(req)).toBe("192.168.1.50");
+  describe("when TRUST_PROXY is enabled", () => {
+    beforeEach(() => {
+      vi.stubEnv("TRUST_PROXY", "true");
+    });
+
+    it("should extract last (trusted) IP from X-Forwarded-For", () => {
+      vi.resetModules();
+      return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
+        const req = {
+          headers: { "x-forwarded-for": "10.0.0.1, 10.0.0.2, 192.168.1.50" },
+          socket: { remoteAddress: "127.0.0.1" },
+        } as unknown as IncomingMessage;
+        expect(getClientIp(req)).toBe("192.168.1.50");
+      });
+    });
+
+    it("should reject spoofed leftmost X-Forwarded-For entry", () => {
+      vi.resetModules();
+      return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
+        const req = {
+          headers: { "x-forwarded-for": "1.2.3.4, 192.168.1.50" },
+          socket: { remoteAddress: "127.0.0.1" },
+        } as unknown as IncomingMessage;
+        expect(getClientIp(req)).toBe("192.168.1.50");
+      });
+    });
+
+    it("should fall back to X-Real-IP", () => {
+      vi.resetModules();
+      return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
+        const req = {
+          headers: { "x-real-ip": "172.16.0.1" },
+          socket: { remoteAddress: "127.0.0.1" },
+        } as unknown as IncomingMessage;
+        expect(getClientIp(req)).toBe("172.16.0.1");
+      });
+    });
+
+    it("should fall back to socket.remoteAddress", () => {
+      vi.resetModules();
+      return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
+        const req = {
+          headers: {},
+          socket: { remoteAddress: "192.168.0.1" },
+        } as unknown as IncomingMessage;
+        expect(getClientIp(req)).toBe("192.168.0.1");
+      });
+    });
+
+    it("should reject non-IP X-Forwarded-For entries", () => {
+      vi.resetModules();
+      return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
+        const req = {
+          headers: { "x-forwarded-for": "not-an-ip, also-not-an-ip" },
+          socket: { remoteAddress: "10.0.0.5" },
+        } as unknown as IncomingMessage;
+        expect(getClientIp(req)).toBe("10.0.0.5");
+      });
+    });
+
+    it("should handle array-valued X-Forwarded-For header", () => {
+      vi.resetModules();
+      return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
+        const req = {
+          headers: {
+            "x-forwarded-for": ["10.0.0.1", "10.0.0.2", "192.168.1.50"],
+          },
+          socket: { remoteAddress: "127.0.0.1" },
+        } as unknown as IncomingMessage;
+        expect(getClientIp(req)).toBe("192.168.1.50");
+      });
     });
   });
 
-  it("should reject spoofed leftmost X-Forwarded-For entry", () => {
-    vi.resetModules();
-    return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
-      const req = {
-        headers: { "x-forwarded-for": "1.2.3.4, 192.168.1.50" },
-        socket: { remoteAddress: "127.0.0.1" },
-      } as unknown as IncomingMessage;
-      expect(getClientIp(req)).toBe("192.168.1.50");
+  describe("when TRUST_PROXY is disabled (default)", () => {
+    beforeEach(() => {
+      vi.unstubAllEnvs();
     });
-  });
 
-  it("should fall back to X-Real-IP", () => {
-    vi.resetModules();
-    return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
-      const req = {
-        headers: { "x-real-ip": "172.16.0.1" },
-        socket: { remoteAddress: "127.0.0.1" },
-      } as unknown as IncomingMessage;
-      expect(getClientIp(req)).toBe("172.16.0.1");
+    it("should ignore a spoofable X-Forwarded-For and use the socket address", () => {
+      vi.resetModules();
+      return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
+        const req = {
+          headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
+          socket: { remoteAddress: "10.0.0.5" },
+        } as unknown as IncomingMessage;
+        expect(getClientIp(req)).toBe("10.0.0.5");
+      });
     });
-  });
 
-  it("should fall back to socket.remoteAddress", () => {
-    vi.resetModules();
-    return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
-      const req = {
-        headers: {},
-        socket: { remoteAddress: "192.168.0.1" },
-      } as unknown as IncomingMessage;
-      expect(getClientIp(req)).toBe("192.168.0.1");
-    });
-  });
-
-  it("should reject non-IP X-Forwarded-For entries", () => {
-    vi.resetModules();
-    return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
-      const req = {
-        headers: { "x-forwarded-for": "not-an-ip, also-not-an-ip" },
-        socket: { remoteAddress: "10.0.0.5" },
-      } as unknown as IncomingMessage;
-      expect(getClientIp(req)).toBe("10.0.0.5");
-    });
-  });
-
-  it("should handle array-valued X-Forwarded-For header", () => {
-    vi.resetModules();
-    return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
-      const req = {
-        headers: {
-          "x-forwarded-for": ["10.0.0.1", "10.0.0.2", "192.168.1.50"],
-        },
-        socket: { remoteAddress: "127.0.0.1" },
-      } as unknown as IncomingMessage;
-      expect(getClientIp(req)).toBe("192.168.1.50");
+    it("should ignore X-Real-IP and use the socket address", () => {
+      vi.resetModules();
+      return import("./verifyTokenAndRateLimit").then(({ getClientIp }) => {
+        const req = {
+          headers: { "x-real-ip": "172.16.0.1" },
+          socket: { remoteAddress: "10.0.0.5" },
+        } as unknown as IncomingMessage;
+        expect(getClientIp(req)).toBe("10.0.0.5");
+      });
     });
   });
 });

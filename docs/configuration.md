@@ -61,6 +61,7 @@ These variables control the Vite development/preview server behavior:
 | `HMR_PORT` | `7861` | Port for Hot Module Replacement during development |
 | `ALLOWED_HOSTS` | `true` | Comma-separated list of allowed hostnames for the preview server |
 | `BASIC_SSL` | `false` | Enable basic SSL for HTTPS support during development |
+| `TRUST_PROXY` | `false` | Trust `X-Forwarded-For`/`X-Real-IP` for the per-client rate-limit key. Enable **only** behind a reverse proxy that sets the rightmost `X-Forwarded-For` entry. Leave off when the instance is exposed directly - otherwise clients could forge the header to evade rate limiting. |
 
 These defaults are provided by `docker-compose.yml`/`docker-compose.production.yml` (e.g. `PORT=${PORT:-7860}`), not by the application itself - `vite.config.ts` reads these variables with no fallback, so when running directly via `npm run dev`/`vite preview` without Docker, unset variables fall through to Vite's own built-in defaults.
 

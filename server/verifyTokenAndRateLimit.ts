@@ -10,23 +10,43 @@ const rateLimiter = new RateLimiterMemory({
   duration: 10,
 });
 
-/** Takes the rightmost X-Forwarded-For entry (the one our proxy appended), validated with `net.isIP()`. */
+/** Whether to trust proxy-set forwarding headers. Off unless `TRUST_PROXY` is `true`/`1`. */
+function isProxyTrusted(): boolean {
+  const value = process.env.TRUST_PROXY?.trim().toLowerCase();
+  return value === "true" || value === "1";
+}
+
+/**
+ * Resolves the client IP used as the rate-limit key.
+ *
+ * `X-Forwarded-For` / `X-Real-IP` are only honored when `TRUST_PROXY` is
+ * enabled. On a directly-exposed instance those headers are fully
+ * client-controlled, so trusting them would let a caller forge a fresh IP per
+ * request and evade rate limiting entirely. When `TRUST_PROXY` is off (the
+ * default) we use the real TCP peer address, which cannot be spoofed.
+ *
+ * Enable `TRUST_PROXY` only when MiniSearch runs behind a reverse proxy that
+ * sets the rightmost `X-Forwarded-For` entry (e.g. nginx's
+ * `$proxy_add_x_forwarded_for`).
+ */
 export function getClientIp(request: IncomingMessage): string {
-  const forwarded = request.headers["x-forwarded-for"];
-  const xff = Array.isArray(forwarded) ? forwarded.join(",") : forwarded;
-  if (typeof xff === "string" && xff.length > 0) {
-    const parts = xff
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean);
-    const ip = parts[parts.length - 1];
-    if (ip && isIP(ip)) {
-      return ip;
+  if (isProxyTrusted()) {
+    const forwarded = request.headers["x-forwarded-for"];
+    const xff = Array.isArray(forwarded) ? forwarded.join(",") : forwarded;
+    if (typeof xff === "string" && xff.length > 0) {
+      const parts = xff
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+      const ip = parts[parts.length - 1];
+      if (ip && isIP(ip)) {
+        return ip;
+      }
     }
-  }
-  const realIp = request.headers["x-real-ip"];
-  if (typeof realIp === "string" && realIp.length > 0 && isIP(realIp)) {
-    return realIp;
+    const realIp = request.headers["x-real-ip"];
+    if (typeof realIp === "string" && realIp.length > 0 && isIP(realIp)) {
+      return realIp;
+    }
   }
   return request.socket.remoteAddress || "unknown";
 }
