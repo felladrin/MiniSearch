@@ -5,7 +5,10 @@ import {
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
-import { canStartResponding } from "./textGenerationUtilities";
+import {
+  ChatGenerationError,
+  canStartResponding,
+} from "./textGenerationUtilities";
 import type { ChatMessage } from "./types";
 
 vi.mock("./pubSub", () => ({
@@ -164,7 +167,7 @@ describe("textGenerationWithInternalApi", () => {
       expect(onUpdate).toHaveBeenNthCalledWith(2, "Hello world");
     });
 
-    it("skips [DONE] and empty-delta lines instead of treating them as content", async () => {
+    it("skips [DONE], choice-less, and empty-delta lines", async () => {
       const { generateChatWithInternalApi } = await import(
         "./textGenerationWithInternalApi"
       );
@@ -172,6 +175,7 @@ describe("textGenerationWithInternalApi", () => {
       mockFetch.mockResolvedValueOnce(
         streamResponse(
           sseChunks([
+            '{"model":"test-model"}',
             '{"choices":[{"delta":{}}]}',
             '{"choices":[{"delta":{"content":"Hello"}}]}',
           ]),
@@ -186,6 +190,28 @@ describe("textGenerationWithInternalApi", () => {
 
       expect(onUpdate).toHaveBeenCalledTimes(1);
       expect(onUpdate).toHaveBeenCalledWith("Hello");
+    });
+
+    it("throws a ChatGenerationError with the server message from an SSE error frame", async () => {
+      const { generateChatWithInternalApi } = await import(
+        "./textGenerationWithInternalApi"
+      );
+      const errorMessage = "Service unavailable - all models failed";
+
+      mockFetch.mockResolvedValueOnce(
+        streamResponse([
+          `data: ${JSON.stringify({ error: errorMessage })}\n\n`,
+          "data: [DONE]\n\n",
+        ]),
+      );
+
+      const response = generateChatWithInternalApi(
+        [{ role: "user", content: "Hi" }],
+        vi.fn(),
+      );
+
+      await expect(response).rejects.toBeInstanceOf(ChatGenerationError);
+      await expect(response).rejects.toThrow(errorMessage);
     });
   });
 });
