@@ -4,10 +4,10 @@ First off, thank you for considering contributing to MiniSearch! It's people lik
 
 ## Quick Start
 
-- **Onboarding**: See [`docs/quick-start.md`](docs/quick-start.md) for setup and running the app.
-- **Development workflow**: See [`docs/pull-requests.md`](docs/pull-requests.md) for the full PR process.
-- **Architecture guide**: See [`agents.md`](agents.md) for codebase navigation.
-- **Full docs**: Browse [`docs/`](docs/) for architecture, configuration, and AI integration.
+- **Onboarding**: See [`../docs/quick-start.md`](../docs/quick-start.md) for setup and running the app.
+- **Development workflow**: See [`../docs/pull-requests.md`](../docs/pull-requests.md) for the full PR process.
+- **Architecture guide**: See [`../agents.md`](../agents.md) for codebase navigation.
+- **Full docs**: Browse [`../docs/`](../docs/) for architecture, configuration, and AI integration.
 
 ## Code Quality
 
