@@ -154,7 +154,7 @@ docker compose logs searxng
 **Solution**: Change ports in `docker-compose.yml`:
 ```yaml
 ports:
-  - "7862:7860"  # Use 7862 instead of 7861
+  - "7862:7861"  # Use 7862 instead of 7860 (HMR port)
 ```
 
 ## Next Steps
