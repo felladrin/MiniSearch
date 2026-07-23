@@ -2,7 +2,7 @@
 
 ## Build & Development
 
-- **`docker compose up`**: Start development server with HMR on port 7861
+- **`docker compose up`**: Start development server (main app on 7860, HMR on 7861)
 - **`docker compose up --build`**: Compile for production
 - **`docker compose exec development-server npm run start`**: Preview production build
 - **`docker compose exec development-server npm run lint`**: Check code quality (Biome, TypeScript, knip, jscpd, architectural linter, documentation validator)

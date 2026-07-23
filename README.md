@@ -155,7 +155,7 @@ cd MiniSearch
 docker compose up
 ```
 
-The development server runs at <http://localhost:7860> with hot reload. Before opening a pull request, run the quality gate:
+The development server runs at <http://localhost:7860>. Hot Module Replacement (HMR) is available on <http://localhost:7861>. Before opening a pull request, run the quality gate:
 
 ```bash
 docker compose exec development-server npm run lint
