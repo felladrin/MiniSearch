@@ -201,7 +201,12 @@ export default function AiResponseContent({
       </Card.Section>
       <Card.Section withBorder>
         <ConditionalScrollArea>
-          <FormattedMarkdown>{response}</FormattedMarkdown>
+          <FormattedMarkdown
+            aria-live="polite"
+            aria-busy={textGenerationState === "generating"}
+          >
+            {response}
+          </FormattedMarkdown>
         </ConditionalScrollArea>
         {textGenerationState === "failed" && (
           <Alert

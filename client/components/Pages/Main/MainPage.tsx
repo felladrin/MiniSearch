@@ -1,4 +1,4 @@
-import { Container, Stack } from "@mantine/core";
+import { Container, Stack, VisuallyHidden } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import { lazy, Suspense } from "react";
 import SearchForm from "@/components/Search/Form/SearchForm";
@@ -33,49 +33,58 @@ export default function MainPage() {
 
   return (
     <Container>
-      <Stack py="md" mih="100vh" justify={isQueryEmpty ? "center" : undefined}>
-        <SearchForm
-          query={query}
-          updateQuery={updateQuery}
-          additionalButtons={<MenuButton />}
-        />
-        {!isQueryEmpty && (
-          <>
-            {settings.showEnableAiResponsePrompt && (
-              <Suspense>
-                <EnableAiResponsePrompt
-                  onAccept={() => {
-                    setSettings({
-                      ...settings,
-                      showEnableAiResponsePrompt: false,
-                      enableAiResponse: true,
-                    });
-                    searchAndRespond();
-                  }}
-                  onDecline={() => {
-                    setSettings({
-                      ...settings,
-                      showEnableAiResponsePrompt: false,
-                      enableAiResponse: false,
-                    });
-                  }}
-                />
-              </Suspense>
-            )}
-            {!settings.showEnableAiResponsePrompt &&
-              textGenerationState !== "idle" && (
+      <main>
+        <VisuallyHidden>
+          <h1>MiniSearch — Private AI search with sourced answers</h1>
+        </VisuallyHidden>
+        <Stack
+          py="md"
+          mih="100vh"
+          justify={isQueryEmpty ? "center" : undefined}
+        >
+          <SearchForm
+            query={query}
+            updateQuery={updateQuery}
+            additionalButtons={<MenuButton />}
+          />
+          {!isQueryEmpty && (
+            <>
+              {settings.showEnableAiResponsePrompt && (
                 <Suspense>
-                  <AiResponseSection />
+                  <EnableAiResponsePrompt
+                    onAccept={() => {
+                      setSettings({
+                        ...settings,
+                        showEnableAiResponsePrompt: false,
+                        enableAiResponse: true,
+                      });
+                      searchAndRespond();
+                    }}
+                    onDecline={() => {
+                      setSettings({
+                        ...settings,
+                        showEnableAiResponsePrompt: false,
+                        enableAiResponse: false,
+                      });
+                    }}
+                  />
                 </Suspense>
               )}
-            {(textSearchState !== "idle" || imageSearchState !== "idle") && (
-              <Suspense>
-                <SearchResultsSection />
-              </Suspense>
-            )}
-          </>
-        )}
-      </Stack>
+              {!settings.showEnableAiResponsePrompt &&
+                textGenerationState !== "idle" && (
+                  <Suspense>
+                    <AiResponseSection />
+                  </Suspense>
+                )}
+              {(textSearchState !== "idle" || imageSearchState !== "idle") && (
+                <Suspense>
+                  <SearchResultsSection />
+                </Suspense>
+              )}
+            </>
+          )}
+        </Stack>
+      </main>
     </Container>
   );
 }

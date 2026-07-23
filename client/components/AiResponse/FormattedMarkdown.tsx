@@ -7,12 +7,16 @@ interface FormattedMarkdownProps {
   children: string;
   className?: string;
   enableCopy?: boolean;
+  "aria-live"?: string;
+  "aria-busy"?: boolean;
 }
 
 export default function FormattedMarkdown({
   children,
   className = "",
   enableCopy = true,
+  "aria-live": ariaLive,
+  "aria-busy": ariaBusy,
 }: FormattedMarkdownProps) {
   const { reasoningContent, mainContent, isGenerating } =
     useReasoningContent(children);
@@ -22,7 +26,7 @@ export default function FormattedMarkdown({
   }
 
   return (
-    <Typography p="lg">
+    <Typography p="lg" aria-live={ariaLive} aria-busy={ariaBusy}>
       {reasoningContent && (
         <ReasoningSection
           content={reasoningContent}

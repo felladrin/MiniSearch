@@ -202,4 +202,21 @@ describe("MainPage", () => {
     });
     expect(searchAndRespond).not.toHaveBeenCalled();
   });
+
+  it("renders a visually-hidden h1 landmark for screen readers", async () => {
+    await renderMainPage(createPageState());
+
+    const h1 = screen.getByRole("heading", { level: 1, hidden: true });
+    expect(h1).toBeInTheDocument();
+    expect(h1.textContent).toBe(
+      "MiniSearch — Private AI search with sourced answers",
+    );
+  });
+
+  it("wraps content in a main landmark element", async () => {
+    await renderMainPage(createPageState());
+
+    const mainEl = document.querySelector("main");
+    expect(mainEl).toBeInTheDocument();
+  });
 });
