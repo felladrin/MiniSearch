@@ -12,6 +12,9 @@
   },
   "homepage": "https://felladrin-minisearch.hf.space",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "vite preview",
     "build": "vite build",
