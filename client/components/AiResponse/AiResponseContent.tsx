@@ -46,6 +46,7 @@ export default function AiResponseContent({
 }) {
   const [settings, setSettings] = usePubSub(settingsPubSub);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const isGenerating = textGenerationState === "generating";
 
   const ConditionalScrollArea = useMemo(
     () =>
@@ -201,7 +202,9 @@ export default function AiResponseContent({
       </Card.Section>
       <Card.Section withBorder>
         <ConditionalScrollArea>
-          <FormattedMarkdown>{response}</FormattedMarkdown>
+          <Box aria-live="polite" aria-busy={isGenerating}>
+            <FormattedMarkdown>{response}</FormattedMarkdown>
+          </Box>
         </ConditionalScrollArea>
         {textGenerationState === "failed" && (
           <Alert

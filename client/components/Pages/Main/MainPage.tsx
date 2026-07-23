@@ -1,4 +1,4 @@
-import { Container, Stack } from "@mantine/core";
+import { Container, Stack, VisuallyHidden } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import { lazy, Suspense } from "react";
 import SearchForm from "@/components/Search/Form/SearchForm";
@@ -33,7 +33,15 @@ export default function MainPage() {
 
   return (
     <Container>
-      <Stack py="md" mih="100vh" justify={isQueryEmpty ? "center" : undefined}>
+      <VisuallyHidden>
+        <h1>MiniSearch — Private AI search with sources</h1>
+      </VisuallyHidden>
+      <Stack
+        component="main"
+        py="md"
+        mih="100vh"
+        justify={isQueryEmpty ? "center" : undefined}
+      >
         <SearchForm
           query={query}
           updateQuery={updateQuery}
