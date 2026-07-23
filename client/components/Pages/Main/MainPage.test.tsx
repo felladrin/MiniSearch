@@ -202,4 +202,18 @@ describe("MainPage", () => {
     });
     expect(searchAndRespond).not.toHaveBeenCalled();
   });
+
+  it("renders a visually-hidden h1 for the document outline", async () => {
+    await renderMainPage(createPageState());
+
+    const h1 = screen.getByRole("heading", { level: 1, hidden: true });
+    expect(h1).toBeInTheDocument();
+    expect(h1.textContent).toBe("MiniSearch — Private AI search with sources");
+  });
+
+  it("wraps content in a main landmark element", async () => {
+    await renderMainPage(createPageState());
+
+    expect(document.querySelector("main")).toBeInTheDocument();
+  });
 });
