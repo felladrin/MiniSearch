@@ -87,6 +87,16 @@ describe("Search Module", () => {
       expect(hashNoLimit).not.toBe(hashLimit20);
     });
 
+    it("should treat an omitted limit the same as an explicit undefined", async () => {
+      const hashOmitted =
+        await searchModule.searchServiceInstance.hashQuery("test query");
+      const hashUndefined = await searchModule.searchServiceInstance.hashQuery(
+        "test query",
+        undefined,
+      );
+      expect(hashOmitted).toBe(hashUndefined);
+    });
+
     it("should return a deterministic hex string of fixed length", async () => {
       const hash =
         await searchModule.searchServiceInstance.hashQuery("any query");

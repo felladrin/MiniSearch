@@ -154,7 +154,7 @@ interface SearchExecutionConfig {
 }
 
 interface SearchOperations<T extends SearchResults> {
-  hashQuery: (query: string, limit?: number) => string;
+  hashQuery: (query: string, limit?: number) => Promise<string>;
   performSearch: (
     endpoint: "text" | "images",
     query: string,
