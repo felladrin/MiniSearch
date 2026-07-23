@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import { sha256 } from "hash-wasm";
 import { addLogEntry } from "./logEntries";
 import { getSearchTokenHash } from "./searchTokenHash";
 import type { ImageSearchResults, TextSearchResults } from "./types";
@@ -153,7 +154,7 @@ interface SearchExecutionConfig {
 }
 
 interface SearchOperations<T extends SearchResults> {
-  hashQuery: (query: string) => string;
+  hashQuery: (query: string, limit?: number) => string;
   performSearch: (
     endpoint: "text" | "images",
     query: string,
@@ -169,7 +170,7 @@ async function executeCachedSearch<T extends SearchResults>(
 ): Promise<T> {
   await db.cleanExpiredCache(context.storeName);
 
-  const key = operations.hashQuery(query);
+  const key = await operations.hashQuery(query, limit);
   const cachedData = await db.getCachedResult<T>(context.storeName, key);
 
   if (cachedData?.fresh) {
@@ -397,32 +398,15 @@ db.ensureIntegrity().catch((error) => {
 
 const searchService = {
   /**
-   * Generates a hash for query caching
-   * Uses a more robust hashing algorithm to minimize collisions
+   * Generates a SHA-256 hash for query caching.
+   * Includes the limit in the hash input so that different limits
+   * produce different cache keys (fixes stale results when limit changes).
    */
-  hashQuery(query: string): string {
-    // Use a combination of hash algorithms to reduce collision risk
-    const djb2 = (str: string) => {
-      let hash = 5381;
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = (hash << 5) + hash + char;
-      }
-      return hash >>> 0;
-    };
-
-    const murmur = (str: string) => {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        hash = Math.imul(hash ^ str.charCodeAt(i), 0x5bd1e9);
-        hash = Math.imul(hash ^ (hash >>> 6), 0x5bd1e9);
-      }
-      return (hash >>> 0) ^ 0x5bd1e9;
-    };
-
-    // Combine multiple hash algorithms for better distribution
-    const combined = djb2(query) ^ murmur(query);
-    return combined.toString(36);
+  async hashQuery(query: string, limit?: number): Promise<string> {
+    const input = limit !== undefined ? `${query}::limit=${limit}` : query;
+    const hash = await sha256(input);
+    // Return first 16 hex chars — enough for cache keys, shorter than full 64
+    return hash.slice(0, 16);
   },
 
   async performSearch<T>(
