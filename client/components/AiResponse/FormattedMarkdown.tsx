@@ -29,7 +29,7 @@ export default function FormattedMarkdown({
           isGenerating={isGenerating}
         />
       )}
-      {!isGenerating && mainContent && (
+      {mainContent && (
         <MarkdownRenderer
           content={mainContent}
           enableCopy={enableCopy}
