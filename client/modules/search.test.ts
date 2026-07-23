@@ -33,40 +33,74 @@ describe("Search Module", () => {
   });
 
   describe("Hash Query Function", () => {
-    it("should return the same hash for identical queries", () => {
+    it("should return the same hash for identical queries", async () => {
       const result1 =
-        searchModule.searchServiceInstance.hashQuery("test query");
+        await searchModule.searchServiceInstance.hashQuery("test query");
       const result2 =
-        searchModule.searchServiceInstance.hashQuery("test query");
+        await searchModule.searchServiceInstance.hashQuery("test query");
       expect(result1).toBe(result2);
     });
 
-    it("should return different hashes for different queries", () => {
-      const result1 = searchModule.searchServiceInstance.hashQuery("query one");
-      const result2 = searchModule.searchServiceInstance.hashQuery("query two");
+    it("should return different hashes for different queries", async () => {
+      const result1 =
+        await searchModule.searchServiceInstance.hashQuery("query one");
+      const result2 =
+        await searchModule.searchServiceInstance.hashQuery("query two");
       expect(result1).not.toBe(result2);
     });
 
-    it("should handle empty query string", () => {
-      const result = searchModule.searchServiceInstance.hashQuery("");
+    it("should handle empty query string", async () => {
+      const result = await searchModule.searchServiceInstance.hashQuery("");
       expect(result).toBeTruthy();
       expect(typeof result).toBe("string");
     });
 
-    it("should handle special characters", () => {
+    it("should handle special characters", async () => {
       const hash1 =
-        searchModule.searchServiceInstance.hashQuery("test@query#123");
+        await searchModule.searchServiceInstance.hashQuery("test@query#123");
       expect(hash1).toBe(
-        searchModule.searchServiceInstance.hashQuery("test@query#123"),
+        await searchModule.searchServiceInstance.hashQuery("test@query#123"),
       );
     });
 
-    it("should handle unicode characters", () => {
+    it("should handle unicode characters", async () => {
       const hash1 =
-        searchModule.searchServiceInstance.hashQuery("日本語テスト");
+        await searchModule.searchServiceInstance.hashQuery("日本語テスト");
       expect(hash1).toBe(
-        searchModule.searchServiceInstance.hashQuery("日本語テスト"),
+        await searchModule.searchServiceInstance.hashQuery("日本語テスト"),
       );
+    });
+
+    it("should include limit in the hash so different limits produce different keys", async () => {
+      const hashNoLimit =
+        await searchModule.searchServiceInstance.hashQuery("test query");
+      const hashLimit10 = await searchModule.searchServiceInstance.hashQuery(
+        "test query",
+        10,
+      );
+      const hashLimit20 = await searchModule.searchServiceInstance.hashQuery(
+        "test query",
+        20,
+      );
+      expect(hashNoLimit).not.toBe(hashLimit10);
+      expect(hashLimit10).not.toBe(hashLimit20);
+      expect(hashNoLimit).not.toBe(hashLimit20);
+    });
+
+    it("should treat an omitted limit the same as an explicit undefined", async () => {
+      const hashOmitted =
+        await searchModule.searchServiceInstance.hashQuery("test query");
+      const hashUndefined = await searchModule.searchServiceInstance.hashQuery(
+        "test query",
+        undefined,
+      );
+      expect(hashOmitted).toBe(hashUndefined);
+    });
+
+    it("should return a deterministic hex string of fixed length", async () => {
+      const hash =
+        await searchModule.searchServiceInstance.hashQuery("any query");
+      expect(hash).toMatch(/^[0-9a-f]{16}$/);
     });
   });
 
