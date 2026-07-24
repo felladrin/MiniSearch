@@ -192,26 +192,30 @@ describe("textGenerationWithInternalApi", () => {
       expect(onUpdate).toHaveBeenCalledWith("Hello");
     });
 
-    it("throws a ChatGenerationError with the server message from an SSE error frame", async () => {
+    it("throws ChatGenerationError after streaming partial content when error frame arrives", async () => {
       const { generateChatWithInternalApi } = await import(
         "./textGenerationWithInternalApi"
       );
-      const errorMessage = "Service unavailable - all models failed";
+      const errorMessage =
+        "Service unavailable - all models failed: connection timeout";
 
       mockFetch.mockResolvedValueOnce(
         streamResponse([
+          'data: {"choices":[{"delta":{"content":"Partial"}}]}\n',
           `data: ${JSON.stringify({ error: errorMessage })}\n\n`,
           "data: [DONE]\n\n",
         ]),
       );
 
+      const onUpdate = vi.fn();
       const response = generateChatWithInternalApi(
         [{ role: "user", content: "Hi" }],
-        vi.fn(),
+        onUpdate,
       );
 
       await expect(response).rejects.toBeInstanceOf(ChatGenerationError);
       await expect(response).rejects.toThrow(errorMessage);
+      expect(onUpdate).toHaveBeenCalledWith("Partial");
     });
   });
 });
