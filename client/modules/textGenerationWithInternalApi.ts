@@ -93,7 +93,11 @@ async function processStreamResponse(
       .map((line) => JSON.parse(line));
 
     for (const parsedLine of parsedLines) {
-      const deltaContent = parsedLine.choices[0].delta.content;
+      if (typeof parsedLine?.error === "string") {
+        throw new ChatGenerationError(parsedLine.error);
+      }
+
+      const deltaContent = parsedLine?.choices?.[0]?.delta?.content;
       if (deltaContent) {
         streamedMessage += deltaContent;
         onChunk(streamedMessage);
