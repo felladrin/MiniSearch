@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockExistsSync = vi.fn();
 const mockReadFileSync = vi.fn();
@@ -22,6 +22,10 @@ beforeEach(() => {
   mockExistsSync.mockReset();
   mockReadFileSync.mockReset();
   mockWriteFileSync.mockReset();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("searchToken", () => {
@@ -67,5 +71,23 @@ describe("searchToken", () => {
     // Token should be a random string (letters and digits, 2+ chars)
     expect(writtenToken.length).toBeGreaterThan(2);
     expect(writtenToken).toMatch(/^[a-z0-9]+$/);
+  });
+
+  it("regenerateSearchToken should draw the token from a cryptographic source", async () => {
+    mockWriteFileSync.mockReturnValue(undefined);
+    const mathRandomSpy = vi.spyOn(Math, "random");
+
+    const { regenerateSearchToken } = await import("./searchToken");
+    regenerateSearchToken();
+    regenerateSearchToken();
+
+    const [firstToken, secondToken] = mockWriteFileSync.mock.calls.map(
+      (call) => call[1] as string,
+    );
+
+    expect(mathRandomSpy).not.toHaveBeenCalled();
+    // 32 random bytes, hex-encoded
+    expect(firstToken).toMatch(/^[0-9a-f]{64}$/);
+    expect(firstToken).not.toBe(secondToken);
   });
 });
