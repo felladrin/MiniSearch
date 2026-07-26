@@ -9,3 +9,15 @@
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   opacity: 1;
 }
+
+.thumbnailButton {
+  display: block;
+  border-radius: var(--mantine-radius-xs);
+  cursor: zoom-in;
+  line-height: 0;
+}
+
+.thumbnailButton:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-5);
+  outline-offset: 3px;
+}

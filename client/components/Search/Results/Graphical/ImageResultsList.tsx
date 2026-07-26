@@ -1,5 +1,13 @@
 import { Carousel } from "@mantine/carousel";
-import { Button, Group, rem, Stack, Text, Transition } from "@mantine/core";
+import {
+  Button,
+  Group,
+  rem,
+  Stack,
+  Text,
+  Transition,
+  UnstyledButton,
+} from "@mantine/core";
 import { useEffect, useState } from "react";
 import type { ImageSearchResult } from "@/modules/types";
 import "@mantine/carousel/styles.css";
@@ -72,18 +80,18 @@ export default function ImageResultsList({
           >
             {(styles) => (
               <Carousel.Slide style={styles}>
-                <img
-                  alt={title}
-                  src={thumbnail}
-                  loading="lazy"
+                <UnstyledButton
+                  aria-label={`Open image preview: ${title || getHostname(url)}`}
+                  className={carouselClassNames.thumbnailButton}
                   onClick={() => handleImageClick(index)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      handleImageClick(index);
-                    }
-                  }}
-                  style={imageStyle}
-                />
+                >
+                  <img
+                    alt={title}
+                    src={thumbnail}
+                    loading="lazy"
+                    style={imageStyle}
+                  />
+                </UnstyledButton>
               </Carousel.Slide>
             )}
           </Transition>
