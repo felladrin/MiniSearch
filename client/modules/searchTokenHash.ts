@@ -29,7 +29,9 @@ export async function getSearchTokenHash() {
     parallelism: 1,
     iterations: 16,
     memorySize: 512,
-    hashLength: 8,
+    // The digest is what a caller without the token would have to guess to
+    // forge a `?token=`, so it sets the ceiling on forgery resistance.
+    hashLength: 32,
     outputType: "encoded",
   });
 

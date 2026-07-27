@@ -3,16 +3,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockExistsSync = vi.fn();
 const mockReadFileSync = vi.fn();
 const mockWriteFileSync = vi.fn();
+const mockChmodSync = vi.fn();
 
 vi.mock("node:fs", () => ({
   default: {
     existsSync: (...args: unknown[]) => mockExistsSync(...args),
     readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
     writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
+    chmodSync: (...args: unknown[]) => mockChmodSync(...args),
   },
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
   readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
   writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
+  chmodSync: (...args: unknown[]) => mockChmodSync(...args),
 }));
 
 vi.mock("temp-dir", () => ({ default: "/tmp" }));
@@ -22,6 +25,7 @@ beforeEach(() => {
   mockExistsSync.mockReset();
   mockReadFileSync.mockReset();
   mockWriteFileSync.mockReset();
+  mockChmodSync.mockReset();
 });
 
 afterEach(() => {
@@ -60,19 +64,6 @@ describe("searchToken", () => {
     expect(token2).toBe("new-token-456");
   });
 
-  it("regenerateSearchToken should write a new token", async () => {
-    mockWriteFileSync.mockReturnValue(undefined);
-
-    const { regenerateSearchToken } = await import("./searchToken");
-    regenerateSearchToken();
-
-    expect(mockWriteFileSync).toHaveBeenCalled();
-    const writtenToken = mockWriteFileSync.mock.calls[0][1] as string;
-    // Token should be a random string (letters and digits, 2+ chars)
-    expect(writtenToken.length).toBeGreaterThan(2);
-    expect(writtenToken).toMatch(/^[a-z0-9]+$/);
-  });
-
   it("regenerateSearchToken should draw the token from a cryptographic source", async () => {
     mockWriteFileSync.mockReturnValue(undefined);
     const mathRandomSpy = vi.spyOn(Math, "random");
@@ -89,5 +80,19 @@ describe("searchToken", () => {
     // 32 random bytes, hex-encoded
     expect(firstToken).toMatch(/^[0-9a-f]{64}$/);
     expect(firstToken).not.toBe(secondToken);
+  });
+
+  it("regenerateSearchToken should restrict the token file to its owner", async () => {
+    mockWriteFileSync.mockReturnValue(undefined);
+    mockChmodSync.mockReturnValue(undefined);
+
+    const { regenerateSearchToken } = await import("./searchToken");
+    regenerateSearchToken();
+
+    const [filePath, , options] = mockWriteFileSync.mock.calls[0];
+    expect(options).toEqual({ mode: 0o600 });
+    // A file left behind by an earlier build keeps its old permissions,
+    // which `mode` alone would not correct.
+    expect(mockChmodSync).toHaveBeenCalledWith(filePath, 0o600);
   });
 });

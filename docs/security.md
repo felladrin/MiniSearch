@@ -20,7 +20,7 @@
 
 Every HTTP request from client to backend carries a `token` query parameter for CSRF protection:
 
-1. **Token Generation**: On build/startup, `regenerateSearchToken()` writes a random token to `{os.tempdir()}/minisearch-token`
+1. **Token Generation**: On build/startup, `regenerateSearchToken()` writes a random token to `{os.tempdir()}/minisearch-token`, readable only by the user running the build (`0600`)
 2. **Client Injection**: The token is injected as `VITE_SEARCH_TOKEN` compile-time constant via Vite's `define` option
 3. **Per-Request Auth**: Client includes token as `?token=` parameter on all `/search/text` and `/search/images` requests
 4. **Server Verification**: `handleTokenVerification()` in `searchEndpointServerHook.ts` validates the token before proxying to SearXNG
@@ -44,12 +44,12 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 
 - Input validation on all endpoints
 - Sanitization of user-generated content
-- Search token generation: a per-build/per-startup token written to a temp file (`server/searchToken.ts`), using 32 bytes from the `node:crypto` CSPRNG
+- Search token generation: a per-build/per-startup token written to a temp file (`server/searchToken.ts`), using 32 bytes from the `node:crypto` CSPRNG, with the file restricted to its owner (`0600`)
 - HTTPS enforcement in production
 - Regular dependency updates via Renovate
 - **Argon2 Hashing**: Access keys hashed using argon2id for secure validation (not storage encryption)
 - **Cross-Origin Isolation**: COOP/COEP headers for SharedArrayBuffer security
-- **CSRF Protection**: Search tokens validated via argon2 hash comparison
+- **CSRF Protection**: Search tokens validated via argon2 hash comparison, over a 32-byte digest
 
 ## Server-Side Security Modules
 
