@@ -1,7 +1,28 @@
+import { argon2Verify } from "hash-wasm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
+
+/** Digest length in bytes, read from the trailing field of the encoded hash. */
+function getDigestLength(encodedHash: string) {
+  const digest = encodedHash.split("$").pop() as string;
+  return atob(digest.replace(/-/g, "+").replace(/_/g, "/")).length;
+}
+
+/** Runs a validation and returns the hash that was sent to the server. */
+async function getHashSentFor(accessKey: string) {
+  const { validateAccessKey } = await import("./accessKey");
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: vi.fn().mockResolvedValue({ valid: true }),
+  });
+
+  await validateAccessKey(accessKey);
+
+  const [, requestInit] = mockFetch.mock.calls[0];
+  return JSON.parse(requestInit.body).accessKeyHash as string;
+}
 
 vi.mock("./logEntries", () => ({
   addLogEntry: vi.fn(),
@@ -50,6 +71,22 @@ describe("Access Key Module", () => {
 
       const result = await validateAccessKey("test-key");
       expect(result).toBe(false);
+    });
+
+    it("should send a hash the server can verify against the access key", async () => {
+      const hash = await getHashSentFor("test-key-123");
+
+      // Mirrors the server-side check in validateAccessKeyServerHook.ts
+      await expect(
+        argon2Verify({ password: "test-key-123", hash }),
+      ).resolves.toBe(true);
+      await expect(
+        argon2Verify({ password: "another-key", hash }),
+      ).resolves.toBe(false);
+    });
+
+    it("should use a digest long enough to resist blind forgery", async () => {
+      expect(getDigestLength(await getHashSentFor("test-key-123"))).toBe(32);
     });
 
     it("should return false when response is not ok", async () => {
