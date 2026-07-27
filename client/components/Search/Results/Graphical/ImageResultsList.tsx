@@ -1,11 +1,19 @@
 import { Carousel } from "@mantine/carousel";
-import { Button, Group, rem, Stack, Text, Transition } from "@mantine/core";
+import {
+  Button,
+  Group,
+  rem,
+  Stack,
+  Text,
+  Transition,
+  UnstyledButton,
+} from "@mantine/core";
 import { useEffect, useState } from "react";
 import type { ImageSearchResult } from "@/modules/types";
 import "@mantine/carousel/styles.css";
 import Lightbox from "yet-another-react-lightbox";
 import Captions from "yet-another-react-lightbox/plugins/captions";
-import carouselClassNames from "./ImageResultsList.module.css";
+import classes from "./ImageResultsList.module.css";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/captions.css";
 import { addLogEntry } from "@/modules/logEntries";
@@ -46,7 +54,6 @@ export default function ImageResultsList({
     width: rem(240),
     borderRadius: rem(4),
     border: `${rem(2)} solid var(--mantine-color-default-border)`,
-    cursor: "zoom-in",
   } as const;
 
   return (
@@ -54,7 +61,7 @@ export default function ImageResultsList({
       <Carousel
         slideSize="0"
         slideGap="xs"
-        classNames={carouselClassNames}
+        classNames={{ root: classes.root, control: classes.control }}
         emblaOptions={{
           align: "start",
           dragFree: true,
@@ -72,18 +79,18 @@ export default function ImageResultsList({
           >
             {(styles) => (
               <Carousel.Slide style={styles}>
-                <img
-                  alt={title}
-                  src={thumbnail}
-                  loading="lazy"
+                <UnstyledButton
+                  aria-label={`Open image preview: ${title || getHostname(url)}`}
+                  className={classes.thumbnailButton}
                   onClick={() => handleImageClick(index)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      handleImageClick(index);
-                    }
-                  }}
-                  style={imageStyle}
-                />
+                >
+                  <img
+                    alt={title}
+                    src={thumbnail}
+                    loading="lazy"
+                    style={imageStyle}
+                  />
+                </UnstyledButton>
               </Carousel.Slide>
             )}
           </Transition>
