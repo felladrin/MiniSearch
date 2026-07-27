@@ -6,4 +6,6 @@ on:
 jobs:
   check-docker:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-check-docker') }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/reusable-check-docker.yml
