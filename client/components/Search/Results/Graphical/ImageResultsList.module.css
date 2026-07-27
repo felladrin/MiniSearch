@@ -12,12 +12,13 @@
 
 .thumbnailButton {
   display: block;
-  border-radius: var(--mantine-radius-xs);
+  border-radius: var(--mantine-radius-sm);
   cursor: zoom-in;
   line-height: 0;
 }
 
+/* The carousel viewport clips overflow, which would cut the outer edge off the
+   focus ring of the leading slide. Drawing it inside keeps it fully visible. */
 .thumbnailButton:focus-visible {
-  outline: 2px solid var(--mantine-color-blue-5);
-  outline-offset: 3px;
+  outline-offset: -2px;
 }

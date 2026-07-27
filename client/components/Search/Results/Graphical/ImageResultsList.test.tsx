@@ -1,43 +1,9 @@
 import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { CSSProperties, ReactNode } from "react";
+import { describe, expect, it } from "vitest";
 import type { ImageSearchResult } from "@/modules/types";
 import ImageResultsList from "./ImageResultsList";
-
-vi.mock("@mantine/carousel", () => {
-  const Carousel = ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  );
-  Carousel.Slide = ({
-    children,
-    style,
-  }: {
-    children: ReactNode;
-    style?: CSSProperties;
-  }) => <div style={style}>{children}</div>;
-
-  return { Carousel };
-});
-
-vi.mock("yet-another-react-lightbox", () => ({
-  default: ({
-    index,
-    open,
-    slides,
-  }: {
-    index: number;
-    open: boolean;
-    slides: { alt?: string }[];
-  }) =>
-    open ? (
-      <div role="dialog" aria-label={slides[index]?.alt ?? "Image preview"} />
-    ) : null,
-}));
-
-vi.mock("yet-another-react-lightbox/plugins/captions", () => ({
-  default: {},
-}));
 
 const imageResults: ImageSearchResult[] = [
   [
@@ -73,20 +39,28 @@ describe("ImageResultsList", () => {
     ).toBeInTheDocument();
   });
 
-  it("opens the lightbox from the keyboard", async () => {
+  it("opens the focused thumbnail in the lightbox from the keyboard", async () => {
     const user = userEvent.setup();
     renderImageResultsList();
 
-    const firstThumbnail = await screen.findByRole("button", {
-      name: "Open image preview: First image",
-    });
-    firstThumbnail.focus();
+    const [firstThumbnail, secondThumbnail] = await Promise.all([
+      screen.findByRole("button", { name: "Open image preview: First image" }),
+      screen.findByRole("button", { name: "Open image preview: Second image" }),
+    ]);
+
+    await user.tab();
     expect(firstThumbnail).toHaveFocus();
+
+    await user.tab();
+    expect(secondThumbnail).toHaveFocus();
 
     await user.keyboard("{Enter}");
 
+    const dialog = await screen.findByRole("dialog");
+    // The lightbox keeps neighbouring slides mounted, so the alt text of every
+    // result is queryable. Only the current slide identifies what the user sees.
     expect(
-      await screen.findByRole("dialog", { name: "First image" }),
-    ).toBeInTheDocument();
+      dialog.querySelector(".yarl__slide_current img")?.getAttribute("alt"),
+    ).toBe("Second image");
   });
 });
