@@ -19,7 +19,9 @@ async function hashAccessKey(accessKey: string): Promise<string> {
     parallelism: 1,
     iterations: 16,
     memorySize: 512,
-    hashLength: 8,
+    // The digest is what a caller without the key would have to guess to pass
+    // validation, so it sets the ceiling on forgery resistance.
+    hashLength: 32,
     outputType: "encoded",
   });
 }
