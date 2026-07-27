@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import temporaryDirectory from "temp-dir";
@@ -23,6 +24,6 @@ export const getSearchToken = () => {
  * Generates and saves a new search token
  */
 export function regenerateSearchToken() {
-  const newToken = Math.random().toString(36).substring(2);
+  const newToken = randomBytes(32).toString("hex");
   writeFileSync(getSearchTokenFilePath(), newToken);
 }

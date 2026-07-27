@@ -44,7 +44,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 
 - Input validation on all endpoints
 - Sanitization of user-generated content
-- Search token generation: a per-build/per-startup token written to a temp file (`server/searchToken.ts`); note this currently uses `Math.random()`, not a cryptographically secure random source
+- Search token generation: a per-build/per-startup token written to a temp file (`server/searchToken.ts`), using 32 bytes from the `node:crypto` CSPRNG
 - HTTPS enforcement in production
 - Regular dependency updates via Renovate
 - **Argon2 Hashing**: Access keys hashed using argon2id for secure validation (not storage encryption)
