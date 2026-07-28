@@ -34,21 +34,14 @@ const MAX_SEQUENCE_LENGTH = 2048;
 const BATCH_SIZE = 10;
 
 /**
- * ONNX Runtime execution providers, in preference order. Defaults to CPU;
- * `cpu` is always appended so an unavailable accelerator degrades instead of
- * failing to load. Set RERANKER_EXECUTION_PROVIDERS=webgpu to opt into GPU
- * where one is available (WebGPU is supported on Windows, Linux x64 and macOS,
- * and CUDA v12 on Linux x64). Avoid `coreml`: it is slower than CPU for this
- * model's dynamic shapes.
+ * ONNX Runtime execution providers, in preference order. WebGPU is roughly 3x
+ * faster than CPU here and agrees with it to within float32 rounding, so it is
+ * preferred when available; listing `cpu` after it means platforms without a
+ * usable GPU provider (Linux arm64, or any host without a GPU) fall back
+ * instead of failing to load. `coreml` is deliberately absent: it is slower
+ * than CPU for this model's dynamic shapes.
  */
-function getExecutionProviders() {
-  const configured = (process.env.RERANKER_EXECUTION_PROVIDERS ?? "")
-    .split(",")
-    .map((provider) => provider.trim())
-    .filter(Boolean);
-
-  return configured.includes("cpu") ? configured : [...configured, "cpu"];
-}
+const EXECUTION_PROVIDERS = ["webgpu", "cpu"];
 
 let isReady = false;
 let session: InferenceSession | null = null;
@@ -121,10 +114,8 @@ export async function startRerankerService() {
     ensureFileExists(TOKENIZER_CONFIG_HF_FILE),
   ]);
 
-  const executionProviders = getExecutionProviders();
-
   printMessage(
-    `Loading model (arch: ${process.arch}, platform: ${process.platform}, execution providers: ${executionProviders.join(", ")})...`,
+    `Loading model (arch: ${process.arch}, platform: ${process.platform}, execution providers: ${EXECUTION_PROVIDERS.join(", ")})...`,
   );
 
   tokenizer = new Tokenizer(
@@ -132,7 +123,12 @@ export async function startRerankerService() {
     JSON.parse(fs.readFileSync(tokenizerConfigPath, "utf8")),
   );
 
-  session = await InferenceSession.create(modelPath, { executionProviders });
+  session = await InferenceSession.create(modelPath, {
+    executionProviders: EXECUTION_PROVIDERS,
+    // Errors only. ONNX Runtime otherwise warns on every startup that it
+    // assigned shape operators to CPU, which is expected and not actionable.
+    logSeverityLevel: 3,
+  });
 
   await score("test", ["test document"]);
 

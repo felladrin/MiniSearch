@@ -27,20 +27,18 @@ There is no child process, port, or health endpoint: inference runs inside the N
 
 ### Execution Providers
 
-By default the reranker runs on CPU. Set `RERANKER_EXECUTION_PROVIDERS` to a comma-separated preference list to use an accelerator:
+The session requests `["webgpu", "cpu"]`, with no configuration to set. WebGPU is roughly 3x faster than CPU (24ms against 77ms for 30 documents) and agrees with it to within float32 rounding (1e-6, identical ordering), so it is preferred where it works. Listing `cpu` after it means hosts without a usable GPU provider fall back rather than failing to load. The list is logged at startup.
 
-```sh
-RERANKER_EXECUTION_PROVIDERS=webgpu
-```
+Note that ONNX Runtime's WebGPU provider here is native, part of the `onnxruntime-node` binary. It is not the browser API, so it needs neither a browser nor Deno.
 
-`cpu` is always appended as the final fallback, so an unavailable accelerator degrades to CPU instead of failing to load. The requested list is logged at startup.
+| Provider | Availability in the Node binding | Notes |
+|----------|----------------------------------|-------|
+| `cpu` | Everywhere | Fallback |
+| `webgpu` | Windows, Linux x64, macOS | Preferred; experimental in ONNX Runtime |
+| `cuda` | Linux x64 (CUDA v12) | Not used: the binaries are not bundled, and would need `npm install onnxruntime-node --onnxruntime-node-install=cuda12` |
+| `coreml` | macOS | Not used: slower than CPU for this model's dynamic shapes |
 
-| Provider | Availability | Notes |
-|----------|--------------|-------|
-| `cpu` | Everywhere | Default |
-| `webgpu` | Windows, Linux x64, macOS | Roughly 3x faster than CPU; experimental in ONNX Runtime |
-| `cuda` | Linux x64 (CUDA v12) | The CUDA binaries are not bundled; install them with `npm install onnxruntime-node --onnxruntime-node-install=cuda12` |
-| `coreml` | macOS | Not recommended: slower than CPU for this model's dynamic shapes |
+There is no GPU provider for Linux arm64, so those hosts always run on CPU.
 
 ### Batching
 

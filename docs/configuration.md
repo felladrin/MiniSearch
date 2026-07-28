@@ -50,12 +50,6 @@ INTERNAL_OPENAI_COMPATIBLE_API_NAME="Company LLM"
 |----------|---------|-------------|
 | `DEFAULT_INFERENCE_TYPE` | `browser` | Default AI inference type (`browser`, `openai`, `horde`, `internal`) |
 
-### Reranker
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `RERANKER_EXECUTION_PROVIDERS` | `''` | Comma-separated ONNX Runtime execution providers, in preference order (e.g. `webgpu` or `cuda`). Blank means CPU. `cpu` is always appended as the final fallback. See `docs/reranking.md#execution-providers` |
-
 ### Server Configuration
 
 These variables control the Vite development/preview server behavior:
