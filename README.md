@@ -170,7 +170,8 @@ MiniSearch builds on the work of these projects:
 | Project | Role |
 | --- | --- |
 | [SearXNG](https://github.com/searxng/searxng) | Metasearch engine behind the results |
-| [wllama](https://github.com/ngxson/wllama) and [llama.cpp](https://github.com/ggml-org/llama.cpp) | In-browser inference and local reranking |
+| [ONNX Runtime](https://github.com/microsoft/onnxruntime) | Local reranking of the search results |
+| [wllama](https://github.com/ngxson/wllama) and [llama.cpp](https://github.com/ggml-org/llama.cpp) | In-browser inference |
 | [AI Horde](https://aihorde.net) | Crowdsourced distributed inference |
 | [AI SDK](https://github.com/vercel/ai) | Client for OpenAI-compatible APIs |
 | [Mantine](https://mantine.dev) | UI components |
