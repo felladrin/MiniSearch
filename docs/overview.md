@@ -41,10 +41,10 @@ The application has three primary entry points:
 
 The Docker container runs three services concurrently:
 - **SearXNG** - Privacy-focused metasearch engine
-- **llama-server** - Local AI inference server
+- **ONNX Runtime** - In-process inference for result reranking
 - **Node.js application** - Main application server
 
-The multi-stage build process first compiles llama-server from source, then creates the final runtime image with Node.js and Python environments. The container entrypoint starts SearXNG in the background and then launches the Node.js application.
+The build creates a runtime image with Node.js and Python environments. The container entrypoint starts SearXNG in the background and then launches the Node.js application.
 
 ## State Management Architecture
 
@@ -76,7 +76,7 @@ The system supports two operational modes:
 - Vite preview server (no HMR)
 - Optimized bundle with minification
 
-Both modes run the same underlying services (SearXNG, llama-server) but differ in how the frontend is served and rebuilt.
+Both modes run the same underlying services (SearXNG, the reranker) but differ in how the frontend is served and rebuilt.
 
 ## Search and AI Integration Flow
 
@@ -102,7 +102,7 @@ The system executes two parallel flows when a user submits a query:
 5. Response updates throttled to ~12 updates/sec via `throttleit` to prevent React render overload
 6. Response saved to history database via `saveLlmResponseForQuery`
 
-The `textGeneration` module orchestrates the entire search-to-response flow, managing search requests, LLM context preparation, and response streaming. Search results are optionally reranked using a local llama-server instance before being passed to the LLM for response generation.
+The `textGeneration` module orchestrates the entire search-to-response flow, managing search requests, LLM context preparation, and response streaming. Search results are optionally reranked in-process via ONNX Runtime before being passed to the LLM for response generation.
 
 ### Web Search Service Reliability
 
@@ -192,7 +192,7 @@ MiniSearch implements all server-side logic as Vite plugin hooks. Each hook regi
 | `cacheServerHook` | `server/cacheServerHook.ts` | Cache-Control headers (preview only) |
 | `validateAccessKeyServerHook` | `server/validateAccessKeyServerHook.ts` | Access key validation endpoint |
 | `internalApiEndpointServerHook` | `server/internalApiEndpointServerHook.ts` | `/inference` proxy to self-hosted API |
-| `rerankerServiceHook` | `server/rerankerServiceHook.ts` | llama-server lifecycle management for result reranking |
+| `rerankerServiceHook` | `server/rerankerServiceHook.ts` | Reranker model lifecycle management for result reranking |
 
 Key server-side modules:
 

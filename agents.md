@@ -30,7 +30,7 @@ This is your navigation hub. Start here, follow the links, and return when you n
 - **`docs/ui-components.md`** - Component architecture and PubSub patterns
 - **`docs/search-history.md`** - History database schema and management
 - **`docs/conversation-memory.md`** - Token budgeting and rolling summaries
-- **`docs/reranking.md`** - Reranker subsystem and llama-server lifecycle
+- **`docs/reranking.md`** - Reranker subsystem and model lifecycle
 - **`docs/glossary.md`** - Codebase-specific terms and domain concepts
 
 ### Development
@@ -128,19 +128,19 @@ Need to:
 - `server/internalApiEndpointServerHook.ts` - `/inference` proxy to self-hosted API
 - `server/validateAccessKeyServerHook.ts` - Access key validation endpoint
 - `server/statusEndpointServerHook.ts` - `/status` health check endpoint
-- `server/rerankerServiceHook.ts` - llama-server lifecycle management for reranking
+- `server/rerankerServiceHook.ts` - Reranker model lifecycle management
 - `server/compressionServerHook.ts` - gzip/brotli compression for responses
 - `server/crossOriginServerHook.ts` - COOP/COEP headers for SharedArrayBuffer
 - `server/cacheServerHook.ts` - Cache-Control headers (preview server only)
 - `server/webSearchService.ts` - SearXNG integration with circuit breaker and retry logic
-- `server/rerankerService.ts` - Reranker service (llama-server process management)
+- `server/rerankerService.ts` - Reranker service (ONNX Runtime inference)
 - `server/rankSearchResults.ts` - Score-based filtering and result reordering
 - `server/searchToken.ts` - CSRF token generation and storage
 - `server/verifiedTokens.ts` - In-memory `Set<string>` of verified session tokens
 - `server/verifyTokenAndRateLimit.ts` - Token verification and rate limiting
 - `server/handleTokenVerification.ts` - Search token validation logic
 - `server/searchesSinceLastRestart.ts` - In-memory search counters for analytics
-- `server/downloadFileFromHuggingFaceRepository.ts` - Downloads GGUF models from HuggingFace
+- `server/downloadFileFromHuggingFaceRepository.ts` - Downloads model files from HuggingFace
 
 ### Hooks
 - `client/hooks/useSearchHistory.ts` - Search history management from IndexedDB

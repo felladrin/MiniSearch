@@ -6,6 +6,12 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: resolve(__dirname, "client/setupTests.ts"),
+    // Loads the real model; runs via vitest.integration.config.ts instead.
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "server/**/*.integration.test.ts",
+    ],
     alias: {
       "@": resolve(__dirname, "client"),
       "@/modules": resolve(__dirname, "client/modules"),

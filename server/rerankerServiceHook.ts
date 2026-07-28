@@ -18,6 +18,8 @@ export async function rerankerServiceHook<
   }
 
   server.httpServer?.on("close", () => {
-    stopRerankerService();
+    stopRerankerService().catch((error) => {
+      console.error("Failed to stop reranker service:", error);
+    });
   });
 }

@@ -10,7 +10,7 @@
 
 ## Docker
 
-- **`docker compose up`**: Development environment with SearXNG, llama-server, and Node.js
+- **`docker compose up`**: Development environment with SearXNG and Node.js
 - **`docker compose -f docker-compose.production.yml up --build`**: Production deployment
 
 ## Testing
@@ -70,8 +70,7 @@ Used by both `on-push-to-main` and `on-pull-request-to-main` to run the producti
 ### Docker Image Builds
 
 The Docker image uses a multi-stage build:
-1. **Builder stage** (`llama-builder`): Compiles llama-server from llama.cpp source, extracts shared libraries (`libllama.so`, `libmtmd.so`, `libggml.so`, etc.)
-2. **Runtime stage**: Installs Python/SearXNG, copies llama-server binaries, builds the Vite frontend, runs SearXNG and Node.js in a single container via shell process composition
+The image installs Python/SearXNG, builds the Vite frontend, and runs SearXNG and Node.js in a single container via shell process composition. No compilation step is required: the reranker's ONNX Runtime binaries ship prebuilt with the npm dependency.
 
 The production image is published to `ghcr.io` with multi-platform support (linux/amd64, linux/arm64). Tags and labels are auto-generated from Git metadata via `docker/metadata-action`.
 

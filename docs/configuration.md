@@ -50,6 +50,12 @@ INTERNAL_OPENAI_COMPATIBLE_API_NAME="Company LLM"
 |----------|---------|-------------|
 | `DEFAULT_INFERENCE_TYPE` | `browser` | Default AI inference type (`browser`, `openai`, `horde`, `internal`) |
 
+### Reranker
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RERANKER_EXECUTION_PROVIDERS` | `''` | Comma-separated ONNX Runtime execution providers, in preference order (e.g. `webgpu` or `cuda`). Blank means CPU. `cpu` is always appended as the final fallback. See `docs/reranking.md#execution-providers` |
+
 ### Server Configuration
 
 These variables control the Vite development/preview server behavior:
@@ -197,16 +203,13 @@ Same structure but without volume mounts and with pre-built assets.
 
 ### Dockerfile Environment
 
-The Dockerfile sets up:
-1. **Builder stage**: Compiles `llama-server` from llama.cpp
-2. **Runtime stage**: 
+The Dockerfile sets up a single runtime stage:
    - Node.js LTS
    - Python 3 + SearXNG
-   - llama-server binary
 
 The app runs under the `node` user, with the app directory at `/home/node/app`. The production image starts the app with `npm start -- --host` (i.e. `vite preview`), not `npm run dev`.
 
-**Multi-service container** runs all three concurrently via shell process composition.
+**Multi-service container** runs SearXNG and Node.js concurrently via shell process composition.
 
 ## Vite Environment Injection
 
