@@ -207,12 +207,14 @@ describe("reranker service", () => {
         .sort((a, b) => b.relevance_score - a.relevance_score)
         .map(({ index }) => index);
 
-      expect(fixture.relevant).toContain(ordered[0]);
-
-      const topRelevant = ordered
+      // Every relevant result must outrank every irrelevant one. The model
+      // clears this with a score gap of at least 0.99 between the two groups,
+      // so it is not sensitive to the ~1e-6 difference between the CPU and
+      // WebGPU execution providers.
+      const topIndices = ordered
         .slice(0, fixture.relevant.length)
-        .filter((index) => fixture.relevant.includes(index)).length;
-      expect(topRelevant / fixture.relevant.length).toBeGreaterThanOrEqual(0.5);
+        .sort((a, b) => a - b);
+      expect(topIndices).toEqual([...fixture.relevant].sort((a, b) => a - b));
     }, 120_000);
   }
 });
