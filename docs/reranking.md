@@ -25,6 +25,14 @@ The `rerankerServiceHook` starts the reranker during server initialization:
 
 There is no child process, port, or health endpoint: inference runs inside the Node process.
 
+### Model Cache Integrity
+
+`downloadFileFromHuggingFaceRepository` compares each cached file against the size the Hub reports, so a file downloaded only in part is replaced instead of being loaded. Without that check a truncated model made every later startup fail with `Protobuf parsing failed`, and only deleting `server/models/` by hand recovered.
+
+Downloads land on a sibling `.part-<pid>` path and are renamed once the whole body is on disk, which keeps an interrupted write from being visible where the next startup would trust it. Files are also checked individually, so a missing tokenizer is fetched on its own while the 130MB model stays cached.
+
+The size check costs one metadata request per file at startup (roughly 600ms for the three of them). When the Hub is unreachable the cached files are used as they are, so an offline server still starts with a warm cache.
+
 ### Execution Providers
 
 The session requests `["webgpu", "cpu"]`, with no configuration to set. WebGPU is roughly 3x faster than CPU (24ms against 77ms for 30 documents) and agrees with it to within float32 rounding (1e-6, identical ordering), so it is preferred where it works. Listing `cpu` after it means hosts without a usable GPU provider fall back rather than failing to load. The list is logged at startup.
@@ -135,6 +143,9 @@ npx vitest run --config vitest.integration.config.ts
 |----------|----------|
 | Reranker not ready | Falls back to unranked SearXNG results |
 | Model fails to load | Logged by the hook; reranker stays unready and search returns unranked results |
+| Cached file of the wrong size | Logged, then downloaded again before the session is created |
+| Download shorter than the reported size | Throws before anything is written, so the cache keeps no partial file |
+| HuggingFace unreachable with a warm cache | Metadata failure is logged and the cached files are used unchanged |
 | Empty documents array | Returns empty array without running inference |
 | Unicode sanitization needed | Logs warning, continues with sanitized input |
 
