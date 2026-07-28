@@ -11,7 +11,11 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
-      - uses: JacobLinCool/huggingface-sync@60850d5a74ea004fc094f77c960c2c8bd9a0f9d1 # v1.3.1
+      # Pin to the tip of the action's `v1` branch, which is where its build
+      # output lives. Its release tags point at source commits, and `dist/` is
+      # gitignored there, so a tag digest resolves to a tree with no
+      # `dist/index.js` and the step fails before it runs.
+      - uses: JacobLinCool/huggingface-sync@48eb49940149dc1015d8294621cb203635fe9ff3 # v1 branch, 2026-05-12
         with:
           github: ${{ secrets.GITHUB_TOKEN }}
           user: ${{ vars.HF_SPACE_OWNER }}

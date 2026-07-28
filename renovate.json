@@ -1,4 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["local>felladrin/.github:renovate-config"]
+  "extends": ["local>felladrin/.github:renovate-config"],
+  "packageRules": [
+    {
+      "description": "Keep the pin on the action's v1 branch tip. Its release tags point at source commits where dist/ is gitignored, so any tag digest resolves to a tree with no dist/index.js and the deploy fails. Renovate cannot resolve a branch tip, so it has nothing correct to offer here.",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["JacobLinCool/huggingface-sync"],
+      "enabled": false
+    }
+  ]
 }
