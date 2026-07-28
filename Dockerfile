@@ -1,23 +1,3 @@
-FROM node:lts AS llama-builder
-
-ARG LLAMA_CPP_RELEASE_TAG="b6604"
-
-RUN apt-get update && apt-get install -y \
-  build-essential \
-  cmake \
-  ccache \
-  git \
-  curl
-
-RUN cd /tmp && \
-  git clone https://github.com/ggerganov/llama.cpp.git && \
-  cd llama.cpp && \
-  git checkout $LLAMA_CPP_RELEASE_TAG && \
-  cmake -B build -DGGML_NATIVE=OFF -DLLAMA_CURL=OFF && \
-  cmake --build build --config Release -j --target llama-server && \
-  mkdir -p /usr/local/lib/llama && \
-  find build -type f \( -name "libllama.so" -o -name "libmtmd.so" -o -name "libggml.so" -o -name "libggml-base.so" -o -name "libggml-cpu.so" \) -exec cp {} /usr/local/lib/llama/ \;
-
 FROM node:lts
 
 ARG SEARXNG_COMMIT_SHA="6da6eee265daeb4a62ab638d6921522bf405de69"
@@ -60,10 +40,6 @@ RUN chmod 644 $SEARXNG_SETTINGS_PATH && \
   /usr/local/searxng/searxng-venv/bin/pip install -r requirements.txt && \
   /usr/local/searxng/searxng-venv/bin/pip install --no-build-isolation -e .
 
-COPY --from=llama-builder /tmp/llama.cpp/build/bin/llama-server /usr/local/bin/
-COPY --from=llama-builder /usr/local/lib/llama/* /usr/local/lib/
-RUN ldconfig /usr/local/lib
-
 USER ${USERNAME}
 
 WORKDIR ${APP_DIR}
@@ -86,7 +62,13 @@ RUN npm ci
 
 COPY --chown=${USERNAME}:${USERNAME} . .
 
-RUN git config --global --add safe.directory ${APP_DIR} && \
+# The commit hash is optional build metadata, so a build context without a
+# usable repository must not fail the build. This happens when building from a
+# git worktree, where `.git` is a file pointing at a gitdir outside the context;
+# git then treats every command as fatal, including `config --global`.
+RUN git config --global --add safe.directory ${APP_DIR} 2>/dev/null || true; \
+  git rev-parse --short HEAD >/dev/null 2>&1 || \
+  echo "WARNING: no usable git repository in the build context, so the app will report an empty commit hash."; \
   npm run build
 
 HEALTHCHECK --interval=5m CMD curl -f http://localhost:7860/status || exit 1

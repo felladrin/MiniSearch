@@ -47,7 +47,7 @@ Production mode:
 
 The Docker container runs three services concurrently:
 - **SearXNG** - Privacy-focused metasearch engine (starts in background)
-- **llama-server** - Local AI inference server (for result reranking)
+- **ONNX Runtime** - In-process inference for result reranking
 - **Node.js (Vite)** - Main application server
 
 ### Startup Sequence

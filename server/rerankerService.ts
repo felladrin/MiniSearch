@@ -1,22 +1,51 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { Tokenizer } from "@huggingface/tokenizers";
 import debug from "debug";
+import { InferenceSession, Tensor } from "onnxruntime-node";
 import { downloadFileFromHuggingFaceRepository } from "./downloadFileFromHuggingFaceRepository";
 
 const fileName = path.basename(import.meta.url);
 const printMessage = debug(fileName);
 printMessage.enabled = true;
 
-const SERVICE_HOST = "127.0.0.1";
-const SERVICE_PORT = 8012;
-const VERBOSE_MODE = false;
-const MODEL_HF_REPO = "Felladrin/gguf-jina-reranker-v1-tiny-en";
-const MODEL_HF_FILE = "jina-reranker-v1-tiny-en-Q8_0.gguf";
+const MODEL_HF_REPO = "jinaai/jina-reranker-v1-tiny-en";
+const MODEL_HF_FILE = "onnx/model.onnx";
+const TOKENIZER_HF_FILE = "tokenizer.json";
+const TOKENIZER_CONFIG_HF_FILE = "tokenizer_config.json";
+
+/** From the model's config.json. */
+const PAD_TOKEN_ID = 0;
+
+/**
+ * Documents are truncated to 512 characters upstream, so this only guards
+ * against pathological tokenization.
+ */
+const MAX_SEQUENCE_LENGTH = 2048;
+
+/**
+ * onnxruntime-node wraps a synchronous native call, so a single large batch
+ * blocks the event loop for its whole duration. Scoring in batches yields
+ * between them, capping the stall at ~27ms instead of ~78ms for 30 results,
+ * for about 4% more wall time. Scores are unaffected: padding is per batch but
+ * the attention mask makes the result identical either way.
+ */
+const BATCH_SIZE = 10;
+
+/**
+ * ONNX Runtime execution providers, in preference order. WebGPU is roughly 3x
+ * faster than CPU here and agrees with it to within float32 rounding, so it is
+ * preferred when available; listing `cpu` after it means platforms without a
+ * usable GPU provider (Linux arm64, or any host without a GPU) fall back
+ * instead of failing to load. `coreml` is deliberately absent: it is slower
+ * than CPU for this model's dynamic shapes.
+ */
+const EXECUTION_PROVIDERS = ["webgpu", "cpu"];
 
 let isReady = false;
-let serverProcess: ChildProcess | null = null;
-let restartTimeout: NodeJS.Timeout | null = null;
+let session: InferenceSession | null = null;
+let tokenizer: Tokenizer | null = null;
 
 /**
  * Sanitizes Unicode surrogate pairs in input string
@@ -57,170 +86,128 @@ export function sanitizeUnicodeSurrogates(input: string) {
   return output;
 }
 
-export function getRerankerModelPath() {
+function resolveModelPath(hfRepoFile: string) {
   return path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     "models",
     MODEL_HF_REPO,
-    MODEL_HF_FILE,
+    hfRepoFile,
   );
 }
 
-async function ensureModelExists(modelPath: string) {
+async function ensureFileExists(hfRepoFile: string) {
+  const localPath = resolveModelPath(hfRepoFile);
   await downloadFileFromHuggingFaceRepository(
     MODEL_HF_REPO,
-    MODEL_HF_FILE,
-    modelPath,
+    hfRepoFile,
+    localPath,
   );
+  return localPath;
 }
 
 export async function startRerankerService() {
   printMessage("Preparing model...");
-  const modelPath = getRerankerModelPath();
-  await ensureModelExists(modelPath);
+
+  const [modelPath, tokenizerPath, tokenizerConfigPath] = await Promise.all([
+    ensureFileExists(MODEL_HF_FILE),
+    ensureFileExists(TOKENIZER_HF_FILE),
+    ensureFileExists(TOKENIZER_CONFIG_HF_FILE),
+  ]);
+
   printMessage(
-    `Starting service (arch: ${process.arch}, platform: ${process.platform})...`,
+    `Loading model (arch: ${process.arch}, platform: ${process.platform}, execution providers: ${EXECUTION_PROVIDERS.join(", ")})...`,
   );
 
-  const contextSize = 2048;
-
-  serverProcess = spawn(
-    "llama-server",
-    [
-      "--model",
-      modelPath,
-      "--ctx-size",
-      contextSize.toString(),
-      "--batch-size",
-      contextSize.toString(),
-      "--ubatch-size",
-      contextSize.toString(),
-      "--flash-attn",
-      "auto",
-      "--host",
-      SERVICE_HOST,
-      "--port",
-      SERVICE_PORT.toString(),
-      "--log-verbosity",
-      VERBOSE_MODE ? "1" : "0",
-      "--threads",
-      "1",
-      "--parallel",
-      "1",
-      "--reranking",
-      "--pooling",
-      "rank",
-    ],
-    {
-      stdio: [
-        "ignore",
-        VERBOSE_MODE ? "pipe" : "ignore",
-        VERBOSE_MODE ? "pipe" : "ignore",
-      ],
-    },
+  tokenizer = new Tokenizer(
+    JSON.parse(fs.readFileSync(tokenizerPath, "utf8")),
+    JSON.parse(fs.readFileSync(tokenizerConfigPath, "utf8")),
   );
 
-  serverProcess.stderr?.on("data", (data) => {
-    printMessage(data.toString());
+  session = await InferenceSession.create(modelPath, {
+    executionProviders: EXECUTION_PROVIDERS,
+    // Errors only. ONNX Runtime otherwise warns on every startup that it
+    // assigned shape operators to CPU, which is expected and not actionable.
+    logSeverityLevel: 3,
   });
 
-  serverProcess.on("exit", (code: number | null, signal: string | null) => {
-    printMessage(
-      `Reranker service exited with code: ${code}, signal: ${signal}`,
-    );
-    if (signal === "SIGTRAP" || signal === "SIGILL") {
-      printMessage(
-        `Binary compatibility issue detected (${signal}). The llama-server binary may not match the current CPU architecture (${process.arch}).`,
-      );
-    }
-    isReady = false;
+  await score("test", ["test document"]);
 
-    if (restartTimeout) clearTimeout(restartTimeout);
-    restartTimeout = setTimeout(() => {
-      printMessage("Attempting to restart reranker service...");
-      startRerankerService();
-    }, 5000);
-  });
-
-  serverProcess.on("error", (error: Error) => {
-    printMessage(`Reranker service error: ${error.message}`);
-    isReady = false;
-  });
-
-  await new Promise<void>((resolve) => {
-    const checkReady = async () => {
-      try {
-        const response = await fetch(
-          `http://${SERVICE_HOST}:${SERVICE_PORT}/health`,
-        );
-        const responseJson = (await response.json()) as {
-          status: "ok" | string;
-        };
-        if (responseJson.status === "ok") {
-          const warmupResponse = await fetch(
-            `http://${SERVICE_HOST}:${SERVICE_PORT}/v1/rerank`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                model: "rerank",
-                query: "test",
-                documents: ["test document"],
-                top_n: 1,
-              }),
-            },
-          );
-          if (warmupResponse.ok) {
-            isReady = true;
-            resolve();
-          } else {
-            const errorBody = await warmupResponse.text().catch(() => "");
-            printMessage(
-              `Warmup failed: ${warmupResponse.statusText} - ${errorBody}`,
-            );
-            setTimeout(checkReady, 500);
-          }
-        } else {
-          setTimeout(checkReady, 100);
-        }
-      } catch {
-        setTimeout(checkReady, 100);
-      }
-    };
-    checkReady();
-  });
-
+  isReady = true;
   printMessage("Service ready!");
-
-  return serverProcess;
 }
 
-export function stopRerankerService() {
-  if (restartTimeout) {
-    clearTimeout(restartTimeout);
-    restartTimeout = null;
-  }
-
-  if (serverProcess) {
-    serverProcess.kill();
-    serverProcess = null;
-  }
+export async function stopRerankerService() {
+  isReady = false;
+  const currentSession = session;
+  session = null;
+  tokenizer = null;
+  await currentSession?.release();
 }
 
 export async function getRerankerStatus() {
-  if (!isReady) {
-    return false;
+  return isReady;
+}
+
+async function scoreBatch(
+  activeSession: InferenceSession,
+  encodings: number[][],
+) {
+  const paddedLength = Math.max(...encodings.map(({ length }) => length));
+  const inputIds = new BigInt64Array(encodings.length * paddedLength);
+  const attentionMask = new BigInt64Array(encodings.length * paddedLength);
+
+  encodings.forEach((ids, row) => {
+    const offset = row * paddedLength;
+    for (let column = 0; column < paddedLength; column += 1) {
+      const isPadding = column >= ids.length;
+      inputIds[offset + column] = BigInt(
+        isPadding ? PAD_TOKEN_ID : ids[column],
+      );
+      attentionMask[offset + column] = isPadding ? 0n : 1n;
+    }
+  });
+
+  const dimensions = [encodings.length, paddedLength];
+  const { logits } = await activeSession.run({
+    input_ids: new Tensor("int64", inputIds, dimensions),
+    attention_mask: new Tensor("int64", attentionMask, dimensions),
+  });
+
+  return Array.from(logits.data as Float32Array, Number);
+}
+
+/**
+ * Returns the cross-encoder's raw relevance logit per document. Deliberately
+ * not squashed through sigmoid: the standard-deviation filter in
+ * rankSearchResults is calibrated against this scale.
+ */
+async function score(query: string, documents: string[]) {
+  if (!session || !tokenizer) {
+    throw new Error("Reranker model is not loaded");
   }
 
-  try {
-    const response = await fetch(
-      `http://${SERVICE_HOST}:${SERVICE_PORT}/health`,
+  const activeSession = session;
+  const loadedTokenizer = tokenizer;
+
+  const encodings = documents.map((document) => {
+    const { ids } = loadedTokenizer.encode(query, { text_pair: document });
+    return ids.length > MAX_SEQUENCE_LENGTH
+      ? ids.slice(0, MAX_SEQUENCE_LENGTH)
+      : ids;
+  });
+
+  const scores: number[] = [];
+
+  for (let offset = 0; offset < encodings.length; offset += BATCH_SIZE) {
+    scores.push(
+      ...(await scoreBatch(
+        activeSession,
+        encodings.slice(offset, offset + BATCH_SIZE),
+      )),
     );
-    const responseJson = (await response.json()) as { status: "ok" | string };
-    return responseJson.status === "ok";
-  } catch {
-    return false;
   }
+
+  return scores;
 }
 
 export async function rerank(query: string, documents: string[]) {
@@ -232,82 +219,22 @@ export async function rerank(query: string, documents: string[]) {
     throw new Error("Reranker service is not ready");
   }
 
-  if (VERBOSE_MODE) {
-    console.time("Time to rerank");
+  const sanitizedQuery = sanitizeUnicodeSurrogates(query);
+  const sanitizedDocuments = documents.map(sanitizeUnicodeSurrogates);
+
+  if (sanitizedQuery !== query) {
+    printMessage(
+      "Rerank query contained invalid Unicode surrogates; sanitized",
+    );
   }
 
-  try {
-    const sanitizedQuery = sanitizeUnicodeSurrogates(query);
-    const sanitizedDocuments = documents.map((document) =>
-      sanitizeUnicodeSurrogates(document),
+  if (sanitizedDocuments.some((doc, index) => doc !== documents[index])) {
+    printMessage(
+      "One or more rerank documents contained invalid Unicode surrogates; sanitized",
     );
-
-    if (sanitizedQuery !== query) {
-      printMessage(
-        "Rerank query contained invalid Unicode surrogates; sanitized",
-      );
-    }
-
-    if (sanitizedDocuments.some((doc, index) => doc !== documents[index])) {
-      printMessage(
-        "One or more rerank documents contained invalid Unicode surrogates; sanitized",
-      );
-    }
-
-    const response = await fetch(
-      `http://${SERVICE_HOST}:${SERVICE_PORT}/v1/rerank`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "rerank",
-          query: sanitizedQuery,
-          documents: sanitizedDocuments,
-          top_n: sanitizedDocuments.length,
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      const errorBody = await response
-        .text()
-        .catch(() => "Unable to read error body");
-      printMessage(`Reranking error response: ${errorBody}`);
-      throw new Error(
-        `Reranking failed: ${response.statusText} - ${errorBody}`,
-      );
-    }
-
-    const jsonResponse = await response.json();
-
-    const results = jsonResponse.results as {
-      index: number;
-      relevance_score: number;
-    }[];
-
-    if (VERBOSE_MODE) {
-      console.timeEnd("Time to rerank");
-      const sortedResults = results
-        .slice()
-        .sort((a, b) => b.relevance_score - a.relevance_score);
-      const rankedDocuments = results.map(({ index, relevance_score }) => ({
-        document: sanitizedDocuments[index],
-        ranking_position:
-          sortedResults.findIndex((result) => result.index === index) + 1,
-        relevance_score,
-      }));
-      printMessage(rankedDocuments);
-    }
-
-    return results;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("Reranking failed")) {
-      printMessage("Reranking service error detected, marking as not ready");
-      isReady = false;
-      serverProcess?.kill();
-    }
-    throw error;
   }
+
+  const scores = await score(sanitizedQuery, sanitizedDocuments);
+
+  return scores.map((relevance_score, index) => ({ index, relevance_score }));
 }

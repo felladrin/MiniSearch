@@ -197,16 +197,13 @@ Same structure but without volume mounts and with pre-built assets.
 
 ### Dockerfile Environment
 
-The Dockerfile sets up:
-1. **Builder stage**: Compiles `llama-server` from llama.cpp
-2. **Runtime stage**: 
+The Dockerfile sets up a single runtime stage:
    - Node.js LTS
    - Python 3 + SearXNG
-   - llama-server binary
 
 The app runs under the `node` user, with the app directory at `/home/node/app`. The production image starts the app with `npm start -- --host` (i.e. `vite preview`), not `npm run dev`.
 
-**Multi-service container** runs all three concurrently via shell process composition.
+**Multi-service container** runs SearXNG and Node.js concurrently via shell process composition.
 
 ## Vite Environment Injection
 

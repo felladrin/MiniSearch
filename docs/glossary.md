@@ -34,9 +34,9 @@ Instead of a heavy state management library like Redux, MiniSearch uses a minima
 
 ### Reranker
 
-A secondary search stage that takes initial results from SearXNG and re-orders them based on relevance to the query using a cross-encoder model (`jina-reranker-v1-tiny-en`) running on a local `llama-server` instance.
+A secondary search stage that takes initial results from SearXNG and re-orders them based on relevance to the query using a cross-encoder model (`jina-reranker-v1-tiny-en`) running in-process via ONNX Runtime.
 
-- **Implementation**: Spawns `llama-server` child process with `--reranking` and `--pooling rank` flags
+- **Implementation**: Loads the model's ONNX export with `onnxruntime-node`; no child process
 - **Health Check**: Polls `/health` endpoint via `getRerankerStatus`
 - **Scoring**: Results filtered using standard deviation thresholds (`kStandardDeviationFactor = 0.3`)
 - **Fallback**: If reranker is unhealthy, returns unranked SearXNG results
@@ -95,7 +95,7 @@ Middleware registered via Vite plugin hooks (`configureServer`, `configurePrevie
 | `cacheServerHook` | Cache-Control headers |
 | `validateAccessKeyServerHook` | Access key validation |
 | `internalApiEndpointServerHook` | `/inference` proxy |
-| `rerankerServiceHook` | llama-server lifecycle management |
+| `rerankerServiceHook` | Reranker model lifecycle management |
 
 ### Circuit Breaker
 

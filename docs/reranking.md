@@ -1,6 +1,6 @@
 # Search Result Reranking
 
-MiniSearch optionally reranks search results using a cross-encoder model running on a local `llama-server` instance. This secondary search stage reorders initial SearXNG results based on their semantic relevance to the user's query.
+MiniSearch optionally reranks search results using a cross-encoder model running in-process via ONNX Runtime. This secondary search stage reorders initial SearXNG results based on their semantic relevance to the user's query.
 
 ## Architecture Overview
 
@@ -8,7 +8,7 @@ The reranking subsystem consists of three components:
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| Service Manager | `server/rerankerService.ts` | llama-server lifecycle, health checks, reranking API calls |
+| Service Manager | `server/rerankerService.ts` | Model loading, readiness state, reranking inference |
 | Ranking Logic | `server/rankSearchResults.ts` | Score-based filtering and result reordering |
 | Server Hook | `server/rerankerServiceHook.ts` | Startup/shutdown coordination with Vite server |
 
@@ -18,51 +18,39 @@ The reranking subsystem consists of three components:
 
 The `rerankerServiceHook` starts the reranker during server initialization:
 
-1. Downloads the model from HuggingFace if not present (`Felladrin/gguf-jina-reranker-v1-tiny-en/jina-reranker-v1-tiny-en-Q8_0.gguf`)
-2. Spawns `llama-server` as a child process
-3. Polls `/health` endpoint until status is `ok`
-4. Performs a warmup rerank request (`query: "test"`, `documents: ["test document"]`) to ensure the model is fully loaded
-5. Sets `isReady = true`
+1. Downloads the model and tokenizer from HuggingFace if not present (`jinaai/jina-reranker-v1-tiny-en`)
+2. Creates an ONNX Runtime inference session
+3. Performs a warmup inference (`query: "test"`, `documents: ["test document"]`) to ensure the graph is initialized
+4. Sets `isReady = true`
 
-### llama-server Configuration
+There is no child process, port, or health endpoint: inference runs inside the Node process.
 
-The reranker process is spawned with these arguments:
+### Execution Providers
 
-| Argument | Value | Purpose |
-|----------|-------|---------|
-| `--model` | `jina-reranker-v1-tiny-en-Q8_0.gguf` | Cross-encoder reranking model |
-| `--ctx-size` | 2048 | Context window size |
-| `--batch-size` | 2048 | Batch processing size |
-| `--ubatch-size` | 2048 | Micro-batch size |
-| `--flash-attn` | auto | Flash attention optimization |
-| `--host` | 127.0.0.1 | Local-only binding |
-| `--port` | 8012 | Service port |
-| `--threads` | 1 | Single-threaded operation |
-| `--parallel` | 1 | Single parallel request |
-| `--reranking` | (flag) | Enable reranking mode |
-| `--pooling` | rank | Rank pooling strategy |
+The session requests `["webgpu", "cpu"]`, with no configuration to set. WebGPU is roughly 3x faster than CPU (24ms against 77ms for 30 documents) and agrees with it to within float32 rounding (1e-6, identical ordering), so it is preferred where it works. Listing `cpu` after it means hosts without a usable GPU provider fall back rather than failing to load. The list is logged at startup.
 
-### Automatic Restart
+Note that ONNX Runtime's WebGPU provider here is native, part of the `onnxruntime-node` binary. It is not the browser API, so it needs neither a browser nor Deno.
 
-If the `llama-server` process exits unexpectedly:
+| Provider | Availability in the Node binding | Notes |
+|----------|----------------------------------|-------|
+| `cpu` | Everywhere | Fallback |
+| `webgpu` | Windows, Linux x64, macOS | Preferred; experimental in ONNX Runtime |
+| `cuda` | Linux x64 (CUDA v12) | Not used: the binaries are not bundled, and would need `npm install onnxruntime-node --onnxruntime-node-install=cuda12` |
+| `coreml` | macOS | Not used: slower than CPU for this model's dynamic shapes |
 
-1. `isReady` is set to `false`
-2. A 5-second restart timeout is scheduled
-3. `startRerankerService()` is called again automatically
-4. Binary compatibility errors (`SIGTRAP`, `SIGILL`) are logged with architecture details
+There is no GPU provider for Linux arm64, so those hosts always run on CPU.
+
+### Batching
+
+Documents are scored in batches of 10. `onnxruntime-node` wraps a synchronous native call, so scoring all 30 results at once would block the event loop for the full duration. Batching yields between calls, capping the stall at roughly 27ms rather than 78ms, at the cost of about 4% more wall time. Scores are identical either way, because padding is per batch but the attention mask excludes it.
 
 ### Shutdown
 
-On server close, `stopRerankerService()` clears any pending restart timeout and kills the child process.
+On server close, `stopRerankerService()` clears the readiness flag and releases the inference session.
 
 ## Health Monitoring
 
-`getRerankerStatus()` performs a live health check by fetching `/health` from the llama-server. Returns `false` if:
-- `isReady` flag is `false`
-- Health endpoint is unreachable
-- Response status is not `ok`
-
-The search endpoint checks reranker health before attempting ranking and falls back to unranked SearXNG results if unhealthy.
+`getRerankerStatus()` reports whether the model finished loading. The search endpoint checks it before attempting ranking and falls back to unranked SearXNG results if the reranker is unavailable.
 
 ## Reranking Process
 
@@ -75,21 +63,23 @@ const doc = `[${title}](${url} "${snippet}")`.toLocaleLowerCase();
 // Truncated to MAX_DOCUMENT_LENGTH (512 characters)
 ```
 
-Both query and documents are lowercased and Unicode surrogates are sanitized before sending to the reranker.
+Both query and documents are lowercased and Unicode surrogates are sanitized before tokenization.
 
 ### Unicode Sanitization
 
-`sanitizeUnicodeSurrogates()` validates Unicode surrogate pairs in input strings. Invalid surrogates are replaced with the Unicode replacement character (`\ufffd`). This prevents crashes when processing malformed UTF-8 from web search results.
+`sanitizeUnicodeSurrogates()` validates Unicode surrogate pairs in input strings. Invalid surrogates are replaced with the Unicode replacement character (`�`). This prevents failures when processing malformed UTF-8 from web search results.
 
 ### Scoring and Filtering
 
-The reranker returns relevance scores for each document. Results are filtered using a two-stage statistical approach:
+The reranker returns the classifier's raw relevance logit for each document. Scores are deliberately not passed through a sigmoid, because the filter below is calibrated against the raw scale. Results are then filtered using a two-stage statistical approach:
 
 1. **Score Normalization**: Scores are shifted to positive range by adding the absolute value of the minimum score
 2. **Standard Deviation Filter**: Results below `mean - kStandardDeviationFactor * standardDeviation` are filtered out
    - `kStandardDeviationFactor = 0.3`
 3. **Percentage Fallback**: If fewer than 40% of results pass the standard deviation filter, a fallback threshold is applied:
    - `minPercentageFallback = 0.4` (40% of the highest normalized score)
+
+This filter is invariant to linear rescaling of the scores, since both the scores and the threshold scale together.
 
 ### Preserve Top Results Mode
 
@@ -121,21 +111,32 @@ Reranking is applied to both text and image search results. For image results, t
 | Property | Value |
 |----------|-------|
 | Model | jina-reranker-v1-tiny-en |
-| Format | GGUF (Q8_0 quantized) |
-| HuggingFace Repo | Felladrin/gguf-jina-reranker-v1-tiny-en |
+| Format | ONNX (fp32) |
+| HuggingFace Repo | jinaai/jina-reranker-v1-tiny-en |
 | Type | Cross-encoder reranker |
-| Language | English |
-| Storage | `server/models/Felladrin/gguf-jina-reranker-v1-tiny-en/` |
+| Size | 4 layers, 33M parameters |
+| Storage | `server/models/jinaai/jina-reranker-v1-tiny-en/` |
+
+Despite being an English model, it ranks non-English results (Portuguese, for example) well in practice, which is why it is preferred over larger alternatives.
+
+Quantized variants are deliberately not used. The `q8` export measurably degrades ranking quality on this 33M-parameter model, and the `fp16` export fails to load in `onnxruntime-node`.
+
+## Testing
+
+`server/rerankerService.integration.test.ts` loads the real model and asserts ranking quality against English and Portuguese fixtures. It downloads ~130MB, so it is excluded from the default suite:
+
+```sh
+npx vitest run --config vitest.integration.config.ts
+```
 
 ## Error Handling
 
 | Scenario | Behavior |
 |----------|----------|
 | Reranker not ready | Falls back to unranked SearXNG results |
-| Reranking API error | `isReady` set to `false`, process killed, auto-restart scheduled |
-| Empty documents array | Returns empty array without calling reranker |
+| Model fails to load | Logged by the hook; reranker stays unready and search returns unranked results |
+| Empty documents array | Returns empty array without running inference |
 | Unicode sanitization needed | Logs warning, continues with sanitized input |
-| Binary architecture mismatch | Logs `SIGTRAP`/`SIGILL` error with architecture details |
 
 ## Related Topics
 

@@ -85,7 +85,7 @@ flowchart LR
     subgraph container [Docker container]
         Server[App server]
         SearXNG[SearXNG<br/>metasearch]
-        Reranker[Reranker<br/>llama-server]
+        Reranker[Reranker<br/>ONNX Runtime]
     end
     UI <--> Storage
     UI -->|search| Server
