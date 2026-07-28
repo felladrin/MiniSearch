@@ -62,7 +62,13 @@ RUN npm ci
 
 COPY --chown=${USERNAME}:${USERNAME} . .
 
-RUN git config --global --add safe.directory ${APP_DIR} && \
+# The commit hash is optional build metadata, so a build context without a
+# usable repository must not fail the build. This happens when building from a
+# git worktree, where `.git` is a file pointing at a gitdir outside the context;
+# git then treats every command as fatal, including `config --global`.
+RUN git config --global --add safe.directory ${APP_DIR} 2>/dev/null || true; \
+  git rev-parse --short HEAD >/dev/null 2>&1 || \
+  echo "WARNING: no usable git repository in the build context, so the app will report an empty commit hash."; \
   npm run build
 
 HEALTHCHECK --interval=5m CMD curl -f http://localhost:7860/status || exit 1
