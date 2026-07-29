@@ -79,9 +79,7 @@ export async function verifyTokenAndRateLimit(
       void error;
     }
 
-    if (isValidToken) {
-      addVerifiedToken(token);
-    } else {
+    if (!isValidToken) {
       return {
         isAuthorized: false,
         statusCode: 401,
@@ -89,6 +87,9 @@ export async function verifyTokenAndRateLimit(
       };
     }
   }
+
+  // Records a new session or refreshes an active one's last-seen time.
+  addVerifiedToken(token);
 
   const rateLimitKey = request ? getClientIp(request) : token;
 
