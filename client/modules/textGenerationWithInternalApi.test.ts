@@ -50,15 +50,34 @@ function sseChunks(lines: string[]) {
   return [...lines.map((line) => `data: ${line}\n`), "data: [DONE]\n"];
 }
 
-function streamResponse(chunks: string[], status = 200) {
+function streamResponse(chunks: Array<string | Uint8Array>, status = 200) {
   const encoder = new TextEncoder();
   const body = new ReadableStream({
     start(controller) {
-      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      for (const chunk of chunks) {
+        controller.enqueue(
+          typeof chunk === "string" ? encoder.encode(chunk) : chunk,
+        );
+      }
       controller.close();
     },
   });
   return new Response(body, { status });
+}
+
+async function generateChatFromChunks(chunks: Array<string | Uint8Array>) {
+  const { generateChatWithInternalApi } = await import(
+    "./textGenerationWithInternalApi"
+  );
+  mockFetch.mockResolvedValueOnce(streamResponse(chunks));
+
+  const onUpdate = vi.fn();
+  const result = await generateChatWithInternalApi(
+    [{ role: "user", content: "Hi" }],
+    onUpdate,
+  );
+
+  return { onUpdate, result };
 }
 
 describe("textGenerationWithInternalApi", () => {
@@ -144,23 +163,43 @@ describe("textGenerationWithInternalApi", () => {
 
   describe("generateChatWithInternalApi", () => {
     it("streams incremental accumulated text as multiple SSE chunks arrive", async () => {
-      const { generateChatWithInternalApi } = await import(
-        "./textGenerationWithInternalApi"
+      const { onUpdate, result } = await generateChatFromChunks([
+        'data: {"choices":[{"delta":{"content":"Hello"}}]}\n',
+        'data: {"choices":[{"delta":{"content":" world"}}]}\n',
+        "data: [DONE]\n",
+      ]);
+
+      expect(result).toBe("Hello world");
+      expect(onUpdate).toHaveBeenNthCalledWith(1, "Hello");
+      expect(onUpdate).toHaveBeenNthCalledWith(2, "Hello world");
+    });
+
+    it("reassembles SSE frames split across arbitrary byte boundaries", async () => {
+      const encodedResponse = new TextEncoder().encode(
+        [
+          'data: {"choices":[{"delta":{"content":"Hello 🌍"}}]}',
+          'data: {"choices":[{"delta":{"content":"!"}}]}',
+        ].join("\n"),
       );
 
-      mockFetch.mockResolvedValueOnce(
-        streamResponse([
-          'data: {"choices":[{"delta":{"content":"Hello"}}]}\n',
-          'data: {"choices":[{"delta":{"content":" world"}}]}\n',
-          "data: [DONE]\n",
-        ]),
+      const { onUpdate, result } = await generateChatFromChunks(
+        Array.from({ length: encodedResponse.length }, (_, index) =>
+          encodedResponse.slice(index, index + 1),
+        ),
       );
 
-      const onUpdate = vi.fn();
-      const result = await generateChatWithInternalApi(
-        [{ role: "user", content: "Hi" }],
-        onUpdate,
-      );
+      expect(result).toBe("Hello 🌍!");
+      expect(onUpdate).toHaveBeenNthCalledWith(1, "Hello 🌍");
+      expect(onUpdate).toHaveBeenNthCalledWith(2, "Hello 🌍!");
+    });
+
+    it("skips a malformed data line and continues streaming", async () => {
+      const { onUpdate, result } = await generateChatFromChunks([
+        'data: {"choices":[{"delta":{"content":"Hello"}}]}\n',
+        "data: not-json\n",
+        'data: {"choices":[{"delta":{"content":" world"}}]}\n',
+        "data: [DONE]\n",
+      ]);
 
       expect(result).toBe("Hello world");
       expect(onUpdate).toHaveBeenNthCalledWith(1, "Hello");
