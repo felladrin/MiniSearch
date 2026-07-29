@@ -34,14 +34,21 @@ const MAX_SEQUENCE_LENGTH = 2048;
 const BATCH_SIZE = 10;
 
 /**
- * ONNX Runtime execution providers, in preference order. WebGPU is roughly 3x
- * faster than CPU here and agrees with it to within float32 rounding, so it is
- * preferred when available; listing `cpu` after it means platforms without a
- * usable GPU provider (Linux arm64, or any host without a GPU) fall back
- * instead of failing to load. `coreml` is deliberately absent: it is slower
- * than CPU for this model's dynamic shapes.
+ * ONNX Runtime execution providers to try first. WebGPU is roughly 3x faster
+ * than CPU here and agrees with it to within float32 rounding, so it is
+ * preferred when available. `coreml` is deliberately absent: it is slower than
+ * CPU for this model's dynamic shapes.
  */
-const EXECUTION_PROVIDERS = ["webgpu", "cpu"];
+const PREFERRED_EXECUTION_PROVIDERS = ["webgpu", "cpu"];
+
+/**
+ * Trailing `cpu` in a provider list is not a fallback chain: ONNX Runtime only
+ * falls back per operator, once a provider is registered. A provider that fails
+ * to initialize at all (no GPU adapter, or no `libvulkan.so.1` for Dawn to
+ * load, as on Hugging Face Spaces) rejects the whole session, so the CPU-only
+ * session has to be a second attempt.
+ */
+const FALLBACK_EXECUTION_PROVIDERS = ["cpu"];
 
 let isReady = false;
 let session: InferenceSession | null = null;
@@ -105,6 +112,19 @@ async function ensureFileExists(hfRepoFile: string) {
   return localPath;
 }
 
+function createSession(modelPath: string, executionProviders: string[]) {
+  printMessage(
+    `Loading model (arch: ${process.arch}, platform: ${process.platform}, execution providers: ${executionProviders.join(", ")})...`,
+  );
+
+  return InferenceSession.create(modelPath, {
+    executionProviders,
+    // Errors only. ONNX Runtime otherwise warns on every startup that it
+    // assigned shape operators to CPU, which is expected and not actionable.
+    logSeverityLevel: 3,
+  });
+}
+
 export async function startRerankerService() {
   printMessage("Preparing model...");
 
@@ -114,21 +134,19 @@ export async function startRerankerService() {
     ensureFileExists(TOKENIZER_CONFIG_HF_FILE),
   ]);
 
-  printMessage(
-    `Loading model (arch: ${process.arch}, platform: ${process.platform}, execution providers: ${EXECUTION_PROVIDERS.join(", ")})...`,
-  );
-
   tokenizer = new Tokenizer(
     JSON.parse(fs.readFileSync(tokenizerPath, "utf8")),
     JSON.parse(fs.readFileSync(tokenizerConfigPath, "utf8")),
   );
 
-  session = await InferenceSession.create(modelPath, {
-    executionProviders: EXECUTION_PROVIDERS,
-    // Errors only. ONNX Runtime otherwise warns on every startup that it
-    // assigned shape operators to CPU, which is expected and not actionable.
-    logSeverityLevel: 3,
-  });
+  try {
+    session = await createSession(modelPath, PREFERRED_EXECUTION_PROVIDERS);
+  } catch (error) {
+    printMessage(
+      `Could not load the model with ${PREFERRED_EXECUTION_PROVIDERS.join(", ")}: ${error instanceof Error ? error.message : error}`,
+    );
+    session = await createSession(modelPath, FALLBACK_EXECUTION_PROVIDERS);
+  }
 
   await score("test", ["test document"]);
 

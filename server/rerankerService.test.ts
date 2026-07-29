@@ -1,5 +1,29 @@
-import { describe, expect, it } from "vitest";
-import { sanitizeUnicodeSurrogates } from "./rerankerService";
+import fs from "node:fs";
+import { InferenceSession } from "onnxruntime-node";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  getRerankerStatus,
+  sanitizeUnicodeSurrogates,
+  startRerankerService,
+  stopRerankerService,
+} from "./rerankerService";
+
+vi.mock("@huggingface/tokenizers", () => ({
+  Tokenizer: class {
+    encode() {
+      return { ids: [1, 2, 3] };
+    }
+  },
+}));
+
+vi.mock("./downloadFileFromHuggingFaceRepository", () => ({
+  downloadFileFromHuggingFaceRepository: vi.fn(),
+}));
+
+vi.mock("onnxruntime-node", () => ({
+  InferenceSession: { create: vi.fn() },
+  Tensor: class {},
+}));
 
 describe("sanitizeUnicodeSurrogates", () => {
   describe("valid input passthrough", () => {
@@ -192,5 +216,74 @@ describe("sanitizeUnicodeSurrogates", () => {
       const input = "\uD800\uDC00\uD801";
       expect(sanitizeUnicodeSurrogates(input)).toBe("\uD800\uDC00\uFFFD");
     });
+  });
+});
+
+describe("startRerankerService", () => {
+  const requestedExecutionProviders: string[][] = [];
+
+  const sessionStub = {
+    run: async () => ({ logits: { data: new Float32Array([0.5]) } }),
+    release: async () => {},
+  } as unknown as InferenceSession;
+
+  /** The message onnxruntime-node throws when Dawn finds no GPU adapter. */
+  const webGpuAdapterError = new Error(
+    "Failed to get a WebGPU adapter: No supported adapters",
+  );
+
+  function mockSessionCreation(
+    respond: (executionProviders: string[]) => Promise<InferenceSession>,
+  ) {
+    vi.mocked(InferenceSession.create).mockImplementation(((
+      _modelPath: string,
+      options: { executionProviders: string[] },
+    ) => {
+      requestedExecutionProviders.push(options.executionProviders);
+      return respond(options.executionProviders);
+    }) as unknown as typeof InferenceSession.create);
+  }
+
+  beforeEach(() => {
+    vi.spyOn(fs, "readFileSync").mockImplementation(() => "{}");
+  });
+
+  afterEach(async () => {
+    await stopRerankerService();
+    requestedExecutionProviders.length = 0;
+    vi.restoreAllMocks();
+  });
+
+  it("keeps the preferred providers when the session loads", async () => {
+    mockSessionCreation(async () => sessionStub);
+
+    await startRerankerService();
+
+    expect(requestedExecutionProviders).toEqual([["webgpu", "cpu"]]);
+    expect(await getRerankerStatus()).toBe(true);
+  });
+
+  it("retries on CPU when the WebGPU provider fails to initialize", async () => {
+    mockSessionCreation(async (executionProviders) => {
+      if (executionProviders.includes("webgpu")) throw webGpuAdapterError;
+      return sessionStub;
+    });
+
+    await startRerankerService();
+
+    expect(requestedExecutionProviders).toEqual([["webgpu", "cpu"], ["cpu"]]);
+    expect(await getRerankerStatus()).toBe(true);
+  });
+
+  it("stays unready when CPU fails too", async () => {
+    const cpuError = new Error("Protobuf parsing failed");
+    mockSessionCreation(async (executionProviders) => {
+      throw executionProviders.includes("webgpu")
+        ? webGpuAdapterError
+        : cpuError;
+    });
+
+    await expect(startRerankerService()).rejects.toThrow(cpuError);
+    expect(await getRerankerStatus()).toBe(false);
   });
 });
