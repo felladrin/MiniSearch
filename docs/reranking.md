@@ -35,14 +35,16 @@ The size check costs one metadata request per file at startup (roughly 600ms for
 
 ### Execution Providers
 
-The session requests `["webgpu", "cpu"]`, with no configuration to set. WebGPU is roughly 3x faster than CPU (24ms against 77ms for 30 documents) and agrees with it to within float32 rounding (1e-6, identical ordering), so it is preferred where it works. Listing `cpu` after it means hosts without a usable GPU provider fall back rather than failing to load. The list is logged at startup.
+The session is created with `["webgpu", "cpu"]`, with no configuration to set. WebGPU is roughly 3x faster than CPU (24ms against 77ms for 30 documents) and agrees with it to within float32 rounding (1e-6, identical ordering), so it is preferred where it works.
+
+When that session fails to be created, the reason is logged and a second session is created with `["cpu"]`. The retry is what makes hosts without a GPU work: a trailing `cpu` in the provider list is not a fallback chain, because ONNX Runtime only falls back per operator once a provider has been registered. A provider that fails to initialize at all rejects `InferenceSession.create` outright, and the entries behind it never get a chance. On Hugging Face Spaces, for instance, Dawn cannot find `libvulkan.so.1`, WebGPU then reports `No supported adapters`, and before the retry existed that left the reranker permanently unready with every search falling back to unranked results. The providers of each attempt are logged.
 
 Note that ONNX Runtime's WebGPU provider here is native, part of the `onnxruntime-node` binary. It is not the browser API, so it needs neither a browser nor Deno.
 
 | Provider | Availability in the Node binding | Notes |
 |----------|----------------------------------|-------|
-| `cpu` | Everywhere | Fallback |
-| `webgpu` | Windows, Linux x64, macOS | Preferred; experimental in ONNX Runtime |
+| `cpu` | Everywhere | Fallback, retried as its own session |
+| `webgpu` | Windows, Linux x64, macOS | Preferred; experimental in ONNX Runtime, and needs a real GPU adapter plus a Vulkan loader on Linux |
 | `cuda` | Linux x64 (CUDA v12) | Not used: the binaries are not bundled, and would need `npm install onnxruntime-node --onnxruntime-node-install=cuda12` |
 | `coreml` | macOS | Not used: slower than CPU for this model's dynamic shapes |
 
@@ -131,6 +133,8 @@ Quantized variants are deliberately not used. The `q8` export measurably degrade
 
 ## Testing
 
+`server/rerankerService.test.ts` runs in the default suite and covers Unicode sanitization plus the execution-provider fallback, with the ONNX Runtime session, the tokenizer, and the model download all mocked.
+
 `server/rerankerService.integration.test.ts` loads the real model and asserts ranking quality against English and Portuguese fixtures. It downloads ~130MB, so it is excluded from the default suite:
 
 ```sh
@@ -142,6 +146,7 @@ npx vitest run --config vitest.integration.config.ts
 | Scenario | Behavior |
 |----------|----------|
 | Reranker not ready | Falls back to unranked SearXNG results |
+| GPU provider unavailable | Logged, then the session is created again with `["cpu"]` |
 | Model fails to load | Logged by the hook; reranker stays unready and search returns unranked results |
 | Cached file of the wrong size | Logged, then downloaded again before the session is created |
 | Download shorter than the reported size | Throws before anything is written, so the cache keeps no partial file |
