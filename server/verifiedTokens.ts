@@ -1,11 +1,24 @@
-/** Set of verified tokens for session management. */
-const verifiedTokens = new Set<string>();
+/** Verified tokens mapped to the time they were last seen, used to skip re-verifying repeat requests. */
+const verifiedTokens = new Map<string, number>();
+
+/** A token idle for longer than this is dropped from the cache, bounding memory; a request after that starts a new session. */
+const SESSION_IDLE_TIMEOUT_MS = 30 * 60_000;
 const CLEANUP_INTERVAL_MS = 60_000;
+
+/**
+ * Distinct sessions seen since the server started. Kept separate from the
+ * cache above so the count survives idle tokens being evicted, staying on the
+ * same "since restart" basis as the search counters it is averaged against.
+ */
+let sessionCount = 0;
 
 let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
 function cleanupVerifiedTokens(): void {
-  verifiedTokens.clear();
+  const now = Date.now();
+  for (const [token, lastSeen] of verifiedTokens) {
+    if (now - lastSeen > SESSION_IDLE_TIMEOUT_MS) verifiedTokens.delete(token);
+  }
 }
 
 function startCleanupTimer(): void {
@@ -19,7 +32,7 @@ function startCleanupTimer(): void {
 startCleanupTimer();
 
 export function getVerifiedTokensAmount() {
-  return verifiedTokens.size;
+  return sessionCount;
 }
 
 export function isVerifiedToken(token: string) {
@@ -27,5 +40,6 @@ export function isVerifiedToken(token: string) {
 }
 
 export function addVerifiedToken(token: string) {
-  return verifiedTokens.add(token);
+  if (!verifiedTokens.has(token)) sessionCount++;
+  verifiedTokens.set(token, Date.now());
 }
