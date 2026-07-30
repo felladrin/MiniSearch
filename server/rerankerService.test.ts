@@ -1,8 +1,10 @@
 import fs from "node:fs";
+import { Tokenizer } from "@huggingface/tokenizers";
 import { InferenceSession } from "onnxruntime-node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getRerankerStatus,
+  rerank,
   sanitizeUnicodeSurrogates,
   startRerankerService,
   stopRerankerService,
@@ -22,7 +24,16 @@ vi.mock("./downloadFileFromHuggingFaceRepository", () => ({
 
 vi.mock("onnxruntime-node", () => ({
   InferenceSession: { create: vi.fn() },
-  Tensor: class {},
+  Tensor: class {
+    type: string;
+    data: unknown;
+    dims: number[];
+    constructor(type: string, data: unknown, dims: number[]) {
+      this.type = type;
+      this.data = data;
+      this.dims = dims;
+    }
+  },
 }));
 
 describe("sanitizeUnicodeSurrogates", () => {
@@ -285,5 +296,119 @@ describe("startRerankerService", () => {
 
     await expect(startRerankerService()).rejects.toThrow(cpuError);
     expect(await getRerankerStatus()).toBe(false);
+  });
+});
+
+describe("rerank", () => {
+  let runMock: ReturnType<typeof vi.fn>;
+  let encodeSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(async () => {
+    vi.spyOn(fs, "readFileSync").mockImplementation(() => "{}");
+    encodeSpy = vi.spyOn(Tokenizer.prototype, "encode");
+    runMock = vi.fn().mockResolvedValue({
+      logits: { data: new Float32Array([0.5]) },
+    });
+    vi.mocked(InferenceSession.create).mockResolvedValue({
+      run: runMock,
+      release: async () => {},
+    } as unknown as InferenceSession);
+    await startRerankerService();
+    // startRerankerService runs one warm-up score("test", ["test document"]);
+    // clear it so per-test call-count assertions start from zero.
+    runMock.mockClear();
+    encodeSpy.mockClear();
+  });
+
+  afterEach(async () => {
+    await stopRerankerService();
+    vi.restoreAllMocks();
+  });
+
+  it("returns an empty array without calling the model when there are no documents", async () => {
+    expect(await rerank("query", [])).toEqual([]);
+    expect(runMock).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty array for null or undefined documents", async () => {
+    expect(await rerank("query", null as unknown as string[])).toEqual([]);
+    expect(await rerank("query", undefined as unknown as string[])).toEqual([]);
+    expect(runMock).not.toHaveBeenCalled();
+  });
+
+  it("throws when the service is not ready", async () => {
+    await stopRerankerService();
+    await expect(rerank("query", ["doc"])).rejects.toThrow(
+      "Reranker service is not ready",
+    );
+  });
+
+  it("maps each score to its document index and preserves input order", async () => {
+    // Non-monotonic scores: the result must stay in input order, not be
+    // sorted by relevance (sorting/filtering lives in rankSearchResults).
+    runMock.mockResolvedValueOnce({
+      logits: { data: new Float32Array([0.5, 0.3, 0.8]) },
+    });
+
+    const result = await rerank("query", ["A", "B", "C"]);
+
+    expect(result).toEqual([
+      { index: 0, relevance_score: expect.closeTo(0.5) },
+      { index: 1, relevance_score: expect.closeTo(0.3) },
+      { index: 2, relevance_score: expect.closeTo(0.8) },
+    ]);
+  });
+
+  it("splits documents into batches of BATCH_SIZE and concatenates in order", async () => {
+    // Give every document a unique score equal to its global position, so a
+    // dropped, duplicated, or reordered batch would break the assertions.
+    let nextScore = 0;
+    runMock.mockImplementation(
+      async (inputs: { input_ids: { dims: number[] } }) => {
+        const batchSize = inputs.input_ids.dims[0];
+        const data = new Float32Array(batchSize);
+        for (let i = 0; i < batchSize; i++) data[i] = nextScore++;
+        return { logits: { data } };
+      },
+    );
+
+    const documents = Array.from({ length: 25 }, (_, i) => `doc ${i}`);
+    const result = await rerank("query", documents);
+
+    expect(runMock).toHaveBeenCalledTimes(3); // 10 + 10 + 5
+    expect(result).toHaveLength(25);
+    // Spot-check both sides of every batch boundary.
+    expect(result[0]).toEqual({ index: 0, relevance_score: 0 });
+    expect(result[9]).toEqual({ index: 9, relevance_score: 9 });
+    expect(result[10]).toEqual({ index: 10, relevance_score: 10 });
+    expect(result[24]).toEqual({ index: 24, relevance_score: 24 });
+  });
+
+  it("makes exactly one model call per full batch when the count is a multiple of BATCH_SIZE", async () => {
+    runMock.mockImplementation(
+      async (inputs: { input_ids: { dims: number[] } }) => ({
+        logits: {
+          data: new Float32Array(inputs.input_ids.dims[0]).fill(0.5),
+        },
+      }),
+    );
+
+    const documents = Array.from({ length: 20 }, (_, i) => `doc ${i}`);
+    const result = await rerank("query", documents);
+
+    expect(runMock).toHaveBeenCalledTimes(2); // 10 + 10, no trailing empty batch
+    expect(result).toHaveLength(20);
+  });
+
+  it("sanitizes unpaired surrogates in the query and documents before tokenizing", async () => {
+    const loneHighSurrogate = String.fromCharCode(0xd800);
+
+    await rerank(`query${loneHighSurrogate}`, [`doc${loneHighSurrogate}`]);
+
+    // The lone surrogate must reach the tokenizer as U+FFFD, never raw: this
+    // proves sanitization runs on the real path, not just that the model was hit.
+    const [query, options] = encodeSpy.mock.calls[0];
+    expect(query).toBe("query\ufffd");
+    expect((options as { text_pair: string }).text_pair).toBe("doc\ufffd");
   });
 });
