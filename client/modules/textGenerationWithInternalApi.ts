@@ -14,6 +14,11 @@ import {
 } from "./textGenerationUtilities";
 import type { ChatMessage } from "./types";
 
+interface InternalApiStreamPayload {
+  error?: unknown;
+  choices?: Array<{ delta?: { content?: unknown } }>;
+}
+
 export async function generateTextWithInternalApi() {
   await canStartResponding();
   updateTextGenerationState("preparingToGenerate");
@@ -80,30 +85,45 @@ async function processStreamResponse(
   const reader = response.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let streamedMessage = "";
+  let bufferedText = "";
+
+  const processLine = (line: string) => {
+    const data = line.replace(/^data: /, "").trim();
+    if (data === "" || data === "[DONE]") return;
+
+    let parsedLine: InternalApiStreamPayload;
+    try {
+      parsedLine = JSON.parse(data) as InternalApiStreamPayload;
+    } catch {
+      return;
+    }
+
+    if (typeof parsedLine?.error === "string") {
+      throw new ChatGenerationError(parsedLine.error);
+    }
+
+    const deltaContent = parsedLine?.choices?.[0]?.delta?.content;
+    if (typeof deltaContent === "string" && deltaContent !== "") {
+      streamedMessage += deltaContent;
+      onChunk(streamedMessage);
+    }
+  };
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    const chunk = decoder.decode(value);
-    const lines = chunk.split("\n");
-    const parsedLines = lines
-      .map((line) => line.replace(/^data: /, "").trim())
-      .filter((line) => line !== "" && line !== "[DONE]")
-      .map((line) => JSON.parse(line));
+    bufferedText += decoder.decode(value, { stream: true });
+    const lines = bufferedText.split("\n");
+    bufferedText = lines.pop() ?? "";
 
-    for (const parsedLine of parsedLines) {
-      if (typeof parsedLine?.error === "string") {
-        throw new ChatGenerationError(parsedLine.error);
-      }
-
-      const deltaContent = parsedLine?.choices?.[0]?.delta?.content;
-      if (deltaContent) {
-        streamedMessage += deltaContent;
-        onChunk(streamedMessage);
-      }
+    for (const line of lines) {
+      processLine(line);
     }
   }
+
+  bufferedText += decoder.decode();
+  processLine(bufferedText);
 
   return streamedMessage;
 }
