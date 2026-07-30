@@ -1,0 +1,10 @@
+contact_links:
+  - name: MiniSearch Discussions
+    url: https://github.com/felladrin/MiniSearch/discussions
+    about: Ask questions, share ideas, and discuss features
+  - name: Report a Security Vulnerability Privately
+    url: https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability
+    about: Report security vulnerabilities privately via GitHub's Private Vulnerability Reporting
+  - name: Live Demo
+    url: https://felladrin-minisearch.hf.space
+    about: Try MiniSearch in your browser
