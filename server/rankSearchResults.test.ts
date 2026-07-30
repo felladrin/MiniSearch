@@ -82,7 +82,7 @@ describe("rankSearchResults", () => {
     expect(result).toEqual([]);
   });
 
-  it("should truncate document strings to MAX_DOCUMENT_LENGTH", async () => {
+  it("should pass full document text to rerank without character truncation", async () => {
     mockRerank.mockResolvedValue([{ index: 0, relevance_score: 0.9 }] as {
       index: number;
       relevance_score: number;
@@ -91,7 +91,10 @@ describe("rankSearchResults", () => {
     const longTitle = "A".repeat(600);
     await rankSearchResults("query", [[longTitle, "short", "https://a.com"]]);
     const docs = mockRerank.mock.calls[0][1] as string[];
-    expect(docs[0].length).toBeLessThanOrEqual(512);
+    // Truncation is now token-based inside the reranker, so the full document
+    // reaches it; nothing is cut by character count upstream.
+    expect(docs[0]).toBe(`${longTitle}\nshort`);
+    expect(docs[0].length).toBeGreaterThan(512);
   });
 
   it("should preserve double quotes in snippet verbatim", async () => {

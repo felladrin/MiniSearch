@@ -8,12 +8,13 @@ import {
   sanitizeUnicodeSurrogates,
   startRerankerService,
   stopRerankerService,
+  truncatePairTokens,
 } from "./rerankerService";
 
 vi.mock("@huggingface/tokenizers", () => ({
   Tokenizer: class {
     encode() {
-      return { ids: [1, 2, 3] };
+      return { ids: [1, 2, 3], token_type_ids: [0, 0, 0] };
     }
   },
 }));
@@ -410,5 +411,33 @@ describe("rerank", () => {
     const [query, options] = encodeSpy.mock.calls[0];
     expect(query).toBe("query\ufffd");
     expect((options as { text_pair: string }).text_pair).toBe("doc\ufffd");
+  });
+});
+
+describe("truncatePairTokens", () => {
+  // Sequence layout: [CLS] q q [SEP] | d d d d [SEP]
+  const ids = [101, 11, 12, 102, 21, 22, 23, 24, 102];
+  const tokenTypeIds = [0, 0, 0, 0, 1, 1, 1, 1, 1];
+
+  it("returns the ids unchanged when within budget", () => {
+    expect(truncatePairTokens(ids, tokenTypeIds, 20)).toBe(ids);
+  });
+
+  it("drops document tokens from the end, keeping the query and trailing separator", () => {
+    const out = truncatePairTokens(ids, tokenTypeIds, 6);
+
+    expect(out).toHaveLength(6);
+    expect(out.slice(0, 4)).toEqual([101, 11, 12, 102]); // query segment intact
+    expect(out.at(-1)).toBe(102); // trailing [SEP] preserved
+    expect(out).toEqual([101, 11, 12, 102, 21, 102]); // budget: 6 - 4 - 1 = 1 doc token
+  });
+
+  it("falls back to a plain head slice when the query alone exceeds the budget", () => {
+    const queryHeavyIds = [101, 11, 12, 13, 14, 102, 21, 102];
+    const queryHeavyTypes = [0, 0, 0, 0, 0, 0, 1, 1];
+
+    expect(truncatePairTokens(queryHeavyIds, queryHeavyTypes, 4)).toEqual([
+      101, 11, 12, 13,
+    ]);
   });
 });
