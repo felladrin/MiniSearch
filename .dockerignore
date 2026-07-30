@@ -1,3 +1,8 @@
+# Environment files (may contain secrets)
+.env
+.env.*
+!.env.example
+
 # Logs
 logs
 *.log
@@ -7,10 +12,28 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies and build output. Vite writes to `client/dist`, so these need
+# `**/` for the same reason as the test patterns below.
 node_modules
-dist
-dist-ssr
+**/dist
+**/dist-ssr
 *.local
+
+# Test files (not needed at runtime). The `**/` matters: a leading `*` does not
+# cross `/`, so a bare `*.test.ts` would only match the context root.
+**/*.test.ts
+**/*.test.tsx
+**/__tests__
+
+# Documentation and CI (not needed at runtime)
+docs
+.github
+
+# Coverage and lint reports
+coverage
+vite-build-stats.html
+knip
+jscpd-report
 
 # Editor directories and files
 .vscode/*
@@ -22,4 +45,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-

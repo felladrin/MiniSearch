@@ -205,6 +205,22 @@ The app runs under the `node` user, with the app directory at `/home/node/app`. 
 
 **Multi-service container** runs SearXNG and Node.js concurrently via shell process composition.
 
+### Nothing Is Configured at Build Time
+
+The Dockerfile declares no `ARG` for any of the settings above, and
+`.dockerignore` excludes `.env` files from the build context. Both are
+deliberate: build args are recorded in `docker history`, and a copied `.env`
+becomes a readable image layer, so either one would publish `ACCESS_KEYS` and
+`INTERNAL_OPENAI_COMPATIBLE_API_KEY` to anyone who pulls the image.
+
+Pass configuration when you start the container, via `docker run -e`, the
+`environment:` block in a compose file, or a secret manager. Building your own
+image with `--build-arg ACCESS_KEYS=...` has no effect, and neither does
+relying on a local `.env` being baked in; without runtime values the app falls
+back to the `.env.example` defaults. See
+[Runtime Configuration](#runtime-configuration) for how those values reach the
+client.
+
 ## Runtime Configuration
 
 Client-facing configuration (access keys, inference type, internal API settings) is resolved at runtime via the `/api/config` endpoint. The client fetches this endpoint on app initialization, so the published Docker image is fully configurable via environment variables at runtime - no rebuild needed.
