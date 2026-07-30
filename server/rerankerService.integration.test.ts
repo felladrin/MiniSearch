@@ -166,9 +166,8 @@ const MAX_DOCUMENT_LENGTH = 512;
 
 /** Mirrors the document formatting in rankSearchResults.ts. */
 function buildDocuments(results: SearchResult[]) {
-  return results.map(([title, snippet, url]) => {
-    const doc =
-      `[${title}](${url} "${snippet.replaceAll('"', "'")}")`.toLocaleLowerCase();
+  return results.map(([title, snippet]) => {
+    const doc = `${title}\n${snippet}`;
     return doc.length > MAX_DOCUMENT_LENGTH
       ? doc.slice(0, MAX_DOCUMENT_LENGTH)
       : doc;
@@ -195,7 +194,7 @@ describe("reranker service", () => {
   for (const fixture of fixtures) {
     it(`ranks relevant results first: ${fixture.name}`, async () => {
       const documents = buildDocuments(fixture.results);
-      const scored = await rerank(fixture.query.toLocaleLowerCase(), documents);
+      const scored = await rerank(fixture.query, documents);
 
       expect(scored).toHaveLength(fixture.results.length);
       expect(

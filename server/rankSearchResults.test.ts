@@ -22,7 +22,7 @@ describe("rankSearchResults", () => {
     expect(mockRerank).toHaveBeenCalledWith("test query", []);
   });
 
-  it("should pass lowercased query and documents to rerank", async () => {
+  it("should pass query and title+snippet (cased, no URL) to rerank", async () => {
     mockRerank.mockResolvedValue([
       { index: 0, relevance_score: 0.9 },
       { index: 1, relevance_score: 0.5 },
@@ -33,12 +33,11 @@ describe("rankSearchResults", () => {
       ["Title B", "Content B", "https://b.com"],
     ]);
     expect(mockRerank).toHaveBeenCalledWith(
-      "test query",
-      expect.arrayContaining([
-        expect.stringContaining("title a"),
-        expect.stringContaining("title b"),
-      ]),
+      "Test Query",
+      expect.arrayContaining(["Title A\nContent A", "Title B\nContent B"]),
     );
+    const [, docs] = mockRerank.mock.calls[0];
+    expect(docs.join("\n")).not.toContain("https://");
   });
 
   it("should sort results by score descending when preserveTopResults is false", async () => {
@@ -95,7 +94,7 @@ describe("rankSearchResults", () => {
     expect(docs[0].length).toBeLessThanOrEqual(512);
   });
 
-  it("should replace double quotes with single quotes in snippet", async () => {
+  it("should preserve double quotes in snippet verbatim", async () => {
     mockRerank.mockResolvedValue([{ index: 0, relevance_score: 0.9 }] as {
       index: number;
       relevance_score: number;
@@ -105,7 +104,7 @@ describe("rankSearchResults", () => {
       ["Title", 'Content with "quotes"', "https://a.com"],
     ]);
     const docs = mockRerank.mock.calls[0][1] as string[];
-    // The snippet's double quotes are replaced with single quotes
-    expect(docs[0]).toContain("'quotes'");
+    // Double quotes in the snippet are preserved (no Markdown wrapper to escape for)
+    expect(docs[0]).toBe('Title\nContent with "quotes"');
   });
 });
