@@ -65,10 +65,13 @@ export async function validateAccessKey(accessKey: string): Promise<boolean> {
 
 /**
  * Verifies a stored access key hash against the server
+ * @param timeoutHours - How long a validated key stays usable; 0 requires validation on every load
  * @returns Promise<boolean> - True if the stored access key is still valid, false otherwise
  */
-export async function verifyStoredAccessKey(): Promise<boolean> {
-  if (VITE_ACCESS_KEY_TIMEOUT_HOURS === 0) return false;
+export async function verifyStoredAccessKey(
+  timeoutHours: number,
+): Promise<boolean> {
+  if (timeoutHours === 0) return false;
 
   const storedData = localStorage.getItem(ACCESS_KEY_STORAGE_KEY);
   if (!storedData) return false;
@@ -76,7 +79,7 @@ export async function verifyStoredAccessKey(): Promise<boolean> {
   try {
     const { hash, timestamp }: StoredAccessKey = JSON.parse(storedData);
 
-    const expirationTime = VITE_ACCESS_KEY_TIMEOUT_HOURS * 60 * 60 * 1000;
+    const expirationTime = timeoutHours * 60 * 60 * 1000;
     if (Date.now() - timestamp > expirationTime) {
       localStorage.removeItem(ACCESS_KEY_STORAGE_KEY);
       addLogEntry("Stored access key expired");

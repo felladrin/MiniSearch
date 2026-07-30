@@ -2,9 +2,11 @@ import { Select, Stack, Switch, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { usePubSub } from "create-pubsub/react";
+import { useEffect, useState } from "react";
+import { FALLBACK_CONFIG, getConfig } from "@/modules/config";
 import { requestNotificationPermission } from "@/modules/notifications";
 import { settingsPubSub } from "@/modules/pubSub";
-import { inferenceTypes } from "@/modules/settings";
+import { getInferenceTypes } from "@/modules/settings";
 import { BrowserSettings } from "./components/BrowserSettings";
 import { HordeSettings } from "./components/HordeSettings";
 import { OpenAISettings } from "./components/OpenAISettings";
@@ -18,6 +20,15 @@ export default function AISettingsForm() {
   const { openAiModels, useTextInput } = useOpenAiModels(settings);
   const hordeModels = useHordeModels(settings);
   const hordeUserInfo = useHordeUserInfo(settings);
+  const [inferenceTypes, setInferenceTypes] = useState(
+    getInferenceTypes(FALLBACK_CONFIG),
+  );
+
+  useEffect(() => {
+    getConfig()
+      .catch(() => FALLBACK_CONFIG)
+      .then((config) => setInferenceTypes(getInferenceTypes(config)));
+  }, []);
 
   const form = useForm({
     initialValues: settings,

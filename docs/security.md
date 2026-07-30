@@ -16,6 +16,19 @@
 5. On subsequent loads, `useAccessKeyValidation` in `App.tsx` calls `verifyStoredAccessKey()` to check if the cached key is still valid
 6. If expired (based on `ACCESS_KEY_TIMEOUT_HOURS`), user is prompted to re-enter
 
+Whether access keys are enabled is read at runtime from `/api/config`. When that
+request fails, the app shell refuses to render rather than assuming access keys
+are off, so a request that never arrives cannot skip the access key page.
+
+### `/api/config` Exposure
+
+`/api/config` is unauthenticated by design: the client needs it before it can
+prove anything, and the access key page itself depends on it. It returns only
+whether a feature is on plus its display defaults, and never returns
+`ACCESS_KEYS`, `INTERNAL_OPENAI_COMPATIBLE_API_KEY`, or any other secret. Adding
+a field to `ServerConfig` in `shared/serverConfig.ts` publishes it to anyone who
+can reach the instance, so keep secrets out of that interface.
+
 ### Search Token Lifecycle
 
 Every HTTP request from client to backend carries a `token` query parameter for CSRF protection:
@@ -61,6 +74,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 | `server/searchEndpointServerHook.ts` | Proxies text/image search to SearXNG after token verification (via `handleTokenVerification`) |
 | `server/verifyTokenAndRateLimit.ts` | Verifies the Argon2 token hash and enforces rate limiting (10 requests per 10 seconds) shared by search and inference endpoints |
 | `server/handleTokenVerification.ts` | Middleware bridge that calls `verifyTokenAndRateLimit` and writes 400/401/429 error responses for the search and inference endpoints |
+| `server/configEndpointServerHook.ts` | Serves the non-secret runtime config at `/api/config`, including whether access keys are enabled |
 
 ## Threat Model
 

@@ -8,6 +8,7 @@ import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
 import { cacheServerHook } from "./server/cacheServerHook";
 import { compressionServerHook } from "./server/compressionServerHook";
+import { configEndpointServerHook } from "./server/configEndpointServerHook";
 import { crossOriginServerHook } from "./server/crossOriginServerHook";
 import { internalApiEndpointServerHook } from "./server/internalApiEndpointServerHook";
 import { rerankerServiceHook } from "./server/rerankerServiceHook";
@@ -30,24 +31,6 @@ export default defineConfig(({ command }) => {
       VITE_SEARCH_TOKEN: JSON.stringify(getSearchToken()),
       VITE_BUILD_DATE_TIME: Date.now(),
       VITE_COMMIT_SHORT_HASH: JSON.stringify(getGitCommitHash({ short: true })),
-      VITE_ACCESS_KEYS_ENABLED: JSON.stringify(
-        Boolean(process.env.ACCESS_KEYS),
-      ),
-      VITE_ACCESS_KEY_TIMEOUT_HOURS: JSON.stringify(
-        Number(process.env.ACCESS_KEY_TIMEOUT_HOURS) || 0,
-      ),
-      VITE_WLLAMA_DEFAULT_MODEL_ID: JSON.stringify(
-        process.env.WLLAMA_DEFAULT_MODEL_ID,
-      ),
-      VITE_INTERNAL_API_ENABLED: JSON.stringify(
-        Boolean(process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL),
-      ),
-      VITE_INTERNAL_API_NAME: JSON.stringify(
-        process.env.INTERNAL_OPENAI_COMPATIBLE_API_NAME,
-      ),
-      VITE_DEFAULT_INFERENCE_TYPE: JSON.stringify(
-        process.env.DEFAULT_INFERENCE_TYPE,
-      ),
     },
     resolve: {
       alias: {
@@ -97,6 +80,11 @@ export default defineConfig(({ command }) => {
         name: "configure-server-cross-origin-isolation",
         configureServer: crossOriginServerHook,
         configurePreviewServer: crossOriginServerHook,
+      },
+      {
+        name: "configure-server-config-endpoint",
+        configureServer: configEndpointServerHook,
+        configurePreviewServer: configEndpointServerHook,
       },
       {
         name: "configure-server-search-endpoint",

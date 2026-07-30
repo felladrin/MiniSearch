@@ -90,7 +90,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `inferenceType` | enum | `'browser'` | AI provider: `browser`, `openai`, `horde`, `internal` |
 | `cpuThreads` | number | (auto) | Number of CPU threads for inference (Wllama), defaults to `navigator.hardwareConcurrency - 2` |
 | `allowAiModelDownload` | boolean | `false` | Allow automatic AI model downloads |
-| `wllamaModelId` | string | `VITE_WLLAMA_DEFAULT_MODEL_ID` | Default Wllama model ID |
+| `wllamaModelId` | string | `WLLAMA_DEFAULT_MODEL_ID` env var | Default Wllama model ID |
 | `hordeApiKey` | string | `'0000000000'` | AI Horde API key (default is anonymous) |
 | `hordeModel` | string | `''` | Specific AI Horde model to request |
 | `openAiApiBaseUrl` | string | `''` | Base URL for the OpenAI-compatible API |
@@ -205,42 +205,41 @@ The app runs under the `node` user, with the app directory at `/home/node/app`. 
 
 **Multi-service container** runs SearXNG and Node.js concurrently via shell process composition.
 
-## Vite Environment Injection
+## Runtime Configuration
 
-Environment variables are loaded via `dotenv` at application startup and injected at build time via `vite.config.ts` using Vite's `define` feature. Variables are replaced at build time with their actual values, appearing as global constants in the client code.
+Client-facing configuration (access keys, inference type, internal API settings) is resolved at runtime via the `/api/config` endpoint. The client fetches this endpoint on app initialization, so the published Docker image is fully configurable via environment variables at runtime - no rebuild needed.
 
-### Injected Constants
+### `/api/config` Response
 
-| Constant | Source | Description |
-|----------|--------|-------------|
-| `VITE_SEARCH_TOKEN` | Generated at build time | CSRF protection token |
-| `VITE_ACCESS_KEYS_ENABLED` | `ACCESS_KEYS` | Boolean indicating if access control is active |
-| `VITE_ACCESS_KEY_TIMEOUT_HOURS` | `ACCESS_KEY_TIMEOUT_HOURS` | Hours to cache validated access keys |
-| `VITE_WLLAMA_DEFAULT_MODEL_ID` | `WLLAMA_DEFAULT_MODEL_ID` | Default Wllama model identifier |
-| `VITE_INTERNAL_API_ENABLED` | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` | Boolean indicating if internal API is configured |
-| `VITE_DEFAULT_INFERENCE_TYPE` | `DEFAULT_INFERENCE_TYPE` | Default AI provider |
-| `VITE_INTERNAL_API_NAME` | `INTERNAL_OPENAI_COMPATIBLE_API_NAME` | Display name for internal API |
-
-### Build-Time Metadata
-
-These constants are generated during the build process:
-
-| Constant | Description |
-|----------|-------------|
-| `VITE_BUILD_DATE_TIME` | Epoch milliseconds when the build occurred (`Date.now()`) |
-| `VITE_COMMIT_SHORT_HASH` | Git commit hash at build time (if available) |
-
-These are accessed in client code as:
-```typescript
-const token = VITE_SEARCH_TOKEN;
-const buildDate = VITE_BUILD_DATE_TIME;
+```json
+{
+  "accessKeysEnabled": true,
+  "accessKeyTimeoutHours": 24,
+  "wllamaDefaultModelId": "qwen-3-0.6b",
+  "internalApiEnabled": true,
+  "internalApiName": "Internal API",
+  "defaultInferenceType": "browser"
+}
 ```
+
+### Build-Time vs Runtime Configuration
+
+| Value | Resolved At | Notes |
+|-------|-------------|-------|
+| `VITE_SEARCH_TOKEN` | Build time | CSRF protection token, regenerated on each build |
+| `VITE_BUILD_DATE_TIME` | Build time | Epoch milliseconds when the build occurred |
+| `VITE_COMMIT_SHORT_HASH` | Build time | Git commit hash at build time (if available) |
+| `ACCESS_KEYS` | Runtime | Read from `/api/config` |
+| `ACCESS_KEY_TIMEOUT_HOURS` | Runtime | Read from `/api/config` |
+| `WLLAMA_DEFAULT_MODEL_ID` | Runtime | Read from `/api/config` |
+| `INTERNAL_OPENAI_COMPATIBLE_API_*` | Runtime | Read from `/api/config` (except `API_KEY` which is server-only) |
+| `DEFAULT_INFERENCE_TYPE` | Runtime | Read from `/api/config` |
 
 ### Security Considerations
 
-- Variables with `VITE_` prefix are bundled into the client JavaScript and visible in browser dev tools
-- Non-prefixed variables remain server-side only (e.g., `INTERNAL_OPENAI_COMPATIBLE_API_KEY` is NOT injected)
-- The search token is hashed client-side before transmission; the raw token is never sent over the network
+- `VITE_SEARCH_TOKEN`, `VITE_BUILD_DATE_TIME`, and `VITE_COMMIT_SHORT_HASH` are bundled into the client JavaScript as build-time constants (CSRF token and build metadata)
+- All other configuration is fetched at runtime from `/api/config` and never appears in the bundled JavaScript
+- Server-only variables like `INTERNAL_OPENAI_COMPATIBLE_API_KEY` are never exposed to the client
 
 ## Configuration Patterns
 
@@ -281,7 +280,7 @@ Check effective configuration:
 ```typescript
 // In browser console
 console.log('Settings:', JSON.parse(localStorage.getItem('settings') || '{}'));
-console.log('Env:', import.meta.env);
+console.log('Server config:', await fetch('/api/config').then(r => r.json()));
 ```
 
 ## Related Topics

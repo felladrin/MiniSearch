@@ -1,7 +1,7 @@
 import { createPubSub } from "create-pubsub";
 import throttle from "throttleit";
 import { addLogEntry } from "./logEntries";
-import { defaultSettings } from "./settings";
+import { defaultSettings, SETTINGS_STORAGE_KEY } from "./settings";
 import type {
   ImageSearchResults,
   SearchResults,
@@ -132,7 +132,7 @@ export const [updateModelLoadingProgress] = modelLoadingProgressPubSub;
  * PubSub instance for managing application settings with localStorage persistence
  */
 export const settingsPubSub = createLocalStoragePubSub(
-  "settings",
+  SETTINGS_STORAGE_KEY,
   defaultSettings,
 );
 
