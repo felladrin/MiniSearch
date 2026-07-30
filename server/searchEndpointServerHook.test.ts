@@ -100,6 +100,26 @@ describe("searchEndpointServerHook", () => {
     expect(fetchSearXNG).not.toHaveBeenCalled();
   });
 
+  it("responds 400 when the query parameter exceeds the maximum length", async () => {
+    const handler = getRegisteredHandler();
+    const response = createResponse();
+    const query = "a".repeat(2001);
+
+    await handler(
+      createRequest(`/search/text?q=${query}&token=abc`),
+      response,
+      vi.fn(),
+    );
+
+    expect(response.statusCode).toBe(400);
+    expect(response.end).toHaveBeenCalledWith(
+      JSON.stringify({
+        error: "Query parameter must not exceed 2000 characters",
+      }),
+    );
+    expect(fetchSearXNG).not.toHaveBeenCalled();
+  });
+
   it("stops processing when token verification fails", async () => {
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: false,
@@ -137,6 +157,19 @@ describe("searchEndpointServerHook", () => {
     expect(response.end).toHaveBeenCalledWith(
       JSON.stringify([["Title", "Snippet", "https://example.com"]]),
     );
+  });
+
+  it("clamps the requested result limit to the server maximum", async () => {
+    vi.mocked(fetchSearXNG).mockResolvedValue([]);
+    const handler = getRegisteredHandler();
+
+    await handler(
+      createRequest("/search/text?q=cats&token=abc&limit=1000"),
+      createResponse(),
+      vi.fn(),
+    );
+
+    expect(fetchSearXNG).toHaveBeenCalledWith("cats", "text", 30);
   });
 
   it("reranks results when the reranker is healthy and returns its reordered output", async () => {

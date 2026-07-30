@@ -1,4 +1,5 @@
 import type { PreviewServer, ViteDevServer } from "vite";
+import { z } from "zod";
 import { handleTokenVerification } from "./handleTokenVerification";
 import { rankSearchResults } from "./rankSearchResults";
 import { getRerankerStatus } from "./rerankerService";
@@ -9,6 +10,26 @@ import {
 import { fetchSearXNG } from "./webSearchService";
 
 const THUMBNAIL_TIMEOUT_MS = 1000;
+const DEFAULT_SEARCH_LIMIT = 30;
+const MAX_SEARCH_LIMIT = 30;
+const MAX_QUERY_LENGTH = 2000;
+
+const searchParamsSchema = z.object({
+  query: z
+    .string({ error: "Missing query parameter" })
+    .trim()
+    .min(1, "Missing query parameter")
+    .max(
+      MAX_QUERY_LENGTH,
+      `Query parameter must not exceed ${MAX_QUERY_LENGTH} characters`,
+    ),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .catch(DEFAULT_SEARCH_LIMIT)
+    .transform((limit) => Math.min(limit, MAX_SEARCH_LIMIT)),
+});
 
 type TextResult = [title: string, content: string, url: string];
 type ImageResult = [
@@ -80,17 +101,22 @@ export function searchEndpointServerHook<
     if (!request.url?.startsWith("/search/")) return next();
 
     const url = new URL(request.url, `http://${request.headers.host}`);
-    const query = url.searchParams.get("q");
     const token = url.searchParams.get("token");
-    const limit = Number(url.searchParams.get("limit")) || 30;
+    const parsedParams = searchParamsSchema.safeParse({
+      query: url.searchParams.get("q") ?? undefined,
+      limit: url.searchParams.get("limit") ?? DEFAULT_SEARCH_LIMIT,
+    });
 
-    if (!query) {
+    if (!parsedParams.success) {
       response.statusCode = 400;
       response.setHeader("Content-Type", "application/json");
-      response.end(JSON.stringify({ error: "Missing query parameter" }));
+      response.end(
+        JSON.stringify({ error: parsedParams.error.issues[0].message }),
+      );
       return;
     }
 
+    const { query, limit } = parsedParams.data;
     const { shouldContinue } = await handleTokenVerification(
       token,
       response,
