@@ -147,7 +147,9 @@ Yes. Configure the `INTERNAL_OPENAI_COMPATIBLE_API_*` variables from the [Config
 
 ## Contributing
 
-Contributions are welcome. To set up a development environment:
+Contributions are welcome. Looking for where to start? [Browse the good first issues](https://github.com/felladrin/MiniSearch/issues?q=label%3A%22good+first+issue%22+state%3Aopen) — they are curated for first-time contributors.
+
+To set up a development environment:
 
 ```bash
 git clone https://github.com/felladrin/MiniSearch.git
