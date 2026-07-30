@@ -2,6 +2,10 @@
 
 First off, thank you for considering contributing to MiniSearch! It's people like you that make MiniSearch such a great tool.
 
+## Your First Contribution
+
+Not sure where to start? [Browse issues labeled "good first issue"](https://github.com/felladrin/MiniSearch/issues?q=label%3A%22good+first+issue%22+state%3Aopen). They are curated for first-time contributors, and you are welcome to ask for help in the issue comments.
+
 ## Quick Start
 
 - **Onboarding**: See [`../docs/quick-start.md`](../docs/quick-start.md) for setup and running the app.
@@ -18,6 +22,7 @@ docker compose exec development-server npm run lint
 ```
 
 This runs:
+
 - Biome (formatting/linting)
 - TypeScript (type checking)
 - knip (dead code detection)
