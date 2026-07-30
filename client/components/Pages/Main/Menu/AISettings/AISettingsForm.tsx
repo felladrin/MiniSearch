@@ -72,6 +72,13 @@ export default function AISettingsForm() {
             allowDeselect={false}
           />
 
+          {form.values.inferenceType === "browser" && (
+            <Text size="xs" c="dimmed">
+              Search queries still go through your MiniSearch instance and
+              SearXNG; only the AI answer is generated locally.
+            </Text>
+          )}
+
           {form.values.inferenceType === "openai" && (
             <OpenAISettings
               form={form}

@@ -52,7 +52,7 @@ addLogEntry(
 );
 
 export const inferenceTypes = [
-  { value: "browser", label: "In the browser (Private)" },
+  { value: "browser", label: "In the browser (local inference)" },
   { value: "openai", label: "Remote server (API)" },
   { value: "horde", label: "AI Horde (Pre-configured)" },
   ...(VITE_INTERNAL_API_ENABLED
