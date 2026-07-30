@@ -21,8 +21,10 @@ const PAD_TOKEN_ID = 0;
 /**
  * Sequence-length budget for one (query, document) pair, and the single point
  * where truncation happens now that rankSearchResults sends whole documents.
- * Left at 2048 rather than the tokenizer's declared `model_max_length` of 512,
- * matching the prior intent; see #2193.
+ * jina-reranker-v1-tiny-en is an ALiBi model that handles up to 8192 tokens
+ * (verified: the ONNX graph runs at 8192 without error); the `model_max_length`
+ * of 512 in tokenizer_config.json is a stale BERT default, not the real limit.
+ * 2048 is a deliberate, conservative cap. See #2193.
  */
 const MAX_SEQUENCE_LENGTH = 2048;
 
