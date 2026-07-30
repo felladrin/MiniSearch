@@ -7,6 +7,7 @@ import {
   type MockedFunction,
   vi,
 } from "vitest";
+import { CircuitBreaker } from "./utils/circuitBreaker";
 import {
   describeUnresponsiveEngines,
   fetchSearXNG,
@@ -165,36 +166,30 @@ describe("retry logic", () => {
 });
 
 describe("circuit breaker", () => {
-  let isolatedFetchSearXNG: typeof fetchSearXNG;
-
-  beforeEach(async () => {
-    vi.resetModules();
-    const module = await import("./webSearchService");
-    isolatedFetchSearXNG = module.fetchSearXNG;
-  });
-
   it("opens after exactly 5 non-retriable failures", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
 
     for (let i = 0; i < 5; i++) {
-      await isolatedFetchSearXNG("test", "text");
+      await fetchSearXNG("test", "text", 30, breaker);
     }
 
     const callsBeforeBreak = fetchMock.mock.calls.length;
-    await isolatedFetchSearXNG("test", "text");
+    await fetchSearXNG("test", "text", 30, breaker);
 
     expect(fetchMock.mock.calls.length).toBe(callsBeforeBreak);
   });
 
   it("does not open before 5 failures", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
 
     for (let i = 0; i < 4; i++) {
-      await isolatedFetchSearXNG("test", "text");
+      await fetchSearXNG("test", "text", 30, breaker);
     }
 
     const callsBefore = fetchMock.mock.calls.length;
-    await isolatedFetchSearXNG("test", "text");
+    await fetchSearXNG("test", "text", 30, breaker);
 
     expect(fetchMock.mock.calls.length).toBe(callsBefore + 1);
   });

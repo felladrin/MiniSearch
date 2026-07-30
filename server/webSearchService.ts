@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
+import { CircuitBreaker } from "./utils/circuitBreaker";
 
 const fileName = basename(import.meta.url);
 const printMessage = debug(fileName);
@@ -11,22 +12,16 @@ const SERVICE_HOST = "127.0.0.1";
 const SERVICE_PORT = 8888;
 const SERVICE_BASE_URL = `http://${SERVICE_HOST}:${SERVICE_PORT}`;
 
-interface CircuitBreakerState {
-  failures: number;
-  lastFailureTime: number;
-  isOpen: boolean;
-}
-
-const circuitBreaker: CircuitBreakerState = {
-  failures: 0,
-  lastFailureTime: 0,
-  isOpen: false,
-};
-
-const CIRCUIT_BREAKER_THRESHOLD = 5;
-const CIRCUIT_BREAKER_TIMEOUT = 60000;
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY = 1000;
+
+// successThreshold: 1 preserves the previous breaker's single-success reset:
+// once resetTimeout elapses, one healthy request closes the circuit again.
+const searxngCircuitBreaker = new CircuitBreaker({
+  failureThreshold: 5,
+  resetTimeout: 60_000,
+  successThreshold: 1,
+});
 
 type SearchType = "text" | "images";
 
@@ -121,33 +116,10 @@ export function describeUnresponsiveEngines(
     .join(", ");
 }
 
-function recordFailure() {
-  circuitBreaker.failures++;
-  circuitBreaker.lastFailureTime = Date.now();
-  if (circuitBreaker.failures >= CIRCUIT_BREAKER_THRESHOLD) {
-    circuitBreaker.isOpen = true;
-    printMessage(
-      `Circuit breaker opened after ${circuitBreaker.failures} failures`,
-    );
-  }
-}
-
 async function performSearch(
   query: string,
   searchType: SearchType,
 ): Promise<SearxngSearchResult[]> {
-  if (circuitBreaker.isOpen) {
-    const timeSinceLastFailure = Date.now() - circuitBreaker.lastFailureTime;
-    if (timeSinceLastFailure < CIRCUIT_BREAKER_TIMEOUT) {
-      throw new Error(
-        "Circuit breaker is open - SearXNG service temporarily unavailable",
-      );
-    }
-    circuitBreaker.isOpen = false;
-    circuitBreaker.failures = 0;
-    printMessage("Circuit breaker reset");
-  }
-
   const searchUrl = buildSearchUrl(query, searchType);
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -161,21 +133,14 @@ async function performSearch(
 
     const response = await fetch(searchUrl, {
       headers: { Accept: "application/json" },
-    }).catch((error: unknown) => {
-      recordFailure();
-      throw error;
     });
 
     if (!response.ok) {
       if (response.status === 500 && attempt < MAX_RETRIES) {
         continue;
       }
-      recordFailure();
       throw new Error(`SearXNG request failed with status ${response.status}`);
     }
-
-    circuitBreaker.failures = 0;
-    circuitBreaker.isOpen = false;
 
     const data = (await response.json()) as SearxngSearchResponse;
     const results = Array.isArray(data.results) ? data.results : [];
@@ -192,7 +157,6 @@ async function performSearch(
     return results;
   }
 
-  recordFailure();
   throw new Error(
     `SearXNG request failed with status 500 after ${MAX_RETRIES} retries`,
   );
@@ -202,8 +166,11 @@ async function processSearchResults(
   query: string,
   searchType: SearchType,
   limit: number,
+  breaker: CircuitBreaker,
 ) {
-  const results = await performSearch(query, searchType);
+  const results = await breaker.execute("searxng", () =>
+    performSearch(query, searchType),
+  );
   const deduplicatedResults = deduplicateResults(results);
 
   if (searchType === "text") {
@@ -253,9 +220,10 @@ export async function fetchSearXNG(
   query: string,
   searchType: SearchType,
   limit = 30,
+  breaker: CircuitBreaker = searxngCircuitBreaker,
 ) {
   try {
-    return await processSearchResults(query, searchType, limit);
+    return await processSearchResults(query, searchType, limit, breaker);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     printMessage(`Search failed: ${errorMessage}`);
