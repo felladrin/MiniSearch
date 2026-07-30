@@ -19,8 +19,12 @@ const TOKENIZER_CONFIG_HF_FILE = "tokenizer_config.json";
 const PAD_TOKEN_ID = 0;
 
 /**
- * Documents are truncated to 512 characters upstream, so this only guards
- * against pathological tokenization.
+ * Sequence-length budget for one (query, document) pair, and the single point
+ * where truncation happens now that rankSearchResults sends whole documents.
+ * jina-reranker-v1-tiny-en is an ALiBi model that handles up to 8192 tokens
+ * (verified: the ONNX graph runs at 8192 without error); the `model_max_length`
+ * of 512 in tokenizer_config.json is a stale BERT default, not the real limit.
+ * 2048 is a deliberate, conservative cap. See #2193.
  */
 const MAX_SEQUENCE_LENGTH = 2048;
 
@@ -195,6 +199,36 @@ async function scoreBatch(
 }
 
 /**
+ * Caps an encoded cross-encoder pair at `maxLength` tokens by dropping tokens
+ * from the end of the document only. The sequence is `[CLS] query [SEP]
+ * document [SEP]`, so the query sits at the front and is preserved, and the
+ * trailing separator is kept so the model still receives a well-formed pair.
+ * `tokenTypeIds` mark the query segment (0) apart from the document (1). This
+ * mirrors the tokenizer's `only_second` truncation, which the JS package does
+ * not implement. Falls back to a plain head slice if the query alone already
+ * exceeds the budget.
+ */
+export function truncatePairTokens(
+  ids: number[],
+  tokenTypeIds: number[],
+  maxLength: number,
+): number[] {
+  if (ids.length <= maxLength) {
+    return ids;
+  }
+
+  const querySegmentLength = tokenTypeIds.filter((type) => type === 0).length;
+  const documentBudget = maxLength - querySegmentLength - 1;
+
+  if (documentBudget <= 0) {
+    return ids.slice(0, maxLength);
+  }
+
+  const separator = ids[ids.length - 1];
+  return [...ids.slice(0, querySegmentLength + documentBudget), separator];
+}
+
+/**
  * Returns the cross-encoder's raw relevance logit per document. Deliberately
  * not squashed through sigmoid: the standard-deviation filter in
  * rankSearchResults is calibrated against this scale.
@@ -208,10 +242,11 @@ async function score(query: string, documents: string[]) {
   const loadedTokenizer = tokenizer;
 
   const encodings = documents.map((document) => {
-    const { ids } = loadedTokenizer.encode(query, { text_pair: document });
-    return ids.length > MAX_SEQUENCE_LENGTH
-      ? ids.slice(0, MAX_SEQUENCE_LENGTH)
-      : ids;
+    const { ids, token_type_ids } = loadedTokenizer.encode(query, {
+      text_pair: document,
+      return_token_type_ids: true,
+    });
+    return truncatePairTokens(ids, token_type_ids, MAX_SEQUENCE_LENGTH);
   });
 
   const scores: number[] = [];

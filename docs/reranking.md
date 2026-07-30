@@ -66,14 +66,9 @@ On server close, `stopRerankerService()` clears the readiness flag and releases 
 
 ### Document Preparation
 
-Search results are formatted as Markdown-style strings and truncated:
+Each result is formatted as `` `${title}\n${snippet}` ``: the cased title and snippet on either side of a newline, with no URL. The query keeps its original casing too. Unicode surrogates in both are sanitized before tokenization.
 
-```typescript
-const doc = `[${title}](${url} "${snippet}")`.toLocaleLowerCase();
-// Truncated to MAX_DOCUMENT_LENGTH (512 characters)
-```
-
-Both query and documents are lowercased and Unicode surrogates are sanitized before tokenization.
+Documents are sent to the reranker whole. Truncation happens by tokens inside the reranker, not by characters here: `score()` caps each encoded `(query, document)` pair at `MAX_SEQUENCE_LENGTH` tokens, dropping tokens from the end of the document only, so the query and the trailing separator are preserved.
 
 ### Unicode Sanitization
 
@@ -125,6 +120,7 @@ Reranking is applied to both text and image search results. For image results, t
 | HuggingFace Repo | jinaai/jina-reranker-v1-tiny-en |
 | Type | Cross-encoder reranker |
 | Size | 4 layers, 33M parameters |
+| Max sequence length | 8192 tokens (ALiBi); capped at 2048 via `MAX_SEQUENCE_LENGTH` |
 | Storage | `server/models/jinaai/jina-reranker-v1-tiny-en/` |
 
 Despite being an English model, it ranks non-English results (Portuguese, for example) well in practice, which is why it is preferred over larger alternatives.

@@ -1,18 +1,13 @@
 import { rerank } from "./rerankerService";
 
-const MAX_DOCUMENT_LENGTH = 512;
-
 export async function rankSearchResults(
   query: string,
   searchResults: [title: string, content: string, url: string][],
   preserveTopResults = false,
 ) {
-  const documents = searchResults.map(([title, snippet]) => {
-    const doc = `${title}\n${snippet}`;
-    return doc.length > MAX_DOCUMENT_LENGTH
-      ? doc.slice(0, MAX_DOCUMENT_LENGTH)
-      : doc;
-  });
+  const documents = searchResults.map(
+    ([title, snippet]) => `${title}\n${snippet}`,
+  );
 
   const results = await rerank(query, documents);
 

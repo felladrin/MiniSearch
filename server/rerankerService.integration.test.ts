@@ -162,16 +162,9 @@ const fixtures: Fixture[] = [
   },
 ];
 
-const MAX_DOCUMENT_LENGTH = 512;
-
 /** Mirrors the document formatting in rankSearchResults.ts. */
 function buildDocuments(results: SearchResult[]) {
-  return results.map(([title, snippet]) => {
-    const doc = `${title}\n${snippet}`;
-    return doc.length > MAX_DOCUMENT_LENGTH
-      ? doc.slice(0, MAX_DOCUMENT_LENGTH)
-      : doc;
-  });
+  return results.map(([title, snippet]) => `${title}\n${snippet}`);
 }
 
 describe("reranker service", () => {
