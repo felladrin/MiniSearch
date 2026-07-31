@@ -6,15 +6,15 @@ import { z } from "zod";
 import {
   listOpenAiCompatibleModels,
   selectRandomModel,
-} from "../shared/openaiModels";
-import { getModelConfig } from "./config/modelConfig";
-import { handleTokenVerification } from "./handleTokenVerification";
+} from "../shared/openaiModels.ts";
+import { getModelConfig } from "./config/modelConfig.ts";
+import { handleTokenVerification } from "./handleTokenVerification.ts";
 import {
   calculateBackoffTime,
   isResponseWritable,
   safeEndResponse,
   safeWriteResponse,
-} from "./utils/streamUtils";
+} from "./utils/streamUtils.ts";
 
 const chatCompletionRequestSchema = z.object({
   messages: z

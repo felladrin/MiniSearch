@@ -1,6 +1,9 @@
 import type { PreviewServer, ViteDevServer } from "vite";
-import { startRerankerService, stopRerankerService } from "./rerankerService";
-import { startWebSearchService } from "./webSearchService";
+import {
+  startRerankerService,
+  stopRerankerService,
+} from "./rerankerService.ts";
+import { startWebSearchService } from "./webSearchService.ts";
 
 export async function rerankerServiceHook<
   T extends ViteDevServer | PreviewServer,

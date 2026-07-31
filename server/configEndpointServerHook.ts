@@ -4,7 +4,7 @@ import {
   DEFAULT_INTERNAL_API_NAME,
   DEFAULT_WLLAMA_MODEL_ID,
   type ServerConfig,
-} from "../shared/serverConfig";
+} from "../shared/serverConfig.ts";
 
 /**
  * Vite server hook that serves runtime server config at /api/config.

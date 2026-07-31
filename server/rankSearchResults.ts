@@ -1,4 +1,4 @@
-import { rerank } from "./rerankerService";
+import { rerank } from "./rerankerService.ts";
 
 export async function rankSearchResults(
   query: string,

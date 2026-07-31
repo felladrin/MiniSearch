@@ -1,5 +1,5 @@
 declare module "http-compression" {
-  import { IncomingMessage, ServerResponse } from "http";
+  import { IncomingMessage, ServerResponse } from "node:http";
 
   interface Options {
     gzip?: {
