@@ -1,7 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { type ModelMessage, streamText } from "ai";
+import { streamText } from "ai";
 import type { PreviewServer, ViteDevServer } from "vite";
+import { z } from "zod";
 import {
   listOpenAiCompatibleModels,
   selectRandomModel,
@@ -15,19 +16,19 @@ import {
   safeWriteResponse,
 } from "./utils/streamUtils";
 
-/**
- * Request body interface for chat completion
- */
-interface ChatCompletionRequestBody {
-  /** Array of chat messages */
-  messages: ModelMessage[];
-  /** Sampling temperature */
-  temperature?: number;
-  /** Top-p sampling parameter */
-  top_p?: number;
-  /** Maximum tokens to generate */
-  max_tokens?: number;
-}
+const chatCompletionRequestSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["system", "user", "assistant"]),
+        content: z.string(),
+      }),
+    )
+    .min(1),
+  temperature: z.number().optional(),
+  top_p: z.number().optional(),
+  max_tokens: z.number().optional(),
+});
 
 /**
  * Chat completion chunk for streaming responses
@@ -170,18 +171,8 @@ export function internalApiEndpointServerHook<
       );
       if (!shouldContinue) return;
 
-      if (
-        !process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL ||
-        !process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY
-      ) {
-        sendJsonError(response, 500, {
-          error: "OpenAI API configuration is missing",
-        });
-        return;
-      }
-
       try {
-        let requestBody: ChatCompletionRequestBody;
+        let rawRequestBody: unknown;
         try {
           const maxBodyBytes = 1024 * 1024;
           const chunks: Buffer[] = [];
@@ -205,15 +196,29 @@ export function internalApiEndpointServerHook<
             }
             chunks.push(buf);
           }
-          requestBody = JSON.parse(Buffer.concat(chunks).toString());
+          rawRequestBody = JSON.parse(Buffer.concat(chunks).toString());
         } catch (_error) {
           sendJsonError(response, 400, { error: "Invalid request body" });
           return;
         }
 
-        if (!Array.isArray(requestBody.messages)) {
+        const parsedRequestBody =
+          chatCompletionRequestSchema.safeParse(rawRequestBody);
+        if (!parsedRequestBody.success) {
+          const issue = parsedRequestBody.error.issues[0];
           sendJsonError(response, 400, {
-            error: "Invalid request body: messages is required",
+            error: `Invalid request body: ${issue.path.join(".") || "body"} ${issue.message}`,
+          });
+          return;
+        }
+        const requestBody = parsedRequestBody.data;
+
+        if (
+          !process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL ||
+          !process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY
+        ) {
+          sendJsonError(response, 500, {
+            error: "OpenAI API configuration is missing",
           });
           return;
         }
