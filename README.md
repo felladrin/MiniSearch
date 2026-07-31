@@ -23,7 +23,7 @@ The AI can run entirely inside your browser tab, on GPU or CPU, so a working set
 ## Features
 
 - **Private by design.** No tracking, no telemetry, no accounts. Search history, cached results, and chats are stored in your browser and never leave your machine.
-- **AI in your browser.** Pick from 30+ curated models (135M to 4B parameters) that run on WebGPU where available and on CPU elsewhere. Models are downloaded once and cached by the browser.
+- **AI in your browser.** Pick from several curated models (135M to 4B parameters) that run on WebGPU where available and on CPU elsewhere. Models are downloaded once and cached by the browser.
 - **Any backend you like.** Connect an OpenAI-compatible API (Ollama, LM Studio, vLLM, llama.cpp server, or a hosted provider), use the crowdsourced AI Horde, or let the server proxy your own API without exposing its key.
 - **A real search pipeline.** Text and image results aggregated by SearXNG, reranked locally by a cross-encoder model, cached, and rate-limited; all inside the container.
 - **Answers you can verify.** Responses cite the sources they draw from, support follow-up questions with conversation memory, reveal the model's reasoning on demand, and can be read aloud.
@@ -100,20 +100,7 @@ Your query goes to the app server, which asks the bundled SearXNG instance to ag
 
 ## Configuration
 
-Set these in a `.env` file (see [.env.example](.env.example)) when using Docker Compose, or pass them with `-e`/`--env-file` to `docker run`:
-
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `ACCESS_KEYS` | Comma-separated keys that gate access to the instance | Unset (open access) |
-| `ACCESS_KEY_TIMEOUT_HOURS` | How long a validated key stays cached in the browser | `24` |
-| `WLLAMA_DEFAULT_MODEL_ID` | Default model for in-browser inference | `qwen-3-0.6b` |
-| `DEFAULT_INFERENCE_TYPE` | Backend preselected in the UI: `browser`, `openai`, `horde`, or `internal` | `browser` |
-| `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` | Base URL of a self-hosted API that the server proxies for its users | Unset (disabled) |
-| `INTERNAL_OPENAI_COMPATIBLE_API_KEY` | Key for that API; never sent to clients | Unset |
-| `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` | Model served through that API | Auto-detected |
-| `INTERNAL_OPENAI_COMPATIBLE_API_NAME` | Name shown for it in the UI | `Internal API` |
-
-The full reference, including server options such as `PORT` and `ALLOWED_HOSTS`, is in [docs/configuration.md](docs/configuration.md).
+MiniSearch works out-of-the-box, but you can customize it if you want. More details at [docs/configuration.md](docs/configuration.md).
 
 ## FAQ
 
@@ -147,38 +134,8 @@ Yes. Configure the `INTERNAL_OPENAI_COMPATIBLE_API_*` variables from the [Config
 
 ## Contributing
 
-Contributions are welcome. Looking for where to start? [Browse the good first issues](https://github.com/felladrin/MiniSearch/issues?q=label%3A%22good+first+issue%22+state%3Aopen) — they are curated for first-time contributors.
-
-To set up a development environment:
-
-```bash
-git clone https://github.com/felladrin/MiniSearch.git
-cd MiniSearch
-docker compose up
-```
-
-The development server runs at <http://localhost:7860>. Hot Module Replacement (HMR) is available on <http://localhost:7861>. Before opening a pull request, run the quality gate:
-
-```bash
-docker compose exec development-server npm run lint
-```
-
-See the [Contributing Guidelines](.github/CONTRIBUTING.md), [Code of Conduct](.github/CODE_OF_CONDUCT.md), and [Security Policy](.github/SECURITY.md). The codebase is documented for humans and AI agents alike: [agents.md](agents.md) is the navigation hub, and [docs/](docs/) covers the architecture in depth.
-
-## Acknowledgments
-
-MiniSearch builds on the work of these projects:
-
-| Project | Role |
-| --- | --- |
-| [SearXNG](https://github.com/searxng/searxng) | Metasearch engine behind the results |
-| [ONNX Runtime](https://github.com/microsoft/onnxruntime) | Local reranking of the search results |
-| [wllama](https://github.com/ngxson/wllama) and [llama.cpp](https://github.com/ggml-org/llama.cpp) | In-browser inference |
-| [AI Horde](https://aihorde.net) | Crowdsourced distributed inference |
-| [AI SDK](https://github.com/vercel/ai) | Client for OpenAI-compatible APIs |
-| [Mantine](https://mantine.dev) | UI components |
-| [Hugging Face](https://huggingface.co) | Model hosting and the live demo Space |
+See the [Contributing Guidelines](.github/CONTRIBUTING.md), [Code of Conduct](.github/CODE_OF_CONDUCT.md), and [Security Policy](.github/SECURITY.md).
 
 ## License
 
-MiniSearch is released under the [Apache License 2.0](license.txt).
+[Apache License 2.0](license.txt)
