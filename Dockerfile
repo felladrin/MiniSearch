@@ -59,7 +59,7 @@ RUN git config --global --add safe.directory ${APP_DIR} 2>/dev/null || true; \
   echo "WARNING: no usable git repository in the build context, so the app will report an empty commit hash."; \
   npm run build
 
-HEALTHCHECK --interval=5m CMD curl -f http://localhost:7860/status || exit 1
+HEALTHCHECK --start-period=60s --interval=30s --timeout=10s --retries=3 CMD curl -fsS http://localhost:${PORT}/status || exit 1
 
 ENTRYPOINT [ "/bin/sh", "-c" ]
 
