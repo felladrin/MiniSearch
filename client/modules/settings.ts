@@ -73,9 +73,9 @@ addLogEntry(
  * Core inference types that are always available.
  */
 const coreInferenceTypes = [
-  { value: "browser", label: "In the browser (Private)" },
-  { value: "openai", label: "Remote server (API)" },
-  { value: "horde", label: "AI Horde (Pre-configured)" },
+  { value: "browser", label: "In the browser" },
+  { value: "openai", label: "Remote server (OpenAI-compatible API)" },
+  { value: "horde", label: "AI Horde" },
 ] as const;
 
 /**
