@@ -9,13 +9,6 @@ const EXTERNAL_API_ALLOWLIST = [
 ];
 
 const VIOLATIONS = {
-  COMPONENT_NOT_SELF_CONTAINED: {
-    message: "Component should be self-contained in its own folder",
-    remediation:
-      "Move component to its own folder with related styles, hooks, and utilities. See docs/project-structure.md for guidelines.",
-    severity: "error",
-  },
-
   CONTEXT_PROVIDER_NESTING: {
     message: "Avoid nested Context providers - use create-pubsub instead",
     remediation:
