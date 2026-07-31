@@ -128,6 +128,7 @@ Need to:
 - `server/internalApiEndpointServerHook.ts` - `/inference` proxy to self-hosted API
 - `server/validateAccessKeyServerHook.ts` - Access key validation endpoint
 - `server/statusEndpointServerHook.ts` - `/status` health check endpoint
+- `server/configEndpointServerHook.ts` - `/api/config` runtime client configuration
 - `server/rerankerServiceHook.ts` - Reranker model lifecycle management
 - `server/compressionServerHook.ts` - gzip/brotli compression for responses
 - `server/crossOriginServerHook.ts` - COOP/COEP headers for SharedArrayBuffer

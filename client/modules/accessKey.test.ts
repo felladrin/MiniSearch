@@ -28,7 +28,7 @@ vi.mock("./logEntries", () => ({
   addLogEntry: vi.fn(),
 }));
 
-vi.stubGlobal("VITE_ACCESS_KEY_TIMEOUT_HOURS", 24);
+const TIMEOUT_HOURS = 24;
 
 describe("Access Key Module", () => {
   beforeEach(() => {
@@ -113,14 +113,14 @@ describe("Access Key Module", () => {
         "accessKeyHash",
         JSON.stringify({ hash: "test-hash", timestamp: Date.now() }),
       );
-      const result = await verifyStoredAccessKey();
+      const result = await verifyStoredAccessKey(TIMEOUT_HOURS);
       expect(result).toBe(true);
     });
 
     it("should return false when no key is stored", async () => {
       const { verifyStoredAccessKey } = await import("./accessKey");
 
-      const result = await verifyStoredAccessKey();
+      const result = await verifyStoredAccessKey(TIMEOUT_HOURS);
       expect(result).toBe(false);
     });
 
@@ -135,8 +135,20 @@ describe("Access Key Module", () => {
         "accessKeyHash",
         JSON.stringify({ hash: "invalid-hash", timestamp: Date.now() }),
       );
-      const result = await verifyStoredAccessKey();
+      const result = await verifyStoredAccessKey(TIMEOUT_HOURS);
       expect(result).toBe(false);
+    });
+
+    it("should return false without asking the server when the timeout is zero", async () => {
+      const { verifyStoredAccessKey } = await import("./accessKey");
+      localStorage.setItem(
+        "accessKeyHash",
+        JSON.stringify({ hash: "test-hash", timestamp: Date.now() }),
+      );
+
+      const result = await verifyStoredAccessKey(0);
+      expect(result).toBe(false);
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("should return false when stored key is expired", async () => {
@@ -147,7 +159,7 @@ describe("Access Key Module", () => {
         JSON.stringify({ hash: "old-hash", timestamp: expiredTimestamp }),
       );
 
-      const result = await verifyStoredAccessKey();
+      const result = await verifyStoredAccessKey(TIMEOUT_HOURS);
       expect(result).toBe(false);
     });
   });

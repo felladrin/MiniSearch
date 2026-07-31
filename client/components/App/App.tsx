@@ -13,32 +13,40 @@ import { usePubSub } from "create-pubsub/react";
 import { lazy, useEffect, useState } from "react";
 import { addLogEntry } from "@/modules/logEntries";
 import { settingsPubSub } from "@/modules/pubSub";
-import { defaultSettings } from "@/modules/settings";
+import {
+  applyServerConfig,
+  defaultSettings,
+  hasStoredUserSettings,
+} from "@/modules/settings";
 import "@mantine/notifications/styles.css";
 import { verifyStoredAccessKey } from "@/modules/accessKey";
+import {
+  FALLBACK_CONFIG,
+  getConfig,
+  type ServerConfig,
+} from "@/modules/config";
 import MainPage from "../Pages/Main/MainPage";
 
 const AccessPage = lazy(() => import("../Pages/AccessPage"));
+
+/** The server config while it is being fetched, or after the fetch failed. */
+type ConfigState = ServerConfig | "loading" | "unavailable";
 
 /**
  * Main application component with access key validation and routing
  */
 function App() {
-  useInitializeSettings();
+  const config = useServerConfig();
+  useInitializeSettings(config);
   const { hasValidatedAccessKey, isCheckingStoredKey, setValidatedAccessKey } =
-    useAccessKeyValidation();
+    useAccessKeyValidation(config);
 
   return (
     <MantineProvider defaultColorScheme="dark">
-      {isCheckingStoredKey ? (
-        <Container h="100vh">
-          <Center h="100vh">
-            <Stack align="center">
-              <Loader />
-              <Text>Verifying access...</Text>
-            </Stack>
-          </Center>
-        </Container>
+      {config === "unavailable" ? (
+        <FullScreenMessage message="Could not load the server configuration. Please reload the page." />
+      ) : isCheckingStoredKey ? (
+        <FullScreenMessage message="Loading..." showLoader />
       ) : (
         <>
           <Notifications />
@@ -59,60 +67,101 @@ function App() {
   );
 }
 
+function FullScreenMessage({
+  message,
+  showLoader,
+}: {
+  message: string;
+  showLoader?: boolean;
+}) {
+  return (
+    <Container h="100vh">
+      <Center h="100vh">
+        <Stack align="center">
+          {showLoader && <Loader />}
+          <Text>{message}</Text>
+        </Stack>
+      </Center>
+    </Container>
+  );
+}
+
 export default App;
+
+/**
+ * Fetches the runtime server config once on mount.
+ */
+function useServerConfig(): ConfigState {
+  const [config, setConfig] = useState<ConfigState>("loading");
+
+  useEffect(() => {
+    getConfig().then(setConfig, (error) => {
+      addLogEntry(`Could not load the server configuration: ${error}`);
+      setConfig("unavailable");
+    });
+  }, []);
+
+  return config;
+}
 
 /**
  * A custom React hook that initializes the application settings.
  *
- * @returns The initialized settings object.
- *
  * @remarks
- * This hook uses the `usePubSub` hook to access and update the settings state.
- * It initializes the settings by merging the default settings with any existing settings.
- * The initialization is performed once when the component mounts.
+ * Waits for the server config so its defaults can seed a fresh profile. Falling
+ * back to shipped defaults is safe here: unlike access control, guessing wrong
+ * only means the user sees the settings they can already change themselves.
  */
-function useInitializeSettings() {
+function useInitializeSettings(config: ConfigState) {
   const [settings, setSettings] = usePubSub(settingsPubSub);
-  const [state, setState] = useState({
-    settingsInitialized: false,
-  });
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
 
   useEffect(() => {
-    if (state.settingsInitialized) return;
+    if (settingsInitialized || config === "loading") return;
 
-    setSettings({ ...defaultSettings, ...settings });
-
-    setState({ settingsInitialized: true });
-
+    setSettings(
+      applyServerConfig(
+        { ...defaultSettings, ...settings },
+        config === "unavailable" ? FALLBACK_CONFIG : config,
+        hasStoredUserSettings,
+      ),
+    );
+    setSettingsInitialized(true);
     addLogEntry("Settings initialized");
-  }, [settings, setSettings, state.settingsInitialized]);
-
-  return settings;
+  }, [config, settingsInitialized, settings, setSettings]);
 }
 
 /**
- * A custom React hook that validates the stored access key on mount.
+ * A custom React hook that validates the stored access key once the server
+ * config is known.
+ *
+ * @remarks
+ * Starts out unvalidated and stays that way while the config is missing, so an
+ * unreachable server can never be mistaken for "access keys are disabled".
  *
  * @returns An object containing the validation state and loading state
  */
-function useAccessKeyValidation() {
-  const [state, setState] = useState(() => ({
-    hasValidatedAccessKey: !VITE_ACCESS_KEYS_ENABLED,
-    isCheckingStoredKey: VITE_ACCESS_KEYS_ENABLED,
-  }));
+function useAccessKeyValidation(config: ConfigState) {
+  const [state, setState] = useState({
+    hasValidatedAccessKey: false,
+    isCheckingStoredKey: true,
+  });
 
   useEffect(() => {
-    if (!VITE_ACCESS_KEYS_ENABLED) return;
+    if (config === "loading" || config === "unavailable") return;
 
-    async function checkStoredAccessKey() {
-      const isValid = await verifyStoredAccessKey();
-      if (isValid)
-        setState((prev) => ({ ...prev, hasValidatedAccessKey: true }));
-      setState((prev) => ({ ...prev, isCheckingStoredKey: false }));
+    if (!config.accessKeysEnabled) {
+      setState({ hasValidatedAccessKey: true, isCheckingStoredKey: false });
+      return;
     }
 
-    checkStoredAccessKey();
-  }, []);
+    verifyStoredAccessKey(config.accessKeyTimeoutHours).then((isValid) =>
+      setState({
+        hasValidatedAccessKey: isValid,
+        isCheckingStoredKey: false,
+      }),
+    );
+  }, [config]);
 
   return {
     hasValidatedAccessKey: state.hasValidatedAccessKey,
