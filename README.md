@@ -121,7 +121,7 @@ Add [this Quicklink](https://ray.so/quicklinks/shared?quicklinks=%7B%22link%22:%
 <details>
 <summary>Can I use my own models through an OpenAI-compatible API?</summary>
 
-Yes. Open the menu, set "AI Processing Location" to `Remote server (API)`, then fill in the base URL, and optionally an API key and a model name. If the model is left blank, it is picked from the ones the API lists.
+Yes. Open the menu, set "AI Processing Location" to `Remote server (OpenAI-compatible API)`, then fill in the base URL, and optionally an API key and a model name. If the model is left blank, it is picked from the ones the API lists.
 
 </details>
 
