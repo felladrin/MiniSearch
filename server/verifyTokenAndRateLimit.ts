@@ -2,8 +2,8 @@ import type { IncomingMessage } from "node:http";
 import { isIP } from "node:net";
 import { argon2Verify } from "hash-wasm";
 import { RateLimiterMemory } from "rate-limiter-flexible";
-import { getSearchToken } from "./searchToken";
-import { addVerifiedToken, isVerifiedToken } from "./verifiedTokens";
+import { getSearchToken } from "./searchToken.ts";
+import { addVerifiedToken, isVerifiedToken } from "./verifiedTokens.ts";
 
 const rateLimiter = new RateLimiterMemory({
   points: 10,

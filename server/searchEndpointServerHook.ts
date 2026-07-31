@@ -1,13 +1,13 @@
 import type { PreviewServer, ViteDevServer } from "vite";
 import { z } from "zod";
-import { handleTokenVerification } from "./handleTokenVerification";
-import { rankSearchResults } from "./rankSearchResults";
-import { getRerankerStatus } from "./rerankerService";
+import { handleTokenVerification } from "./handleTokenVerification.ts";
+import { rankSearchResults } from "./rankSearchResults.ts";
+import { getRerankerStatus } from "./rerankerService.ts";
 import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
-} from "./searchesSinceLastRestart";
-import { fetchSearXNG } from "./webSearchService";
+} from "./searchesSinceLastRestart.ts";
+import { fetchSearXNG } from "./webSearchService.ts";
 
 const THUMBNAIL_TIMEOUT_MS = 1000;
 const DEFAULT_SEARCH_LIMIT = 30;

@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
-import { CircuitBreaker } from "./utils/circuitBreaker";
+import { CircuitBreaker } from "./utils/circuitBreaker.ts";
 
 const fileName = basename(import.meta.url);
 const printMessage = debug(fileName);

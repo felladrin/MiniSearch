@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { Tokenizer } from "@huggingface/tokenizers";
 import debug from "debug";
 import { InferenceSession, Tensor } from "onnxruntime-node";
-import { downloadFileFromHuggingFaceRepository } from "./downloadFileFromHuggingFaceRepository";
+import { downloadFileFromHuggingFaceRepository } from "./downloadFileFromHuggingFaceRepository.ts";
 
 const fileName = path.basename(import.meta.url);
 const printMessage = debug(fileName);

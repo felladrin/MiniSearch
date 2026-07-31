@@ -1,12 +1,12 @@
 import prettyMilliseconds from "pretty-ms";
 import type { PreviewServer, ViteDevServer } from "vite";
-import { getRerankerStatus } from "./rerankerService";
+import { getRerankerStatus } from "./rerankerService.ts";
 import {
   getGraphicalSearchesSinceLastRestart,
   getTextualSearchesSinceLastRestart,
-} from "./searchesSinceLastRestart";
-import { getVerifiedTokensAmount } from "./verifiedTokens";
-import { getWebSearchStatus } from "./webSearchService";
+} from "./searchesSinceLastRestart.ts";
+import { getVerifiedTokensAmount } from "./verifiedTokens.ts";
+import { getWebSearchStatus } from "./webSearchService.ts";
 
 /**
  * Server start time for uptime calculation

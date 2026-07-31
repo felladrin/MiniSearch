@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit";
+import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit.ts";
 
 /** Handles token verification and sends appropriate error responses if needed. */
 export async function handleTokenVerification(

@@ -6,16 +6,16 @@ import dotenv from "dotenv";
 import getGitCommitHash from "helper-git-hash";
 import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
-import { cacheServerHook } from "./server/cacheServerHook";
-import { compressionServerHook } from "./server/compressionServerHook";
-import { configEndpointServerHook } from "./server/configEndpointServerHook";
-import { crossOriginServerHook } from "./server/crossOriginServerHook";
-import { internalApiEndpointServerHook } from "./server/internalApiEndpointServerHook";
-import { rerankerServiceHook } from "./server/rerankerServiceHook";
-import { searchEndpointServerHook } from "./server/searchEndpointServerHook";
-import { getSearchToken, regenerateSearchToken } from "./server/searchToken";
-import { statusEndpointServerHook } from "./server/statusEndpointServerHook";
-import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook";
+import { cacheServerHook } from "./server/cacheServerHook.ts";
+import { compressionServerHook } from "./server/compressionServerHook.ts";
+import { configEndpointServerHook } from "./server/configEndpointServerHook.ts";
+import { crossOriginServerHook } from "./server/crossOriginServerHook.ts";
+import { internalApiEndpointServerHook } from "./server/internalApiEndpointServerHook.ts";
+import { rerankerServiceHook } from "./server/rerankerServiceHook.ts";
+import { searchEndpointServerHook } from "./server/searchEndpointServerHook.ts";
+import { getSearchToken, regenerateSearchToken } from "./server/searchToken.ts";
+import { statusEndpointServerHook } from "./server/statusEndpointServerHook.ts";
+import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook.ts";
 
 dotenv.config({ path: [".env", ".env.example"], quiet: true });
 
