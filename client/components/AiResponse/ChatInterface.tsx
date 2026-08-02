@@ -8,12 +8,8 @@ import {
   useState,
 } from "react";
 import throttle from "throttleit";
+import { persistChatMessages, runFollowUpSearch } from "@/modules/chatHelpers";
 import { generateFollowUpQuestion } from "@/modules/followUpQuestions";
-import {
-  getCurrentSearchRunId,
-  saveChatMessageForQuery,
-  updateSearchResults,
-} from "@/modules/history";
 import { handleEnterKeyDown } from "@/modules/keyboard";
 import { addLogEntry } from "@/modules/logEntries";
 import { showAiCompleteNotification } from "@/modules/notifications";
@@ -26,14 +22,8 @@ import {
   settingsPubSub,
   suppressNextFollowUpPubSub,
   textSearchResultsPubSub,
-  updateImageSearchResults,
-  updateLlmTextSearchResults,
-  updateTextSearchResults,
 } from "@/modules/pubSub";
-import { generateRelatedSearchQuery } from "@/modules/relatedSearchQuery";
-import { searchImages, searchText } from "@/modules/search";
 import { generateChatResponse } from "@/modules/textGeneration";
-import { searchResultsToConsider } from "@/modules/textGenerationUtilities";
 import type { ChatMessage } from "@/modules/types";
 import ChatHeader from "./ChatHeader";
 import ChatInputArea from "./ChatInputArea";
@@ -279,84 +269,13 @@ export default function ChatInterface({
       setStreamedResponse("");
 
       try {
-        const relatedQuery = await generateRelatedSearchQuery([...newMessages]);
-        const searchQuery = relatedQuery || currentInput;
-
-        if (settings.enableTextSearch) {
-          const freshResults = await searchText(
-            searchQuery,
-            settings.searchResultsLimit,
-          );
-
-          if (freshResults.length > 0) {
-            const existingUrls = new Set(
-              textSearchResults.map(([, , url]) => url),
-            );
-
-            const uniqueFreshResults = freshResults.filter(
-              ([, , url]) => !existingUrls.has(url),
-            );
-
-            updateLlmTextSearchResults(
-              freshResults.slice(0, searchResultsToConsider),
-            );
-
-            if (uniqueFreshResults.length > 0) {
-              const updatedResults = [
-                ...textSearchResults,
-                ...uniqueFreshResults,
-              ];
-              updateTextSearchResults(updatedResults);
-
-              updateSearchResults(getCurrentSearchRunId(), {
-                type: "text",
-                items: updatedResults.map(([title, snippet, url]) => ({
-                  title,
-                  url,
-                  snippet,
-                })),
-              });
-            }
-          }
-        }
-
-        if (settings.enableImageSearch) {
-          searchImages(searchQuery, settings.searchResultsLimit)
-            .then((imageResults) => {
-              if (imageResults.length > 0) {
-                const existingUrls = new Set(
-                  imageSearchResults.map(([, url]) => url),
-                );
-
-                const uniqueFreshResults = imageResults.filter(
-                  ([, url]) => !existingUrls.has(url),
-                );
-
-                if (uniqueFreshResults.length > 0) {
-                  const updatedImageResults = [
-                    ...uniqueFreshResults,
-                    ...imageSearchResults,
-                  ];
-                  updateImageSearchResults(updatedImageResults);
-
-                  updateSearchResults(getCurrentSearchRunId(), {
-                    type: "image",
-                    items: updatedImageResults.map(
-                      ([title, url, thumbnailUrl, sourceUrl]) => ({
-                        title,
-                        url,
-                        thumbnail: thumbnailUrl,
-                        sourceUrl,
-                      }),
-                    ),
-                  });
-                }
-              }
-            })
-            .catch((error) => {
-              addLogEntry(`Error in follow-up image search: ${error}`);
-            });
-        }
+        await runFollowUpSearch(
+          newMessages,
+          currentInput,
+          settings,
+          textSearchResults,
+          imageSearchResults,
+        );
       } catch (error) {
         addLogEntry(`Error in follow-up search: ${error}`);
       }
@@ -378,8 +297,7 @@ export default function ChatInterface({
           showAiCompleteNotification(currentInput);
         }
 
-        await saveChatMessageForQuery(currentQuery, "user", currentInput);
-        await saveChatMessageForQuery(currentQuery, "assistant", finalResponse);
+        await persistChatMessages(currentQuery, currentInput, finalResponse);
 
         await regenerateFollowUpQuestion(currentInput, finalResponse);
       } catch (error) {
