@@ -80,20 +80,6 @@ export const updateResponse = throttle(responsePubSub[0], 1000 / 12);
 export const [, , getResponse] = responsePubSub;
 
 /**
- * PubSub instance for managing reasoning content
- */
-export const reasoningContentPubSub = createPubSub("");
-
-/**
- * Throttled function to update reasoning content (12 updates per second)
- */
-export const updateReasoningContent = throttle(
-  reasoningContentPubSub[0],
-  1000 / 12,
-);
-export const [, , getReasoningContent] = reasoningContentPubSub;
-
-/**
  * PubSub instance for managing the search promise
  */
 export const [updateSearchPromise, , getSearchPromise] = createPubSub<

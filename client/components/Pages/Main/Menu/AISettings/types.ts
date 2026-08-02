@@ -17,15 +17,3 @@ export interface HordeUserInfo {
   /** Number of kudos (credits) the user has */
   kudos: number;
 }
-
-/**
- * Props for AI parameter slider components
- */
-export interface AIParameterSliderProps extends Record<string, unknown> {
-  /** Label for the slider */
-  label: string;
-  /** Description for the slider */
-  description: string;
-  /** Default value for the slider */
-  defaultValue: number;
-}
