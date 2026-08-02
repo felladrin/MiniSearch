@@ -25,7 +25,7 @@ const MONTH_NAMES = [
   "Dec",
 ];
 
-export interface DayCell {
+interface DayCell {
   /** Local calendar day as YYYY-MM-DD. */
   date: string;
   count: number;
@@ -33,7 +33,7 @@ export interface DayCell {
   future: boolean;
 }
 
-export interface ActivityStats {
+interface ActivityStats {
   total: number;
   daysActive: number;
   busiestCount: number;

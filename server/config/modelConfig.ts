@@ -9,7 +9,7 @@ export interface ModelConfig {
   topP: number;
 }
 
-export const modelConfig: ModelConfig = {
+const modelConfig: ModelConfig = {
   maxRetries: 5,
   baseBackoffMs: 100,
   maxBackoffMs: 5000,

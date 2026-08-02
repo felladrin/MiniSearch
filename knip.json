@@ -1,9 +1,9 @@
 {
-  "include": ["dependencies"],
   "ignoreDependencies": [
     "postcss",
     "postcss-preset-mantine",
     "postcss-simple-vars",
     "globals"
-  ]
+  ],
+  "ignoreFiles": ["client/postcss.config.cjs", "vitest.integration.config.ts"]
 }
