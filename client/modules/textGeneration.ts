@@ -49,12 +49,14 @@ type InferenceStrategy = {
   ) => Promise<string>;
 };
 
-// Lazily-loaded strategy map keyed by inference type.
-// Each entry is a Promise that resolves to the strategy object.
-const getInferenceStrategies = () => {
-  const strategies: Record<string, Promise<InferenceStrategy>> = {};
+type InferenceType = "openai" | "internal" | "horde" | "browser";
 
-  strategies.openai = (async () => {
+// Lazy thunks — only the selected backend is loaded.
+const inferenceStrategyLoaders: Record<
+  InferenceType,
+  () => Promise<InferenceStrategy>
+> = {
+  openai: async () => {
     const { generateTextWithOpenAi, generateChatWithOpenAi } = await import(
       "./textGenerationWithOpenAi"
     );
@@ -62,16 +64,16 @@ const getInferenceStrategies = () => {
       generateText: generateTextWithOpenAi,
       generateChat: generateChatWithOpenAi,
     };
-  })();
-  strategies.internal = (async () => {
+  },
+  internal: async () => {
     const { generateTextWithInternalApi, generateChatWithInternalApi } =
       await import("./textGenerationWithInternalApi");
     return {
       generateText: generateTextWithInternalApi,
       generateChat: generateChatWithInternalApi,
     };
-  })();
-  strategies.horde = (async () => {
+  },
+  horde: async () => {
     const { generateTextWithHorde, generateChatWithHorde } = await import(
       "./textGenerationWithHorde"
     );
@@ -79,8 +81,8 @@ const getInferenceStrategies = () => {
       generateText: generateTextWithHorde,
       generateChat: generateChatWithHorde,
     };
-  })();
-  strategies.browser = (async () => {
+  },
+  browser: async () => {
     const { generateTextWithWllama, generateChatWithWllama } = await import(
       "./textGenerationWithWllama"
     );
@@ -88,16 +90,24 @@ const getInferenceStrategies = () => {
       generateText: generateTextWithWllama,
       generateChat: generateChatWithWllama,
     };
-  })();
-
-  return strategies;
+  },
 };
 
 /** Returns the resolved strategy for the current inference type. */
 async function getCurrentInferenceStrategy(): Promise<InferenceStrategy> {
-  const strategies = getInferenceStrategies();
-  const type = getSettings().inferenceType;
-  return strategies[type] ?? strategies.browser;
+  const type = getSettings().inferenceType as string;
+  const effective: InferenceType =
+    type in inferenceStrategyLoaders ? (type as InferenceType) : "browser";
+  return inferenceStrategyLoaders[effective]();
+}
+
+/** Returns true when the effective inference type needs the model-download gate. */
+function needsModelDownloadGate(): boolean {
+  const type = getSettings().inferenceType as string;
+  return (
+    (type in inferenceStrategyLoaders ? (type as InferenceType) : "browser") ===
+    "browser"
+  );
 }
 
 function getCurrentModelName(): string {
@@ -232,7 +242,7 @@ export async function searchAndRespond() {
 
   try {
     const settings = getSettings();
-    if (settings.inferenceType === "browser") {
+    if (needsModelDownloadGate()) {
       await canDownloadModels();
       updateTextGenerationState("loadingModel");
     }

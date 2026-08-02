@@ -13,6 +13,7 @@ import {
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
 import type { defaultSettings } from "./settings";
+import { searchResultsToConsider } from "./textGenerationUtilities";
 import type {
   ChatMessage,
   ImageSearchResults,
@@ -20,8 +21,6 @@ import type {
 } from "./types";
 
 type Settings = typeof defaultSettings;
-
-const searchResultsToConsider = 10;
 
 /**
  * Fetches fresh text search results and merges them into existing results,
@@ -115,7 +114,6 @@ export async function persistChatMessages(
 /**
  * Runs the follow-up search phase: generates a related search query from chat
  * history, then refreshes text and image results with deduplication.
- * Returns the search query to use (related query or original input).
  */
 export async function runFollowUpSearch(
   messages: ChatMessage[],
@@ -123,7 +121,7 @@ export async function runFollowUpSearch(
   settings: Settings,
   existingTextResults: TextSearchResults,
   existingImageResults: ImageSearchResults,
-): Promise<string> {
+): Promise<void> {
   const { generateRelatedSearchQuery } = await import("./relatedSearchQuery");
   const relatedQuery = await generateRelatedSearchQuery([...messages]);
   const searchQuery = relatedQuery || currentInput;
@@ -149,6 +147,4 @@ export async function runFollowUpSearch(
       addLogEntry(`Error in follow-up image search: ${error}`);
     });
   }
-
-  return searchQuery;
 }
