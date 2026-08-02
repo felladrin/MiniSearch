@@ -41,6 +41,75 @@ import type {
 
 const SUMMARY_TOKEN_LIMIT = 800;
 
+type InferenceStrategy = {
+  generateText: () => Promise<void>;
+  generateChat: (
+    messages: ChatMessage[],
+    onUpdate: (partialResponse: string) => void,
+  ) => Promise<string>;
+};
+
+type InferenceType = "openai" | "internal" | "horde" | "browser";
+
+// Lazy thunks — only the selected backend is loaded.
+const inferenceStrategyLoaders: Record<
+  InferenceType,
+  () => Promise<InferenceStrategy>
+> = {
+  openai: async () => {
+    const { generateTextWithOpenAi, generateChatWithOpenAi } = await import(
+      "./textGenerationWithOpenAi"
+    );
+    return {
+      generateText: generateTextWithOpenAi,
+      generateChat: generateChatWithOpenAi,
+    };
+  },
+  internal: async () => {
+    const { generateTextWithInternalApi, generateChatWithInternalApi } =
+      await import("./textGenerationWithInternalApi");
+    return {
+      generateText: generateTextWithInternalApi,
+      generateChat: generateChatWithInternalApi,
+    };
+  },
+  horde: async () => {
+    const { generateTextWithHorde, generateChatWithHorde } = await import(
+      "./textGenerationWithHorde"
+    );
+    return {
+      generateText: generateTextWithHorde,
+      generateChat: generateChatWithHorde,
+    };
+  },
+  browser: async () => {
+    const { generateTextWithWllama, generateChatWithWllama } = await import(
+      "./textGenerationWithWllama"
+    );
+    return {
+      generateText: generateTextWithWllama,
+      generateChat: generateChatWithWllama,
+    };
+  },
+};
+
+/** Returns the resolved strategy for the current inference type. */
+async function getCurrentInferenceStrategy(): Promise<InferenceStrategy> {
+  const type = getSettings().inferenceType as string;
+  const effective: InferenceType =
+    type in inferenceStrategyLoaders ? (type as InferenceType) : "browser";
+  return inferenceStrategyLoaders[effective]();
+}
+
+/** Returns true when the effective inference type needs the model-download gate. */
+function needsModelDownloadGate(): boolean {
+  const type = getSettings().inferenceType as string;
+  return (
+    (type in inferenceStrategyLoaders ? (type as InferenceType) : "browser") ===
+    "browser"
+  );
+}
+
 function getCurrentModelName(): string {
   const settings = getSettings();
   switch (settings.inferenceType) {
@@ -93,33 +162,9 @@ async function createLlmSummary(
 
   const chat: ChatMessage[] = [{ role: "user", content: prompt }];
 
-  const settings = getSettings();
   try {
-    if (settings.inferenceType === "openai") {
-      const { generateChatWithOpenAi } = await import(
-        "./textGenerationWithOpenAi"
-      );
-      return (await generateChatWithOpenAi(chat, () => {})).trim();
-    }
-
-    if (settings.inferenceType === "internal") {
-      const { generateChatWithInternalApi } = await import(
-        "./textGenerationWithInternalApi"
-      );
-      return (await generateChatWithInternalApi(chat, () => {})).trim();
-    }
-
-    if (settings.inferenceType === "horde") {
-      const { generateChatWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
-      return (await generateChatWithHorde(chat, () => {})).trim();
-    }
-
-    const { generateChatWithWllama } = await import(
-      "./textGenerationWithWllama"
-    );
-    return (await generateChatWithWllama(chat, () => {})).trim();
+    const strategy = await getCurrentInferenceStrategy();
+    return (await strategy.generateChat(chat, () => {})).trim();
   } catch (e) {
     addLogEntry(
       `LLM summary failed, falling back to extractive: ${
@@ -197,30 +242,12 @@ export async function searchAndRespond() {
 
   try {
     const settings = getSettings();
-    if (settings.inferenceType === "openai") {
-      const { generateTextWithOpenAi } = await import(
-        "./textGenerationWithOpenAi"
-      );
-      await generateTextWithOpenAi();
-    } else if (settings.inferenceType === "internal") {
-      const { generateTextWithInternalApi } = await import(
-        "./textGenerationWithInternalApi"
-      );
-      await generateTextWithInternalApi();
-    } else if (settings.inferenceType === "horde") {
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
-      await generateTextWithHorde();
-    } else {
+    if (needsModelDownloadGate()) {
       await canDownloadModels();
       updateTextGenerationState("loadingModel");
-
-      const { generateTextWithWllama } = await import(
-        "./textGenerationWithWllama"
-      );
-      await generateTextWithWllama();
     }
+    const strategy = await getCurrentInferenceStrategy();
+    await strategy.generateText();
 
     try {
       await saveLlmResponseForQuery(
@@ -263,7 +290,6 @@ export async function generateChatResponse(
   newMessages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
 ) {
-  const settings = getSettings();
   let response = "";
 
   try {
@@ -329,27 +355,8 @@ export async function generateChatResponse(
 
     const lastMessages = [systemPrompt, initialResponse, ...processedMessages];
 
-    if (settings.inferenceType === "openai") {
-      const { generateChatWithOpenAi } = await import(
-        "./textGenerationWithOpenAi"
-      );
-      response = await generateChatWithOpenAi(lastMessages, onUpdate);
-    } else if (settings.inferenceType === "internal") {
-      const { generateChatWithInternalApi } = await import(
-        "./textGenerationWithInternalApi"
-      );
-      response = await generateChatWithInternalApi(lastMessages, onUpdate);
-    } else if (settings.inferenceType === "horde") {
-      const { generateChatWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
-      response = await generateChatWithHorde(lastMessages, onUpdate);
-    } else {
-      const { generateChatWithWllama } = await import(
-        "./textGenerationWithWllama"
-      );
-      response = await generateChatWithWllama(lastMessages, onUpdate);
-    }
+    const strategy = await getCurrentInferenceStrategy();
+    response = await strategy.generateChat(lastMessages, onUpdate);
   } catch (error) {
     if (error instanceof ChatGenerationError) {
       addLogEntry(`Chat generation interrupted: ${error.message}`);
@@ -472,4 +479,5 @@ export const textGenerationFunctions = {
   loadConversationSummary,
   createLlmSummary,
   summarizeDroppedMessages,
+  needsModelDownloadGate,
 };
