@@ -479,4 +479,5 @@ export const textGenerationFunctions = {
   loadConversationSummary,
   createLlmSummary,
   summarizeDroppedMessages,
+  needsModelDownloadGate,
 };
