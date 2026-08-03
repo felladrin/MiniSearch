@@ -56,6 +56,8 @@ export default function SearchResultsList({
                     component="a"
                     href={url}
                     target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="search-result-link"
                     onClick={() => {
                       addLogEntry("User clicked a text result");
                     }}
@@ -79,6 +81,7 @@ export default function SearchResultsList({
                     component="a"
                     href={url}
                     target="_blank"
+                    rel="noopener noreferrer"
                     fs="italic"
                     onClick={() => {
                       addLogEntry("User clicked a text result");
