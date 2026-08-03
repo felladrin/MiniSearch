@@ -30,7 +30,6 @@ export const SystemPromptInput = ({ form }: SystemPromptInputProps) => {
       size="sm"
       label="Instructions for AI"
       descriptionProps={{
-        // @ts-expect-error Mantine v7: `InputDescriptionProps` does not support `component`.
         component: "div",
       }}
       description={
