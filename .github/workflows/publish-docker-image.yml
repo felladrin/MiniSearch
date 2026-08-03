@@ -2,6 +2,15 @@ name: Publish Docker Image
 
 on:
   workflow_dispatch:
+  push:
+    branches: ["main"]
+
+# A newer commit's image supersedes the one being built, so bursts of pushes
+# don't need to queue. The trade-off is that commits superseded mid-build get
+# no `sha-` tag of their own.
+concurrency:
+  group: publish-docker-image
+  cancel-in-progress: true
 
 jobs:
   build-and-push-image:
@@ -27,6 +36,16 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # `type=sha` is not one of the action's defaults, and it's the only
+          # immutable tag here, so self-hosters can pin and roll back. The date
+          # pattern mirrors `getSemanticVersion` in
+          # `client/modules/stringFormatters.ts`, which the app reports as its
+          # version: unpadded month and day, UTC (the action's default timezone).
+          tags: |
+            type=sha
+            type=raw,value={{date 'YYYY.M.D'}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4
       - name: Build and push Docker Image
@@ -37,3 +56,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+          # BuildKit pushes these attestations with the registry credentials
+          # already in use, so no extra job permissions are needed.
+          provenance: mode=max
+          sbom: true
