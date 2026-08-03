@@ -12,4 +12,20 @@ jobs:
       - name: Check if main page is available
         run: until curl -s -o /dev/null -w "%{http_code}" localhost:7860 | grep 200; do sleep 1; done
         timeout-minutes: 1
-      - run: docker compose -f docker-compose.production.yml down
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright e2e smoke
+        run: npm run test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:7860
+      - if: ${{ always() }}
+        run: docker compose -f docker-compose.production.yml down
