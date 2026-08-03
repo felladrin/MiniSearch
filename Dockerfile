@@ -1,4 +1,4 @@
-FROM node:lts
+FROM node:lts-slim
 
 ARG SEARXNG_COMMIT_SHA="6da6eee265daeb4a62ab638d6921522bf405de69"
 
@@ -9,8 +9,16 @@ ARG USERNAME=node
 ARG HOME_DIR=/home/${USERNAME}
 ARG APP_DIR=${HOME_DIR}/app
 
+# The slim base omits tools the full `node` image ships implicitly: `git` for
+# the SearXNG checkout and the build's commit hash, `curl` for the HEALTHCHECK
+# below, `openssl` for the SearXNG secret key, and `ca-certificates` for both
+# the clone and pip.
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
+  ca-certificates \
+  curl \
+  git \
+  openssl \
   python3 \
   python3-venv && \
   apt-get clean && \
