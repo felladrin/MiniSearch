@@ -1,0 +1,8 @@
+# Hadolint configuration for MiniSearch
+# Suppress rules that are not applicable to our Dockerfile
+
+ignored:
+  - DL3064
+  - DL3008
+  - SC2046
+  - DL3025
