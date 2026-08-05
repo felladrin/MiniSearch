@@ -10,49 +10,39 @@ const fileName = path.basename(import.meta.url);
 const printMessage = debug(fileName);
 printMessage.enabled = true;
 
-const MODEL_HF_REPO = "jinaai/jina-reranker-v1-tiny-en";
-const MODEL_HF_FILE = "onnx/model.onnx";
+const MODEL_HF_REPO = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1";
+
+/**
+ * The dynamically quantized export. The repository ships one build per CPU
+ * kernel family (`qint8_arm64`, `qint8_avx512`, `qint8_avx512_vnni`,
+ * `quint8_avx2`) from the same weights; this one is the portable choice, because
+ * unsigned activations sidestep the signed-int8 saturation that x64 without VNNI
+ * has to work around, and it measured no slower than the arm64 build on arm64.
+ * Quantization costs nothing measurable: 0.7992 against 0.7973 nDCG@10 for fp32
+ * on 240 MIRACL queries, for a quarter of the download and half the latency.
+ */
+const MODEL_HF_FILE = "onnx/model_quint8_avx2.onnx";
+
 const TOKENIZER_HF_FILE = "tokenizer.json";
 const TOKENIZER_CONFIG_HF_FILE = "tokenizer_config.json";
 
-/** From the model's config.json. */
-const PAD_TOKEN_ID = 0;
+/**
+ * Hard ceiling rather than a tuning knob: the model has 514 learned position
+ * embeddings, two of which XLM-RoBERTa reserves, so a 513-token pair fails
+ * outright with `indices element out of data bounds` at the position-embedding
+ * gather. Still more generous than what shipped before #2260, which cut
+ * documents to 512 characters upstream.
+ */
+const MAX_SEQUENCE_LENGTH = 512;
 
 /**
- * Sequence-length budget for one (query, document) pair, and the single point
- * where truncation happens now that rankSearchResults sends whole documents.
- * jina-reranker-v1-tiny-en is an ALiBi model that handles up to 8192 tokens
- * (verified: the ONNX graph runs at 8192 without error); the `model_max_length`
- * of 512 in tokenizer_config.json is a stale BERT default, not the real limit.
- * 2048 is a deliberate, conservative cap. See #2193.
+ * Only `cpu`. A dynamically quantized graph is the wrong shape for the WebGPU
+ * provider, which has no kernels for the integer matmuls and shuttles every one
+ * of them back to the CPU: 812ms against 172ms for the same work, with scores
+ * drifting by up to 1.15 and reordering results. `coreml` is out for the same
+ * reason it was before, being slower than CPU on dynamic shapes.
  */
-const MAX_SEQUENCE_LENGTH = 2048;
-
-/**
- * onnxruntime-node wraps a synchronous native call, so a single large batch
- * blocks the event loop for its whole duration. Scoring in batches yields
- * between them, capping the stall at ~27ms instead of ~78ms for 30 results,
- * for about 4% more wall time. Scores are unaffected: padding is per batch but
- * the attention mask makes the result identical either way.
- */
-const BATCH_SIZE = 10;
-
-/**
- * ONNX Runtime execution providers to try first. WebGPU is roughly 3x faster
- * than CPU here and agrees with it to within float32 rounding, so it is
- * preferred when available. `coreml` is deliberately absent: it is slower than
- * CPU for this model's dynamic shapes.
- */
-const PREFERRED_EXECUTION_PROVIDERS = ["webgpu", "cpu"];
-
-/**
- * Trailing `cpu` in a provider list is not a fallback chain: ONNX Runtime only
- * falls back per operator, once a provider is registered. A provider that fails
- * to initialize at all (no GPU adapter, or no `libvulkan.so.1` for Dawn to
- * load, as on Hugging Face Spaces) rejects the whole session, so the CPU-only
- * session has to be a second attempt.
- */
-const FALLBACK_EXECUTION_PROVIDERS = ["cpu"];
+const EXECUTION_PROVIDERS = ["cpu"];
 
 let isReady = false;
 let session: InferenceSession | null = null;
@@ -116,13 +106,13 @@ async function ensureFileExists(hfRepoFile: string) {
   return localPath;
 }
 
-function createSession(modelPath: string, executionProviders: string[]) {
+function createSession(modelPath: string) {
   printMessage(
-    `Loading model (arch: ${process.arch}, platform: ${process.platform}, execution providers: ${executionProviders.join(", ")})...`,
+    `Loading model (arch: ${process.arch}, platform: ${process.platform}, execution providers: ${EXECUTION_PROVIDERS.join(", ")})...`,
   );
 
   return InferenceSession.create(modelPath, {
-    executionProviders,
+    executionProviders: EXECUTION_PROVIDERS,
     // Errors only. ONNX Runtime otherwise warns on every startup that it
     // assigned shape operators to CPU, which is expected and not actionable.
     logSeverityLevel: 3,
@@ -143,14 +133,7 @@ export async function startRerankerService() {
     JSON.parse(fs.readFileSync(tokenizerConfigPath, "utf8")),
   );
 
-  try {
-    session = await createSession(modelPath, PREFERRED_EXECUTION_PROVIDERS);
-  } catch (error) {
-    printMessage(
-      `Could not load the model with ${PREFERRED_EXECUTION_PROVIDERS.join(", ")}: ${error instanceof Error ? error.message : error}`,
-    );
-    session = await createSession(modelPath, FALLBACK_EXECUTION_PROVIDERS);
-  }
+  session = await createSession(modelPath);
 
   await score("test", ["test document"]);
 
@@ -170,62 +153,49 @@ export async function getRerankerStatus() {
   return isReady;
 }
 
-async function scoreBatch(
+/**
+ * Scores one pair on its own. Documents are deliberately not batched: this graph
+ * quantizes activations dynamically, deriving the scale from each tensor's own
+ * range, and padding rows out to a shared width puts the pad positions inside
+ * that range even though the attention mask excludes them from attention. A
+ * document's score then depends on which documents happen to sit beside it,
+ * which moved logits by up to 1.29 and reordered 2 of 10 fixtures. One pair per
+ * call has no padding to begin with, and it also holds the event loop for 13ms
+ * at a time instead of 50ms, for about 12% more wall time on two threads.
+ */
+async function scoreDocument(
   activeSession: InferenceSession,
-  encodings: number[][],
-) {
-  const paddedLength = Math.max(...encodings.map(({ length }) => length));
-  const inputIds = new BigInt64Array(encodings.length * paddedLength);
-  const attentionMask = new BigInt64Array(encodings.length * paddedLength);
-
-  encodings.forEach((ids, row) => {
-    const offset = row * paddedLength;
-    for (let column = 0; column < paddedLength; column += 1) {
-      const isPadding = column >= ids.length;
-      inputIds[offset + column] = BigInt(
-        isPadding ? PAD_TOKEN_ID : ids[column],
-      );
-      attentionMask[offset + column] = isPadding ? 0n : 1n;
-    }
-  });
-
-  const dimensions = [encodings.length, paddedLength];
+  ids: number[],
+): Promise<number> {
+  const dimensions = [1, ids.length];
   const { logits } = await activeSession.run({
-    input_ids: new Tensor("int64", inputIds, dimensions),
-    attention_mask: new Tensor("int64", attentionMask, dimensions),
+    input_ids: new Tensor("int64", BigInt64Array.from(ids, BigInt), dimensions),
+    attention_mask: new Tensor(
+      "int64",
+      new BigInt64Array(ids.length).fill(1n),
+      dimensions,
+    ),
   });
 
-  return Array.from(logits.data as Float32Array, Number);
+  return Number((logits.data as Float32Array)[0]);
 }
 
 /**
  * Caps an encoded cross-encoder pair at `maxLength` tokens by dropping tokens
- * from the end of the document only. The sequence is `[CLS] query [SEP]
- * document [SEP]`, so the query sits at the front and is preserved, and the
- * trailing separator is kept so the model still receives a well-formed pair.
- * `tokenTypeIds` mark the query segment (0) apart from the document (1). This
- * mirrors the tokenizer's `only_second` truncation, which the JS package does
- * not implement. Falls back to a plain head slice if the query alone already
- * exceeds the budget.
+ * from the end, which is where the document is: the sequence is `<s> query </s>
+ * </s> document </s>`, so the query sits at the front and survives. The final
+ * separator is carried over to the new end so the model still receives a
+ * well-formed pair. This mirrors the tokenizer's `only_second` truncation, which
+ * the JS package does not implement. The query segment is not read off
+ * `token_type_ids`, because XLM-RoBERTa has a `type_vocab_size` of 1 and emits
+ * zeros for the whole sequence.
  */
-export function truncatePairTokens(
-  ids: number[],
-  tokenTypeIds: number[],
-  maxLength: number,
-): number[] {
+export function truncatePairTokens(ids: number[], maxLength: number): number[] {
   if (ids.length <= maxLength) {
     return ids;
   }
 
-  const querySegmentLength = tokenTypeIds.filter((type) => type === 0).length;
-  const documentBudget = maxLength - querySegmentLength - 1;
-
-  if (documentBudget <= 0) {
-    return ids.slice(0, maxLength);
-  }
-
-  const separator = ids[ids.length - 1];
-  return [...ids.slice(0, querySegmentLength + documentBudget), separator];
+  return [...ids.slice(0, maxLength - 1), ids[ids.length - 1]];
 }
 
 /**
@@ -241,22 +211,15 @@ async function score(query: string, documents: string[]) {
   const activeSession = session;
   const loadedTokenizer = tokenizer;
 
-  const encodings = documents.map((document) => {
-    const { ids, token_type_ids } = loadedTokenizer.encode(query, {
-      text_pair: document,
-      return_token_type_ids: true,
-    });
-    return truncatePairTokens(ids, token_type_ids, MAX_SEQUENCE_LENGTH);
-  });
-
   const scores: number[] = [];
 
-  for (let offset = 0; offset < encodings.length; offset += BATCH_SIZE) {
+  for (const document of documents) {
+    const { ids } = loadedTokenizer.encode(query, { text_pair: document });
     scores.push(
-      ...(await scoreBatch(
+      await scoreDocument(
         activeSession,
-        encodings.slice(offset, offset + BATCH_SIZE),
-      )),
+        truncatePairTokens(ids, MAX_SEQUENCE_LENGTH),
+      ),
     );
   }
 
