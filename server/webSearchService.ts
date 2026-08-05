@@ -74,7 +74,9 @@ export async function startWebSearchService() {
 
 export async function getWebSearchStatus() {
   try {
-    const response = await fetch(`${SERVICE_BASE_URL}/healthz`);
+    const response = await fetch(`${SERVICE_BASE_URL}/healthz`, {
+      signal: AbortSignal.timeout(2000),
+    });
     const responseText = await response.text();
     return responseText.trim() === "OK";
   } catch {

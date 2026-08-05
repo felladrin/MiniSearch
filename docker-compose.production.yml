@@ -5,7 +5,7 @@ services:
       - PORT=${PORT:-7860}
       - BASIC_SSL=${BASIC_SSL:-false}
     ports:
-      - "${PORT:-7860}:7860"
+      - "${PORT:-7860}:${PORT:-7860}"
     build:
       dockerfile: Dockerfile
       context: .

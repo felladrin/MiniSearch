@@ -95,6 +95,27 @@ describe("WebSearchService", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("returns false when health endpoint hangs and the request times out", async () => {
+    vi.useFakeTimers();
+    try {
+      (global.fetch as MockedFunction<typeof fetch>).mockImplementation(
+        (_input: string | Request | URL, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () =>
+              reject(new Error("Aborted")),
+            );
+          }),
+      );
+
+      const promise = getWebSearchStatus();
+      await vi.advanceTimersByTimeAsync(2000);
+      const status = await promise;
+      expect(status).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("should return empty array on fetchSearXNG error", async () => {
     (global.fetch as MockedFunction<typeof fetch>).mockRejectedValue(
       new Error("Network failure"),

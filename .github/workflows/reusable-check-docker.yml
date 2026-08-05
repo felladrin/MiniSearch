@@ -1,16 +1,22 @@
 on:
   workflow_call:
+    inputs:
+      port:
+        type: string
+        default: "7860"
 jobs:
   check-docker-container:
     name: Check Docker Container
     runs-on: ubuntu-latest
+    env:
+      PORT: ${{ inputs.port }}
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v7
       - run: docker compose -f docker-compose.production.yml up -d
       - name: Check if main page is available
-        run: until curl -s -o /dev/null -w "%{http_code}" localhost:7860 | grep 200; do sleep 1; done
+        run: until curl -s -o /dev/null -w "%{http_code}" localhost:"$PORT" | grep 200; do sleep 1; done
         timeout-minutes: 1
 
       - uses: actions/setup-node@v7
@@ -26,11 +32,11 @@ jobs:
       - name: Playwright e2e smoke
         run: npm run test:e2e
         env:
-          PLAYWRIGHT_BASE_URL: http://127.0.0.1:7860
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:${{ inputs.port }}
 
       - name: Upload Playwright report
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
