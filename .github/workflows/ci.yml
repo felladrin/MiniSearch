@@ -32,6 +32,9 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+      - name: Lint Dockerfile
+        run: hadolint Dockerfile
+
       - name: Check formatting
         run: npm run format:check
 
