@@ -32,6 +32,12 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+      - name: Install hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          version: latest
+
       - name: Lint Dockerfile
         run: hadolint Dockerfile
 
