@@ -35,15 +35,6 @@ const TOKENIZER_CONFIG_HF_FILE = "tokenizer_config.json";
  */
 const MAX_SEQUENCE_LENGTH = 512;
 
-/**
- * Only `cpu`. A dynamically quantized graph is the wrong shape for the WebGPU
- * provider, which has no kernels for the integer matmuls and shuttles every one
- * of them back to the CPU: 812ms against 172ms for the same work, with scores
- * drifting by up to 1.15 and reordering results. `coreml` is out for the same
- * reason it was before, being slower than CPU on dynamic shapes.
- */
-const EXECUTION_PROVIDERS = ["cpu"];
-
 let isReady = false;
 let session: InferenceSession | null = null;
 let tokenizer: Tokenizer | null = null;
@@ -106,13 +97,22 @@ async function ensureFileExists(hfRepoFile: string) {
   return localPath;
 }
 
+/**
+ * Runs on the CPU, with nothing to configure. A dynamically quantized graph is
+ * the wrong shape for the WebGPU provider, which has no kernels for the integer
+ * matmuls and shuttles every one of them back to the CPU: 812ms against 172ms
+ * for the same work, with scores drifting by up to 1.15 and reordering results.
+ * `coreml` is out for the same reason it was before, being slower than CPU on
+ * dynamic shapes. The architecture is logged because it selects the quantized
+ * kernel, which is the part that varies between hosts.
+ */
 function createSession(modelPath: string) {
   printMessage(
-    `Loading model (arch: ${process.arch}, platform: ${process.platform}, execution providers: ${EXECUTION_PROVIDERS.join(", ")})...`,
+    `Loading model on CPU (arch: ${process.arch}, platform: ${process.platform})...`,
   );
 
   return InferenceSession.create(modelPath, {
-    executionProviders: EXECUTION_PROVIDERS,
+    executionProviders: ["cpu"],
     // Errors only. ONNX Runtime otherwise warns on every startup that it
     // assigned shape operators to CPU, which is expected and not actionable.
     logSeverityLevel: 3,
