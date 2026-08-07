@@ -1,0 +1,33 @@
+name: Scan Docker Image
+
+# Deliberately not tied to pull requests. The image inherits its base OS
+# packages from `node:lts-slim`, so findings arrive when upstream publishes an
+# advisory rather than when someone changes the app, and gating pull requests on
+# them would only produce a red check nobody can act on.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  scan-published-image:
+    name: Scan Published Image for Vulnerabilities
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Run Trivy on the published image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}:latest
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          # Without this, the report fills with advisories that have no patched
+          # version, drowning out the findings that can actually be fixed.
+          ignore-unfixed: true
+      - name: Upload results to code scanning
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
