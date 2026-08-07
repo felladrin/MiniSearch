@@ -12,6 +12,6 @@ export interface ServerConfig {
  * `.env.example` and are the single source of truth for both the server
  * response and the client-side fallback.
  */
-export const DEFAULT_WLLAMA_MODEL_ID = "qwen-3-0.6b";
+export const DEFAULT_WLLAMA_MODEL_ID = "littlelamb-290m";
 export const DEFAULT_INFERENCE_TYPE = "browser";
 export const DEFAULT_INTERNAL_API_NAME = "Internal API";

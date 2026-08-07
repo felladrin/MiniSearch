@@ -164,6 +164,13 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "granite-4.0-350m-Q4_K_S-00001-of-00003.gguf",
     fileSizeInMegabytes: 229,
   },
+  "littlelamb-290m": {
+    ...createDefaultModelConfig(),
+    label: "LittleLamb 290M",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-LittleLamb",
+    hfFilePath: "LittleLamb-i1-Q4_K_S-00001-of-00003.gguf",
+    fileSizeInMegabytes: 231,
+  },
   "gemma-3-270m": {
     ...createDefaultModelConfig(),
     label: "Gemma 3 270M",
