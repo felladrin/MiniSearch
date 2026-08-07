@@ -169,7 +169,10 @@ export async function generateTextWithOpenAi() {
   await createOpenAiStream({
     messages,
     onUpdate: (text, reasoningContent) => {
-      if (getTextGenerationState() !== "generating") {
+      if (
+        getTextGenerationState() !== "generating" &&
+        (text.length > 0 || (reasoningContent?.length ?? 0) > 0)
+      ) {
         updateTextGenerationState("generating");
       }
 

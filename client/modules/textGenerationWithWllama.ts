@@ -131,14 +131,15 @@ async function generateWithWllama({
           abortController.abort();
           throw new ChatGenerationError("Chat generation interrupted");
         }
-
-        if (getTextGenerationState() !== "generating") {
-          updateTextGenerationState("generating");
-        }
       }
 
       const delta = chunk.choices[0]?.delta?.content ?? "";
       if (!delta) continue;
+
+      if (shouldCheckCanRespond && getTextGenerationState() !== "generating") {
+        updateTextGenerationState("generating");
+      }
+
       streamedMessage += delta;
       streamedMessage = handleWllamaCompletion(
         model,
