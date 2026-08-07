@@ -9,7 +9,7 @@ import {
 const mockConfig: ServerConfig = {
   accessKeysEnabled: false,
   accessKeyTimeoutHours: 0,
-  wllamaDefaultModelId: "qwen-3-0.6b",
+  wllamaDefaultModelId: "littlelamb-290m",
   internalApiEnabled: false,
   internalApiName: "Internal API",
   defaultInferenceType: "browser",

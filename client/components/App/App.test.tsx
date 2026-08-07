@@ -24,7 +24,7 @@ vi.mock("../Pages/AccessPage", () => ({
 const serverConfig: ServerConfig = {
   accessKeysEnabled: false,
   accessKeyTimeoutHours: 24,
-  wllamaDefaultModelId: "qwen-3-0.6b",
+  wllamaDefaultModelId: "littlelamb-290m",
   internalApiEnabled: false,
   internalApiName: "Internal API",
   defaultInferenceType: "browser",

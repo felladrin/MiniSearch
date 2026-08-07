@@ -34,7 +34,7 @@ Instead of a heavy state management library like Redux, MiniSearch uses a minima
 
 ### Reranker
 
-A secondary search stage that takes initial results from SearXNG and re-orders them based on relevance to the query using a cross-encoder model (`jina-reranker-v1-tiny-en`) running in-process via ONNX Runtime.
+A secondary search stage that takes initial results from SearXNG and re-orders them based on relevance to the query using a multilingual cross-encoder model (`mmarco-mMiniLMv2-L12-H384-v1`) running in-process via ONNX Runtime.
 
 - **Implementation**: Loads the model's ONNX export with `onnxruntime-node`; no child process
 - **Health Check**: Polls `/health` endpoint via `getRerankerStatus`

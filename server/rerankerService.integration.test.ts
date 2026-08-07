@@ -2,8 +2,8 @@
 
 /**
  * Exercises the real reranker model end to end, including the multilingual
- * behaviour that motivated picking jina-reranker-v1-tiny-en. Downloads ~130MB
- * on first run, so it is excluded from the default suite:
+ * behaviour that motivated picking mmarco-mMiniLMv2-L12-H384-v1. Downloads
+ * ~136MB on first run, so it is excluded from the default suite:
  *
  *   npx vitest run --config vitest.integration.config.ts
  */
@@ -200,9 +200,9 @@ describe("reranker service", () => {
         .map(({ index }) => index);
 
       // Every relevant result must outrank every irrelevant one. The model
-      // clears this with a score gap of at least 0.99 between the two groups,
-      // so it is not sensitive to the ~1e-6 difference between the CPU and
-      // WebGPU execution providers.
+      // clears this with a score gap of at least 5.7 between the two groups, so
+      // the assertion is about ranking behaviour and not about a threshold the
+      // model happens to sit on.
       const topIndices = ordered
         .slice(0, fixture.relevant.length)
         .sort((a, b) => a - b);

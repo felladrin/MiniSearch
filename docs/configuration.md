@@ -23,7 +23,7 @@ Configure default models for different inference types:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WLLAMA_DEFAULT_MODEL_ID` | `qwen-3-0.6b` | Default Wllama model ID (used for both WebGPU-accelerated and CPU inference) |
+| `WLLAMA_DEFAULT_MODEL_ID` | `littlelamb-290m` | Default Wllama model ID (used for both WebGPU-accelerated and CPU inference) |
 
 ### Internal API Configuration
 
@@ -231,7 +231,7 @@ Client-facing configuration (access keys, inference type, internal API settings)
 {
   "accessKeysEnabled": true,
   "accessKeyTimeoutHours": 24,
-  "wllamaDefaultModelId": "qwen-3-0.6b",
+  "wllamaDefaultModelId": "littlelamb-290m",
   "internalApiEnabled": true,
   "internalApiName": "Internal API",
   "defaultInferenceType": "browser"

@@ -6,3 +6,5 @@ ignored:
   - DL3008
   - SC2046
   - DL3025
+  # We run as the named `node` user that the base image already provides, by design.
+  - DL3066

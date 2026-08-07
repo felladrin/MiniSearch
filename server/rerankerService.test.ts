@@ -14,7 +14,7 @@ import {
 vi.mock("@huggingface/tokenizers", () => ({
   Tokenizer: class {
     encode() {
-      return { ids: [1, 2, 3], token_type_ids: [0, 0, 0] };
+      return { ids: [1, 2, 3] };
     }
   },
 }));
@@ -239,20 +239,13 @@ describe("startRerankerService", () => {
     release: async () => {},
   } as unknown as InferenceSession;
 
-  /** The message onnxruntime-node throws when Dawn finds no GPU adapter. */
-  const webGpuAdapterError = new Error(
-    "Failed to get a WebGPU adapter: No supported adapters",
-  );
-
-  function mockSessionCreation(
-    respond: (executionProviders: string[]) => Promise<InferenceSession>,
-  ) {
+  function mockSessionCreation(respond: () => Promise<InferenceSession>) {
     vi.mocked(InferenceSession.create).mockImplementation(((
       _modelPath: string,
       options: { executionProviders: string[] },
     ) => {
       requestedExecutionProviders.push(options.executionProviders);
-      return respond(options.executionProviders);
+      return respond();
     }) as unknown as typeof InferenceSession.create);
   }
 
@@ -266,36 +259,26 @@ describe("startRerankerService", () => {
     vi.restoreAllMocks();
   });
 
-  it("keeps the preferred providers when the session loads", async () => {
+  // No GPU provider is requested: the quantized graph has no integer-matmul
+  // kernels there and falls back operator by operator, which is slower than
+  // running on CPU outright.
+  it("creates a single CPU session and reports ready", async () => {
     mockSessionCreation(async () => sessionStub);
 
     await startRerankerService();
 
-    expect(requestedExecutionProviders).toEqual([["webgpu", "cpu"]]);
+    expect(requestedExecutionProviders).toEqual([["cpu"]]);
     expect(await getRerankerStatus()).toBe(true);
   });
 
-  it("retries on CPU when the WebGPU provider fails to initialize", async () => {
-    mockSessionCreation(async (executionProviders) => {
-      if (executionProviders.includes("webgpu")) throw webGpuAdapterError;
-      return sessionStub;
+  it("stays unready when the session cannot be created", async () => {
+    const loadError = new Error("Protobuf parsing failed");
+    mockSessionCreation(async () => {
+      throw loadError;
     });
 
-    await startRerankerService();
-
-    expect(requestedExecutionProviders).toEqual([["webgpu", "cpu"], ["cpu"]]);
-    expect(await getRerankerStatus()).toBe(true);
-  });
-
-  it("stays unready when CPU fails too", async () => {
-    const cpuError = new Error("Protobuf parsing failed");
-    mockSessionCreation(async (executionProviders) => {
-      throw executionProviders.includes("webgpu")
-        ? webGpuAdapterError
-        : cpuError;
-    });
-
-    await expect(startRerankerService()).rejects.toThrow(cpuError);
+    await expect(startRerankerService()).rejects.toThrow(loadError);
+    expect(requestedExecutionProviders).toEqual([["cpu"]]);
     expect(await getRerankerStatus()).toBe(false);
   });
 });
@@ -347,9 +330,11 @@ describe("rerank", () => {
   it("maps each score to its document index and preserves input order", async () => {
     // Non-monotonic scores: the result must stay in input order, not be
     // sorted by relevance (sorting/filtering lives in rankSearchResults).
-    runMock.mockResolvedValueOnce({
-      logits: { data: new Float32Array([0.5, 0.3, 0.8]) },
-    });
+    for (const score of [0.5, 0.3, 0.8]) {
+      runMock.mockResolvedValueOnce({
+        logits: { data: new Float32Array([score]) },
+      });
+    }
 
     const result = await rerank("query", ["A", "B", "C"]);
 
@@ -360,45 +345,39 @@ describe("rerank", () => {
     ]);
   });
 
-  it("splits documents into batches of BATCH_SIZE and concatenates in order", async () => {
-    // Give every document a unique score equal to its global position, so a
-    // dropped, duplicated, or reordered batch would break the assertions.
+  it("scores one document per model call and concatenates in order", async () => {
+    // Give every document a unique score equal to its position, so a dropped,
+    // duplicated, or reordered call would break the assertions.
     let nextScore = 0;
-    runMock.mockImplementation(
-      async (inputs: { input_ids: { dims: number[] } }) => {
-        const batchSize = inputs.input_ids.dims[0];
-        const data = new Float32Array(batchSize);
-        for (let i = 0; i < batchSize; i++) data[i] = nextScore++;
-        return { logits: { data } };
-      },
-    );
+    runMock.mockImplementation(async () => ({
+      logits: { data: new Float32Array([nextScore++]) },
+    }));
 
     const documents = Array.from({ length: 25 }, (_, i) => `doc ${i}`);
     const result = await rerank("query", documents);
 
-    expect(runMock).toHaveBeenCalledTimes(3); // 10 + 10 + 5
+    expect(runMock).toHaveBeenCalledTimes(25);
     expect(result).toHaveLength(25);
-    // Spot-check both sides of every batch boundary.
     expect(result[0]).toEqual({ index: 0, relevance_score: 0 });
-    expect(result[9]).toEqual({ index: 9, relevance_score: 9 });
-    expect(result[10]).toEqual({ index: 10, relevance_score: 10 });
     expect(result[24]).toEqual({ index: 24, relevance_score: 24 });
   });
 
-  it("makes exactly one model call per full batch when the count is a multiple of BATCH_SIZE", async () => {
-    runMock.mockImplementation(
-      async (inputs: { input_ids: { dims: number[] } }) => ({
-        logits: {
-          data: new Float32Array(inputs.input_ids.dims[0]).fill(0.5),
-        },
-      }),
-    );
+  // The scores of a dynamically quantized graph depend on the whole tensor's
+  // range, so a padded row would let one document's score shift another's.
+  it("sends one unpadded row per call, with every position attended to", async () => {
+    await rerank("query", ["A", "B"]);
 
-    const documents = Array.from({ length: 20 }, (_, i) => `doc ${i}`);
-    const result = await rerank("query", documents);
-
-    expect(runMock).toHaveBeenCalledTimes(2); // 10 + 10, no trailing empty batch
-    expect(result).toHaveLength(20);
+    expect(runMock).toHaveBeenCalledTimes(2);
+    for (const [inputs] of runMock.mock.calls) {
+      const { input_ids, attention_mask } = inputs as {
+        input_ids: { dims: number[]; data: BigInt64Array };
+        attention_mask: { dims: number[]; data: BigInt64Array };
+      };
+      expect(input_ids.dims).toEqual([1, 3]);
+      expect(Array.from(input_ids.data)).toEqual([1n, 2n, 3n]);
+      expect(attention_mask.dims).toEqual([1, 3]);
+      expect(Array.from(attention_mask.data)).toEqual([1n, 1n, 1n]);
+    }
   });
 
   it("sanitizes unpaired surrogates in the query and documents before tokenizing", async () => {
@@ -415,29 +394,29 @@ describe("rerank", () => {
 });
 
 describe("truncatePairTokens", () => {
-  // Sequence layout: [CLS] q q [SEP] | d d d d [SEP]
-  const ids = [101, 11, 12, 102, 21, 22, 23, 24, 102];
-  const tokenTypeIds = [0, 0, 0, 0, 1, 1, 1, 1, 1];
+  // Sequence layout: <s> q q </s> </s> | d d d d </s>
+  const ids = [0, 11, 12, 2, 2, 21, 22, 23, 24, 2];
 
   it("returns the ids unchanged when within budget", () => {
-    expect(truncatePairTokens(ids, tokenTypeIds, 20)).toBe(ids);
+    expect(truncatePairTokens(ids, 20)).toBe(ids);
   });
 
   it("drops document tokens from the end, keeping the query and trailing separator", () => {
-    const out = truncatePairTokens(ids, tokenTypeIds, 6);
+    const out = truncatePairTokens(ids, 7);
 
-    expect(out).toHaveLength(6);
-    expect(out.slice(0, 4)).toEqual([101, 11, 12, 102]); // query segment intact
-    expect(out.at(-1)).toBe(102); // trailing [SEP] preserved
-    expect(out).toEqual([101, 11, 12, 102, 21, 102]); // budget: 6 - 4 - 1 = 1 doc token
+    expect(out).toHaveLength(7);
+    expect(out.slice(0, 5)).toEqual([0, 11, 12, 2, 2]); // query segment intact
+    expect(out.at(-1)).toBe(2); // trailing separator preserved
+    expect(out).toEqual([0, 11, 12, 2, 2, 21, 2]);
   });
 
-  it("falls back to a plain head slice when the query alone exceeds the budget", () => {
-    const queryHeavyIds = [101, 11, 12, 13, 14, 102, 21, 102];
-    const queryHeavyTypes = [0, 0, 0, 0, 0, 0, 1, 1];
+  it("keeps a well-formed pair even when the query alone exceeds the budget", () => {
+    expect(truncatePairTokens(ids, 3)).toEqual([0, 11, 2]);
+  });
 
-    expect(truncatePairTokens(queryHeavyIds, queryHeavyTypes, 4)).toEqual([
-      101, 11, 12, 13,
-    ]);
+  it("never exceeds the position-embedding limit the model was built with", () => {
+    const overLong = Array.from({ length: 900 }, (_, index) => index);
+
+    expect(truncatePairTokens(overLong, 512)).toHaveLength(512);
   });
 });
