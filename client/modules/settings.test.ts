@@ -3,6 +3,7 @@ import type { ServerConfig } from "./config";
 import {
   applyServerConfig,
   defaultSettings,
+  getDefaultCpuThreads,
   getInferenceTypes,
 } from "./settings";
 
@@ -22,6 +23,34 @@ describe("Settings Module", () => {
     expect(defaultSettings.enableImageSearch).toBe(true);
     expect(defaultSettings.searchResultsLimit).toBe(15);
     expect(defaultSettings.inferenceType).toBeDefined();
+  });
+
+  describe("getDefaultCpuThreads", () => {
+    it("should always leave at least one thread on tiny machines", () => {
+      expect(getDefaultCpuThreads(1)).toBe(1);
+      expect(getDefaultCpuThreads(2)).toBe(1);
+    });
+
+    it("should scale with the machine instead of using a fixed ceiling", () => {
+      expect(getDefaultCpuThreads(4)).toBe(2);
+      expect(getDefaultCpuThreads(8)).toBe(4);
+      expect(getDefaultCpuThreads(16)).toBe(8);
+      expect(getDefaultCpuThreads(32)).toBe(16);
+      expect(getDefaultCpuThreads(128)).toBe(64);
+    });
+
+    it("should round down on an odd processor count", () => {
+      expect(getDefaultCpuThreads(3)).toBe(1);
+      expect(getDefaultCpuThreads(9)).toBe(4);
+    });
+
+    it("should never oversubscribe the logical processors", () => {
+      for (const cores of [1, 2, 3, 4, 8, 12, 16, 24, 32, 64, 256]) {
+        expect(getDefaultCpuThreads(cores)).toBeLessThanOrEqual(
+          Math.max(1, Math.floor(cores / 2)),
+        );
+      }
+    });
   });
 
   it("should include core inference types", () => {
