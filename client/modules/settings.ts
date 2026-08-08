@@ -17,6 +17,18 @@ export const hasStoredUserSettings =
   localStorage.getItem(SETTINGS_STORAGE_KEY) !== null;
 
 /**
+ * `navigator.hardwareConcurrency` reports logical processors, so half of it
+ * approximates the physical core count on the SMT CPUs most users have.
+ * wllama's throughput peaks there and degrades past it: on a 16-core/32-thread
+ * machine, 30 threads generated 3.5x slower than 16 and used 39% more memory.
+ */
+export function getDefaultCpuThreads(
+  hardwareConcurrency: number = navigator.hardwareConcurrency ?? 1,
+): number {
+  return Math.max(1, Math.floor(hardwareConcurrency / 2));
+}
+
+/**
  * Default application settings configuration.
  * Runtime server config is merged in via `applyServerConfig()` after
  * /api/config is fetched.
@@ -26,7 +38,7 @@ export const defaultSettings = {
   enableAiResponse: false,
   enableImageSearch: true,
   wllamaModelId: DEFAULT_WLLAMA_MODEL_ID,
-  cpuThreads: Math.max(1, (navigator.hardwareConcurrency ?? 1) - 2),
+  cpuThreads: getDefaultCpuThreads(),
   searchResultsLimit: 15,
   systemPrompt: `Answer using the search results below as your primary source, supplemented by your own knowledge when needed. Write your response in the same language as the query.
 
