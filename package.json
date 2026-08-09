@@ -56,7 +56,7 @@
     "keyword-extractor": "^0.0.28",
     "node-emoji": "^2.1.3",
     "onnxruntime-node": "^1.24.3",
-    "postcss": "^8.4.45",
+    "postcss": "^8.5.25",
     "postcss-preset-mantine": "^1.17.0",
     "postcss-simple-vars": "^7.0.1",
     "pretty-ms": "^9.1.0",
