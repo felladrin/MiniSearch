@@ -16,10 +16,16 @@ function mockReducedMotionPreference(matches: boolean) {
   );
 }
 
+/**
+ * Set the reduced-motion media query result for component tests.
+ */
 export function setReducedMotionPreference(matches: boolean) {
   mockReducedMotionPreference(matches);
 }
 
+/**
+ * Restore the default reduced-motion media query result for component tests.
+ */
 export function resetReducedMotionPreference() {
   mockReducedMotionPreference(false);
 }
