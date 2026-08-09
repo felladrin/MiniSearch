@@ -8,7 +8,7 @@ import {
   Transition,
   UnstyledButton,
 } from "@mantine/core";
-import { useMediaQuery } from "@mantine/hooks";
+import { useMediaQuery, useReducedMotion } from "@mantine/hooks";
 import { useEffect, useState } from "react";
 import { addLogEntry } from "@/modules/logEntries";
 import { getHostname } from "@/modules/stringFormatters";
@@ -22,6 +22,7 @@ export default function SearchResultsList({
   const shouldDisplayDomainBelowTitle = useMediaQuery(
     `(max-width: ${em(720)})`,
   );
+  const shouldReduceMotion = useReducedMotion();
   const [canStartTransition, setCanStartTransition] = useState(false);
 
   useEffect(() => {
@@ -36,8 +37,8 @@ export default function SearchResultsList({
           mounted={canStartTransition}
           transition="fade"
           timingFunction="ease"
-          enterDelay={index * 200}
-          duration={750}
+          enterDelay={shouldReduceMotion ? 0 : Math.min(index, 5) * 40}
+          duration={shouldReduceMotion ? 0 : 250}
         >
           {(styles) => (
             <Stack gap={16} style={styles}>
