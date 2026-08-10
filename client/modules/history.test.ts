@@ -215,10 +215,16 @@ describe("Search run ID management", () => {
 });
 
 describe("History Module - Dexie CRUD", () => {
+  let historyDatabase: typeof import("./history").historyDatabase;
+  let resetSearchRunId: typeof import("./history").resetSearchRunId;
+
+  beforeAll(async () => {
+    const mod = await import("./history");
+    historyDatabase = mod.historyDatabase;
+    resetSearchRunId = mod.resetSearchRunId;
+  });
+
   beforeEach(async () => {
-    vi.resetModules();
-    const { historyDatabase, resetSearchRunId } = await import("./history");
-    // Clear all tables so each test starts from a clean state
     await historyDatabase.searches.clear();
     await historyDatabase.llmResponses.clear();
     await historyDatabase.chatHistory.clear();
@@ -237,17 +243,21 @@ describe("History Module - Dexie CRUD", () => {
       expect(typeof id).toBe("number");
     });
 
-    it("should add an image search entry and return an ID", async () => {
-      const { addSearchToHistory } = await import("./history");
+    it("should store image results under imageResults, not textResults", async () => {
+      const { addSearchToHistory, getRecentSearches } = await import(
+        "./history"
+      );
       const results = {
         type: "image" as const,
         items: [
           { title: "I", url: "https://i.com", thumbnail: "https://t.com" },
         ],
       };
-      const id = await addSearchToHistory("image query", results);
-      expect(id).toBeDefined();
-      expect(typeof id).toBe("number");
+      await addSearchToHistory("image query", results);
+      const [entry] = await getRecentSearches();
+      expect(entry.imageResults).toEqual(results);
+      expect(entry.textResults).toBeUndefined();
+      expect(entry.results).toEqual(results);
     });
   });
 
@@ -267,14 +277,16 @@ describe("History Module - Dexie CRUD", () => {
         items: [{ title: "T", url: "https://t.com", snippet: "S" }],
       };
 
+      vi.setSystemTime(new Date(2000, 0, 1));
       await addSearchToHistory("first", results);
-      await new Promise((r) => setTimeout(r, 10));
+      vi.setSystemTime(new Date(2000, 0, 2));
       await addSearchToHistory("second", results);
+      vi.useRealTimers();
 
       const searches = await getRecentSearches();
-      expect(searches.length).toBeGreaterThanOrEqual(2);
-      // Most recent should be first
+      expect(searches).toHaveLength(2);
       expect(searches[0].query).toBe("second");
+      expect(searches[1].query).toBe("first");
     });
 
     it("should respect the limit parameter", async () => {
@@ -293,6 +305,23 @@ describe("History Module - Dexie CRUD", () => {
       const searches = await getRecentSearches(2);
       expect(searches).toHaveLength(2);
     });
+
+    it("should return all entries when count is below the default limit", async () => {
+      const { addSearchToHistory, getRecentSearches } = await import(
+        "./history"
+      );
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+
+      for (let i = 0; i < 12; i++) {
+        await addSearchToHistory(`query ${i}`, results);
+      }
+
+      const searches = await getRecentSearches();
+      expect(searches).toHaveLength(10);
+    });
   });
 
   describe("addSearchToHistory + getRecentSearches round-trip", () => {
@@ -306,11 +335,7 @@ describe("History Module - Dexie CRUD", () => {
       };
 
       await addSearchToHistory("round trip query", results, "user");
-      const searches = await getRecentSearches();
-      const entry = searches.find((s) => s.query === "round trip query");
-
-      expect(entry).toBeDefined();
-      if (!entry) return;
+      const [entry] = await getRecentSearches();
       expect(entry.query).toBe("round trip query");
       expect(entry.searchRunId).toBe(runId);
       expect(entry.source).toBe("user");
@@ -326,18 +351,14 @@ describe("History Module - Dexie CRUD", () => {
       };
 
       await addSearchToHistory("fields test", results);
-      const searches = await getRecentSearches();
-      const entry = searches.find((s) => s.query === "fields test");
-
-      expect(entry).toBeDefined();
-      if (!entry) return;
+      const [entry] = await getRecentSearches();
       expect(entry.textResults).toEqual(results);
       expect(entry.results).toEqual(results);
     });
   });
 
   describe("updateSearchResults", () => {
-    it("should update the latest entry for a searchRunId with new results", async () => {
+    it("should update the first entry for a searchRunId with new results", async () => {
       const {
         addSearchToHistory,
         updateSearchResults,
@@ -363,11 +384,7 @@ describe("History Module - Dexie CRUD", () => {
       await addSearchToHistory("update test", initialResults);
       await updateSearchResults(runId, updatedResults);
 
-      const searches = await getRecentSearches();
-      const entry = searches.find((s) => s.query === "update test");
-
-      expect(entry).toBeDefined();
-      if (!entry) return;
+      const [entry] = await getRecentSearches();
       expect(entry.imageResults).toEqual(updatedResults);
     });
   });
@@ -388,19 +405,32 @@ describe("History Module - Dexie CRUD", () => {
       await addSearchToHistory("llm test", results);
       await saveLlmResponseForQuery("llm test", "AI answer", "model-x");
 
-      const searches = await getRecentSearches();
-      const entry = searches.find((s) => s.query === "llm test");
-      expect(entry).toBeDefined();
-      if (!entry) return;
-
+      const [entry] = await getRecentSearches();
       const response = await getLatestLlmResponseForEntry(entry);
       expect(response).toBe("AI answer");
     });
 
-    it("should return null when no LLM response exists", async () => {
+    it("should store searchId back-link from llmResponses to the search row", async () => {
+      const { addSearchToHistory, historyDatabase, saveLlmResponseForQuery } =
+        await import("./history");
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+
+      const id = await addSearchToHistory("llm link test", results);
+      await saveLlmResponseForQuery("llm link test", "answer", "m");
+
+      const llmRecords = await historyDatabase.llmResponses.toArray();
+      expect(llmRecords).toHaveLength(1);
+      expect(llmRecords[0].searchId).toBe(id);
+    });
+
+    it("should return the most recent response when multiple exist", async () => {
       const {
         addSearchToHistory,
         getRecentSearches,
+        saveLlmResponseForQuery,
         getLatestLlmResponseForEntry,
       } = await import("./history");
       const results = {
@@ -408,14 +438,40 @@ describe("History Module - Dexie CRUD", () => {
         items: [{ title: "T", url: "https://t.com", snippet: "S" }],
       };
 
-      await addSearchToHistory("no llm", results);
-      const searches = await getRecentSearches();
-      const entry = searches.find((s) => s.query === "no llm");
-      expect(entry).toBeDefined();
-      if (!entry) return;
+      await addSearchToHistory("multi llm", results);
+      vi.setSystemTime(new Date(2000, 0, 1));
+      await saveLlmResponseForQuery("multi llm", "first", "m");
+      vi.setSystemTime(new Date(2000, 0, 2));
+      await saveLlmResponseForQuery("multi llm", "second", "m");
+      vi.useRealTimers();
 
+      const [entry] = await getRecentSearches();
       const response = await getLatestLlmResponseForEntry(entry);
-      expect(response).toBeNull();
+      expect(response).toBe("second");
+    });
+
+    it("should fall back to entry.query when searchRunId is missing", async () => {
+      const { historyDatabase, getLatestLlmResponseForEntry } = await import(
+        "./history"
+      );
+
+      // Insert an LLM response with a known searchRunId directly
+      await historyDatabase.llmResponses.add({
+        searchRunId: "my-query-fallback",
+        prompt: "legacy key test",
+        response: "answer",
+        model: "m",
+        timestamp: Date.now(),
+      });
+
+      // Entry without searchRunId should resolve via entry.query fallback
+      const entryWithoutRunId = {
+        id: -1,
+        query: "my-query-fallback",
+        timestamp: Date.now(),
+      };
+      const response = await getLatestLlmResponseForEntry(entryWithoutRunId);
+      expect(response).toBe("answer");
     });
   });
 
@@ -434,9 +490,11 @@ describe("History Module - Dexie CRUD", () => {
       const runId = getCurrentSearchRunId();
 
       await addSearchToHistory("chat test", results);
+      vi.setSystemTime(new Date(2000, 0, 1));
       await saveChatMessageForQuery("chat test", "user", "Hello");
-      await new Promise((r) => setTimeout(r, 10));
+      vi.setSystemTime(new Date(2000, 0, 2));
       await saveChatMessageForQuery("chat test", "assistant", "Hi there");
+      vi.useRealTimers();
 
       const messages = await getChatMessagesForQuery(runId);
       expect(messages).toHaveLength(2);
@@ -447,6 +505,46 @@ describe("History Module - Dexie CRUD", () => {
     it("should return empty array when no messages exist", async () => {
       const { getChatMessagesForQuery } = await import("./history");
       const messages = await getChatMessagesForQuery("nonexistent-run-id");
+      expect(messages).toEqual([]);
+    });
+  });
+
+  describe("error paths", () => {
+    it("should return undefined when addSearchToHistory fails", async () => {
+      const { addSearchToHistory, historyDatabase } = await import("./history");
+      vi.spyOn(historyDatabase.searches, "add").mockRejectedValue(
+        new Error("boom"),
+      );
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+      const id = await addSearchToHistory("q", results);
+      expect(id).toBeUndefined();
+    });
+
+    it("should return null when getLatestLlmResponseForEntry fails", async () => {
+      const { getLatestLlmResponseForEntry, historyDatabase } = await import(
+        "./history"
+      );
+      vi.spyOn(historyDatabase.llmResponses, "where").mockImplementation(() => {
+        throw new Error("boom") as never;
+      });
+      const response = await getLatestLlmResponseForEntry({
+        query: "test",
+        timestamp: 0,
+      });
+      expect(response).toBeNull();
+    });
+
+    it("should return empty array when getChatMessagesForQuery fails", async () => {
+      const { getChatMessagesForQuery, historyDatabase } = await import(
+        "./history"
+      );
+      vi.spyOn(historyDatabase.chatHistory, "where").mockImplementation(() => {
+        throw new Error("boom") as never;
+      });
+      const messages = await getChatMessagesForQuery("test");
       expect(messages).toEqual([]);
     });
   });
