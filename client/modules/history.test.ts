@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock the pubSub module so cleanup hooks don't fail on missing getSettings
+// Pin auto-cleanup off and avoid pubSub's module-level localStorage reads.
 vi.mock("./pubSub", () => ({
   getSettings: () => ({
     historyAutoCleanup: false,
@@ -231,6 +231,11 @@ describe("History Module - Dexie CRUD", () => {
     resetSearchRunId();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
   describe("addSearchToHistory", () => {
     it("should add a text search entry and return an ID", async () => {
       const { addSearchToHistory } = await import("./history");
@@ -277,16 +282,16 @@ describe("History Module - Dexie CRUD", () => {
         items: [{ title: "T", url: "https://t.com", snippet: "S" }],
       };
 
-      vi.setSystemTime(new Date(2000, 0, 1));
-      await addSearchToHistory("first", results);
+      // Insert "second" with the earlier timestamp so it proves sorting by timestamp, not ID.
       vi.setSystemTime(new Date(2000, 0, 2));
+      await addSearchToHistory("first", results);
+      vi.setSystemTime(new Date(2000, 0, 1));
       await addSearchToHistory("second", results);
-      vi.useRealTimers();
 
       const searches = await getRecentSearches();
       expect(searches).toHaveLength(2);
-      expect(searches[0].query).toBe("second");
-      expect(searches[1].query).toBe("first");
+      expect(searches[0].query).toBe("first");
+      expect(searches[1].query).toBe("second");
     });
 
     it("should respect the limit parameter", async () => {
@@ -306,7 +311,7 @@ describe("History Module - Dexie CRUD", () => {
       expect(searches).toHaveLength(2);
     });
 
-    it("should return all entries when count is below the default limit", async () => {
+    it("should cap at the default limit of 10", async () => {
       const { addSearchToHistory, getRecentSearches } = await import(
         "./history"
       );
@@ -386,6 +391,8 @@ describe("History Module - Dexie CRUD", () => {
 
       const [entry] = await getRecentSearches();
       expect(entry.imageResults).toEqual(updatedResults);
+      // Verify spread preserves original textResults
+      expect(entry.textResults).toEqual(initialResults);
     });
   });
 
@@ -439,15 +446,15 @@ describe("History Module - Dexie CRUD", () => {
       };
 
       await addSearchToHistory("multi llm", results);
-      vi.setSystemTime(new Date(2000, 0, 1));
-      await saveLlmResponseForQuery("multi llm", "first", "m");
+      // Save "second" first with a later timestamp, "first" second with earlier timestamp.
       vi.setSystemTime(new Date(2000, 0, 2));
       await saveLlmResponseForQuery("multi llm", "second", "m");
-      vi.useRealTimers();
+      vi.setSystemTime(new Date(2000, 0, 1));
+      await saveLlmResponseForQuery("multi llm", "first", "m");
 
       const [entry] = await getRecentSearches();
       const response = await getLatestLlmResponseForEntry(entry);
-      expect(response).toBe("second");
+      expect(response).toBe("second"); // must pick by timestamp, not insertion order
     });
 
     it("should fall back to entry.query when searchRunId is missing", async () => {
@@ -490,16 +497,17 @@ describe("History Module - Dexie CRUD", () => {
       const runId = getCurrentSearchRunId();
 
       await addSearchToHistory("chat test", results);
-      vi.setSystemTime(new Date(2000, 0, 1));
-      await saveChatMessageForQuery("chat test", "user", "Hello");
+      // Save assistant message with earlier timestamp so it proves sort by timestamp.
       vi.setSystemTime(new Date(2000, 0, 2));
+      await saveChatMessageForQuery("chat test", "user", "Hello");
+      vi.setSystemTime(new Date(2000, 0, 1));
       await saveChatMessageForQuery("chat test", "assistant", "Hi there");
-      vi.useRealTimers();
 
       const messages = await getChatMessagesForQuery(runId);
       expect(messages).toHaveLength(2);
-      expect(messages[0]).toEqual({ role: "user", content: "Hello" });
-      expect(messages[1]).toEqual({ role: "assistant", content: "Hi there" });
+      // sortBy("timestamp") puts the assistant (Jan 1) before user (Jan 2).
+      expect(messages[0]).toEqual({ role: "assistant", content: "Hi there" });
+      expect(messages[1]).toEqual({ role: "user", content: "Hello" });
     });
 
     it("should return empty array when no messages exist", async () => {
@@ -523,13 +531,24 @@ describe("History Module - Dexie CRUD", () => {
       expect(id).toBeUndefined();
     });
 
+    it("should return empty array when getRecentSearches fails", async () => {
+      const { getRecentSearches, historyDatabase } = await import("./history");
+      vi.spyOn(historyDatabase.searches, "orderBy").mockImplementation(() => {
+        throw new Error("boom") as never;
+      });
+      const results = await getRecentSearches();
+      expect(results).toEqual([]);
+    });
+
     it("should return null when getLatestLlmResponseForEntry fails", async () => {
       const { getLatestLlmResponseForEntry, historyDatabase } = await import(
         "./history"
       );
-      vi.spyOn(historyDatabase.llmResponses, "where").mockImplementation(() => {
-        throw new Error("boom") as never;
-      });
+      vi.spyOn(historyDatabase.llmResponses, "where").mockReturnValue({
+        equals: () => ({
+          toArray: () => Promise.reject(new Error("boom")),
+        }),
+      } as never);
       const response = await getLatestLlmResponseForEntry({
         query: "test",
         timestamp: 0,
@@ -541,9 +560,11 @@ describe("History Module - Dexie CRUD", () => {
       const { getChatMessagesForQuery, historyDatabase } = await import(
         "./history"
       );
-      vi.spyOn(historyDatabase.chatHistory, "where").mockImplementation(() => {
-        throw new Error("boom") as never;
-      });
+      vi.spyOn(historyDatabase.chatHistory, "where").mockReturnValue({
+        equals: () => ({
+          sortBy: () => Promise.reject(new Error("boom")),
+        }),
+      } as never);
       const messages = await getChatMessagesForQuery("test");
       expect(messages).toEqual([]);
     });
