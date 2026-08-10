@@ -3,14 +3,11 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ImageSearchResult } from "@/modules/types";
-import {
-  resetReducedMotionPreference,
-  setReducedMotionPreference,
-} from "../testUtils";
+import { setReducedMotionPreference } from "../testUtils";
 import ImageResultsList from "./ImageResultsList";
 
 afterEach(() => {
-  resetReducedMotionPreference();
+  setReducedMotionPreference(false);
 });
 
 const imageResults: ImageSearchResult[] = [
@@ -28,8 +25,10 @@ const imageResults: ImageSearchResult[] = [
   ],
 ];
 
+// Mirrors the default `searchResultsLimit`, so a reintroduced per-index
+// stagger pushes the last thumbnail far past the timeouts asserted below.
 const manyImageResults: ImageSearchResult[] = Array.from(
-  { length: 6 },
+  { length: 15 },
   (_, index) => [
     `Image ${index + 1}`,
     `https://example.com/${index + 1}`,
@@ -37,6 +36,7 @@ const manyImageResults: ImageSearchResult[] = Array.from(
     `https://source.example.com/${index + 1}`,
   ],
 );
+const lastImageButtonName = "Open image preview: Image 15";
 
 function renderImageResultsList() {
   return render(
@@ -89,9 +89,7 @@ describe("ImageResultsList", () => {
       </MantineProvider>,
     );
 
-    await screen.findByRole("button", {
-      name: "Open image preview: Image 6",
-    });
+    await screen.findByRole("button", { name: lastImageButtonName });
   });
 
   it("skips the animation when reduced motion is preferred", async () => {
@@ -104,13 +102,11 @@ describe("ImageResultsList", () => {
     );
 
     const imageButton = await screen.findByRole("button", {
-      name: "Open image preview: Image 6",
+      name: lastImageButtonName,
     });
-    const slideStyle = imageButton
-      .closest('[role="group"]')
-      ?.getAttribute("style");
+    const slide = imageButton.closest('[role="group"]');
 
-    expect(slideStyle ?? "").not.toContain("transition-property");
-    expect(slideStyle ?? "").not.toContain("transition-duration");
+    expect(slide).toBeInTheDocument();
+    expect(slide?.getAttribute("style") ?? "").not.toContain("transition");
   });
 });

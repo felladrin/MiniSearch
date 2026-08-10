@@ -2,14 +2,11 @@ import { MantineProvider } from "@mantine/core";
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach } from "vitest";
 import type { TextSearchResult } from "@/modules/types";
-import {
-  resetReducedMotionPreference,
-  setReducedMotionPreference,
-} from "../testUtils";
+import { setReducedMotionPreference } from "../testUtils";
 import SearchResultsList from "./SearchResultsList";
 
 afterEach(() => {
-  resetReducedMotionPreference();
+  setReducedMotionPreference(false);
 });
 
 describe("SearchResultsList", () => {
@@ -17,14 +14,17 @@ describe("SearchResultsList", () => {
     ["First Title", "First snippet text", "https://example.com/first"],
     ["Second Title", "Second snippet text", "https://example.com/second"],
   ];
+  // Mirrors the default `searchResultsLimit`, so a reintroduced per-index
+  // stagger pushes the last result far past the timeouts asserted below.
   const manyResults: TextSearchResult[] = Array.from(
-    { length: 6 },
+    { length: 15 },
     (_, index) => [
       `Result ${index + 1}`,
       `Snippet ${index + 1}`,
       `https://example.com/result-${index + 1}`,
     ],
   );
+  const lastResultTitle = "Result 15";
 
   it("renders a list of results after transition", async () => {
     render(
@@ -68,7 +68,7 @@ describe("SearchResultsList", () => {
     );
 
     await waitFor(
-      () => expect(screen.getByText("Result 6")).toBeInTheDocument(),
+      () => expect(screen.getByText(lastResultTitle)).toBeInTheDocument(),
       {
         timeout: 1000,
       },
@@ -84,15 +84,15 @@ describe("SearchResultsList", () => {
       </MantineProvider>,
     );
 
-    const resultTitle = await waitFor(() => screen.getByText("Result 6"), {
+    const resultTitle = await waitFor(() => screen.getByText(lastResultTitle), {
       timeout: 1000,
     });
-    const resultStyle = resultTitle
-      .closest(".mantine-Stack-root")
-      ?.getAttribute("style");
+    const resultStack = resultTitle.closest(".mantine-Stack-root");
 
-    expect(resultStyle ?? "").not.toContain("transition-property");
-    expect(resultStyle ?? "").not.toContain("transition-duration");
+    expect(resultStack).toBeInTheDocument();
+    expect(resultStack?.getAttribute("style") ?? "").not.toContain(
+      "transition",
+    );
   });
 
   it("renders links with correct href", async () => {
