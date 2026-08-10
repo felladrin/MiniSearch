@@ -24,7 +24,17 @@ const mockFetchResponse = (results: string[][]) => {
 };
 
 describe("Search Module", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Reset shared mutable state mutated by other test suites so every
+    // describe block runs with a clean, deterministic cache config.
+    searchModule.searchServiceInstance.updateCacheConfig({
+      ttl: 15 * 60 * 1000,
+      maxEntries: 100,
+      enabled: true,
+    });
+    // Clear the fake IndexedDB database so each test starts fresh.
+    await searchModule.searchServiceInstance.clearSearchCache();
+    // Clear mocks after clearSearchCache so addLogEntry starts empty.
     vi.clearAllMocks();
   });
 
@@ -357,6 +367,144 @@ describe("Search Module", () => {
       const results = await searchModule.searchImages("test query");
 
       expect(results).toEqual(mockResults);
+    });
+  });
+
+  describe("Cache Hit Path", () => {
+    it("should serve a repeated text query from the IndexedDB cache without a second fetch", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockResults),
+      });
+
+      // First call — cache miss, fetches from network.
+      const firstResults = await searchModule.searchText("cached query");
+      expect(firstResults).toEqual(mockResults);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Second call with the same query — should be a cache hit.
+      const secondResults = await searchModule.searchText("cached query");
+      expect(secondResults).toEqual(mockResults);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(addLogEntry).toHaveBeenCalledWith(
+        expect.stringContaining("Text search: Reused 1 results from the cache"),
+      );
+      expect(searchModule.searchServiceInstance.getCacheStats().textHits).toBe(
+        1,
+      );
+    });
+
+    it("should serve a repeated image query from the IndexedDB cache without a second fetch", async () => {
+      const mockResults: string[][] = [
+        ["Image", "Alt", "https://example.com/img.jpg"],
+      ];
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockResults),
+      });
+
+      const firstResults = await searchModule.searchImages("cached images");
+      expect(firstResults).toEqual(mockResults);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      const secondResults = await searchModule.searchImages("cached images");
+      expect(secondResults).toEqual(mockResults);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(addLogEntry).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "Image search: Reused 1 results from the cache",
+        ),
+      );
+      expect(searchModule.searchServiceInstance.getCacheStats().imageHits).toBe(
+        1,
+      );
+    });
+
+    it("should treat different queries as separate cache entries", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockResults),
+      });
+
+      await searchModule.searchText("query A");
+      await searchModule.searchText("query B");
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("should treat different limits as separate cache entries", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockResults),
+      });
+
+      await searchModule.searchText("same query", 5);
+      await searchModule.searchText("same query", 10);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("should refetch when TTL expires", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockResults),
+      });
+
+      await searchModule.searchText("ttl query");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Expire the cache entry instantly.
+      searchModule.searchServiceInstance.updateCacheConfig({ ttl: 0 });
+
+      const secondResults = await searchModule.searchText("ttl query");
+      expect(secondResults).toEqual(mockResults);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("should skip cache when caching is disabled", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockResults),
+      });
+
+      searchModule.searchServiceInstance.updateCacheConfig({ enabled: false });
+
+      await searchModule.searchText("disabled cache query");
+      await searchModule.searchText("disabled cache query");
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("should use separate caches for text and image stores", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockResults),
+      });
+
+      await searchModule.searchText("cross-store query");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      await searchModule.searchImages("cross-store query");
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      // Repeat the image query — should hit the image cache, not the network.
+      await searchModule.searchImages("cross-store query");
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
   });
 

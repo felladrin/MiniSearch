@@ -1,3 +1,7 @@
+// fake-indexeddb/auto installs all IndexedDB globals (indexedDB, IDBKeyRange,
+// etc.) so that Dexie-based cache tests exercise the real cache code paths
+// instead of silently erroring into catch blocks.
+import "fake-indexeddb/auto";
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
 
