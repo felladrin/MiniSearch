@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock the pubSub module so cleanup hooks don't fail on missing getSettings
+vi.mock("./pubSub", () => ({
+  getSettings: () => ({
+    historyAutoCleanup: false,
+    historyRetentionDays: 30,
+    historyMaxEntries: 500,
+  }),
+}));
+
 const createTestEntry = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
   searchRunId: "test-1",
@@ -202,5 +211,243 @@ describe("Search run ID management", () => {
     const id = getCurrentSearchRunId();
     expect(id).not.toBe("custom-id-123");
     expect(id).toMatch(/^\d+-[a-z0-9]+$/);
+  });
+});
+
+describe("History Module - Dexie CRUD", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    const { historyDatabase, resetSearchRunId } = await import("./history");
+    // Clear all tables so each test starts from a clean state
+    await historyDatabase.searches.clear();
+    await historyDatabase.llmResponses.clear();
+    await historyDatabase.chatHistory.clear();
+    resetSearchRunId();
+  });
+
+  describe("addSearchToHistory", () => {
+    it("should add a text search entry and return an ID", async () => {
+      const { addSearchToHistory } = await import("./history");
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+      const id = await addSearchToHistory("test query", results);
+      expect(id).toBeDefined();
+      expect(typeof id).toBe("number");
+    });
+
+    it("should add an image search entry and return an ID", async () => {
+      const { addSearchToHistory } = await import("./history");
+      const results = {
+        type: "image" as const,
+        items: [
+          { title: "I", url: "https://i.com", thumbnail: "https://t.com" },
+        ],
+      };
+      const id = await addSearchToHistory("image query", results);
+      expect(id).toBeDefined();
+      expect(typeof id).toBe("number");
+    });
+  });
+
+  describe("getRecentSearches", () => {
+    it("should return empty array when no entries exist", async () => {
+      const { getRecentSearches } = await import("./history");
+      const results = await getRecentSearches();
+      expect(results).toEqual([]);
+    });
+
+    it("should return entries in reverse chronological order", async () => {
+      const { addSearchToHistory, getRecentSearches } = await import(
+        "./history"
+      );
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+
+      await addSearchToHistory("first", results);
+      await new Promise((r) => setTimeout(r, 10));
+      await addSearchToHistory("second", results);
+
+      const searches = await getRecentSearches();
+      expect(searches.length).toBeGreaterThanOrEqual(2);
+      // Most recent should be first
+      expect(searches[0].query).toBe("second");
+    });
+
+    it("should respect the limit parameter", async () => {
+      const { addSearchToHistory, getRecentSearches } = await import(
+        "./history"
+      );
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+
+      for (let i = 0; i < 5; i++) {
+        await addSearchToHistory(`query ${i}`, results);
+      }
+
+      const searches = await getRecentSearches(2);
+      expect(searches).toHaveLength(2);
+    });
+  });
+
+  describe("addSearchToHistory + getRecentSearches round-trip", () => {
+    it("should preserve query, source, and searchRunId through a write/read cycle", async () => {
+      const { addSearchToHistory, getRecentSearches, getCurrentSearchRunId } =
+        await import("./history");
+      const runId = getCurrentSearchRunId();
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+
+      await addSearchToHistory("round trip query", results, "user");
+      const searches = await getRecentSearches();
+      const entry = searches.find((s) => s.query === "round trip query");
+
+      expect(entry).toBeDefined();
+      if (!entry) return;
+      expect(entry.query).toBe("round trip query");
+      expect(entry.searchRunId).toBe(runId);
+      expect(entry.source).toBe("user");
+    });
+
+    it("should store textResults and legacy results fields", async () => {
+      const { addSearchToHistory, getRecentSearches } = await import(
+        "./history"
+      );
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+
+      await addSearchToHistory("fields test", results);
+      const searches = await getRecentSearches();
+      const entry = searches.find((s) => s.query === "fields test");
+
+      expect(entry).toBeDefined();
+      if (!entry) return;
+      expect(entry.textResults).toEqual(results);
+      expect(entry.results).toEqual(results);
+    });
+  });
+
+  describe("updateSearchResults", () => {
+    it("should update the latest entry for a searchRunId with new results", async () => {
+      const {
+        addSearchToHistory,
+        updateSearchResults,
+        getRecentSearches,
+        getCurrentSearchRunId,
+      } = await import("./history");
+      const runId = getCurrentSearchRunId();
+      const initialResults = {
+        type: "text" as const,
+        items: [{ title: "Initial", url: "https://i.com", snippet: "I" }],
+      };
+      const updatedResults = {
+        type: "image" as const,
+        items: [
+          {
+            title: "Updated",
+            url: "https://u.com",
+            thumbnail: "https://th.com",
+          },
+        ],
+      };
+
+      await addSearchToHistory("update test", initialResults);
+      await updateSearchResults(runId, updatedResults);
+
+      const searches = await getRecentSearches();
+      const entry = searches.find((s) => s.query === "update test");
+
+      expect(entry).toBeDefined();
+      if (!entry) return;
+      expect(entry.imageResults).toEqual(updatedResults);
+    });
+  });
+
+  describe("saveLlmResponseForQuery / getLatestLlmResponseForEntry", () => {
+    it("should save and retrieve an LLM response for a search entry", async () => {
+      const {
+        addSearchToHistory,
+        getRecentSearches,
+        saveLlmResponseForQuery,
+        getLatestLlmResponseForEntry,
+      } = await import("./history");
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+
+      await addSearchToHistory("llm test", results);
+      await saveLlmResponseForQuery("llm test", "AI answer", "model-x");
+
+      const searches = await getRecentSearches();
+      const entry = searches.find((s) => s.query === "llm test");
+      expect(entry).toBeDefined();
+      if (!entry) return;
+
+      const response = await getLatestLlmResponseForEntry(entry);
+      expect(response).toBe("AI answer");
+    });
+
+    it("should return null when no LLM response exists", async () => {
+      const {
+        addSearchToHistory,
+        getRecentSearches,
+        getLatestLlmResponseForEntry,
+      } = await import("./history");
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+
+      await addSearchToHistory("no llm", results);
+      const searches = await getRecentSearches();
+      const entry = searches.find((s) => s.query === "no llm");
+      expect(entry).toBeDefined();
+      if (!entry) return;
+
+      const response = await getLatestLlmResponseForEntry(entry);
+      expect(response).toBeNull();
+    });
+  });
+
+  describe("saveChatMessageForQuery / getChatMessagesForQuery", () => {
+    it("should save and retrieve chat messages in order", async () => {
+      const {
+        addSearchToHistory,
+        getCurrentSearchRunId,
+        saveChatMessageForQuery,
+        getChatMessagesForQuery,
+      } = await import("./history");
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+      const runId = getCurrentSearchRunId();
+
+      await addSearchToHistory("chat test", results);
+      await saveChatMessageForQuery("chat test", "user", "Hello");
+      await new Promise((r) => setTimeout(r, 10));
+      await saveChatMessageForQuery("chat test", "assistant", "Hi there");
+
+      const messages = await getChatMessagesForQuery(runId);
+      expect(messages).toHaveLength(2);
+      expect(messages[0]).toEqual({ role: "user", content: "Hello" });
+      expect(messages[1]).toEqual({ role: "assistant", content: "Hi there" });
+    });
+
+    it("should return empty array when no messages exist", async () => {
+      const { getChatMessagesForQuery } = await import("./history");
+      const messages = await getChatMessagesForQuery("nonexistent-run-id");
+      expect(messages).toEqual([]);
+    });
   });
 });
