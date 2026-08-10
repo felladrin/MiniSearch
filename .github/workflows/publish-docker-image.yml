@@ -27,18 +27,12 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          # The date pattern mirrors `getSemanticVersion` in
-          # `client/modules/stringFormatters.ts`, which the app reports as its
-          # version: unpadded month and day, UTC (the action's default timezone).
-          # A running instance reporting `2026.8.10+f1c8d2e` therefore maps to
-          # the `2026.8.10-f1c8d2e` tag, hyphenated because `+` is not a legal
-          # character in a Docker tag.
-          #
-          # `latest` is guarded by `is_default_branch` because it's the only
-          # moving tag: without the guard, dispatching this workflow from a
-          # side branch would move it for everyone.
+          # `latest` replaces the `main` tag this action emits by default. With
+          # releases cut on demand, the image can sit several commits behind the
+          # branch, so naming it after the branch misleads. The
+          # `is_default_branch` guard stops a dispatch from a side branch from
+          # moving the tag for everyone.
           tags: |
-            type=raw,value={{date 'YYYY.M.D'}}-{{sha}}
             type=raw,value=latest,enable={{is_default_branch}}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c  # v4

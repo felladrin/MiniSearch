@@ -73,7 +73,7 @@ Used by both `on-push-to-main` and `on-pull-request-to-main` to run the producti
 The Docker image uses a multi-stage build:
 The image installs Python/SearXNG, builds the Vite frontend, and runs SearXNG and Node.js in a single container via shell process composition. No compilation step is required: the reranker's ONNX Runtime binaries ship prebuilt with the npm dependency.
 
-The production image is published to `ghcr.io` with multi-platform support (linux/amd64, linux/arm64). Labels are auto-generated from Git metadata via `docker/metadata-action`, and each release is tagged twice: `latest`, plus an immutable `YYYY.M.D-<short-sha>` mirroring the version the app reports (`getSemanticVersion` in `client/modules/stringFormatters.ts`, with `+` replaced by `-`, which Docker tags do not allow). Weekly, `scan-docker-image.yml` runs Trivy against the published `latest` and reports fixable HIGH/CRITICAL findings to code scanning.
+The production image is published to `ghcr.io` with multi-platform support (linux/amd64, linux/arm64). Labels are auto-generated from Git metadata via `docker/metadata-action`, and each release is published as `latest`; to pin a build, users reference the image digest. Weekly, `scan-docker-image.yml` runs Trivy against the published `latest` and reports fixable HIGH/CRITICAL findings to code scanning.
 
 ### Manual Deployments
 

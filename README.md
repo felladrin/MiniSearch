@@ -41,24 +41,16 @@ docker run -p 7860:7860 ghcr.io/felladrin/minisearch
 Then open <http://localhost:7860> and start searching.
 
 <details>
-<summary>Pin to a specific version</summary>
+<summary>Pin to a specific build</summary>
 
-`latest` points at the most recent release, so it changes under you. To stay on a known-good build, pin a version instead:
-
-| Tag | Example | Moves? |
-| --- | --- | --- |
-| `latest` | `minisearch:latest` | Yes, on every release |
-| `YYYY.M.D-<commit>` | `minisearch:2026.8.10-f1c8d2e` | No |
-| `@sha256:<digest>` | `minisearch@sha256:1a2b3c...` | No |
-
-The version tag is the one the app reports (in the menu, and under `build` on `/status`) with its `+` turned into a `-`, since `+` is not allowed in a Docker tag. An instance showing `2026.8.10+f1c8d2e` came from `2026.8.10-f1c8d2e`.
-
-For the strongest guarantee, pin the digest, which identifies the exact image no matter what the tags do later:
+`latest` moves on every release, so it changes under you. To stay on a known-good build, pin the digest, which always identifies the same image:
 
 ```bash
-docker pull ghcr.io/felladrin/minisearch:2026.8.10-f1c8d2e
-docker inspect --format '{{index .RepoDigests 0}}' ghcr.io/felladrin/minisearch:2026.8.10-f1c8d2e
+docker inspect --format '{{index .RepoDigests 0}}' ghcr.io/felladrin/minisearch:latest
+docker run -p 7860:7860 ghcr.io/felladrin/minisearch@sha256:1a2b3c...
 ```
+
+The version the running instance reports (in the menu, and under `build` on `/status`) tells you which commit it was built from.
 
 Images carry provenance and SBOM attestations, which you can inspect with:
 
