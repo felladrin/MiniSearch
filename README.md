@@ -35,10 +35,30 @@ The AI can run entirely inside your browser tab, on GPU or CPU, so a working set
 Run the published image:
 
 ```bash
-docker run -p 7860:7860 ghcr.io/felladrin/minisearch:main
+docker run -p 7860:7860 ghcr.io/felladrin/minisearch
 ```
 
 Then open <http://localhost:7860> and start searching.
+
+<details>
+<summary>Pin to a specific build</summary>
+
+`latest` moves on every release, so it changes under you. To stay on a known-good build, pin the digest, which always identifies the same image:
+
+```bash
+docker inspect --format '{{index .RepoDigests 0}}' ghcr.io/felladrin/minisearch:latest
+docker run -p 7860:7860 ghcr.io/felladrin/minisearch@sha256:1a2b3c...
+```
+
+The version the running instance reports (in the menu, and under `build` on `/status`) tells you which commit it was built from.
+
+Images carry provenance and SBOM attestations, which you can inspect with:
+
+```bash
+docker buildx imagetools inspect ghcr.io/felladrin/minisearch:latest
+```
+
+</details>
 
 <details>
 <summary>Use Docker Compose</summary>
@@ -48,7 +68,7 @@ Add the service to your `docker-compose.yml`:
 ```yaml
 services:
   minisearch:
-    image: ghcr.io/felladrin/minisearch:main
+    image: ghcr.io/felladrin/minisearch:latest
     ports:
       - "7860:7860"
 ```
