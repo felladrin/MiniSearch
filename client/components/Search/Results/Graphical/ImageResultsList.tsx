@@ -8,6 +8,7 @@ import {
   Transition,
   UnstyledButton,
 } from "@mantine/core";
+import { useReducedMotion } from "@mantine/hooks";
 import { useEffect, useState } from "react";
 import type { ImageSearchResult } from "@/modules/types";
 import "@mantine/carousel/styles.css";
@@ -30,6 +31,7 @@ export default function ImageResultsList({
 }: {
   imageResults: ImageSearchResult[];
 }) {
+  const shouldReduceMotion = useReducedMotion();
   const [state, setState] = useState<ImageResultsState>({
     isLightboxOpen: false,
     lightboxIndex: 0,
@@ -74,8 +76,8 @@ export default function ImageResultsList({
             mounted={state.canStartTransition}
             transition="fade"
             timingFunction="ease"
-            enterDelay={index * 250}
-            duration={1500}
+            enterDelay={shouldReduceMotion ? 0 : Math.min(index, 5) * 40}
+            duration={shouldReduceMotion ? 0 : 250}
           >
             {(styles) => (
               <Carousel.Slide style={styles}>
