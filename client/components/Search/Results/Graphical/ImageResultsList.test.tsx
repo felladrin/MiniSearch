@@ -1,9 +1,14 @@
 import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { ImageSearchResult } from "@/modules/types";
+import { setReducedMotionPreference } from "../testUtils";
 import ImageResultsList from "./ImageResultsList";
+
+afterEach(() => {
+  setReducedMotionPreference(false);
+});
 
 const imageResults: ImageSearchResult[] = [
   [
@@ -19,6 +24,19 @@ const imageResults: ImageSearchResult[] = [
     "https://source.example.com/second",
   ],
 ];
+
+// Mirrors the default `searchResultsLimit`, so a reintroduced per-index
+// stagger pushes the last thumbnail far past the timeouts asserted below.
+const manyImageResults: ImageSearchResult[] = Array.from(
+  { length: 15 },
+  (_, index) => [
+    `Image ${index + 1}`,
+    `https://example.com/${index + 1}`,
+    `https://example.com/${index + 1}.jpg`,
+    `https://source.example.com/${index + 1}`,
+  ],
+);
+const lastImageButtonName = "Open image preview: Image 15";
 
 function renderImageResultsList() {
   return render(
@@ -62,5 +80,33 @@ describe("ImageResultsList", () => {
     expect(
       dialog.querySelector(".yarl__slide_current img")?.getAttribute("alt"),
     ).toBe("Second image");
+  });
+
+  it("does not leave later results waiting behind a long stagger", async () => {
+    render(
+      <MantineProvider>
+        <ImageResultsList imageResults={manyImageResults} />
+      </MantineProvider>,
+    );
+
+    await screen.findByRole("button", { name: lastImageButtonName });
+  });
+
+  it("skips the animation when reduced motion is preferred", async () => {
+    setReducedMotionPreference(true);
+
+    render(
+      <MantineProvider>
+        <ImageResultsList imageResults={manyImageResults} />
+      </MantineProvider>,
+    );
+
+    const imageButton = await screen.findByRole("button", {
+      name: lastImageButtonName,
+    });
+    const slide = imageButton.closest('[role="group"]');
+
+    expect(slide).toBeInTheDocument();
+    expect(slide?.getAttribute("style") ?? "").not.toContain("transition");
   });
 });
