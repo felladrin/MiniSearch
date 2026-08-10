@@ -35,7 +35,7 @@ The AI can run entirely inside your browser tab, on GPU or CPU, so a working set
 Run the published image:
 
 ```bash
-docker run -p 7860:7860 ghcr.io/felladrin/minisearch:latest
+docker run -p 7860:7860 ghcr.io/felladrin/minisearch
 ```
 
 Then open <http://localhost:7860> and start searching.
@@ -43,22 +43,21 @@ Then open <http://localhost:7860> and start searching.
 <details>
 <summary>Pin to a specific version</summary>
 
-`latest` and `main` both follow the tip of the default branch, so they change under you. To stay on a known-good build, pick one of the immutable options:
+`latest` points at the most recent release, so it changes under you. To stay on a known-good build, pin a version instead:
 
 | Tag | Example | Moves? |
 | --- | --- | --- |
-| `latest` | `minisearch:latest` | Yes, every push to `main` |
-| `YYYY.M.D` | `minisearch:2026.8.3` | Only if another build lands the same day |
-| `sha-<commit>` | `minisearch:sha-f1c8d2e` | No |
+| `latest` | `minisearch:latest` | Yes, on every release |
+| `YYYY.M.D-<commit>` | `minisearch:2026.8.10-f1c8d2e` | No |
 | `@sha256:<digest>` | `minisearch@sha256:1a2b3c...` | No |
 
-The version the app reports (in the menu, and under `build` on `/status`) combines the first two, so a running instance showing `2026.8.3+f1c8d2e` came from `sha-f1c8d2e`.
+The version tag is the one the app reports (in the menu, and under `build` on `/status`) with its `+` turned into a `-`, since `+` is not allowed in a Docker tag. An instance showing `2026.8.10+f1c8d2e` came from `2026.8.10-f1c8d2e`.
 
 For the strongest guarantee, pin the digest, which identifies the exact image no matter what the tags do later:
 
 ```bash
-docker pull ghcr.io/felladrin/minisearch:sha-f1c8d2e
-docker inspect --format '{{index .RepoDigests 0}}' ghcr.io/felladrin/minisearch:sha-f1c8d2e
+docker pull ghcr.io/felladrin/minisearch:2026.8.10-f1c8d2e
+docker inspect --format '{{index .RepoDigests 0}}' ghcr.io/felladrin/minisearch:2026.8.10-f1c8d2e
 ```
 
 Images carry provenance and SBOM attestations, which you can inspect with:

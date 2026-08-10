@@ -58,6 +58,7 @@ The repository uses six GitHub Actions workflows for continuous integration, dep
 | `on-push-to-main.yml` | Push to `main` | Delegates to `reusable-check-docker.yml` |
 | `on-pull-request-to-main.yml` | PR opened/synced/reopened to `main` | Delegates to `reusable-check-docker.yml`; skippable via `skip-check-docker` label |
 | `publish-docker-image.yml` | Manual (`workflow_dispatch`) | Builds multi-platform Docker image (linux/amd64, linux/arm64) and pushes to `ghcr.io` |
+| `scan-docker-image.yml` | Weekly (Monday 06:00 UTC) or manual | Trivy scan of the published image, reporting fixable HIGH/CRITICAL findings to code scanning |
 | `deploy-to-hugging-face.yml` | Manual (`workflow_dispatch`) | Syncs repository to Hugging Face Spaces using `JacobLinCool/huggingface-sync` |
 | `reusable-check-docker.yml` | Called by other workflows | Docker compose production build + health check via `curl localhost:7860` (lint/format/test are covered by `ci.yml`) |
 
@@ -72,7 +73,7 @@ Used by both `on-push-to-main` and `on-pull-request-to-main` to run the producti
 The Docker image uses a multi-stage build:
 The image installs Python/SearXNG, builds the Vite frontend, and runs SearXNG and Node.js in a single container via shell process composition. No compilation step is required: the reranker's ONNX Runtime binaries ship prebuilt with the npm dependency.
 
-The production image is published to `ghcr.io` with multi-platform support (linux/amd64, linux/arm64). Tags and labels are auto-generated from Git metadata via `docker/metadata-action`.
+The production image is published to `ghcr.io` with multi-platform support (linux/amd64, linux/arm64). Labels are auto-generated from Git metadata via `docker/metadata-action`, and each release is tagged twice: `latest`, plus an immutable `YYYY.M.D-<short-sha>` mirroring the version the app reports (`getSemanticVersion` in `client/modules/stringFormatters.ts`, with `+` replaced by `-`, which Docker tags do not allow). Weekly, `scan-docker-image.yml` runs Trivy against the published `latest` and reports fixable HIGH/CRITICAL findings to code scanning.
 
 ### Manual Deployments
 
