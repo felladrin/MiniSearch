@@ -571,7 +571,7 @@ describe("internalApiEndpointServerHook", () => {
       }
     });
 
-    it("emits SSE error when the only model fails", async () => {
+    it("responds 503 JSON when the only model cannot start", async () => {
       vi.mocked(streamText).mockImplementation(() => {
         throw new Error("upstream down");
       });
@@ -582,8 +582,17 @@ describe("internalApiEndpointServerHook", () => {
         response,
         vi.fn(),
       );
-      const writes = response.write.mock.calls.map((c) => c[0]).join("");
-      expect(writes).toContain("all models failed: upstream down");
+      expect(response.statusCode).toBe(503);
+      expect(response.setHeader).toHaveBeenCalledWith(
+        "Content-Type",
+        "application/json",
+      );
+      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      expect(payload).toEqual({
+        error: "Service unavailable - all models failed",
+        lastError: "upstream down",
+      });
+      expect(response.write).not.toHaveBeenCalled();
       expect(vi.mocked(streamText)).toHaveBeenCalledTimes(1);
     });
 

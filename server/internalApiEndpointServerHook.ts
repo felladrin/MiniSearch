@@ -282,13 +282,6 @@ export function internalApiEndpointServerHook<
             return;
           }
 
-          if (!hasStartedStreaming) {
-            response.setHeader("Content-Type", "text/event-stream");
-            response.setHeader("Cache-Control", "no-cache");
-            response.setHeader("Connection", "keep-alive");
-            hasStartedStreaming = true;
-          }
-
           try {
             const stream = streamText({
               model: openaiProvider.chatModel(model),
@@ -298,6 +291,13 @@ export function internalApiEndpointServerHook<
               maxOutputTokens: clampedMaxTokens,
               maxRetries: 0,
             });
+
+            if (!hasStartedStreaming) {
+              response.setHeader("Content-Type", "text/event-stream");
+              response.setHeader("Cache-Control", "no-cache");
+              response.setHeader("Connection", "keep-alive");
+              hasStartedStreaming = true;
+            }
 
             for await (const part of stream.fullStream) {
               if (!isResponseWritable(response)) return;

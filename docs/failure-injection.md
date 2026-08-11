@@ -29,7 +29,8 @@ needed.
 | `/inference` upstream is not configured | HTTP 500 with a JSON error | `server/internalApiEndpointServerHook.test.ts` › environment configuration |
 | `/inference` cannot list upstream models | HTTP 500 with a JSON error | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | Upstream model fails but another one is available | Retried on the next model, answer still streams | `server/internalApiEndpointServerHook.test.ts` › streaming path |
-| Upstream model fails on every attempt | SSE error frame, so the client stops waiting | `server/internalApiEndpointServerHook.test.ts` › streaming path |
+| Every model stream fails before streaming starts | HTTP 503 with a JSON error | `server/internalApiEndpointServerHook.test.ts` › streaming path |
+| An established upstream stream fails | SSE error frame, so the client stops waiting | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | Upstream stream ends without a finish part | `Stream ended unexpectedly` error frame | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | Upstream fails after content was already sent | No retry, the partial answer stands | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | Response is already unwritable when streaming would start | No headers set, the upstream is never called | `server/internalApiEndpointServerHook.test.ts` › streaming path |
