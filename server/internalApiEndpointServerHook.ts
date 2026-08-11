@@ -260,16 +260,20 @@ export function internalApiEndpointServerHook<
         let lastError: unknown = null;
         let hasStartedStreaming = false;
 
-        const clampedMaxTokens = requestBody.max_tokens
-          ? Math.min(requestBody.max_tokens, config.defaultMaxTokens)
-          : undefined;
-        const clampedTemperature = requestBody.temperature
-          ? Math.max(0, Math.min(requestBody.temperature, 2))
-          : undefined;
-        const clampedTopP = requestBody.top_p
-          ? Math.max(0, Math.min(requestBody.top_p, 1))
-          : undefined;
+        const clampedMaxTokens =
+          requestBody.max_tokens !== undefined
+            ? Math.min(requestBody.max_tokens, config.defaultMaxTokens)
+            : undefined;
+        const clampedTemperature =
+          requestBody.temperature !== undefined
+            ? Math.max(0, Math.min(requestBody.temperature, 2))
+            : undefined;
+        const clampedTopP =
+          requestBody.top_p !== undefined
+            ? Math.max(0, Math.min(requestBody.top_p, 1))
+            : undefined;
 
+        let hasEmittedContent = false;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           if (!model) break;
           attemptedModels.add(model);
@@ -299,7 +303,10 @@ export function internalApiEndpointServerHook<
               if (!isResponseWritable(response)) return;
 
               if (part.type === "text-delta") {
+                hasEmittedContent = true;
                 sendSseData(response, createChunkPayload(model, part.text));
+              } else if (part.type === "error") {
+                throw part.error;
               } else if (part.type === "finish") {
                 sendSseData(
                   response,
@@ -316,6 +323,7 @@ export function internalApiEndpointServerHook<
             lastError = error;
             console.error("Error during streaming:", error);
 
+            if (hasEmittedContent) break;
             if (attempt >= maxAttempts) break;
 
             if (
