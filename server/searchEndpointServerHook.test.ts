@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./handleTokenVerification", () => ({
   handleTokenVerification: vi.fn(),
@@ -68,6 +68,9 @@ function getRegisteredHandler() {
 describe("searchEndpointServerHook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks keeps implementations, and one degradation case installs a
+    // fetch that only settles on abort.
+    mockFetch.mockReset();
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: true,
     });
@@ -268,6 +271,193 @@ describe("searchEndpointServerHook", () => {
 
     const [body] = response.end.mock.calls[0];
     expect(JSON.parse(body)).toEqual([]);
+  });
+
+  describe("graceful degradation", () => {
+    const searxngResults: [string, string, string][] = [
+      ["A", "snippet a", "https://a.com"],
+      ["B", "snippet b", "https://b.com"],
+    ];
+    const imageResult: [string, string, string, string] = [
+      "Cat picture",
+      "https://example.com/cat.jpg",
+      "https://thumb.example.com/cat.jpg",
+      "https://example.com/cat",
+    ];
+    const thumbnailDataUrl = `data:image/jpeg;base64,${Buffer.from([1, 2, 3]).toString("base64")}`;
+
+    function respondWithThumbnail() {
+      mockFetch.mockResolvedValue(
+        new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { "content-type": "image/jpeg" },
+        }),
+      );
+    }
+
+    beforeEach(() => {
+      // The degradation paths log on purpose; keep the test output readable.
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("returns unranked results when the reranker is down", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(getRerankerStatus).mockResolvedValue(false);
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/text?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(rankSearchResults).not.toHaveBeenCalled();
+      expect(response.statusCode).toBe(200);
+      expect(response.end).toHaveBeenCalledWith(JSON.stringify(searxngResults));
+    });
+
+    it("returns unranked results when reranking throws mid-request", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(getRerankerStatus).mockResolvedValue(true);
+      vi.mocked(rankSearchResults).mockRejectedValue(
+        new Error("Reranker model is not loaded"),
+      );
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/text?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(response.end).toHaveBeenCalledWith(JSON.stringify(searxngResults));
+    });
+
+    it("still serves image results when the reranker is down", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
+      vi.mocked(getRerankerStatus).mockResolvedValue(false);
+      respondWithThumbnail();
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/images?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(rankSearchResults).not.toHaveBeenCalled();
+      expect(response.statusCode).toBe(200);
+      const [body] = response.end.mock.calls[0];
+      expect(JSON.parse(body)).toEqual([
+        [imageResult[0], imageResult[1], thumbnailDataUrl, imageResult[3]],
+      ]);
+    });
+
+    it("still serves image results when reranking throws mid-request", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
+      vi.mocked(getRerankerStatus).mockResolvedValue(true);
+      vi.mocked(rankSearchResults).mockRejectedValue(
+        new Error("Reranker model is not loaded"),
+      );
+      respondWithThumbnail();
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/images?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(response.statusCode).toBe(200);
+      const [body] = response.end.mock.calls[0];
+      expect(JSON.parse(body)).toEqual([
+        [imageResult[0], imageResult[1], thumbnailDataUrl, imageResult[3]],
+      ]);
+    });
+
+    it("drops an image the reranker returns under an unknown URL", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
+      vi.mocked(getRerankerStatus).mockResolvedValue(true);
+      vi.mocked(rankSearchResults).mockResolvedValue([
+        ["Cat picture", "", "https://example.com/not-in-the-result-set.jpg"],
+      ]);
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/images?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(response.end).toHaveBeenCalledWith("[]");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("drops an image whose thumbnail host never answers", async () => {
+      // Matches THUMBNAIL_TIMEOUT_MS in searchEndpointServerHook.ts.
+      const thumbnailTimeoutMs = 1000;
+      vi.useFakeTimers();
+      try {
+        vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
+        vi.mocked(getRerankerStatus).mockResolvedValue(false);
+        mockFetch.mockImplementation(
+          (_url: string, init?: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              init?.signal?.addEventListener("abort", () =>
+                reject(new Error("The operation was aborted")),
+              );
+            }),
+        );
+
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+        const handled = handler(
+          createRequest("/search/images?q=cats&token=abc"),
+          response,
+          vi.fn(),
+        );
+        await vi.advanceTimersByTimeAsync(thumbnailTimeoutMs);
+        await handled;
+
+        expect(response.statusCode).toBe(200);
+        expect(response.end).toHaveBeenCalledWith("[]");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("serves an empty result set instead of an error when SearXNG is down", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/text?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(response.end).toHaveBeenCalledWith("[]");
+    });
   });
 
   it("responds 500 when an unexpected error is thrown", async () => {

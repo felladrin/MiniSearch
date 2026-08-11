@@ -35,6 +35,7 @@ This is your navigation hub. Start here, follow the links, and return when you n
 
 ### Development
 - **`docs/development-commands.md`** - Docker, npm, and testing commands
+- **`docs/failure-injection.md`** - Graceful-degradation test matrix
 - **`docs/coding-conventions.md`** - Style guide and patterns
 - **`docs/pull-requests.md`** - PR process and merge philosophy
 - **`docs/core-technologies.md`** - Technology stack and dependencies
