@@ -186,6 +186,165 @@ describe("retry logic", () => {
   });
 });
 
+describe("graceful degradation", () => {
+  // One initial attempt plus MAX_RETRIES.
+  const ATTEMPTS_PER_CALL = 4;
+  // BASE_RETRY_DELAY doubling across the three retries: 1000 + 2000 + 4000.
+  const RETRY_BACKOFF_TOTAL_MS = 7000;
+
+  const breakerOptions = {
+    failureThreshold: 5,
+    resetTimeout: 60_000,
+    successThreshold: 1,
+  };
+
+  /**
+   * Advances only far enough to drain the retry backoff. `runAllTimersAsync`
+   * would also fire the breaker's own reset timer, flipping an open circuit to
+   * half-open and letting the next call reach SearXNG again.
+   */
+  async function searchThroughRetries(breaker: CircuitBreaker) {
+    const promise = fetchSearXNG("failure injection", "text", 30, breaker);
+    await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_TOTAL_MS);
+    return promise;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("counts a whole exhausted retry cycle as a single breaker failure", async () => {
+    const breaker = new CircuitBreaker(breakerOptions);
+    fetchMock.mockResolvedValue(createMockResponse("", false, 500));
+
+    for (let cycle = 0; cycle < breakerOptions.failureThreshold - 1; cycle++) {
+      const results = await searchThroughRetries(breaker);
+      expect(results).toEqual([]);
+    }
+
+    // Four full cycles of upstream requests, still one failure short of opening.
+    expect(fetchMock).toHaveBeenCalledTimes(
+      (breakerOptions.failureThreshold - 1) * ATTEMPTS_PER_CALL,
+    );
+    expect(breaker.getState("searxng")).toBe("CLOSED");
+  });
+
+  it("opens the circuit after five exhausted retry cycles and stops calling SearXNG", async () => {
+    const breaker = new CircuitBreaker(breakerOptions);
+    fetchMock.mockResolvedValue(createMockResponse("", false, 500));
+
+    for (let cycle = 0; cycle < breakerOptions.failureThreshold; cycle++) {
+      await searchThroughRetries(breaker);
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(
+      breakerOptions.failureThreshold * ATTEMPTS_PER_CALL,
+    );
+    expect(breaker.getState("searxng")).toBe("OPEN");
+
+    const callsWhileOpen = fetchMock.mock.calls.length;
+    const results = await searchThroughRetries(breaker);
+
+    expect(results).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(callsWhileOpen);
+  });
+
+  it("closes the circuit again once SearXNG recovers after the reset timeout", async () => {
+    const breaker = new CircuitBreaker(breakerOptions);
+    fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+
+    for (
+      let failure = 0;
+      failure < breakerOptions.failureThreshold;
+      failure++
+    ) {
+      await fetchSearXNG("failure injection", "text", 30, breaker);
+    }
+
+    expect(breaker.getState("searxng")).toBe("OPEN");
+
+    await vi.advanceTimersByTimeAsync(breakerOptions.resetTimeout + 1);
+    fetchMock.mockResolvedValue(successResponse());
+
+    const results = await fetchSearXNG(
+      "failure injection",
+      "text",
+      30,
+      breaker,
+    );
+
+    expect(results).toHaveLength(1);
+    expect(breaker.getState("searxng")).toBe("CLOSED");
+  });
+
+  it("cannot be told apart downstream: provider down and genuinely empty both yield []", async () => {
+    const downBreaker = new CircuitBreaker({ failureThreshold: 1 });
+    fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+    const providerDown = await fetchSearXNG(
+      "failure injection",
+      "text",
+      30,
+      downBreaker,
+    );
+
+    const emptyBreaker = new CircuitBreaker({ failureThreshold: 1 });
+    fetchMock.mockResolvedValue(
+      createMockResponse(JSON.stringify({ results: [] })),
+    );
+    const noResults = await fetchSearXNG(
+      "failure injection",
+      "text",
+      30,
+      emptyBreaker,
+    );
+
+    // The breaker knows which one was a failure; the return value does not.
+    expect(downBreaker.getState("searxng")).toBe("OPEN");
+    expect(emptyBreaker.getState("searxng")).toBe("CLOSED");
+    expect(providerDown).toEqual([]);
+    expect(noResults).toEqual([]);
+  });
+
+  it("returns an empty array when SearXNG answers 200 with a malformed body", async () => {
+    fetchMock.mockResolvedValue(createMockResponse("<html>gateway</html>"));
+
+    const results = await fetchSearXNG(
+      "failure injection",
+      "text",
+      30,
+      new CircuitBreaker(breakerOptions),
+    );
+
+    expect(results).toEqual([]);
+  });
+
+  it("returns an empty array when every result is dropped during processing", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [
+            { title: "No snippet", url: "https://example.com" },
+            { title: "", content: "orphan snippet", url: "https://other.com" },
+          ],
+        }),
+      ),
+    );
+
+    const results = await fetchSearXNG(
+      "failure injection",
+      "text",
+      30,
+      new CircuitBreaker(breakerOptions),
+    );
+
+    expect(results).toEqual([]);
+  });
+});
+
 describe("circuit breaker", () => {
   it("opens after exactly 5 non-retriable failures", async () => {
     const breaker = new CircuitBreaker({ failureThreshold: 5 });

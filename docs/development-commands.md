@@ -19,6 +19,8 @@
 - **`docker compose exec development-server npm run test:watch`**: Run tests in watch mode
 - **`docker compose exec development-server npm run test:coverage`**: Run tests with coverage report
 
+Failure-injection cases (dependency down, empty results, aborted stream) are catalogued in `docs/failure-injection.md`.
+
 ### Coverage Reports for AI Analysis
 
 After running `test:coverage`, AI agents can analyze these JSON files:
