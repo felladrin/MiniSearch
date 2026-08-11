@@ -3,7 +3,7 @@
 The suite exercises happy paths in the modules' own test files. This page maps
 the complementary set: what MiniSearch does when a dependency misbehaves. Every
 row is a Vitest case with the failure injected through a mocked `fetch`, a mocked
-upstream stream, or an injected circuit breaker, so no external service is
+module boundary, or an injected circuit breaker, so no external service is
 needed.
 
 ## Degradation Matrix
@@ -26,13 +26,13 @@ needed.
 | Search returns nothing to the endpoint | HTTP 200 with `[]`, not an error | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Text search returns nothing to the client | Keyword-only query retried as a fallback | `client/modules/textGeneration.degradation.test.ts` |
 | Keyword fallback also returns nothing | Text search state becomes `failed` | `client/modules/textGeneration.degradation.test.ts` |
-| `/inference` upstream is not configured | HTTP 500 with a JSON error, no stream opened | `server/internalApiEndpointServerHook.test.ts` › environment configuration |
+| `/inference` upstream is not configured | HTTP 500 with a JSON error | `server/internalApiEndpointServerHook.test.ts` › environment configuration |
 | `/inference` cannot list upstream models | HTTP 500 with a JSON error | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | Upstream model fails but another one is available | Retried on the next model, answer still streams | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | Upstream model fails on every attempt | SSE error frame, so the client stops waiting | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | Upstream stream ends without a finish part | `Stream ended unexpectedly` error frame | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | Upstream fails after content was already sent | No retry, the partial answer stands | `server/internalApiEndpointServerHook.test.ts` › streaming path |
-| Client disconnects mid-stream | Writes stop at the first unwritable check | `server/internalApiEndpointServerHook.test.ts` › streaming path |
+| Response is already unwritable when streaming would start | No headers set, the upstream is never called | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | `/inference` answers 503 | Generation state becomes `failed`, nothing persisted | `client/modules/textGeneration.degradation.test.ts` |
 | Generation interrupted mid-stream | Partial answer preserved, state stays `interrupted` | `client/modules/textGeneration.degradation.test.ts` |
 
@@ -48,9 +48,9 @@ the endpoint contract, and the test is where that decision becomes visible.
 Keep each case next to the module it covers, reusing that file's mocks and
 harness: a `describe("graceful degradation")` block where the file has no
 failure-shaped block yet, the existing one where it does (the `/inference` rows
-live under `streaming path`), or a sibling `*.degradation.test.ts` when the case
-needs a harness of its own (the client rows drive `searchAndRespond` through a
-fake pubSub store). A row earns
+live under `environment configuration` and `streaming path`), or a sibling
+`*.degradation.test.ts` when the case needs a harness of its own (the client
+rows drive `searchAndRespond` through a fake pubSub store). A row earns
 its place when it fails for the right reason: mutate the degradation branch in
 the module (delete the `catch`, the fallback, or the interrupt check) and confirm
 the case goes red before committing it.
