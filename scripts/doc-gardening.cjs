@@ -8,7 +8,7 @@ class DocGardener {
     this.issues = [];
   }
 
-  async garden() {
+  async garden(fix = false) {
     console.log("🌱 Starting doc gardening...");
 
     await this.checkDocFreshness();
@@ -16,7 +16,10 @@ class DocGardener {
     await this.checkCodeDocAlignment();
 
     await this.reportIssues();
-    await this.createFixupPRs();
+
+    if (fix) {
+      await this.createFixupPRs();
+    }
   }
 
   async checkDocFreshness() {
@@ -73,7 +76,7 @@ class DocGardener {
               type: "broken_link",
               file: docFile,
               severity: "error",
-              message: `Broken link to ${target}`,
+              message: `Broken link in ${docFile} to ${target}`,
               remediation: `Update link to point to existing documentation or create missing file: ${targetPath}`,
             });
           }
@@ -132,6 +135,10 @@ class DocGardener {
     ).length;
 
     console.log(`Summary: ${errorCount} errors, ${warningCount} warnings`);
+
+    if (errorCount > 0) {
+      process.exit(1);
+    }
   }
 
   async createFixupPRs() {
@@ -140,6 +147,24 @@ class DocGardener {
     if (errorIssues.length === 0) {
       console.log("✅ No fix-up PRs needed!");
       return;
+    }
+
+    let clean;
+    try {
+      clean = execSync("git status --porcelain", {
+        cwd: this.rootDir,
+        encoding: "utf8",
+      }).trim();
+    } catch (error) {
+      console.error("❌ Failed to check working tree status:", error.message);
+      process.exit(1);
+    }
+
+    if (clean) {
+      console.error(
+        "❌ Cannot apply fixes: working tree is not clean. Commit or stash your changes first.",
+      );
+      process.exit(1);
     }
 
     console.log(`🔧 Creating fix-up PR for ${errorIssues.length} issues...`);
@@ -166,6 +191,7 @@ class DocGardener {
       );
     } catch (error) {
       console.error("❌ Failed to create fix-up PR:", error.message);
+      process.exit(1);
     }
   }
 
@@ -231,10 +257,14 @@ class DocGardener {
 }
 
 if (require.main === module) {
-  const rootDir = process.argv[2] || process.cwd();
+  const args = process.argv.slice(2);
+  const rootDir = args.includes("--fix")
+    ? args[args.indexOf("--fix") + 1] || process.cwd()
+    : args[0] || process.cwd();
+  const fix = args.includes("--fix");
   const gardener = new DocGardener(rootDir);
 
-  gardener.garden().catch((error) => {
+  gardener.garden(fix).catch((error) => {
     console.error("Doc gardening error:", error);
     process.exit(1);
   });
