@@ -95,7 +95,16 @@ function sendJsonError(
   safeEndResponse(response, JSON.stringify(payload));
 }
 
+function ensureSseHeaders(response: ServerResponse): void {
+  if (response.headersSent) return;
+
+  response.setHeader("Content-Type", "text/event-stream");
+  response.setHeader("Cache-Control", "no-cache");
+  response.setHeader("Connection", "keep-alive");
+}
+
 function sendSseData(response: ServerResponse, data: unknown): void {
+  ensureSseHeaders(response);
   safeWriteResponse(response, `data: ${JSON.stringify(data)}\n\n`);
 }
 
@@ -109,12 +118,6 @@ function sendSseError(
   message: string,
   model?: string,
 ): void {
-  if (!response.headersSent) {
-    response.setHeader("Content-Type", "text/event-stream");
-    response.setHeader("Cache-Control", "no-cache");
-    response.setHeader("Connection", "keep-alive");
-  }
-
   sendSseData(response, {
     error: message,
     ...(model ? { model } : {}),
@@ -258,7 +261,6 @@ export function internalApiEndpointServerHook<
         const config = getModelConfig();
         const maxAttempts = 5;
         let lastError: unknown = null;
-        let hasStartedStreaming = false;
 
         const clampedMaxTokens =
           requestBody.max_tokens !== undefined
@@ -280,13 +282,6 @@ export function internalApiEndpointServerHook<
 
           if (!isResponseWritable(response)) {
             return;
-          }
-
-          if (!hasStartedStreaming) {
-            response.setHeader("Content-Type", "text/event-stream");
-            response.setHeader("Cache-Control", "no-cache");
-            response.setHeader("Connection", "keep-alive");
-            hasStartedStreaming = true;
           }
 
           try {
@@ -355,7 +350,7 @@ export function internalApiEndpointServerHook<
         const lastErrorMessage =
           lastError instanceof Error ? lastError.message : "Unknown error";
 
-        if (!hasStartedStreaming) {
+        if (!response.headersSent) {
           sendJsonError(response, 503, {
             error: "Service unavailable - all models failed",
             lastError: lastErrorMessage,
