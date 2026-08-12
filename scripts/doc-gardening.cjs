@@ -85,8 +85,8 @@ class DocGardener {
               type: "broken_link",
               file: docFile,
               severity: "error",
-              message: `Broken link in ${docFile} to ${target}`,
-              remediation: `Update link to point to existing documentation or create missing file: ${targetPath}`,
+              message: `Broken link in ${path.relative(this.rootDir, docFile)} to ${target}`,
+              remediation: `Update link to point to existing documentation or create missing file: ${path.relative(this.rootDir, targetPath)}`,
             });
           }
         }
@@ -192,7 +192,12 @@ class DocGardener {
         await this.applyFix(issue);
       }
 
-      execSync("git add .", { cwd: this.rootDir });
+      const changedFiles = errorIssues.map((issue) =>
+        path.relative(this.rootDir, issue.file),
+      );
+      execSync(`git add ${changedFiles.map((f) => `"${f}"`).join(" ")}`, {
+        cwd: this.rootDir,
+      });
       execSync(
         `git commit -m "docs: fix documentation issues found by doc gardening"`,
         { cwd: this.rootDir },
@@ -223,29 +228,9 @@ class DocGardener {
   async applyFix(issue) {
     switch (issue.type) {
       case "broken_link": {
-        const content = fs.readFileSync(issue.file, "utf8");
-        const fixedContent = content.replace(/\[.*?\]\([^)]*?\)/g, (match) => {
-          const targetMatch = match.match(/\((.*?)\)/);
-          if (!targetMatch) return match;
-          const target = targetMatch[1];
-          if (
-            target.startsWith("./") ||
-            target.startsWith("../") ||
-            target.startsWith("docs/")
-          ) {
-            const [cleanTarget] = target.split(/[#?]/);
-            if (!cleanTarget) return match;
-            const targetPath = cleanTarget.startsWith("docs/")
-              ? path.resolve(this.rootDir, cleanTarget)
-              : path.resolve(path.dirname(issue.file), cleanTarget);
-            if (!fs.existsSync(targetPath)) {
-              const linkText = match.match(/\[(.*?)\]/)?.[1] ?? "";
-              return `[${linkText}](${target})`;
-            }
-          }
-          return match;
-        });
-        fs.writeFileSync(issue.file, fixedContent);
+        console.log(
+          `⚠️  No automatic fix available for broken link in ${path.relative(this.rootDir, issue.file)}`,
+        );
         break;
       }
 
@@ -288,7 +273,7 @@ class DocGardener {
 if (require.main === module) {
   const args = process.argv.slice(2);
   const fix = args.includes("--fix");
-  const rootDir = args.find((arg) => arg !== "--fix") || process.cwd();
+  const rootDir = args.find((arg) => !arg.startsWith("--")) || process.cwd();
   const gardener = new DocGardener(rootDir);
 
   gardener.garden(fix).catch((error) => {
