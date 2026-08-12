@@ -285,7 +285,7 @@ export function internalApiEndpointServerHook<
           }
 
           try {
-            const stream = streamText({
+            const result = streamText({
               model: openaiProvider.chatModel(model),
               messages: requestBody.messages,
               temperature: clampedTemperature,
@@ -294,7 +294,7 @@ export function internalApiEndpointServerHook<
               maxRetries: 0,
             });
 
-            for await (const part of stream.fullStream) {
+            for await (const part of result.stream) {
               if (!isResponseWritable(response)) return;
 
               if (part.type === "text-delta") {
