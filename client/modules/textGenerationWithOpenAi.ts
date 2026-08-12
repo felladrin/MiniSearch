@@ -84,7 +84,7 @@ async function createOpenAiStream({
     let shouldRetry = false;
 
     try {
-      const stream = streamText({
+      const result = streamText({
         model: openaiProvider.chatModel(effectiveModel),
         messages,
         maxOutputTokens: params.max_tokens,
@@ -122,7 +122,7 @@ async function createOpenAiStream({
 
       let text = "";
       let reasoning = "";
-      for await (const part of stream.fullStream) {
+      for await (const part of result.stream) {
         if (getTextGenerationState() === "interrupted") {
           currentAbortController.abort();
           throw new Error("Chat generation interrupted");

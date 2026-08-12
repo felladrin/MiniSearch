@@ -103,7 +103,7 @@ function streamOf(
   pieces: Array<{ type: string; text?: string; error?: unknown }>,
 ) {
   return {
-    fullStream: (async function* () {
+    stream: (async function* () {
       for (const piece of pieces) yield piece as never;
     })(),
   };
