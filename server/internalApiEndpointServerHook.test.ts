@@ -571,6 +571,34 @@ describe("internalApiEndpointServerHook", () => {
       }
     });
 
+    it("responds 503 JSON when the only model's stream fails before any content", async () => {
+      vi.mocked(streamText).mockImplementation(
+        () =>
+          streamOf([
+            { type: "error", error: new Error("upstream down") },
+          ]) as never,
+      );
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+      await handler(
+        createRequest({ messages: [{ role: "user", content: "hi" }] }),
+        response,
+        vi.fn(),
+      );
+      expect(response.statusCode).toBe(503);
+      expect(response.setHeader).toHaveBeenCalledWith(
+        "Content-Type",
+        "application/json",
+      );
+      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      expect(payload).toEqual({
+        error: "Service unavailable - all models failed",
+        lastError: "upstream down",
+      });
+      expect(response.write).not.toHaveBeenCalled();
+      expect(vi.mocked(streamText)).toHaveBeenCalledTimes(1);
+    });
+
     it("responds 503 JSON when the only model cannot start", async () => {
       vi.mocked(streamText).mockImplementation(() => {
         throw new Error("upstream down");
