@@ -151,13 +151,6 @@ class DocGardener {
   }
 
   async createFixupPRs() {
-    const errorIssues = this.issues.filter((i) => i.severity === "error");
-
-    if (errorIssues.length === 0) {
-      console.log("✅ No fix-up PRs needed!");
-      return;
-    }
-
     let clean;
     try {
       clean = execSync("git status --porcelain", {
@@ -174,6 +167,13 @@ class DocGardener {
         "❌ Cannot apply fixes: working tree is not clean. Commit or stash your changes first.",
       );
       process.exit(1);
+    }
+
+    const errorIssues = this.issues.filter((i) => i.severity === "error");
+
+    if (errorIssues.length === 0) {
+      console.log("✅ No fix-up PRs needed!");
+      return;
     }
 
     console.log(`🔧 Creating fix-up PR for ${errorIssues.length} issues...`);

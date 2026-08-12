@@ -108,13 +108,15 @@ describe("doc-gardening", () => {
   describe("with --fix", () => {
     it("requires a clean working tree", () => {
       execSync("git init", { cwd: tmpDir, stdio: "pipe" });
+      execSync("git config user.email 'test@test.com'", {
+        cwd: tmpDir,
+        stdio: "pipe",
+      });
+      execSync("git config user.name 'Test'", { cwd: tmpDir, stdio: "pipe" });
+      writeMd(tmpDir, "docs/overview.md", "# Overview\n\n[Link](./api.md)\n");
+      writeMd(tmpDir, "docs/api.md", "# API\n");
       execSync("git add .", { cwd: tmpDir, stdio: "pipe" });
       execSync("git commit -m init", { cwd: tmpDir, stdio: "pipe" });
-      writeMd(
-        tmpDir,
-        "docs/overview.md",
-        "# Overview\n\n[Link](./nonexistent.md)\n",
-      );
       fs.writeFileSync(path.join(tmpDir, "README.md"), "uncommitted\n");
       const { exitCode, stderr } = runGarden(["--fix"], tmpDir);
       expect(exitCode).toBe(1);
@@ -122,8 +124,16 @@ describe("doc-gardening", () => {
     });
 
     it("exits 0 when there are no errors even with --fix", () => {
+      execSync("git init", { cwd: tmpDir, stdio: "pipe" });
+      execSync("git config user.email 'test@test.com'", {
+        cwd: tmpDir,
+        stdio: "pipe",
+      });
+      execSync("git config user.name 'Test'", { cwd: tmpDir, stdio: "pipe" });
       writeMd(tmpDir, "docs/overview.md", "# Overview\n\n[Link](./api.md)\n");
       writeMd(tmpDir, "docs/api.md", "# API\n");
+      execSync("git add .", { cwd: tmpDir, stdio: "pipe" });
+      execSync("git commit -m init", { cwd: tmpDir, stdio: "pipe" });
       const { exitCode } = runGarden(["--fix"], tmpDir);
       expect(exitCode).toBe(0);
     });
