@@ -484,6 +484,65 @@ describe("internalApiEndpointServerHook", () => {
       ).toBe(true);
     });
 
+    it("responds 503 JSON when the stream ends before any content", async () => {
+      vi.mocked(streamText).mockImplementation(() => streamOf([]) as never);
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+      await handler(
+        createRequest({ messages: [{ role: "user", content: "hi" }] }),
+        response,
+        vi.fn(),
+      );
+      expect(response.statusCode).toBe(503);
+      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      expect(payload.lastError).toBe("Stream ended unexpectedly");
+      expect(response.write).not.toHaveBeenCalled();
+    });
+
+    it("retries with another model when the stream ends before any content", async () => {
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
+      vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
+        { id: "model-a" },
+        { id: "model-b" },
+      ]);
+      vi.mocked(selectRandomModel)
+        .mockReturnValueOnce("model-a")
+        .mockReturnValueOnce("model-b");
+
+      let callCount = 0;
+      vi.mocked(streamText).mockImplementation(() => {
+        callCount += 1;
+        return (
+          callCount === 1
+            ? streamOf([])
+            : streamOf([
+                { type: "text-delta", text: "Recovered" },
+                { type: "finish" },
+              ])
+        ) as never;
+      });
+
+      vi.useFakeTimers();
+      try {
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+        const pending = handler(
+          createRequest({ messages: [{ role: "user", content: "hi" }] }),
+          response,
+          vi.fn(),
+        );
+        await vi.runAllTimersAsync();
+        await pending;
+
+        expect(streamText).toHaveBeenCalledTimes(2);
+        const writes = response.write.mock.calls.map((c) => c[0]).join("");
+        expect(writes).toContain("Recovered");
+        expect(writes).not.toContain("Stream ended unexpectedly");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("returns early when response is no longer writable", async () => {
       vi.mocked(streamText).mockImplementation(
         () => streamOf([{ type: "text-delta", text: "Hello" }]) as never,

@@ -312,8 +312,7 @@ export function internalApiEndpointServerHook<
               }
             }
 
-            sendSseError(response, "Stream ended unexpectedly", model);
-            return;
+            throw new Error("Stream ended unexpectedly");
           } catch (error) {
             lastError = error;
             console.error("Error during streaming:", error);
