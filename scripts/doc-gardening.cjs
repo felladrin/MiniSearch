@@ -19,6 +19,11 @@ class DocGardener {
 
     if (fix) {
       await this.createFixupPRs();
+      return;
+    }
+
+    if (this.issues.some((issue) => issue.severity === "error")) {
+      process.exit(1);
     }
   }
 
@@ -69,7 +74,11 @@ class DocGardener {
           target.startsWith("../") ||
           target.startsWith("docs/")
         ) {
-          const targetPath = path.resolve(path.dirname(docFile), target);
+          const [cleanTarget] = target.split(/[#?]/);
+          if (!cleanTarget) continue;
+          const targetPath = cleanTarget.startsWith("docs/")
+            ? path.resolve(this.rootDir, cleanTarget)
+            : path.resolve(path.dirname(docFile), cleanTarget);
 
           if (!fs.existsSync(targetPath)) {
             this.issues.push({
@@ -170,7 +179,13 @@ class DocGardener {
     console.log(`🔧 Creating fix-up PR for ${errorIssues.length} issues...`);
 
     const branchName = `doc-gardening-${Date.now()}`;
+    let originalBranch;
     try {
+      originalBranch = execSync("git rev-parse --abbrev-ref HEAD", {
+        cwd: this.rootDir,
+        encoding: "utf8",
+      }).trim();
+
       execSync(`git checkout -b ${branchName}`, { cwd: this.rootDir });
 
       for (const issue of errorIssues) {
@@ -192,6 +207,16 @@ class DocGardener {
     } catch (error) {
       console.error("❌ Failed to create fix-up PR:", error.message);
       process.exit(1);
+    } finally {
+      if (originalBranch) {
+        try {
+          execSync(`git checkout ${originalBranch}`, {
+            cwd: this.rootDir,
+          });
+        } catch {
+          // Ignore checkout errors in finally — the user already has the branch info.
+        }
+      }
     }
   }
 
@@ -200,18 +225,22 @@ class DocGardener {
       case "broken_link": {
         const content = fs.readFileSync(issue.file, "utf8");
         const fixedContent = content.replace(/\[.*?\]\([^)]*?\)/g, (match) => {
-          const target = match.match(/\((.*?)\)/)[1];
+          const targetMatch = match.match(/\((.*?)\)/);
+          if (!targetMatch) return match;
+          const target = targetMatch[1];
           if (
             target.startsWith("./") ||
             target.startsWith("../") ||
             target.startsWith("docs/")
           ) {
-            const targetPath = path.resolve(path.dirname(issue.file), target);
+            const [cleanTarget] = target.split(/[#?]/);
+            if (!cleanTarget) return match;
+            const targetPath = cleanTarget.startsWith("docs/")
+              ? path.resolve(this.rootDir, cleanTarget)
+              : path.resolve(path.dirname(issue.file), cleanTarget);
             if (!fs.existsSync(targetPath)) {
-              return match.replace(
-                /\[.*?\]\([^)]*?\)/,
-                "[REMOVED BROKEN LINK]",
-              );
+              const linkText = match.match(/\[(.*?)\]/)?.[1] ?? "";
+              return `[${linkText}](${target})`;
             }
           }
           return match;
@@ -258,10 +287,8 @@ class DocGardener {
 
 if (require.main === module) {
   const args = process.argv.slice(2);
-  const rootDir = args.includes("--fix")
-    ? args[args.indexOf("--fix") + 1] || process.cwd()
-    : args[0] || process.cwd();
   const fix = args.includes("--fix");
+  const rootDir = args.find((arg) => arg !== "--fix") || process.cwd();
   const gardener = new DocGardener(rootDir);
 
   gardener.garden(fix).catch((error) => {
