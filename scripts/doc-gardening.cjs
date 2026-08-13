@@ -1,6 +1,5 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { execSync } = require("node:child_process");
 
 class DocGardener {
   constructor(rootDir) {
@@ -15,8 +14,11 @@ class DocGardener {
     await this.checkCrossReferences();
     await this.checkCodeDocAlignment();
 
-    await this.reportIssues();
-    await this.createFixupPRs();
+    this.reportIssues();
+
+    if (this.issues.some((issue) => issue.severity === "error")) {
+      process.exitCode = 1;
+    }
   }
 
   async checkDocFreshness() {
@@ -53,13 +55,12 @@ class DocGardener {
 
     for (const docFile of docFiles) {
       const content = fs.readFileSync(docFile, "utf8");
-      const links = content.match(/\[.*?\]\((.*?)\)/g) || [];
 
-      for (const link of links) {
-        const match = link.match(/\[.*?\]\((.*?)\)/);
-        if (!match) continue;
-
-        const target = match[1];
+      for (const [, rawTarget] of content.matchAll(/\[.*?\]\((.*?)\)/g)) {
+        // Drop the optional link title, then the anchor or query, the way a
+        // markdown renderer does before resolving the path.
+        const [pathPart] = rawTarget.trim().split(/\s+/);
+        const [target] = pathPart.split(/[#?]/);
 
         if (
           target.startsWith("./") ||
@@ -73,8 +74,8 @@ class DocGardener {
               type: "broken_link",
               file: docFile,
               severity: "error",
-              message: `Broken link to ${target}`,
-              remediation: `Update link to point to existing documentation or create missing file: ${targetPath}`,
+              message: `Broken link in ${path.relative(this.rootDir, docFile)} to ${rawTarget}`,
+              remediation: `Update link to point to existing documentation or create missing file: ${path.relative(this.rootDir, targetPath)}`,
             });
           }
         }
@@ -110,7 +111,7 @@ class DocGardener {
     }
   }
 
-  async reportIssues() {
+  reportIssues() {
     if (this.issues.length === 0) {
       console.log("✅ No documentation issues found!");
       return;
@@ -122,7 +123,7 @@ class DocGardener {
       console.log(
         `${issue.severity === "error" ? "🚫" : "⚠️"}  ${issue.message}`,
       );
-      console.log(`   📁 File: ${issue.file}`);
+      console.log(`   📁 File: ${path.relative(this.rootDir, issue.file)}`);
       console.log(`   💡 ${issue.remediation}\n`);
     }
 
@@ -132,71 +133,6 @@ class DocGardener {
     ).length;
 
     console.log(`Summary: ${errorCount} errors, ${warningCount} warnings`);
-  }
-
-  async createFixupPRs() {
-    const errorIssues = this.issues.filter((i) => i.severity === "error");
-
-    if (errorIssues.length === 0) {
-      console.log("✅ No fix-up PRs needed!");
-      return;
-    }
-
-    console.log(`🔧 Creating fix-up PR for ${errorIssues.length} issues...`);
-
-    const branchName = `doc-gardening-${Date.now()}`;
-    try {
-      execSync(`git checkout -b ${branchName}`, { cwd: this.rootDir });
-
-      for (const issue of errorIssues) {
-        await this.applyFix(issue);
-      }
-
-      execSync("git add .", { cwd: this.rootDir });
-      execSync(
-        `git commit -m "docs: fix documentation issues found by doc gardening"`,
-        { cwd: this.rootDir },
-      );
-
-      console.log(`✅ Created fix-up PR branch: ${branchName}`);
-      console.log("📝 Run the following to create the PR:");
-      console.log(`   git push -u origin ${branchName}`);
-      console.log(
-        '   gh pr create --title "docs: fix documentation issues" --body "Automated documentation fixes from doc gardening process"',
-      );
-    } catch (error) {
-      console.error("❌ Failed to create fix-up PR:", error.message);
-    }
-  }
-
-  async applyFix(issue) {
-    switch (issue.type) {
-      case "broken_link": {
-        const content = fs.readFileSync(issue.file, "utf8");
-        const fixedContent = content.replace(/\[.*?\]\([^)]*?\)/g, (match) => {
-          const target = match.match(/\((.*?)\)/)[1];
-          if (
-            target.startsWith("./") ||
-            target.startsWith("../") ||
-            target.startsWith("docs/")
-          ) {
-            const targetPath = path.resolve(path.dirname(issue.file), target);
-            if (!fs.existsSync(targetPath)) {
-              return match.replace(
-                /\[.*?\]\([^)]*?\)/,
-                "[REMOVED BROKEN LINK]",
-              );
-            }
-          }
-          return match;
-        });
-        fs.writeFileSync(issue.file, fixedContent);
-        break;
-      }
-
-      default:
-        console.log(`⚠️  No automatic fix available for ${issue.type}`);
-    }
   }
 
   getAllMarkdownFiles(dir) {
@@ -231,12 +167,30 @@ class DocGardener {
 }
 
 if (require.main === module) {
-  const rootDir = process.argv[2] || process.cwd();
-  const gardener = new DocGardener(rootDir);
+  const args = process.argv.slice(2);
+  const [rootDirArg] = args;
+  const usage = "Usage: node scripts/doc-gardening.cjs [rootDir]";
+
+  if (args.length > 1) {
+    console.error(`❌ Too many arguments\n   ${usage}`);
+    process.exit(1);
+  }
+
+  if (rootDirArg?.startsWith("-")) {
+    console.error(`❌ Unknown option: ${rootDirArg}\n   ${usage}`);
+    process.exit(1);
+  }
+
+  if (rootDirArg && !fs.existsSync(rootDirArg)) {
+    console.error(`❌ Directory not found: ${rootDirArg}`);
+    process.exit(1);
+  }
+
+  const gardener = new DocGardener(rootDirArg || process.cwd());
 
   gardener.garden().catch((error) => {
     console.error("Doc gardening error:", error);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 
