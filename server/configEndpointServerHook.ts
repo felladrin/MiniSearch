@@ -3,6 +3,7 @@ import {
   DEFAULT_INFERENCE_TYPE,
   DEFAULT_INTERNAL_API_NAME,
   DEFAULT_WLLAMA_MODEL_ID,
+  isEnvFlagEnabled,
   type ServerConfig,
 } from "../shared/serverConfig.ts";
 
@@ -32,6 +33,9 @@ export function configEndpointServerHook<
         DEFAULT_INTERNAL_API_NAME,
       defaultInferenceType:
         process.env.DEFAULT_INFERENCE_TYPE || DEFAULT_INFERENCE_TYPE,
+      pageContentReadingEnabled: isEnvFlagEnabled(
+        process.env.PAGE_CONTENT_READING_ENABLED,
+      ),
     };
 
     res.setHeader("Content-Type", "application/json");

@@ -97,9 +97,29 @@ function isRedirect(status: number): boolean {
   );
 }
 
-function getCharset(contentType: string): string {
-  const match = /charset=([^;]+)/i.exec(contentType);
-  return match ? match[1].trim().replace(/^["']|["']$/g, "") : "utf-8";
+function findCharset(text: string): string | null {
+  const match = /charset\s*=\s*["']?([\w-]+)/i.exec(text);
+  return match ? match[1] : null;
+}
+
+/**
+ * Resolves the encoding of a document. The `Content-Type` header wins, but
+ * plenty of pages declare their encoding only in a `<meta>` tag, and decoding
+ * those as UTF-8 turns the whole excerpt into mojibake.
+ */
+function decodeDocument(bytes: Uint8Array, contentType: string): string {
+  const headerCharset = findCharset(contentType);
+  const declaredCharset =
+    headerCharset ??
+    // The meta tag is ASCII-compatible in every encoding worth sniffing, so
+    // reading the head of the document as Latin-1 is enough to find it.
+    findCharset(new TextDecoder("latin1").decode(bytes.slice(0, 4096)));
+
+  try {
+    return new TextDecoder(declaredCharset ?? "utf-8").decode(bytes);
+  } catch {
+    return new TextDecoder("utf-8").decode(bytes);
+  }
 }
 
 /**
@@ -107,45 +127,47 @@ function getCharset(contentType: string): string {
  * page must not be able to pin the server's memory, and the extractor gains
  * nothing from the tail of a document it will trim to a few passages anyway.
  */
-async function readCappedText(response: Response): Promise<string> {
+async function readCappedBytes(response: Response): Promise<Uint8Array> {
   const reader = response.body?.getReader();
-  if (!reader) return "";
+  if (!reader) return new Uint8Array();
 
-  const charset = getCharset(response.headers.get("content-type") ?? "");
-  let decoder: TextDecoder;
-  try {
-    decoder = new TextDecoder(charset);
-  } catch {
-    decoder = new TextDecoder("utf-8");
-  }
-
-  let text = "";
+  const chunks: Uint8Array[] = [];
   let bytesRead = 0;
 
   while (bytesRead < MAX_RESPONSE_BYTES) {
     const { done, value } = await reader.read();
     if (done) break;
     bytesRead += value.byteLength;
-    text += decoder.decode(value, { stream: true });
+    chunks.push(value);
   }
 
   await reader.cancel().catch(() => {});
-  return text + decoder.decode();
+
+  const body = new Uint8Array(bytesRead);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
 }
 
 /**
  * Follows redirects by hand so that every hop is validated: `redirect:
  * "follow"` would let a public URL bounce the server into a private address.
+ * The whole chain shares one deadline, so a page cannot buy extra time by
+ * redirecting.
  */
 async function downloadDocument(rawUrl: string): Promise<string | null> {
   let target = rawUrl;
+  const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const url = await resolvePublicUrl(target);
     const response = await fetch(url, {
       headers: REQUEST_HEADERS,
       redirect: "manual",
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: deadline,
     });
 
     const location = response.headers.get("location");
@@ -165,7 +187,7 @@ async function downloadDocument(rawUrl: string): Promise<string | null> {
       return null;
     }
 
-    return readCappedText(response);
+    return decodeDocument(await readCappedBytes(response), contentType);
   }
 
   throw new Error(`Exceeded ${MAX_REDIRECTS} redirects`);
@@ -277,11 +299,8 @@ function scorePassage(
   queryTerms: Set<string>,
   index: number,
 ): number {
-  // Lead passages carry the definition or summary on most pages, so they get a
-  // small prior. It breaks ties and floats the intro of a page whose body never
-  // repeats the query; it stays below the value of a single matched term.
-  const leadPrior = 0.1 / (1 + index);
-  if (queryTerms.size === 0) return leadPrior;
+  const position = 1 / (1 + index);
+  if (queryTerms.size === 0) return position;
 
   const words = new Set(tokenize(passage));
   let matched = 0;
@@ -289,7 +308,11 @@ function scorePassage(
     if (words.has(term)) matched++;
   }
 
-  return matched / queryTerms.size + leadPrior;
+  // Lead passages carry the definition or summary on most pages, so they get a
+  // prior worth half a matched term: enough to break ties and to float the
+  // intro of a page whose body never repeats the query, never enough to
+  // outrank a passage that covers more of it.
+  return (matched + 0.5 * position) / queryTerms.size;
 }
 
 /**

@@ -49,6 +49,7 @@ INTERNAL_OPENAI_COMPATIBLE_API_NAME="Company LLM"
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DEFAULT_INFERENCE_TYPE` | `browser` | Default AI inference type (`browser`, `openai`, `horde`, `internal`) |
+| `PAGE_CONTENT_READING_ENABLED` | `false` | Allow this instance to read the pages behind search results to ground AI answers. Only `true` or `1` turns it on. It makes the server fetch URLs chosen by whoever is using the instance, so grant it deliberately - see `docs/page-content.md`. With it off, `/page-content` answers 404 and the setting is hidden in the UI. |
 
 ### Server Configuration
 
@@ -82,7 +83,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `enterToSubmit` | boolean | `true` | Press Enter to submit query (vs Shift+Enter for new line) |
 | `enableAiResponseScrolling` | boolean | `true` | Auto-scroll AI response as it generates |
 | `enableNotificationOnAiComplete` | boolean | `false` | Show a browser notification when AI response generation finishes |
-| `enablePageContentFetch` | boolean | `false` | Read the pages behind the top results and ground the answer on their text instead of on snippets alone (see `docs/page-content.md`) |
+| `enablePageContentFetch` | boolean | `false` | Read the pages behind the top results and ground the answer on their text instead of on snippets alone. Takes effect only where the instance sets `PAGE_CONTENT_READING_ENABLED` (see `docs/page-content.md`) |
 
 ### Inference Settings
 

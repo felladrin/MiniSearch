@@ -395,12 +395,17 @@ async function readPageContents(query: string, results: TextSearchResults) {
     return;
   }
 
-  updatePageContents(
-    await fetchPageContents(
-      query,
-      results.map(([, , url]) => url),
-    ),
+  const searchRunId = getCurrentSearchRunId();
+  const contents = await fetchPageContents(
+    query,
+    results.map(([, , url]) => url),
   );
+
+  // A newer search has already cleared the channel; publishing now would mix
+  // this run's pages into the next one's answer.
+  if (getCurrentSearchRunId() !== searchRunId) return;
+
+  updatePageContents(contents);
 }
 
 async function startTextSearch(query: string) {
@@ -408,6 +413,7 @@ async function startTextSearch(query: string) {
     textResults: [] as TextSearchResults,
     imageResults: [] as ImageSearchResults,
   };
+  let pageContentsRead = Promise.resolve();
 
   const searchQuery =
     query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query;
@@ -442,7 +448,6 @@ async function startTextSearch(query: string) {
 
     const resultsForLlm = textResults.slice(0, searchResultsToConsider);
     updateLlmTextSearchResults(resultsForLlm);
-    await readPageContents(searchQuery, resultsForLlm);
 
     updateSearchResults(getCurrentSearchRunId(), {
       type: "text",
@@ -452,11 +457,17 @@ async function startTextSearch(query: string) {
         snippet,
       })),
     });
+
+    // Started here but awaited last: only the AI answer waits on it, while
+    // image search and the history write carry on.
+    pageContentsRead = readPageContents(searchQuery, resultsForLlm);
   }
 
   if (getSettings().enableImageSearch) {
     startImageSearch(searchQuery, results);
   }
+
+  await pageContentsRead;
 
   return results;
 }

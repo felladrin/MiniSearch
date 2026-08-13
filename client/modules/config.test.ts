@@ -11,6 +11,7 @@ const serverConfig: ServerConfig = {
   internalApiEnabled: true,
   internalApiName: "Custom LLM",
   defaultInferenceType: "internal",
+  pageContentReadingEnabled: true,
 };
 
 /** Imports a fresh copy of the module so its cache starts empty. */

@@ -27,6 +27,7 @@ export const FALLBACK_CONFIG: ServerConfig = {
   internalApiEnabled: false,
   internalApiName: DEFAULT_INTERNAL_API_NAME,
   defaultInferenceType: DEFAULT_INFERENCE_TYPE,
+  pageContentReadingEnabled: false,
 };
 
 const FETCH_TIMEOUT_MS = 5000;

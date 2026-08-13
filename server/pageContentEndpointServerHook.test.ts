@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./handleTokenVerification", () => ({
   handleTokenVerification: vi.fn(),
@@ -55,10 +55,36 @@ function parseBody(response: RecordedResponse): unknown {
 describe("pageContentEndpointServerHook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("PAGE_CONTENT_READING_ENABLED", "true");
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: true,
     });
     vi.mocked(fetchPageContents).mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("answers 404 while the operator has not enabled page reading", async () => {
+    vi.stubEnv("PAGE_CONTENT_READING_ENABLED", "");
+
+    const { response, handled } = callEndpoint(
+      "/page-content?q=cats&url=https%3A%2F%2Fa.example%2F&token=abc",
+    );
+    await handled;
+
+    expect(response.statusCode).toBe(404);
+    expect(handleTokenVerification).not.toHaveBeenCalled();
+    expect(fetchPageContents).not.toHaveBeenCalled();
+  });
+
+  it("passes through a path that only starts like the endpoint", async () => {
+    const { next, handled } = callEndpoint("/page-content-something-else");
+    await handled;
+
+    expect(next).toHaveBeenCalled();
+    expect(fetchPageContents).not.toHaveBeenCalled();
   });
 
   it("passes through requests for other paths", async () => {

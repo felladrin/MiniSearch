@@ -202,6 +202,38 @@ describe("fetchPageContents", () => {
     expect(contents).toHaveLength(1);
   });
 
+  it("honors the encoding a page declares in a meta tag", async () => {
+    const html = `<html><head><meta charset="windows-1252"></head><body><p>Le café ${"est une boisson tres appreciee. ".repeat(10)}</p></body></html>`;
+    const bytes = Uint8Array.from([...html].map((char) => char.charCodeAt(0)));
+    fetchMock.mockResolvedValue(
+      new Response(bytes, {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+
+    const [page] = await fetchPageContents("café", ["https://example.fr/cafe"]);
+
+    expect(page.content).toContain("café");
+  });
+
+  it("gives up on a redirect chain that never lands", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://example.com/next" },
+      }),
+    );
+
+    const contents = await fetchPageContents("cats", [
+      "https://example.com/loop",
+    ]);
+
+    expect(contents).toEqual([]);
+    // The first request plus MAX_REDIRECTS hops, then it stops.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
   it("skips responses that are not documents", async () => {
     fetchMock.mockResolvedValue(
       new Response("%PDF-1.7", {

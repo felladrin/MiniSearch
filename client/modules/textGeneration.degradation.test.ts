@@ -8,6 +8,7 @@ const harness = vi.hoisted(() => {
     textSearchState: "idle",
     textSearchResults: [] as unknown[],
     pageContents: {} as Record<string, string>,
+    searchRunId: "run-1",
     searchPromise: Promise.resolve({}) as Promise<unknown>,
     settings: {
       inferenceType: "internal",
@@ -64,7 +65,7 @@ vi.mock("./pubSub", () => ({
 }));
 
 vi.mock("./history", () => ({
-  getCurrentSearchRunId: vi.fn(() => "run-1"),
+  getCurrentSearchRunId: vi.fn(() => harness.state.searchRunId),
   saveLlmResponseForQuery: vi.fn(() => Promise.resolve()),
   updateSearchResults: vi.fn(() => Promise.resolve()),
 }));
@@ -112,7 +113,7 @@ vi.mock("gpt-tokenizer", () => ({
 
 import { saveLlmResponseForQuery } from "./history";
 import { fetchPageContents } from "./pageContent";
-import { searchText } from "./search";
+import { searchImages, searchText } from "./search";
 import { searchAndRespond } from "./textGeneration";
 import type { TextSearchResults } from "./types";
 
@@ -196,10 +197,58 @@ describe("page content grounding", () => {
     vi.clearAllMocks();
     harness.state.query = "how do cats sleep";
     harness.state.pageContents = {};
+    harness.state.searchRunId = "run-1";
     harness.state.settings.enableAiResponse = false;
+    harness.state.settings.enableImageSearch = false;
     harness.state.settings.enableTextSearch = true;
     harness.state.settings.enablePageContentFetch = true;
     vi.mocked(searchText).mockResolvedValue(textResults);
+  });
+
+  /** Holds the page read open so a test can observe what happens meanwhile. */
+  function deferPageRead() {
+    let release: (contents: Record<string, string>) => void = () => {};
+    vi.mocked(fetchPageContents).mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    return (contents: Record<string, string> = {}) => release(contents);
+  }
+
+  it("starts image search without waiting for the pages to be read", async () => {
+    const releasePageRead = deferPageRead();
+    harness.state.settings.enableAiResponse = true;
+    harness.state.settings.enableImageSearch = true;
+    mockFetch.mockResolvedValue(
+      sseStream([contentFrame("Answer"), "data: [DONE]\n"]),
+    );
+
+    const responded = searchAndRespond();
+    await vi.waitFor(() => expect(searchImages).toHaveBeenCalled());
+
+    releasePageRead();
+    await responded;
+    await harness.state.searchPromise;
+  });
+
+  it("drops a read that lands after a newer search took over", async () => {
+    const releasePageRead = deferPageRead();
+    harness.state.settings.enableAiResponse = true;
+    mockFetch.mockResolvedValue(
+      sseStream([contentFrame("Answer"), "data: [DONE]\n"]),
+    );
+
+    const responded = searchAndRespond();
+    await vi.waitFor(() => expect(fetchPageContents).toHaveBeenCalled());
+
+    harness.state.searchRunId = "run-2";
+    releasePageRead({ "https://example.com/0": "text from the old search" });
+
+    await responded;
+    await harness.state.searchPromise;
+
+    expect(harness.state.pageContents).toEqual({});
   });
 
   it("reads only the results that reach the prompt", async () => {
