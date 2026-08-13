@@ -62,6 +62,16 @@ export function pageContentEndpointServerHook<
       return;
     }
 
+    // Verified before the parameters are read, so malformed requests from an
+    // unauthenticated caller still count against the rate limiter.
+    const { shouldContinue } = await handleTokenVerification(
+      url.searchParams.get("token"),
+      response,
+      request,
+    );
+
+    if (!shouldContinue) return;
+
     const parsedParams = pageContentParamsSchema.safeParse({
       query: url.searchParams.get("q") ?? undefined,
       urls: url.searchParams.getAll("url"),
@@ -75,14 +85,6 @@ export function pageContentEndpointServerHook<
       );
       return;
     }
-
-    const { shouldContinue } = await handleTokenVerification(
-      url.searchParams.get("token"),
-      response,
-      request,
-    );
-
-    if (!shouldContinue) return;
 
     try {
       const { query, urls } = parsedParams.data;

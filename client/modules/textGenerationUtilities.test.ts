@@ -112,12 +112,22 @@ describe("getFormattedSearchResults", () => {
   it("trims the excerpt to the share of the context it may use", () => {
     const longPage = "sentence about cats. ".repeat(500);
     setPageContents({ "https://a.example/": longPage });
-    state.settings = { openAiContextLength: 512 };
+    state.settings = { inferenceType: "openai", openAiContextLength: 512 };
 
     const formatted = getFormattedSearchResults(true);
 
     expect(formatted).toContain("…");
     expect(formatted.length).toBeLessThan(longPage.length);
+  });
+
+  it("spends the configured context on the OpenAI-compatible backend", () => {
+    const longPage = "sentence about cats. ".repeat(500);
+    setPageContents({ "https://a.example/": longPage });
+    state.settings = { inferenceType: "openai", openAiContextLength: 32768 };
+
+    // 35% of 32768 tokens holds this page whole, 35% of the 4096 default does
+    // not, so an untrimmed excerpt is what pins that the setting was read.
+    expect(getFormattedSearchResults(true)).not.toContain("…");
   });
 });
 
