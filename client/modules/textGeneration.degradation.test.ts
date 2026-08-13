@@ -9,6 +9,7 @@ const harness = vi.hoisted(() => {
     textSearchResults: [] as unknown[],
     pageContents: {} as Record<string, string>,
     searchRunId: "run-1",
+    pageReadingEnabled: true,
     searchPromise: Promise.resolve({}) as Promise<unknown>,
     settings: {
       inferenceType: "internal",
@@ -62,6 +63,15 @@ vi.mock("./pubSub", () => ({
   updateTextSearchState: (value: string) => {
     harness.state.textSearchState = value;
   },
+}));
+
+vi.mock("./config", () => ({
+  FALLBACK_CONFIG: { pageContentReadingEnabled: false },
+  getConfig: vi.fn(() =>
+    Promise.resolve({
+      pageContentReadingEnabled: harness.state.pageReadingEnabled,
+    }),
+  ),
 }));
 
 vi.mock("./history", () => ({
@@ -198,6 +208,7 @@ describe("page content grounding", () => {
     harness.state.query = "how do cats sleep";
     harness.state.pageContents = {};
     harness.state.searchRunId = "run-1";
+    harness.state.pageReadingEnabled = true;
     harness.state.settings.enableAiResponse = false;
     harness.state.settings.enableImageSearch = false;
     harness.state.settings.enableTextSearch = true;
@@ -275,6 +286,19 @@ describe("page content grounding", () => {
   it("does not read any page while the setting is off", async () => {
     harness.state.settings.enableAiResponse = true;
     harness.state.settings.enablePageContentFetch = false;
+    mockFetch.mockResolvedValue(
+      sseStream([contentFrame("Answer"), "data: [DONE]\n"]),
+    );
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(fetchPageContents).not.toHaveBeenCalled();
+  });
+
+  it("does not read any page while the instance keeps page reading off", async () => {
+    harness.state.pageReadingEnabled = false;
+    harness.state.settings.enableAiResponse = true;
     mockFetch.mockResolvedValue(
       sseStream([contentFrame("Answer"), "data: [DONE]\n"]),
     );

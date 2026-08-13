@@ -66,18 +66,35 @@ describe("pageContentEndpointServerHook", () => {
     vi.unstubAllEnvs();
   });
 
-  it("answers 404 while the operator has not enabled page reading", async () => {
-    vi.stubEnv("PAGE_CONTENT_READING_ENABLED", "");
+  it.each(["", "false", "0", "yes", "on"])(
+    "answers 404 while the operator flag reads %o",
+    async (flag) => {
+      vi.stubEnv("PAGE_CONTENT_READING_ENABLED", flag);
 
-    const { response, handled } = callEndpoint(
-      "/page-content?q=cats&url=https%3A%2F%2Fa.example%2F&token=abc",
-    );
-    await handled;
+      const { response, handled } = callEndpoint(
+        "/page-content?q=cats&url=https%3A%2F%2Fa.example%2F&token=abc",
+      );
+      await handled;
 
-    expect(response.statusCode).toBe(404);
-    expect(handleTokenVerification).not.toHaveBeenCalled();
-    expect(fetchPageContents).not.toHaveBeenCalled();
-  });
+      expect(response.statusCode).toBe(404);
+      expect(handleTokenVerification).not.toHaveBeenCalled();
+      expect(fetchPageContents).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["true", "TRUE", " 1 "])(
+    "serves the endpoint while the operator flag reads %o",
+    async (flag) => {
+      vi.stubEnv("PAGE_CONTENT_READING_ENABLED", flag);
+
+      const { handled } = callEndpoint(
+        "/page-content?q=cats&url=https%3A%2F%2Fa.example%2F&token=abc",
+      );
+      await handled;
+
+      expect(fetchPageContents).toHaveBeenCalled();
+    },
+  );
 
   it("passes through a path that only starts like the endpoint", async () => {
     const { next, handled } = callEndpoint("/page-content-something-else");

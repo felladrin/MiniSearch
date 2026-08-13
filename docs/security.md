@@ -73,8 +73,8 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 | `server/verifiedTokens.ts` | In-memory `Set<string>` of verified session tokens |
 | `server/searchesSinceLastRestart.ts` | In-memory counters for abuse monitoring |
 | `server/searchEndpointServerHook.ts` | Proxies text/image search to SearXNG after token verification (via `handleTokenVerification`) |
-| `server/verifyTokenAndRateLimit.ts` | Verifies the Argon2 token hash and enforces rate limiting (10 requests per 10 seconds) shared by search and inference endpoints |
-| `server/handleTokenVerification.ts` | Middleware bridge that calls `verifyTokenAndRateLimit` and writes 400/401/429 error responses for the search and inference endpoints |
+| `server/verifyTokenAndRateLimit.ts` | Verifies the Argon2 token hash and enforces rate limiting (10 requests per 10 seconds) shared by the search, page-content and inference endpoints |
+| `server/handleTokenVerification.ts` | Middleware bridge that calls `verifyTokenAndRateLimit` and writes 400/401/429 error responses for the search, page-content and inference endpoints |
 | `server/configEndpointServerHook.ts` | Serves the non-secret runtime config at `/api/config`, including whether access keys are enabled |
 | `server/utils/publicUrl.ts` | Rejects non-HTTP schemes and hosts resolving into private, loopback, link-local or reserved ranges before the server fetches a client-supplied URL |
 | `server/pageContentEndpointServerHook.ts` | Reads result pages at `/page-content` after token verification, capped at 6 URLs per request and gated by `PAGE_CONTENT_READING_ENABLED` |
@@ -84,14 +84,15 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 `/page-content` is the one endpoint that fetches a URL the client chose, so it
 is the one place where SSRF matters. It stays closed until an operator sets
 `PAGE_CONTENT_READING_ENABLED`, because on a public instance it would otherwise
-let any visitor drive outbound requests that carry the instance's IP.
+let any visitor drive outbound requests that carry the instance's IP. It shares
+the 10-requests-per-10-seconds bucket with `/search/`, but each request can fan
+out to six pages, so it is the heavier of the two per point.
 
 Every hop - the original URL and each redirect - passes `resolvePublicUrl`
-before a request is made, which blocks
-loopback, link-local (including `169.254.169.254`), private, carrier-grade-NAT,
-multicast and reserved addresses. The DNS answer is checked rather than pinned;
-the residual rebinding window and why it is accepted are documented in
-`docs/page-content.md`.
+before a request is made, which blocks loopback, link-local (including
+`169.254.169.254`), private, carrier-grade-NAT, multicast and reserved
+addresses. The DNS answer is checked rather than pinned; the residual rebinding
+window and why it is accepted are documented in `docs/page-content.md`.
 
 ## Threat Model
 

@@ -97,8 +97,8 @@ function isRedirect(status: number): boolean {
   );
 }
 
-function findCharset(text: string): string | null {
-  const match = /charset\s*=\s*["']?([\w-]+)/i.exec(text);
+function findCharset(text: string, pattern: RegExp): string | null {
+  const match = pattern.exec(text);
   return match ? match[1] : null;
 }
 
@@ -108,14 +108,18 @@ function findCharset(text: string): string | null {
  * those as UTF-8 turns the whole excerpt into mojibake.
  */
 function decodeDocument(bytes: Uint8Array, contentType: string): string {
-  const headerCharset = findCharset(contentType);
-  const declaredCharset =
-    headerCharset ??
-    // The meta tag is ASCII-compatible in every encoding worth sniffing, so
-    // reading the head of the document as Latin-1 is enough to find it.
-    findCharset(new TextDecoder("latin1").decode(bytes.slice(0, 4096)));
-
   try {
+    const declaredCharset =
+      findCharset(contentType, /charset\s*=\s*["']?([\w-]+)/i) ??
+      // Only a meta element counts, the way a browser's prescan reads it: a
+      // `charset=` inside a script or a link href is not a declaration. The
+      // element is ASCII-compatible in every encoding worth sniffing, so
+      // reading the head of the document as Latin-1 is enough to find it.
+      findCharset(
+        new TextDecoder("latin1").decode(bytes.slice(0, 4096)),
+        /<meta[^>]+charset\s*=\s*["']?([\w-]+)/i,
+      );
+
     return new TextDecoder(declaredCharset ?? "utf-8").decode(bytes);
   } catch {
     return new TextDecoder("utf-8").decode(bytes);

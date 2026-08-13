@@ -18,6 +18,7 @@ import {
   updateImageSearchState,
   updateIsRestoringFromHistory,
   updateLlmTextSearchResults,
+  updatePageContents,
   updateResponse,
   updateSuppressNextFollowUp,
   updateTextGenerationState,
@@ -48,6 +49,9 @@ export function useHistoryRestore(
 
       updateIsRestoringFromHistory(true);
       updateSuppressNextFollowUp(true);
+      // Excerpts belong to the search that fetched them; a follow-up on the
+      // restored entry must not be grounded on the live search's pages.
+      updatePageContents({});
       updateFollowUpQuestion("");
       updateChatInput("");
 

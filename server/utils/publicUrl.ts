@@ -12,11 +12,13 @@ const BLOCKED_CIDRS = [
   // Covers the unspecified address, ::1, and IPv4-compatible addresses such as
   // ::127.0.0.1, which are another spelling of an IPv4 destination.
   "::/96",
-  // NAT64 and 6to4 embed an IPv4 address that this guard cannot vet, so the
-  // whole prefix is refused rather than trusted.
+  // NAT64, 6to4 and Teredo embed an IPv4 address that this guard cannot vet,
+  // so the whole prefix is refused rather than trusted.
   "64:ff9b::/96",
   "2002::/16",
+  "2001::/32",
   "fc00::/7",
+  "fec0::/10",
   "fe80::/10",
   "ff00::/8",
   "0.0.0.0/8",
