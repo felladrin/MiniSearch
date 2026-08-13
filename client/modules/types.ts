@@ -31,6 +31,11 @@ export type TextSearchResults = TextSearchResult[];
 export type ImageSearchResults = ImageSearchResult[];
 
 /**
+ * Text extracted from result pages, keyed by the URL it was read from
+ */
+export type PageContents = Record<string, string>;
+
+/**
  * Possible states for search operations
  */
 export type SearchState = "idle" | "running" | "failed" | "completed";

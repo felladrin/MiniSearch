@@ -35,7 +35,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 
 1. **Token Generation**: On build/startup, `regenerateSearchToken()` writes a random token to `{os.tempdir()}/minisearch-token`, readable only by the user running the build (`0600`)
 2. **Client Injection**: The token is injected as `VITE_SEARCH_TOKEN` compile-time constant via Vite's `define` option
-3. **Per-Request Auth**: Client includes token as `?token=` parameter on all `/search/text` and `/search/images` requests
+3. **Per-Request Auth**: Client includes token as `?token=` parameter on all `/search/text`, `/search/images` and `/page-content` requests
 4. **Server Verification**: `handleTokenVerification()` in `searchEndpointServerHook.ts` validates the token before proxying to SearXNG
 5. **Session Tracking**: Validated tokens are stored in an in-memory `Set<string>` (`verifiedTokens.ts`) for session counting
 
@@ -45,6 +45,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 - **No Tracking**: No telemetry, analytics, or user tracking
 - **SearXNG Integration**: All web searches routed through privacy-focused metasearch
 - **No External Requests**: Optional browser-only mode for complete privacy
+- **Page Reading Is Opt-In**: `enablePageContentFetch` is off by default; when on, the server (never the browser) requests the top result pages, so those sites see the instance and no user cookies or IP
 
 ## Data Protection
 
@@ -75,6 +76,18 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 | `server/verifyTokenAndRateLimit.ts` | Verifies the Argon2 token hash and enforces rate limiting (10 requests per 10 seconds) shared by search and inference endpoints |
 | `server/handleTokenVerification.ts` | Middleware bridge that calls `verifyTokenAndRateLimit` and writes 400/401/429 error responses for the search and inference endpoints |
 | `server/configEndpointServerHook.ts` | Serves the non-secret runtime config at `/api/config`, including whether access keys are enabled |
+| `server/utils/publicUrl.ts` | Rejects non-HTTP schemes and hosts resolving into private, loopback, link-local or reserved ranges before the server fetches a client-supplied URL |
+| `server/pageContentEndpointServerHook.ts` | Reads result pages at `/page-content` after token verification, capped at 6 URLs per request |
+
+### Server-Side Fetching of Client-Supplied URLs
+
+`/page-content` is the one endpoint that fetches a URL the client chose, so it
+is the one place where SSRF matters. Every hop - the original URL and each
+redirect - passes `resolvePublicUrl` before a request is made, which blocks
+loopback, link-local (including `169.254.169.254`), private, carrier-grade-NAT,
+multicast and reserved addresses. The DNS answer is checked rather than pinned;
+the residual rebinding window and why it is accepted are documented in
+`docs/page-content.md`.
 
 ## Threat Model
 

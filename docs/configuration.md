@@ -82,6 +82,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `enterToSubmit` | boolean | `true` | Press Enter to submit query (vs Shift+Enter for new line) |
 | `enableAiResponseScrolling` | boolean | `true` | Auto-scroll AI response as it generates |
 | `enableNotificationOnAiComplete` | boolean | `false` | Show a browser notification when AI response generation finishes |
+| `enablePageContentFetch` | boolean | `false` | Read the pages behind the top results and ground the answer on their text instead of on snippets alone (see `docs/page-content.md`) |
 
 ### Inference Settings
 
@@ -153,7 +154,7 @@ Search results:
 **Placeholders:**
 - `{{currentDate}}`: Current date injected at generation time
 - `{{dateTime}}`: Alias for `{{currentDate}}` - both are replaced with the same current date value
-- `{{searchResults}}`: Formatted search results from the web search
+- `{{searchResults}}`: Formatted search results from the web search, including the page excerpts when `enablePageContentFetch` is on
 
 **Reasoning Markers:** Models that output internal thought processes use `<think>` and `</think>` markers. The UI extracts and separately displays reasoning content from the final response.
 

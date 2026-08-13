@@ -11,6 +11,7 @@ import { compressionServerHook } from "./server/compressionServerHook.ts";
 import { configEndpointServerHook } from "./server/configEndpointServerHook.ts";
 import { crossOriginServerHook } from "./server/crossOriginServerHook.ts";
 import { internalApiEndpointServerHook } from "./server/internalApiEndpointServerHook.ts";
+import { pageContentEndpointServerHook } from "./server/pageContentEndpointServerHook.ts";
 import { rerankerServiceHook } from "./server/rerankerServiceHook.ts";
 import { searchEndpointServerHook } from "./server/searchEndpointServerHook.ts";
 import { getSearchToken, regenerateSearchToken } from "./server/searchToken.ts";
@@ -90,6 +91,11 @@ export default defineConfig(({ command }) => {
         name: "configure-server-search-endpoint",
         configureServer: searchEndpointServerHook,
         configurePreviewServer: searchEndpointServerHook,
+      },
+      {
+        name: "configure-server-page-content-endpoint",
+        configureServer: pageContentEndpointServerHook,
+        configurePreviewServer: pageContentEndpointServerHook,
       },
       {
         name: "configure-server-status-endpoint",

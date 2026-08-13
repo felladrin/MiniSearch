@@ -26,7 +26,7 @@ The AI can run entirely inside your browser tab, on GPU or CPU, so a working set
 - **AI in your browser.** Pick from several curated models (135M to 4B parameters) that run on WebGPU where available and on CPU elsewhere. Models are downloaded once and cached by the browser.
 - **Any backend you like.** Connect an OpenAI-compatible API (Ollama, LM Studio, vLLM, llama.cpp server, or a hosted provider), use the crowdsourced AI Horde, or let the server proxy your own API without exposing its key.
 - **A real search pipeline.** Text and image results aggregated by SearXNG, reranked locally by a cross-encoder model, cached, and rate-limited; all inside the container.
-- **Answers you can verify.** Responses cite the sources they draw from, support follow-up questions with conversation memory, reveal the model's reasoning on demand, and can be read aloud.
+- **Answers you can verify.** Responses cite the sources they draw from, support follow-up questions with conversation memory, reveal the model's reasoning on demand, and can be read aloud. Turn on *Read Page Content* and the answer is grounded on the text of the top results, not only on their search snippets.
 - **Local history and analytics.** Fuzzy-searchable history with pinning and full-session restore, plus usage statistics and an activity heatmap. Retention is configurable, and storage stays in the browser.
 - **Fits your workflow.** Set it as your browser's default search engine, trigger it from Raycast, embed it in your own pages, and optionally protect your instance with access keys.
 

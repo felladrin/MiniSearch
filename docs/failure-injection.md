@@ -26,6 +26,11 @@ needed.
 | Search returns nothing to the endpoint | HTTP 200 with `[]`, not an error | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Text search returns nothing to the client | Keyword-only query retried as a fallback | `client/modules/textGeneration.degradation.test.ts` |
 | Keyword fallback also returns nothing | Text search state becomes `failed` | `client/modules/textGeneration.degradation.test.ts` |
+| Result page host resolves into a private range | Page skipped, no request is made | `server/pageContentService.test.ts` › fetchPageContents |
+| Result page redirects into a private range | Redirect not followed, page skipped | `server/pageContentService.test.ts` › fetchPageContents |
+| Result page errors, is not a document, or yields no text | That page is skipped, the others still return | `server/pageContentService.test.ts` › fetchPageContents |
+| Result page body never ends | Reading stops at the byte cap | `server/pageContentService.test.ts` › fetchPageContents |
+| `/page-content` errors or never answers | Answer falls back to snippets, search still completes | `client/modules/pageContent.test.ts`, `client/modules/textGeneration.degradation.test.ts` › page content grounding |
 | `/inference` upstream is not configured | HTTP 500 with a JSON error | `server/internalApiEndpointServerHook.test.ts` › environment configuration |
 | `/inference` cannot list upstream models | HTTP 500 with a JSON error | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | Upstream model fails but another one is available | Retried on the next model, answer still streams | `server/internalApiEndpointServerHook.test.ts` › streaming path |
@@ -59,5 +64,6 @@ the case goes red before committing it.
 
 - **Development Commands**: `docs/development-commands.md` - Running the suite
 - **Reranking**: `docs/reranking.md` - Reranker lifecycle and readiness
+- **Page Content**: `docs/page-content.md` - Reading result pages and its failure behavior
 - **AI Integration**: `docs/ai-integration.md` - Inference backends
 - **Overview**: `docs/overview.md` - Search and inference data flow

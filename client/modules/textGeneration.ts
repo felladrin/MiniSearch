@@ -7,6 +7,7 @@ import {
 } from "./history";
 import { addLogEntry } from "./logEntries";
 import { showAiCompleteNotification } from "./notifications";
+import { fetchPageContents } from "./pageContent";
 import {
   getConversationSummary,
   getQuery,
@@ -19,6 +20,7 @@ import {
   updateImageSearchResults,
   updateImageSearchState,
   updateLlmTextSearchResults,
+  updatePageContents,
   updateResponse,
   updateSearchPromise,
   updateTextGenerationState,
@@ -234,6 +236,8 @@ export async function searchAndRespond() {
 
   updateChatMessages([]);
 
+  updatePageContents({});
+
   updateSearchPromise(startTextSearch(getQuery()));
 
   if (!getSettings().enableAiResponse) return;
@@ -375,6 +379,30 @@ async function getKeywords(text: string, limit?: number) {
     .slice(0, limit);
 }
 
+/**
+ * Reads the pages behind the top results so the answer is grounded on their
+ * text instead of on search snippets alone. Awaited by the search promise, so
+ * generation waits for it while the results are already on screen.
+ */
+async function readPageContents(query: string, results: TextSearchResults) {
+  const settings = getSettings();
+
+  if (
+    !settings.enablePageContentFetch ||
+    !settings.enableAiResponse ||
+    results.length === 0
+  ) {
+    return;
+  }
+
+  updatePageContents(
+    await fetchPageContents(
+      query,
+      results.map(([, , url]) => url),
+    ),
+  );
+}
+
 async function startTextSearch(query: string) {
   const results = {
     textResults: [] as TextSearchResults,
@@ -411,7 +439,10 @@ async function startTextSearch(query: string) {
       results.textResults.length === 0 ? "failed" : "completed",
     );
     updateTextSearchResults(textResults);
-    updateLlmTextSearchResults(textResults.slice(0, searchResultsToConsider));
+
+    const resultsForLlm = textResults.slice(0, searchResultsToConsider);
+    updateLlmTextSearchResults(resultsForLlm);
+    await readPageContents(searchQuery, resultsForLlm);
 
     updateSearchResults(getCurrentSearchRunId(), {
       type: "text",

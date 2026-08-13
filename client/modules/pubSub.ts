@@ -4,6 +4,7 @@ import { addLogEntry } from "./logEntries";
 import { defaultSettings, SETTINGS_STORAGE_KEY } from "./settings";
 import type {
   ImageSearchResults,
+  PageContents,
   SearchResults,
   SearchState,
   TextGenerationState,
@@ -195,6 +196,16 @@ export const [updateLlmTextSearchResults, , getLlmTextSearchResults] =
  * Updates image search results
  */
 export const [updateImageSearchResults] = imageSearchResultsPubSub;
+
+/**
+ * PubSub instance for managing text extracted from result pages
+ */
+const pageContentsPubSub = createPubSub<PageContents>({});
+
+/**
+ * Updates the text extracted from result pages
+ */
+export const [updatePageContents, , getPageContents] = pageContentsPubSub;
 
 /**
  * PubSub instance for managing expanded menu accordions with localStorage persistence

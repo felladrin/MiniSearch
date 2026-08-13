@@ -76,6 +76,15 @@ export default function AISettingsForm() {
             description="Show a browser notification when the AI response is ready. Useful for longer queries that take time to process."
           />
 
+          <Switch
+            label="Read Page Content"
+            {...form.getInputProps("enablePageContentFetch", {
+              type: "checkbox",
+            })}
+            labelPosition="left"
+            description="Ground answers on the actual text of the top results instead of only their search snippets. Your instance downloads those pages, which takes a few extra seconds and tells the sites they were read."
+          />
+
           <Select
             {...form.getInputProps("inferenceType")}
             label="AI Processing Location"
