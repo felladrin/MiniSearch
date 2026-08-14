@@ -37,13 +37,17 @@ export function incrementGraphicalSearchesSinceLastRestart() {
   graphicalSearchesSinceLastRestart++;
 }
 
+// The two counters below stand in for the per-search log lines that used to
+// carry the query text: how often either case happens is what anyone acts on,
+// and that survives without recording what was searched for.
+
 /**
- * Counters for the two ways a search ends up with nothing to show. They stand
- * in for the per-search log lines that used to carry the query text: how often
- * either happens is what anyone needs to act on, and that survives without
- * recording what was searched for.
+ * Counter for searches SearXNG answered with zero results
  */
 let searchesWithoutResultsSinceLastRestart = 0;
+/**
+ * Counter for searches whose results were all dropped during processing
+ */
 let searchesWithAllResultsDiscardedSinceLastRestart = 0;
 
 /**

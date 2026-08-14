@@ -225,8 +225,8 @@ The `/status` endpoint returns a JSON object:
 | `graphicalSearches` | number | Image search count since last restart |
 | `averageTextualSearchesPerSession` | number | Text searches / sessions ratio |
 | `averageGraphicalSearchesPerSession` | number | Image searches / sessions ratio |
-| `searchesWithoutResults` | number | Searches SearXNG answered with zero results |
-| `searchesWithAllResultsDiscarded` | number | Searches whose results were all dropped during processing |
+| `searchesWithoutResults` | number | Searches, text and image together, that SearXNG answered with zero results |
+| `searchesWithAllResultsDiscarded` | number | Text searches whose results were all dropped during processing |
 | `rerankerServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `webSearchServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `pageReads` | object | Page-reading counters since last restart, see below |
@@ -236,7 +236,10 @@ The `/status` endpoint returns a JSON object:
 `searchesWithoutResults` and `searchesWithAllResultsDiscarded` are the aggregate
 form of two log lines that used to carry the query text. The log still names the
 unresponsive engines behind an empty response and the size and type of a
-discarded batch; how often either happens is read from here instead.
+discarded batch; how often either happens is read from here instead. The
+discarded count covers text searches only, because an image result is never
+dropped at this stage: an unusable thumbnail is dropped later, when
+`searchEndpointServerHook` fetches it.
 
 `pageReads` reports what happened to the pages read for AI answers. Each field
 is attached to a constant that someone will want to move, which is the reason it

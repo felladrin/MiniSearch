@@ -178,44 +178,45 @@ async function processSearchResults(
   const results = await breaker.execute("searxng", () =>
     performSearch(query, searchType),
   );
-  const deduplicatedResults = deduplicateResults(results);
+  const consideredResults = deduplicateResults(results).slice(0, limit);
 
   if (searchType === "text") {
     const textualResults = await Promise.all(
-      deduplicatedResults.slice(0, limit).map(processTextualResult),
+      consideredResults.map(processTextualResult),
     );
     return reportDiscardedResults(
       filterNullResults(textualResults),
-      results.length,
+      consideredResults.length,
       searchType,
     );
   }
 
   const graphicalResults = await Promise.all(
-    deduplicatedResults.slice(0, limit).map(processGraphicalResult),
+    consideredResults.map(processGraphicalResult),
   );
   return reportDiscardedResults(
     filterNullResults(graphicalResults),
-    results.length,
+    consideredResults.length,
     searchType,
   );
 }
 
 /**
- * Logs when SearXNG returned results but every one was dropped during processing
- * (e.g. missing title, snippet, or media source). Without this, the discarded
- * batch surfaces to the user as an opaque "Search failed" with no server-side
- * trace of why the non-empty response yielded nothing usable.
+ * Counts and logs when SearXNG returned results but every one that was looked at
+ * got dropped during processing (e.g. missing title, snippet, or media source).
+ * Without this, the discarded batch surfaces to the user as an opaque "Search
+ * failed" with no server-side trace of why the non-empty response yielded
+ * nothing usable.
  */
 function reportDiscardedResults<T>(
   filteredResults: T[],
-  rawResultCount: number,
+  processedResultCount: number,
   searchType: SearchType,
 ): T[] {
-  if (rawResultCount > 0 && filteredResults.length === 0) {
+  if (processedResultCount > 0 && filteredResults.length === 0) {
     incrementSearchesWithAllResultsDiscardedSinceLastRestart();
     printMessage(
-      `All ${rawResultCount} ${searchType} result(s) from SearXNG were discarded during processing (missing title, snippet, or media source).`,
+      `All ${processedResultCount} ${searchType} result(s) from SearXNG were discarded during processing (missing title, snippet, or media source).`,
     );
   }
   return filteredResults;

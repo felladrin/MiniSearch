@@ -351,14 +351,18 @@ describe("graceful degradation", () => {
 });
 
 describe("query privacy", () => {
-  const DISTINCTIVE_QUERY = "borogoves-outgrabe-mimsy-42";
+  // The space is here on purpose: a leak of the search URL would carry the
+  // percent-encoded form, which the raw string alone would not catch.
+  const DISTINCTIVE_QUERY = "borogoves outgrabe mimsy-42";
 
   let logLines: string[];
   let originalLog: typeof debug.log;
 
   /**
    * `debug` resolves its writer at call time, so replacing it here captures
-   * everything the module logs regardless of where the writer points.
+   * everything the module logs through `debug`, which under jsdom never reaches
+   * `console` in a spy-able way. The console spies cover the calls the module
+   * makes directly, so a new logging line is caught whichever it uses.
    */
   beforeEach(() => {
     logLines = [];
@@ -366,10 +370,16 @@ describe("query privacy", () => {
     debug.log = (...args: unknown[]) => {
       logLines.push(args.map(String).join(" "));
     };
+    for (const method of ["log", "info", "warn", "error", "debug"] as const) {
+      vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+        logLines.push(args.map(String).join(" "));
+      });
+    }
   });
 
   afterEach(() => {
     debug.log = originalLog;
+    vi.restoreAllMocks();
   });
 
   function emptyResponse() {
@@ -402,8 +412,16 @@ describe("query privacy", () => {
     fetchMock.mockRejectedValue(new Error("Network failure"));
     await fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker());
 
+    const output = logLines.join("\n");
     expect(logLines.length).toBeGreaterThan(0);
-    expect(logLines.join("\n")).not.toContain(DISTINCTIVE_QUERY);
+
+    for (const form of [
+      DISTINCTIVE_QUERY,
+      encodeURIComponent(DISTINCTIVE_QUERY),
+      new URLSearchParams({ q: DISTINCTIVE_QUERY }).toString(),
+    ]) {
+      expect(output).not.toContain(form);
+    }
   });
 
   it("still reports the unresponsive engines behind an empty response", async () => {
