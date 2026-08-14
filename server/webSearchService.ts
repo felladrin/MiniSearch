@@ -2,6 +2,10 @@ import { basename } from "node:path";
 import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
+import {
+  incrementSearchesWithAllResultsDiscardedSinceLastRestart,
+  incrementSearchesWithoutResultsSinceLastRestart,
+} from "./searchesSinceLastRestart.ts";
 import { CircuitBreaker } from "./utils/circuitBreaker.ts";
 
 const fileName = basename(import.meta.url);
@@ -148,11 +152,12 @@ async function performSearch(
     const results = Array.isArray(data.results) ? data.results : [];
 
     if (results.length === 0) {
+      incrementSearchesWithoutResultsSinceLastRestart();
       const reason = describeUnresponsiveEngines(data.unresponsive_engines);
       printMessage(
         reason
-          ? `No results returned from SearXNG for query: ${query}. Unresponsive engines: ${reason}`
-          : `No results returned from SearXNG for query: ${query}. No engine errors were reported; all engines returned zero results.`,
+          ? `No results returned from SearXNG. Unresponsive engines: ${reason}`
+          : "No results returned from SearXNG. No engine errors were reported; all engines returned zero results.",
       );
     }
 
@@ -182,7 +187,6 @@ async function processSearchResults(
     return reportDiscardedResults(
       filterNullResults(textualResults),
       results.length,
-      query,
       searchType,
     );
   }
@@ -193,7 +197,6 @@ async function processSearchResults(
   return reportDiscardedResults(
     filterNullResults(graphicalResults),
     results.length,
-    query,
     searchType,
   );
 }
@@ -207,12 +210,12 @@ async function processSearchResults(
 function reportDiscardedResults<T>(
   filteredResults: T[],
   rawResultCount: number,
-  query: string,
   searchType: SearchType,
 ): T[] {
   if (rawResultCount > 0 && filteredResults.length === 0) {
+    incrementSearchesWithAllResultsDiscardedSinceLastRestart();
     printMessage(
-      `All ${rawResultCount} ${searchType} result(s) from SearXNG for query: ${query} were discarded during processing (missing title, snippet, or media source).`,
+      `All ${rawResultCount} ${searchType} result(s) from SearXNG were discarded during processing (missing title, snippet, or media source).`,
     );
   }
   return filteredResults;

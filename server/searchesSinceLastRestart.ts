@@ -36,3 +36,42 @@ export function getGraphicalSearchesSinceLastRestart() {
 export function incrementGraphicalSearchesSinceLastRestart() {
   graphicalSearchesSinceLastRestart++;
 }
+
+/**
+ * Counters for the two ways a search ends up with nothing to show. They stand
+ * in for the per-search log lines that used to carry the query text: how often
+ * either happens is what anyone needs to act on, and that survives without
+ * recording what was searched for.
+ */
+let searchesWithoutResultsSinceLastRestart = 0;
+let searchesWithAllResultsDiscardedSinceLastRestart = 0;
+
+/**
+ * Gets the number of searches SearXNG answered with zero results
+ * @returns Number of empty searches
+ */
+export function getSearchesWithoutResultsSinceLastRestart() {
+  return searchesWithoutResultsSinceLastRestart;
+}
+
+/**
+ * Increments the empty-search counter
+ */
+export function incrementSearchesWithoutResultsSinceLastRestart() {
+  searchesWithoutResultsSinceLastRestart++;
+}
+
+/**
+ * Gets the number of searches whose results were all dropped during processing
+ * @returns Number of fully discarded searches
+ */
+export function getSearchesWithAllResultsDiscardedSinceLastRestart() {
+  return searchesWithAllResultsDiscardedSinceLastRestart;
+}
+
+/**
+ * Increments the fully-discarded-search counter
+ */
+export function incrementSearchesWithAllResultsDiscardedSinceLastRestart() {
+  searchesWithAllResultsDiscardedSinceLastRestart++;
+}
