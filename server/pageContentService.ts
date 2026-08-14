@@ -462,13 +462,18 @@ function scorePassage(
 }
 
 /**
- * Picks the passages that best cover the query, within a character budget,
- * and restores their original order so the excerpt still reads as prose.
+ * Picks the passages that best cover the query, within a character budget.
+ *
+ * The excerpt comes back best-first rather than in document order, because the
+ * client trims it again against the model's context and keeps a prefix. Under
+ * document order that prefix is whatever the page put at the top, which on an
+ * article is its navigation and its infobox, so the ranking below decided only
+ * what was transferred and never what the model read.
  *
  * @param query - The user's search query
  * @param passages - Candidate passages from a single page
  * @param maxChars - Character budget for the page's excerpt
- * @returns The selected passages, in document order
+ * @returns The selected passages, best match first
  */
 export function selectPassages(
   query: string,
@@ -492,18 +497,18 @@ export function selectPassages(
     }))
     .sort((a, b) => b.score - a.score || a.index - b.index);
 
-  const selected: typeof ranked = [];
+  const selected: string[] = [];
   let usedChars = 0;
 
   for (const passage of ranked) {
     // Skipping rather than stopping lets a shorter passage further down the
     // ranking still fill what is left of the budget.
     if (usedChars + passage.text.length > maxChars) continue;
-    selected.push(passage);
+    selected.push(passage.text);
     usedChars += passage.text.length + 1;
   }
 
-  return selected.sort((a, b) => a.index - b.index).map(({ text }) => text);
+  return selected;
 }
 
 async function fetchPageContent(
@@ -526,9 +531,6 @@ async function fetchPageContent(
     const passages = splitIntoPassages(extractReadableText(download.html));
     const selected = selectPassages(query, passages, MAX_PAGE_CHARS);
     const content = selected.join("\n");
-    // The budget dropped material the page had, which is the signal for whether
-    // `MAX_PAGE_CHARS` is set where it should be.
-    const excerptTruncated = selected.length < passages.length;
 
     if (content.length < MIN_USEFUL_CHARS) {
       recordPageRead({
@@ -543,7 +545,8 @@ async function fetchPageContent(
       outcome: "read",
       durationMs: since(),
       bodyTruncated,
-      excerptTruncated,
+      passagesKept: selected.length,
+      passagesAvailable: passages.length,
     });
 
     return { url, content };

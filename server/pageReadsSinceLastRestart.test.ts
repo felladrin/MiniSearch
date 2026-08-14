@@ -14,7 +14,6 @@ function delta(run: () => void) {
     requested: after.requested - before.requested,
     read: after.read - before.read,
     bodiesTruncated: after.bodiesTruncated - before.bodiesTruncated,
-    excerptsTruncated: after.excerptsTruncated - before.excerptsTruncated,
     skipped: Object.fromEntries(
       Object.entries(after.skipped).map(([outcome, count]) => [
         outcome,
@@ -71,20 +70,14 @@ describe("recordPageRead", () => {
     expect(accounted).toBe(after.requested);
   });
 
-  it("counts the two truncation signals only when they happened", () => {
+  it("counts a truncated body only when it was truncated", () => {
     const counted = delta(() => {
       recordPageRead({ outcome: "read", durationMs: 10, bodyTruncated: true });
-      recordPageRead({
-        outcome: "read",
-        durationMs: 10,
-        excerptTruncated: true,
-      });
       recordPageRead({ outcome: "read", durationMs: 10 });
     });
 
-    expect(counted.read).toBe(3);
+    expect(counted.read).toBe(2);
     expect(counted.bodiesTruncated).toBe(1);
-    expect(counted.excerptsTruncated).toBe(1);
   });
 });
 
@@ -104,7 +97,7 @@ describe("getPageReadStats", () => {
 
   it("reports zeroes rather than NaN before anything has been read", async () => {
     // A fresh module instance is the only way to see the pre-first-read state,
-    // where both derived numbers divide by zero.
+    // where every derived number divides by zero.
     vi.resetModules();
     const fresh = await import("./pageReadsSinceLastRestart");
 
@@ -113,6 +106,43 @@ describe("getPageReadStats", () => {
       read: 0,
       readRate: 0,
       averageReadMs: 0,
+      excerptKeptRate: 0,
     });
+  });
+
+  it("reports how much of a page the budget kept, not how many overflowed", async () => {
+    vi.resetModules();
+    const fresh = await import("./pageReadsSinceLastRestart");
+
+    // Both pages overflow, so a count of pages that overflowed would read 100%
+    // here and say nothing about where the budget sits.
+    fresh.recordPageRead({
+      outcome: "read",
+      durationMs: 10,
+      passagesKept: 5,
+      passagesAvailable: 100,
+    });
+    fresh.recordPageRead({
+      outcome: "read",
+      durationMs: 10,
+      passagesKept: 15,
+      passagesAvailable: 100,
+    });
+
+    expect(fresh.getPageReadStats().excerptKeptRate).toBe(10);
+  });
+
+  it("reports the whole page kept when it all fit", async () => {
+    vi.resetModules();
+    const fresh = await import("./pageReadsSinceLastRestart");
+
+    fresh.recordPageRead({
+      outcome: "read",
+      durationMs: 10,
+      passagesKept: 4,
+      passagesAvailable: 4,
+    });
+
+    expect(fresh.getPageReadStats().excerptKeptRate).toBe(100);
   });
 });

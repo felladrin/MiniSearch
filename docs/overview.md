@@ -242,7 +242,7 @@ is counted at all (see `docs/page-content.md`):
 | `readRate` | number | Nothing; `read` as a percentage of `requested` |
 | `averageReadMs` | number | `REQUEST_TIMEOUT_MS`, including the reads that hit it |
 | `bodiesTruncated` | number | `MAX_RESPONSE_BYTES` |
-| `excerptsTruncated` | number | `MAX_PAGE_CHARS` |
+| `excerptKeptRate` | number | `MAX_PAGE_CHARS`, as the share of a page's passages that fit it |
 | `skipped.blocked` | number | The SSRF guard, and how often callers aim at private space |
 | `skipped.notADocument` | number | `READABLE_CONTENT_TYPES` |
 | `skipped.httpError` | number | Nothing; how often sites refuse the instance |

@@ -138,10 +138,13 @@ describe("selectPassages", () => {
     ]);
   });
 
-  it("keeps the selected passages in document order", () => {
+  it("returns the selected passages best match first", () => {
+    // Document order would put the lead passage first, and the client trims
+    // this excerpt again against the model's context by keeping a prefix, so
+    // the covering passage has to be the one that survives that cut.
     const selected = selectPassages("onnx runtime reranker", passages, 120);
 
-    expect(selected).toEqual([passages[0], passages[1]]);
+    expect(selected).toEqual([passages[1], passages[0]]);
   });
 
   it("stays within the character budget", () => {
@@ -165,24 +168,25 @@ describe("selectPassages", () => {
     ]);
   });
 
-  // Generous on purpose: CI runs this under v8 coverage with file parallelism,
-  // and the pre-index cost was 2776ms locally, so a real regression trips the
-  // bound (or the timeout) with room to spare either way.
+  // The bound sits between two measured costs on this exact input: 176ms
+  // indexed and 7289ms scanning, both on the author's machine. Generous enough
+  // that CI's v8 coverage and file parallelism cannot trip it, tight enough
+  // that restoring the scan does.
   it("ranks a large page against a large query in bounded time", {
     timeout: 20_000,
   }, () => {
     // Comparing every term against every word is quadratic in a product the
-    // page controls, and a page of Han has one word per character. This input
-    // is ~2e8 comparisons that way, which took seconds; the word index makes it
-    // linear in the page.
+    // page controls, and a page of Han has one word per character. This is the
+    // worst case the endpoint accepts: 1.5 MB of Han reaches ranking as
+    // ~500,000 words, against the 2,000-character query limit.
     const han = (start: number, span: number, count: number) =>
       Array.from({ length: count }, (_, i) =>
         String.fromCodePoint(start + (i % span)),
       ).join("");
 
     // Disjoint blocks, so no term matches and nothing exits the search early.
-    const passages = splitIntoPassages(han(0x4e00, 8000, 200_000));
-    const query = han(0x3400, 1500, 1000);
+    const passages = splitIntoPassages(han(0x4e00, 8000, 500_000));
+    const query = han(0x3400, 1500, 2000);
 
     const startedAt = performance.now();
     selectPassages(query, passages, 6000);
@@ -317,7 +321,6 @@ describe("page read counters", () => {
           .filter(([, count]) => count !== 0),
       ),
       bodiesTruncated: after.bodiesTruncated - before.bodiesTruncated,
-      excerptsTruncated: after.excerptsTruncated - before.excerptsTruncated,
     };
   }
 
@@ -398,10 +401,24 @@ describe("page read counters", () => {
     ).join("")}</article></body></html>`;
     respondWithHtml(longPage);
 
-    const counted = await countOutcomes("https://example.com/long");
+    // The rate is cumulative for the process, so this page has to be the only
+    // one the counters have seen for the number to be about this page.
+    vi.resetModules();
+    const [service, counters] = await Promise.all([
+      import("./pageContentService"),
+      import("./pageReadsSinceLastRestart"),
+    ]);
 
-    expect(counted.read).toBe(1);
-    expect(counted.excerptsTruncated).toBe(1);
+    await service.fetchPageContents("cats", ["https://example.com/long"]);
+    const stats = counters.getPageReadStats();
+
+    expect(stats.read).toBe(1);
+    // 40 passages of ~260 characters against a 6,000-character budget, so
+    // roughly 22 of them fit and the rate lands near 55. A count of pages that
+    // overflowed would have read 100% here and moved nowhere if the budget
+    // doubled.
+    expect(stats.excerptKeptRate).toBeGreaterThan(45);
+    expect(stats.excerptKeptRate).toBeLessThan(65);
   });
 
   it("records no query or URL anywhere in what it reports", async () => {

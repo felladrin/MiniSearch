@@ -35,7 +35,8 @@ const outcomes: Record<PageReadOutcome, number> = {
 
 let totalReadMs = 0;
 let bodiesTruncated = 0;
-let excerptsTruncated = 0;
+let totalPassagesKept = 0;
+let totalPassagesAvailable = 0;
 
 /**
  * Records one finished page read.
@@ -43,23 +44,27 @@ let excerptsTruncated = 0;
  * @param outcome - How the read ended
  * @param durationMs - Wall time spent on it, including redirects
  * @param bodyTruncated - Whether the response hit the byte cap, which tunes `MAX_RESPONSE_BYTES`
- * @param excerptTruncated - Whether the character budget dropped passages the page had, which tunes `MAX_PAGE_CHARS`
+ * @param passagesKept - Passages that fit the character budget, which tunes `MAX_PAGE_CHARS`
+ * @param passagesAvailable - Passages the page offered
  */
 export function recordPageRead({
   outcome,
   durationMs,
   bodyTruncated = false,
-  excerptTruncated = false,
+  passagesKept = 0,
+  passagesAvailable = 0,
 }: {
   outcome: PageReadOutcome;
   durationMs: number;
   bodyTruncated?: boolean;
-  excerptTruncated?: boolean;
+  passagesKept?: number;
+  passagesAvailable?: number;
 }): void {
   outcomes[outcome]++;
   totalReadMs += durationMs;
   if (bodyTruncated) bodiesTruncated++;
-  if (excerptTruncated) excerptsTruncated++;
+  totalPassagesKept += passagesKept;
+  totalPassagesAvailable += passagesAvailable;
 }
 
 /**
@@ -81,7 +86,13 @@ export function getPageReadStats() {
     readRate: Number(((read / requested) * 100 || 0).toFixed(1)),
     averageReadMs: Math.round(totalReadMs / requested || 0),
     bodiesTruncated,
-    excerptsTruncated,
+    // A ratio rather than a count of pages that overflowed: an article almost
+    // always has more passages than the budget takes, so counting the pages
+    // that overflowed reads ~100% whatever the budget is set to and settles
+    // nothing. How much of a page survives moves when the budget moves.
+    excerptKeptRate: Number(
+      ((totalPassagesKept / totalPassagesAvailable) * 100 || 0).toFixed(1),
+    ),
     skipped,
   };
 }
