@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { repository, version } from "../package.json" with { type: "json" };
 
 const lookupMock = vi.hoisted(() => vi.fn());
 
@@ -417,6 +418,16 @@ describe("page read counters", () => {
 });
 
 describe("fetchPageContents", () => {
+  it("identifies itself with the name, version and repository in package.json", async () => {
+    respondWithHtml(articlePage);
+
+    await fetchPageContents("cats", ["https://example.com/cats"]);
+
+    expect(fetchMock.mock.calls[0][1].headers["User-Agent"]).toBe(
+      `Mozilla/5.0 (compatible; MiniSearch/${version}; +${repository.url})`,
+    );
+  });
+
   it("returns the passages of a page that could be read", async () => {
     respondWithHtml(articlePage);
 

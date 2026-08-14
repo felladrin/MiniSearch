@@ -1,4 +1,5 @@
 import { convert as convertHtmlToPlainText } from "html-to-text";
+import { repository, version } from "../package.json" with { type: "json" };
 import {
   type PageReadOutcome,
   recordPageRead,
@@ -15,14 +16,15 @@ const MIN_USEFUL_CHARS = 200;
 const MIN_PASSAGE_CHARS = 180;
 const MAX_PASSAGE_CHARS = 1200;
 
+const appName = repository.url.slice(repository.url.lastIndexOf("/") + 1);
+
 const REQUEST_HEADERS = {
   Accept: "text/html,application/xhtml+xml;q=0.9,text/plain;q=0.8",
   // No language preference: searches arrive in every language, and asking for
   // English made a multilingual site serve its English edition for a query
   // written in something else.
   "Accept-Language": "*",
-  "User-Agent":
-    "Mozilla/5.0 (compatible; MiniSearch/1.0; +https://github.com/felladrin/MiniSearch)",
+  "User-Agent": `Mozilla/5.0 (compatible; ${appName}/${version}; +${repository.url})`,
 } as const;
 
 const READABLE_CONTENT_TYPES =
