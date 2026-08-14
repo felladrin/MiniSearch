@@ -1,6 +1,5 @@
 import type { PreviewServer, ViteDevServer } from "vite";
 import { z } from "zod";
-import { isEnvFlagEnabled } from "../shared/serverConfig.ts";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
 import { fetchPageContents } from "./pageContentService.ts";
 
@@ -37,9 +36,9 @@ const pageContentParamsSchema = z.object({
  * ordering to ever be reached.
  *
  * Unlike `/search/`, which only ever reaches the configured SearXNG instance,
- * this endpoint fetches URLs the caller chose. That is a capability an
- * operator has to grant deliberately, so it stays closed until
- * `PAGE_CONTENT_READING_ENABLED` says otherwise.
+ * this endpoint fetches URLs the caller chose. The operator grants this
+ * capability by deploying the image; users then opt in per browser under AI
+ * Settings > Read Page Content.
  *
  * @param server - The Vite dev server or preview server instance
  * @returns void - Modifies the server middleware in place
@@ -52,15 +51,6 @@ export function pageContentEndpointServerHook<
 
     const url = new URL(request.url, `http://${request.headers.host}`);
     if (url.pathname !== "/page-content") return next();
-
-    if (!isEnvFlagEnabled(process.env.PAGE_CONTENT_READING_ENABLED)) {
-      response.statusCode = 404;
-      response.setHeader("Content-Type", "application/json");
-      response.end(
-        JSON.stringify({ error: "Page content reading is disabled." }),
-      );
-      return;
-    }
 
     // Verified before the parameters are read, so malformed requests from an
     // unauthenticated caller still count against the rate limiter.

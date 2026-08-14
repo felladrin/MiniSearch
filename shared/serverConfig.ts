@@ -5,7 +5,6 @@ export interface ServerConfig {
   internalApiEnabled: boolean;
   internalApiName: string;
   defaultInferenceType: string;
-  pageContentReadingEnabled: boolean;
 }
 
 /**

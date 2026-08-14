@@ -5,20 +5,17 @@ two-sentence snippet, and a URL per result. That is a thin base to cite from,
 and it is the main reason an answer can read as confident and still be wrong -
 the model is asked to source facts it can only infer from fragments.
 
-When the instance allows it and the user turns it on, MiniSearch also reads the
-pages behind the top results and feeds the passages that match the query into
-the prompt.
+When the user turns it on, MiniSearch also reads the pages behind the top
+results and feeds the passages that match the query into the prompt.
 
-Two switches have to line up, and both are off by default:
+One switch controls the feature, and it is off by default:
 
 | Switch | Who sets it | What it does |
 |---|---|---|
-| `PAGE_CONTENT_READING_ENABLED` | The operator, as an environment variable | Opens `/page-content`. While it is off the endpoint answers 404 and the UI toggle is hidden |
 | **Read Page Content** | The user, under AI Settings | Turns page reading on for that browser |
 
-The operator switch exists because this is the only endpoint that fetches a URL
-the caller chose. On a public instance that is a capability worth granting
-deliberately rather than shipping on.
+The endpoint is always available; the user toggle decides whether each browser
+actually uses it.
 
 ## Flow
 
@@ -77,7 +74,7 @@ coverage.
 ## Budgets and Limits
 
 | Limit | Value | Where |
-|---|---|---|
+| --- | --- | --- |
 | Pages read per search | 6 | `searchResultsToConsider`, mirrored by `MAX_URLS` in the endpoint |
 | Per-page deadline, redirects included | 6 s | `REQUEST_TIMEOUT_MS` |
 | Redirects followed | 3, each re-validated | `MAX_REDIRECTS` |
@@ -141,7 +138,7 @@ Every failure degrades to the snippet-only prompt, which is what the answer was
 grounded on before:
 
 | Failure | Result |
-|---|---|
+| --- | --- |
 | Host resolves privately, or the scheme is not HTTP | That page is skipped, no request is made |
 | Page times out, errors, or is not a document | That page is skipped |
 | Page yields less than 200 characters | That page is skipped |

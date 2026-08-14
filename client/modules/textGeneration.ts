@@ -1,6 +1,5 @@
 import gptTokenizer from "gpt-tokenizer";
 import prettyMilliseconds from "pretty-ms";
-import { FALLBACK_CONFIG, getConfig } from "./config";
 import {
   getCurrentSearchRunId,
   saveLlmResponseForQuery,
@@ -395,15 +394,6 @@ async function readPageContents(query: string, results: TextSearchResults) {
   ) {
     return;
   }
-
-  // The stored setting outlives an operator turning page reading off, and it
-  // cannot be unset from a UI that hides the toggle in that case, so the
-  // server's answer decides whether the request is worth making.
-  const { pageContentReadingEnabled } = await getConfig().catch(
-    () => FALLBACK_CONFIG,
-  );
-
-  if (!pageContentReadingEnabled) return;
 
   const searchRunId = getCurrentSearchRunId();
   const contents = await fetchPageContents(

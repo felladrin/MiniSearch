@@ -45,7 +45,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 - **No Tracking**: No telemetry, analytics, or user tracking
 - **SearXNG Integration**: All web searches routed through privacy-focused metasearch
 - **No External Requests**: Optional browser-only mode for complete privacy
-- **Page Reading Is Opt-In Twice**: the operator has to set `PAGE_CONTENT_READING_ENABLED` and the user has to turn on `enablePageContentFetch`; when both are on, the server (never the browser) requests the top result pages, so those sites see the instance and no user cookies or IP
+- **Page Reading Is Opt-In**: the user turns on `enablePageContentFetch` under AI Settings; the server (never the browser) requests the top result pages, so those sites see the instance and no user cookies or IP
 
 ## Data Protection
 
@@ -68,7 +68,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 ## Server-Side Security Modules
 
 | Module | Purpose |
-|--------|---------|
+| -------- | --------- |
 | `server/searchToken.ts` | Reads/writes the CSRF token from `{tempdir}/minisearch-token` |
 | `server/verifiedTokens.ts` | In-memory `Set<string>` of verified session tokens |
 | `server/searchesSinceLastRestart.ts` | In-memory counters for abuse monitoring |
@@ -77,16 +77,15 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 | `server/handleTokenVerification.ts` | Middleware bridge that calls `verifyTokenAndRateLimit` and writes 400/401/429 error responses for the search, page-content and inference endpoints |
 | `server/configEndpointServerHook.ts` | Serves the non-secret runtime config at `/api/config`, including whether access keys are enabled |
 | `server/utils/publicUrl.ts` | Rejects non-HTTP schemes and hosts resolving into private, loopback, link-local or reserved ranges before the server fetches a client-supplied URL |
-| `server/pageContentEndpointServerHook.ts` | Reads result pages at `/page-content` after token verification, capped at 6 URLs per request and gated by `PAGE_CONTENT_READING_ENABLED` |
+| `server/pageContentEndpointServerHook.ts` | Reads result pages at `/page-content` after token verification, capped at 6 URLs per request |
 
 ### Server-Side Fetching of Client-Supplied URLs
 
 `/page-content` is the one endpoint that fetches a URL the client chose, so it
-is the one place where SSRF matters. It stays closed until an operator sets
-`PAGE_CONTENT_READING_ENABLED`, because on a public instance it would otherwise
-let any visitor drive outbound requests that carry the instance's IP. It shares
-the 10-requests-per-10-seconds bucket with `/search/`, but each request can fan
-out to six pages, so it is the heavier of the two per point.
+is the one place where SSRF matters. It is always available; the user's
+`enablePageContentFetch` toggle decides whether each browser actually uses it.
+It shares the 10-requests-per-10-seconds bucket with `/search/`, but each
+request can fan out to six pages, so it is the heavier of the two per point.
 
 Every hop - the original URL and each redirect - passes `resolvePublicUrl`
 before a request is made, which blocks loopback, link-local (including

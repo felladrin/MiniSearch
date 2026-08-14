@@ -14,7 +14,6 @@ const mockConfig: ServerConfig = {
   internalApiEnabled: false,
   internalApiName: "Internal API",
   defaultInferenceType: "browser",
-  pageContentReadingEnabled: false,
 };
 
 describe("Settings Module", () => {

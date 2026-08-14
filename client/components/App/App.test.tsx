@@ -28,7 +28,6 @@ const serverConfig: ServerConfig = {
   internalApiEnabled: false,
   internalApiName: "Internal API",
   defaultInferenceType: "browser",
-  pageContentReadingEnabled: false,
 };
 
 describe("App", () => {

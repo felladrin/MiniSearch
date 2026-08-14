@@ -12,6 +12,7 @@ All configuration is done via environment variables. Create a `.env` file in the
 | `ACCESS_KEY_TIMEOUT_HOURS` | `24` | Hours to cache validated keys in browser. Set to `0` to require validation on every request |
 
 **Example:**
+
 ```bash
 ACCESS_KEYS="my-secret-key-1,my-secret-key-2"
 ACCESS_KEY_TIMEOUT_HOURS="24"
@@ -30,13 +31,14 @@ Configure default models for different inference types:
 For self-hosted OpenAI-compatible APIs:
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` | `''` | Base URL of your API (e.g., `https://api.internal.company.com/v1`) |
 | `INTERNAL_OPENAI_COMPATIBLE_API_KEY` | `''` | API key for authentication |
 | `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` | `''` | Model ID to use (auto-detected if empty) |
 | `INTERNAL_OPENAI_COMPATIBLE_API_NAME` | `Internal API` | Display name shown in UI |
 
 **Example:**
+
 ```bash
 INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL="https://llm.internal.company.com/v1"
 INTERNAL_OPENAI_COMPATIBLE_API_KEY="sk-internal-xxx"
@@ -47,16 +49,16 @@ INTERNAL_OPENAI_COMPATIBLE_API_NAME="Company LLM"
 ### Default Behavior
 
 | Variable | Default | Description |
+
 |----------|---------|-------------|
 | `DEFAULT_INFERENCE_TYPE` | `browser` | Default AI inference type (`browser`, `openai`, `horde`, `internal`) |
-| `PAGE_CONTENT_READING_ENABLED` | `false` | Allow this instance to read the pages behind search results to ground AI answers. Only `true` or `1` turns it on. It makes the server fetch URLs chosen by whoever is using the instance, so grant it deliberately - see `docs/page-content.md`. With it off, `/page-content` answers 404 and the setting is hidden in the UI. |
 
 ### Server Configuration
 
 These variables control the Vite development/preview server behavior:
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `HOST` | `0.0.0.0` | Host address for the Vite server to bind to |
 | `PORT` | `7860` | Port number for the main server |
 | `HMR_PORT` | `7861` | Port for Hot Module Replacement during development |
@@ -73,7 +75,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 ### Core Settings
 
 | Setting | Type | Default | Description |
-|---------|------|---------|-------------|
+| --------- | ------ | --------- | ------------- |
 | `enableAiResponse` | boolean | `false` | Enable AI-generated responses for searches |
 | `showEnableAiResponsePrompt` | boolean | `true` | Show prompt to enable AI response on first use |
 | `enableImageSearch` | boolean | `true` | Include image results in searches |
@@ -83,12 +85,12 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `enterToSubmit` | boolean | `true` | Press Enter to submit query (vs Shift+Enter for new line) |
 | `enableAiResponseScrolling` | boolean | `true` | Auto-scroll AI response as it generates |
 | `enableNotificationOnAiComplete` | boolean | `false` | Show a browser notification when AI response generation finishes |
-| `enablePageContentFetch` | boolean | `false` | Read the pages behind the top results and ground the answer on their text instead of on snippets alone. Takes effect only where the instance sets `PAGE_CONTENT_READING_ENABLED` (see `docs/page-content.md`) |
+| `enablePageContentFetch` | boolean | `false` | Read the pages behind the top results and ground the answer on their text instead of on snippets alone. |
 
 ### Inference Settings
 
 | Setting | Type | Default | Description |
-|---------|------|---------|-------------|
+| --------- | ------ | --------- | ------------- |
 | `inferenceType` | enum | `'browser'` | AI provider: `browser`, `openai`, `horde`, `internal` |
 | `cpuThreads` | number | (auto) | Number of CPU threads for inference (Wllama), defaults to `navigator.hardwareConcurrency - 2` |
 | `allowAiModelDownload` | boolean | `false` | Allow automatic AI model downloads |
@@ -103,25 +105,29 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 ### Model Selection
 
 **Wllama Models:**
+
 - 30+ pre-configured models
 - Range from 135M to 4B parameters
+
 - All quantized to Q4_K_S or UD-Q4_K_XL
 - Stored at: `Felladrin/gguf-sharded-*` on HuggingFace
 
 **OpenAI/Internal:**
+
 - Any OpenAI-compatible API
 - Auto-model detection if not specified
 - Supports streaming and reasoning models
 
 **AI Horde:**
+
 - Uses aihorde.net distributed network
-- Anonymous or authenticated access
+- Anonymou s  or au t henticate d  access
 - Parallel generation with race conditions
 
 ### History Settings
 
 | Setting | Type | Default | Description |
-|---------|------|---------|-------------|
+| --------- | ------ | --------- | ------------- |
 | `enableHistory` | boolean | `true` | Enable search history persistence |
 | `historyRetentionDays` | number | `30` | Days to keep search history |
 | `historyMaxEntries` | number | `1000` | Maximum history entries before cleanup |
@@ -147,22 +153,24 @@ You are allowed to use these Markdown elements: anchor, bold, italic, code, quot
 Search results:
 
 {{searchResults}}`,
+
   reasoningStartMarker: '<think>',
   reasoningEndMarker: '</think>'
 }
 ```
 
 **Placeholders:**
+
 - `{{currentDate}}`: Current date injected at generation time
 - `{{dateTime}}`: Alias for `{{currentDate}}` - both are replaced with the same current date value
-- `{{searchResults}}`: Formatted search results from the web search, including the page excerpts when `enablePageContentFetch` is on
+- `{{searc h Result s }}`: Form a tted search r esults from the web search, including the page excerpts when `enablePageContentFetch` is on
 
 **Reasoning Markers:** Models that output internal thought processes use `<think>` and `</think>` markers. The UI extracts and separately displays reasoning content from the final response.
 
 ### Privacy Settings
 
 | Setting | Type | Default | Description |
-|---------|------|---------|-------------|
+| --------- | ------ | --------- | ------------- |
 | `selectedVoiceId` | string | `""` | Voice ID for text-to-speech |
 | `reasoningStartMarker` | string | `"<think>"` | Marker for start of reasoning content |
 | `reasoningEndMarker` | string | `"</think>"` | Marker for end of reasoning content |
@@ -193,15 +201,16 @@ services:
       ]
 ```
 
-### docker-compose.production.yml
+ docker-compose.production.yml
 
 Same structure but without volume mounts and with pre-built assets.
 
 ### Dockerfile Environment
 
 The Dockerfile sets up a single runtime stage:
-   - Node.js LTS
-   - Python 3 + SearXNG
+
+- Node.js LTS
+- Python 3 + SearXNG
 
 The app runs under the `node` user, with the app directory at `/home/node/app`. The production image starts the app with `npm start -- --host` (i.e. `vite preview`), not `npm run dev`.
 
@@ -235,7 +244,7 @@ Client-facing configuration (access keys, inference type, internal API settings)
   "accessKeyTimeoutHours": 24,
   "wllamaDefaultModelId": "littlelamb-290m",
   "internalApiEnabled": true,
-  "internalApiName": "Internal API",
+   "inter n alApiName": " I nternal  API",
   "defaultInferenceType": "browser"
 }
 ```
@@ -243,7 +252,7 @@ Client-facing configuration (access keys, inference type, internal API settings)
 ### Build-Time vs Runtime Configuration
 
 | Value | Resolved At | Notes |
-|-------|-------------|-------|
+| ------- | ------------- | ------- |
 | `VITE_SEARCH_TOKEN` | Build time | CSRF protection token, regenerated on each build |
 | `VITE_BUILD_DATE_TIME` | Build time | Epoch milliseconds when the build occurred |
 | `VITE_COMMIT_SHORT_HASH` | Build time | Git commit hash at build time (if available) |
@@ -295,6 +304,7 @@ MiniSearch logs internal events to an in-app log panel (see the Logs section of 
 **Diagnosing empty search results:** if a search returns no results, the client only sees a generic failure. The actual reason is printed to the server's console (via `server/webSearchService.ts`, always-on `debug` logging), either the SearXNG engines that failed (timeouts, suspensions, rate limits, from SearXNG's `unresponsive_engines` field) or a note that all returned results were discarded during processing (missing title, snippet, or media source). Check the server logs (`docker compose logs`) when troubleshooting failed searches.
 
 Check effective configuration:
+
 ```typescript
 // In browser console
 console.log('Settings:', JSON.parse(localStorage.getItem('settings') || '{}'));
