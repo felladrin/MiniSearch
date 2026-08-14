@@ -399,6 +399,22 @@ describe("query privacy", () => {
     );
   }
 
+  function imageResultsResponse() {
+    return createMockResponse(
+      JSON.stringify({
+        results: [
+          {
+            title: "picture",
+            url: "https://example.com/picture",
+            category: "images",
+            img_src: "https://example.com/picture.jpg",
+            thumbnail_src: "https://example.com/thumbnail.jpg",
+          },
+        ],
+      }),
+    );
+  }
+
   it("never writes the query to the log", async () => {
     for (const response of [
       emptyResponse(),
@@ -409,6 +425,9 @@ describe("query privacy", () => {
       await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
     }
 
+    fetchMock.mockResolvedValue(imageResultsResponse());
+    await fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker());
+
     fetchMock.mockRejectedValue(new Error("Network failure"));
     await fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker());
 
@@ -418,7 +437,7 @@ describe("query privacy", () => {
     for (const form of [
       DISTINCTIVE_QUERY,
       encodeURIComponent(DISTINCTIVE_QUERY),
-      new URLSearchParams({ q: DISTINCTIVE_QUERY }).toString(),
+      DISTINCTIVE_QUERY.replaceAll(" ", "+"),
     ]) {
       expect(output).not.toContain(form);
     }
@@ -443,7 +462,7 @@ describe("query privacy", () => {
     await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
 
     expect(logLines.join("\n")).toContain(
-      "All 1 text result(s) from SearXNG were discarded during processing",
+      "All 1 text result(s) processed from the SearXNG response were discarded",
     );
     expect(getSearchesWithAllResultsDiscardedSinceLastRestart()).toBe(
       before + 1,

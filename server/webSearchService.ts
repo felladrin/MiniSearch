@@ -216,7 +216,7 @@ function reportDiscardedResults<T>(
   if (processedResultCount > 0 && filteredResults.length === 0) {
     incrementSearchesWithAllResultsDiscardedSinceLastRestart();
     printMessage(
-      `All ${processedResultCount} ${searchType} result(s) from SearXNG were discarded during processing (missing title, snippet, or media source).`,
+      `All ${processedResultCount} ${searchType} result(s) processed from the SearXNG response were discarded (missing title, snippet, or media source).`,
     );
   }
   return filteredResults;
