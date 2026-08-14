@@ -81,7 +81,7 @@ export default function AISettingsForm() {
               type: "checkbox",
             })}
             labelPosition="left"
-            description="Ground answers on the actual text of the top results instead of only their search snippets. Your instance downloads those pages, which takes a few extra seconds and tells the sites they were read."
+            description="Ground answers on the actual text of the top results instead of only their search snippets. Note that those pages have to be downloaded, which takes a few extra seconds and tells the sites they were read."
           />
 
           <Select
