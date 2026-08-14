@@ -315,7 +315,10 @@ export function internalApiEndpointServerHook<
             throw new Error("Stream ended unexpectedly");
           } catch (error) {
             lastError = error;
-            console.error("Error during streaming:", error);
+            console.error(
+              "Error during streaming:",
+              error instanceof Error ? error.message : error,
+            );
 
             if (hasEmittedContent) break;
             if (attempt >= maxAttempts) break;
@@ -363,7 +366,10 @@ export function internalApiEndpointServerHook<
           model,
         );
       } catch (error) {
-        console.error("Error in internal API endpoint:", error);
+        console.error(
+          "Error in internal API endpoint:",
+          error instanceof Error ? error.message : error,
+        );
         sendJsonError(response, 500, {
           error: "Internal server error",
           message: error instanceof Error ? error.message : "Unknown error",

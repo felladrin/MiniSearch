@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
+import { inspect } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./handleTokenVerification", () => ({
@@ -806,5 +807,127 @@ describe("internalApiEndpointServerHook", () => {
       const payload = JSON.parse(response.end.mock.calls[0][0]);
       expect(payload.error).toBe("No model available");
     });
+  });
+});
+
+describe("error logging privacy", () => {
+  // Matches the "query privacy" block in webSearchService.test.ts: the space
+  // matters because URL-encoded leakage would carry it as "+".
+  const DISTINCTIVE_PROMPT = "borogoves outgrabe mimsy-42";
+  const MODEL_CONFIG = {
+    maxRetries: 5,
+    baseBackoffMs: 100,
+    maxBackoffMs: 5000,
+    requestTimeoutMs: 30000,
+    maxConcurrentRequests: 10,
+    defaultMaxTokens: 2048,
+    temperature: 0.7,
+    topP: 0.9,
+  };
+
+  let logLines: string[];
+
+  // String() alone would flatten an Error to its message and hide the leak:
+  // console serializes error objects with util.inspect, which includes own
+  // enumerable properties like APICallError#requestBodyValues.
+  const formatLogArg = (value: unknown) =>
+    typeof value === "string" ? value : inspect(value, { depth: 5 });
+
+  beforeEach(() => {
+    logLines = [];
+    for (const method of ["log", "info", "warn", "error", "debug"] as const) {
+      vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+        logLines.push(args.map(formatLogArg).join(" "));
+      });
+    }
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  function stubStreamingConfig() {
+    vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL", "http://test-api");
+    vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_KEY", "test-key");
+    vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "test-model");
+    vi.mocked(getModelConfig).mockReturnValue(MODEL_CONFIG);
+    vi.mocked(createOpenAICompatible).mockReturnValue({
+      chatModel: vi.fn().mockReturnValue("mock-chat-model"),
+    } as never);
+  }
+
+  it("logs the streaming error message without the request body", async () => {
+    stubStreamingConfig();
+
+    const upstreamError = new Error("upstream exploded") as Error & {
+      requestBodyValues: unknown;
+    };
+    upstreamError.requestBodyValues = {
+      messages: [
+        {
+          role: "system",
+          content: `Search results for ${DISTINCTIVE_PROMPT}`,
+        },
+        { role: "user", content: DISTINCTIVE_PROMPT },
+      ],
+    };
+    vi.mocked(streamText).mockImplementation(() => {
+      throw upstreamError;
+    });
+
+    const handler = getRegisteredHandler();
+    const response = createResponse();
+    await handler(
+      createRequest({
+        messages: [{ role: "user", content: DISTINCTIVE_PROMPT }],
+      }),
+      response,
+      vi.fn(),
+    );
+
+    expect(response.statusCode).toBe(503);
+    const output = logLines.join("\n");
+    expect(output).toContain("upstream exploded");
+    for (const form of [
+      DISTINCTIVE_PROMPT,
+      encodeURIComponent(DISTINCTIVE_PROMPT),
+    ]) {
+      expect(output).not.toContain(form);
+    }
+  });
+
+  it("logs the endpoint error message without the request body", async () => {
+    stubStreamingConfig();
+
+    const providerError = new Error("provider init failed") as Error & {
+      requestBodyValues: unknown;
+    };
+    providerError.requestBodyValues = {
+      messages: [{ role: "user", content: DISTINCTIVE_PROMPT }],
+    };
+    vi.mocked(createOpenAICompatible).mockImplementation(() => {
+      throw providerError;
+    });
+
+    const handler = getRegisteredHandler();
+    const response = createResponse();
+    await handler(
+      createRequest({
+        messages: [{ role: "user", content: DISTINCTIVE_PROMPT }],
+      }),
+      response,
+      vi.fn(),
+    );
+
+    expect(response.statusCode).toBe(500);
+    const output = logLines.join("\n");
+    expect(output).toContain("provider init failed");
+    for (const form of [
+      DISTINCTIVE_PROMPT,
+      encodeURIComponent(DISTINCTIVE_PROMPT),
+    ]) {
+      expect(output).not.toContain(form);
+    }
   });
 });
