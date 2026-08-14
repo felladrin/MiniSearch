@@ -7,9 +7,13 @@ import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
 } from "./searchesSinceLastRestart.ts";
+import { resolvePublicUrl } from "./utils/publicUrl.ts";
+import { readCappedBytes } from "./utils/streamUtils.ts";
 import { fetchSearXNG } from "./webSearchService.ts";
 
 const THUMBNAIL_TIMEOUT_MS = 1000;
+const MAX_THUMBNAIL_REDIRECTS = 3;
+const MAX_THUMBNAIL_BYTES = 500_000;
 const DEFAULT_SEARCH_LIMIT = 30;
 const MAX_SEARCH_LIMIT = 30;
 const MAX_QUERY_LENGTH = 2000;
@@ -43,24 +47,56 @@ async function fetchThumbnailAsDataUrl(thumbnailSource: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), THUMBNAIL_TIMEOUT_MS);
   try {
-    const response = await fetch(thumbnailSource, {
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      throw new Error(
-        `Thumbnail request failed with status ${response.status}`,
-      );
+    let target = thumbnailSource;
+
+    for (let hop = 0; hop <= MAX_THUMBNAIL_REDIRECTS; hop++) {
+      let url: URL;
+      try {
+        url = await resolvePublicUrl(target);
+      } catch {
+        // Malformed, non-HTTP, or a private/link-local/reserved address:
+        // do not fetch it on the server's behalf. Throwing lets the caller's
+        // catch drop the whole image result, matching the other failure paths.
+        throw new Error(
+          "Refusing to fetch thumbnail from a non-public address",
+        );
+      }
+
+      const response = await fetch(url, {
+        redirect: "manual",
+        signal: controller.signal,
+      });
+
+      const location = response.headers.get("location");
+      if (isRedirect(response.status) && location) {
+        await response.body?.cancel().catch(() => {});
+        target = new URL(location, url).toString();
+        continue;
+      }
+
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => {});
+        throw new Error(
+          `Thumbnail request failed with status ${response.status}`,
+        );
+      }
+
+      const contentType =
+        response.headers.get("content-type") ?? "application/octet-stream";
+      const { bytes } = await readCappedBytes(response, MAX_THUMBNAIL_BYTES);
+      const base64 = Buffer.from(bytes).toString("base64");
+
+      return `data:${contentType};base64,${base64}`;
     }
 
-    const contentType =
-      response.headers.get("content-type") ?? "application/octet-stream";
-    const arrayBuffer = await response.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-
-    return `data:${contentType};base64,${base64}`;
+    throw new Error("Thumbnail redirected too many times");
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function isRedirect(status: number): boolean {
+  return status >= 300 && status < 400 && status !== 304;
 }
 
 async function handleRanking(

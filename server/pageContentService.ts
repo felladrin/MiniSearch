@@ -5,6 +5,7 @@ import {
   recordPageRead,
 } from "./pageReadsSinceLastRestart.ts";
 import { resolvePublicUrl } from "./utils/publicUrl.ts";
+import { readCappedBytes } from "./utils/streamUtils.ts";
 
 const REQUEST_TIMEOUT_MS = 6000;
 const MAX_REDIRECTS = 3;
@@ -134,42 +135,6 @@ function decodeDocument(bytes: Uint8Array, contentType: string): string {
   }
 }
 
-/**
- * Reads at most `MAX_RESPONSE_BYTES` of the body. A hostile or merely huge
- * page must not be able to pin the server's memory, and the extractor gains
- * nothing from the tail of a document it will trim to a few passages anyway.
- */
-async function readCappedBytes(
-  response: Response,
-): Promise<{ bytes: Uint8Array; truncated: boolean }> {
-  const reader = response.body?.getReader();
-  if (!reader) return { bytes: new Uint8Array(), truncated: false };
-
-  const chunks: Uint8Array[] = [];
-  let bytesRead = 0;
-  let reachedEnd = false;
-
-  while (bytesRead < MAX_RESPONSE_BYTES) {
-    const { done, value } = await reader.read();
-    if (done) {
-      reachedEnd = true;
-      break;
-    }
-    bytesRead += value.byteLength;
-    chunks.push(value);
-  }
-
-  await reader.cancel().catch(() => {});
-
-  const bytes = new Uint8Array(bytesRead);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return { bytes, truncated: !reachedEnd };
-}
-
 /** `AbortSignal.timeout` rejects with this; a network failure is a `TypeError`. */
 function isTimeout(error: unknown): boolean {
   return error instanceof Error && error.name === "TimeoutError";
@@ -234,7 +199,10 @@ async function downloadDocument(rawUrl: string): Promise<DownloadResult> {
     }
 
     try {
-      const { bytes, truncated } = await readCappedBytes(response);
+      const { bytes, truncated } = await readCappedBytes(
+        response,
+        MAX_RESPONSE_BYTES,
+      );
       return {
         outcome: "ok",
         html: decodeDocument(bytes, contentType),

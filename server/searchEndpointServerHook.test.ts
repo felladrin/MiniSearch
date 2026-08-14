@@ -1,6 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const lookupMock = vi.hoisted(() => vi.fn());
+
+vi.mock("node:dns/promises", () => ({
+  default: { lookup: lookupMock },
+  lookup: lookupMock,
+}));
+
 vi.mock("./handleTokenVerification", () => ({
   handleTokenVerification: vi.fn(),
 }));
@@ -71,6 +78,8 @@ describe("searchEndpointServerHook", () => {
     // clearAllMocks keeps implementations, and one degradation case installs a
     // fetch that only settles on abort.
     mockFetch.mockReset();
+    lookupMock.mockReset();
+    lookupMock.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: true,
     });
@@ -457,6 +466,105 @@ describe("searchEndpointServerHook", () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.end).toHaveBeenCalledWith("[]");
+    });
+
+    it("drops an image whose thumbnail resolves to a private address", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
+      vi.mocked(getRerankerStatus).mockResolvedValue(false);
+      lookupMock.mockResolvedValue([{ address: "192.168.1.5", family: 4 }]);
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/images?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(response.end).toHaveBeenCalledWith("[]");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("drops an image whose thumbnail URL uses a non-HTTP scheme", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([
+        [
+          "Cat picture",
+          "https://example.com/cat.jpg",
+          "file:///etc/passwd",
+          "https://example.com/cat",
+        ],
+      ]);
+      vi.mocked(getRerankerStatus).mockResolvedValue(false);
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/images?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(response.end).toHaveBeenCalledWith("[]");
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("does not follow a thumbnail redirect into a private address", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
+      vi.mocked(getRerankerStatus).mockResolvedValue(false);
+      lookupMock
+        .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
+        .mockResolvedValue([{ address: "10.0.0.7", family: 4 }]);
+      mockFetch.mockResolvedValueOnce(
+        new Response(null, {
+          status: 302,
+          headers: { location: "http://10.0.0.7/thumb.jpg" },
+        }),
+      );
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/images?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(response.end).toHaveBeenCalledWith("[]");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("truncates an oversized thumbnail body", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
+      vi.mocked(getRerankerStatus).mockResolvedValue(false);
+      const bigBody = new Uint8Array(600_000).fill(7);
+      mockFetch.mockResolvedValue(
+        new Response(bigBody, {
+          status: 200,
+          headers: { "content-type": "image/jpeg" },
+        }),
+      );
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/images?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      const [body] = response.end.mock.calls[0];
+      const [thumbnailDataUrl] = JSON.parse(body);
+      expect(thumbnailDataUrl[2]).toContain("data:image/jpeg;base64,");
+      // The cap is 500_000 bytes; a 600_000-byte body must be truncated.
+      const decoded = Buffer.from(thumbnailDataUrl[2].split(",")[1], "base64");
+      expect(decoded.length).toBe(500_000);
     });
   });
 

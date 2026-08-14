@@ -1,6 +1,54 @@
 import type { ServerResponse } from "node:http";
 
 /**
+ * Reads at most `maxBytes` of a fetch response body. A hostile or merely huge
+ * upstream must not be able to pin the server's memory, and callers that only
+ * need the head of a document (page text, thumbnails) gain nothing from the
+ * tail anyway.
+ *
+ * @param response - The response whose body should be read
+ * @param maxBytes - Upper bound on how many bytes to read
+ * @returns The bytes read, and whether the body was truncated by the cap
+ */
+export async function readCappedBytes(
+  response: Response,
+  maxBytes: number,
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
+  const reader = response.body?.getReader();
+  if (!reader) return { bytes: new Uint8Array(), truncated: false };
+
+  const chunks: Uint8Array[] = [];
+  let bytesRead = 0;
+  let reachedEnd = false;
+
+  while (bytesRead < maxBytes) {
+    const { done, value } = await reader.read();
+    if (done) {
+      reachedEnd = true;
+      break;
+    }
+
+    const remaining = maxBytes - bytesRead;
+    const chunk =
+      value.byteLength > remaining ? value.subarray(0, remaining) : value;
+    bytesRead += chunk.byteLength;
+    chunks.push(chunk);
+
+    if (chunk.byteLength < value.byteLength) break;
+  }
+
+  await reader.cancel().catch(() => {});
+
+  const bytes = new Uint8Array(bytesRead);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { bytes, truncated: !reachedEnd };
+}
+
+/**
  * Calculate backoff time with exponential jitter
  * @param attempt - Current attempt number (1-based)
  * @param baseDelayMs - Base delay in milliseconds (default: 100ms)

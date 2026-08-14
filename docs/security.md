@@ -81,17 +81,25 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 
 ### Server-Side Fetching of Client-Supplied URLs
 
-`/page-content` is the one endpoint that fetches a URL the client chose, so it
-is the one place where SSRF matters. It is always available; the user's
+`/page-content` is the endpoint that fetches a URL the client chose, so it is
+the main place where SSRF matters. It is always available; the user's
 `enablePageContentFetch` toggle decides whether each browser actually uses it.
 It shares the 10-requests-per-10-seconds bucket with `/search/`, but each
 request can fan out to six pages, so it is the heavier of the two per point.
+
+`/search/images` also fetches on the server's behalf: the thumbnail URLs that
+come back from SearXNG are fetched and returned as data URLs. Thumbnails are
+harder for an attacker to steer than a client-chosen page URL, but a
+compromised or hostile engine result could still point the server at an
+internal address, so the same guard applies.
 
 Every hop - the original URL and each redirect - passes `resolvePublicUrl`
 before a request is made, which blocks loopback, link-local (including
 `169.254.169.254`), private, carrier-grade-NAT, multicast and reserved
 addresses. The DNS answer is checked rather than pinned; the residual rebinding
 window and why it is accepted are documented in `docs/page-content.md`.
+Thumbnail responses are also capped in size, so an oversized image cannot pin
+the server's memory.
 
 ## Threat Model
 
