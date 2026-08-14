@@ -109,4 +109,41 @@ describe("ImageResultsList", () => {
     expect(slide).toBeInTheDocument();
     expect(slide?.getAttribute("style") ?? "").not.toContain("transition");
   });
+
+  it("renders source labels for protocol-relative and relative source URLs", async () => {
+    const user = userEvent.setup();
+    render(
+      <MantineProvider>
+        <ImageResultsList
+          imageResults={[
+            [
+              "Protocol-relative video",
+              "https://example.com/video",
+              "https://example.com/video.jpg",
+              "//www.youtube.com/embed/dQw4w9WgXcQ",
+            ],
+            [
+              "Relative source image",
+              "https://example.com/relative",
+              "https://example.com/relative.jpg",
+              "/images/source.jpg",
+            ],
+          ]}
+        />
+      </MantineProvider>,
+    );
+
+    const thumbnail = await screen.findByRole("button", {
+      name: "Open image preview: Protocol-relative video",
+    });
+    await user.click(thumbnail);
+
+    const dialog = await screen.findByRole("dialog");
+    // getHostname() leaves unparseable URLs untouched instead of throwing, so
+    // a protocol-relative or relative source URL no longer takes down the
+    // whole image section during render.
+    expect(dialog).toHaveTextContent(
+      "Source: //www.youtube.com/embed/dQw4w9WgXcQ",
+    );
+  });
 });
