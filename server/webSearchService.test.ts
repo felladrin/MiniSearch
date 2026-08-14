@@ -1,3 +1,4 @@
+import debug from "debug";
 import {
   afterEach,
   beforeEach,
@@ -7,6 +8,10 @@ import {
   type MockedFunction,
   vi,
 } from "vitest";
+import {
+  getSearchesWithAllResultsDiscardedSinceLastRestart,
+  getSearchesWithoutResultsSinceLastRestart,
+} from "./searchesSinceLastRestart";
 import { CircuitBreaker } from "./utils/circuitBreaker";
 import {
   describeUnresponsiveEngines,
@@ -342,6 +347,126 @@ describe("graceful degradation", () => {
     );
 
     expect(results).toEqual([]);
+  });
+});
+
+describe("query privacy", () => {
+  // The space is here on purpose: a leaked search URL carries it encoded (as
+  // `+`, from URLSearchParams), which a match on the raw string alone misses.
+  const DISTINCTIVE_QUERY = "borogoves outgrabe mimsy-42";
+
+  let logLines: string[];
+  let originalLog: typeof debug.log;
+
+  /**
+   * `debug` resolves its writer at call time, so replacing it here captures
+   * everything the module logs through `debug`, which under jsdom never reaches
+   * `console` in a spy-able way. The console spies cover the calls the module
+   * makes directly, so a new logging line is caught whichever it uses.
+   */
+  beforeEach(() => {
+    logLines = [];
+    originalLog = debug.log;
+    debug.log = (...args: unknown[]) => {
+      logLines.push(args.map(String).join(" "));
+    };
+    for (const method of ["log", "info", "warn", "error", "debug"] as const) {
+      vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+        logLines.push(args.map(String).join(" "));
+      });
+    }
+  });
+
+  afterEach(() => {
+    debug.log = originalLog;
+    vi.restoreAllMocks();
+  });
+
+  function emptyResponse() {
+    return createMockResponse(
+      JSON.stringify({
+        results: [],
+        unresponsive_engines: [["google", "Timeout"]],
+      }),
+    );
+  }
+
+  function unusableResultsResponse() {
+    return createMockResponse(
+      JSON.stringify({
+        results: [{ title: "No snippet", url: "https://example.com" }],
+      }),
+    );
+  }
+
+  function imageResultsResponse() {
+    return createMockResponse(
+      JSON.stringify({
+        results: [
+          {
+            title: "picture",
+            url: "https://example.com/picture",
+            category: "images",
+            img_src: "https://example.com/picture.jpg",
+            thumbnail_src: "https://example.com/thumbnail.jpg",
+          },
+        ],
+      }),
+    );
+  }
+
+  it("never writes the query to the log", async () => {
+    for (const response of [
+      emptyResponse(),
+      unusableResultsResponse(),
+      createMockResponse("<html>gateway</html>"),
+    ]) {
+      fetchMock.mockResolvedValue(response);
+      await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
+    }
+
+    fetchMock.mockResolvedValue(imageResultsResponse());
+    await fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker());
+
+    fetchMock.mockRejectedValue(new Error("Network failure"));
+    await fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker());
+
+    const output = logLines.join("\n");
+    expect(logLines.length).toBeGreaterThan(0);
+
+    for (const form of [
+      DISTINCTIVE_QUERY,
+      encodeURIComponent(DISTINCTIVE_QUERY),
+      DISTINCTIVE_QUERY.replaceAll(" ", "+"),
+    ]) {
+      expect(output).not.toContain(form);
+    }
+  });
+
+  it("still reports the unresponsive engines behind an empty response", async () => {
+    fetchMock.mockResolvedValue(emptyResponse());
+    const before = getSearchesWithoutResultsSinceLastRestart();
+
+    await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
+
+    expect(logLines.join("\n")).toContain(
+      "Unresponsive engines: google (Timeout)",
+    );
+    expect(getSearchesWithoutResultsSinceLastRestart()).toBe(before + 1);
+  });
+
+  it("still reports the count and search type of a discarded batch", async () => {
+    fetchMock.mockResolvedValue(unusableResultsResponse());
+    const before = getSearchesWithAllResultsDiscardedSinceLastRestart();
+
+    await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
+
+    expect(logLines.join("\n")).toContain(
+      "All 1 text result(s) processed from the SearXNG response were discarded",
+    );
+    expect(getSearchesWithAllResultsDiscardedSinceLastRestart()).toBe(
+      before + 1,
+    );
   });
 });
 

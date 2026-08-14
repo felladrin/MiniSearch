@@ -2,6 +2,10 @@ import { basename } from "node:path";
 import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
+import {
+  incrementSearchesWithAllResultsDiscardedSinceLastRestart,
+  incrementSearchesWithoutResultsSinceLastRestart,
+} from "./searchesSinceLastRestart.ts";
 import { CircuitBreaker } from "./utils/circuitBreaker.ts";
 
 const fileName = basename(import.meta.url);
@@ -148,11 +152,12 @@ async function performSearch(
     const results = Array.isArray(data.results) ? data.results : [];
 
     if (results.length === 0) {
+      incrementSearchesWithoutResultsSinceLastRestart();
       const reason = describeUnresponsiveEngines(data.unresponsive_engines);
       printMessage(
         reason
-          ? `No results returned from SearXNG for query: ${query}. Unresponsive engines: ${reason}`
-          : `No results returned from SearXNG for query: ${query}. No engine errors were reported; all engines returned zero results.`,
+          ? `No results returned from SearXNG. Unresponsive engines: ${reason}`
+          : "No results returned from SearXNG. No engine errors were reported; all engines returned zero results.",
       );
     }
 
@@ -173,46 +178,45 @@ async function processSearchResults(
   const results = await breaker.execute("searxng", () =>
     performSearch(query, searchType),
   );
-  const deduplicatedResults = deduplicateResults(results);
+  const consideredResults = deduplicateResults(results).slice(0, limit);
 
   if (searchType === "text") {
     const textualResults = await Promise.all(
-      deduplicatedResults.slice(0, limit).map(processTextualResult),
+      consideredResults.map(processTextualResult),
     );
     return reportDiscardedResults(
       filterNullResults(textualResults),
-      results.length,
-      query,
+      consideredResults.length,
       searchType,
     );
   }
 
   const graphicalResults = await Promise.all(
-    deduplicatedResults.slice(0, limit).map(processGraphicalResult),
+    consideredResults.map(processGraphicalResult),
   );
   return reportDiscardedResults(
     filterNullResults(graphicalResults),
-    results.length,
-    query,
+    consideredResults.length,
     searchType,
   );
 }
 
 /**
- * Logs when SearXNG returned results but every one was dropped during processing
- * (e.g. missing title, snippet, or media source). Without this, the discarded
- * batch surfaces to the user as an opaque "Search failed" with no server-side
- * trace of why the non-empty response yielded nothing usable.
+ * Counts and logs when SearXNG returned results but every one that was looked at
+ * got dropped during processing (e.g. missing title, snippet, or media source).
+ * Without this, the discarded batch surfaces to the user as an opaque "Search
+ * failed" with no server-side trace of why the non-empty response yielded
+ * nothing usable.
  */
 function reportDiscardedResults<T>(
   filteredResults: T[],
-  rawResultCount: number,
-  query: string,
+  processedResultCount: number,
   searchType: SearchType,
 ): T[] {
-  if (rawResultCount > 0 && filteredResults.length === 0) {
+  if (processedResultCount > 0 && filteredResults.length === 0) {
+    incrementSearchesWithAllResultsDiscardedSinceLastRestart();
     printMessage(
-      `All ${rawResultCount} ${searchType} result(s) from SearXNG for query: ${query} were discarded during processing (missing title, snippet, or media source).`,
+      `All ${processedResultCount} ${searchType} result(s) processed from the SearXNG response were discarded (missing title, snippet, or media source).`,
     );
   }
   return filteredResults;
