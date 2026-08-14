@@ -45,7 +45,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 - **No Tracking**: No telemetry, analytics, or user tracking
 - **SearXNG Integration**: All web searches routed through privacy-focused metasearch
 - **No External Requests**: Optional browser-only mode for complete privacy
-- **Page Reading Is Opt-In**: the user turns on `enablePageContentFetch` under AI Settings; the server (never the browser) requests the top result pages, so those sites see the instance and no user cookies or IP
+- **Page Reading Is On By Default, And Reversible**: `enablePageContentFetch` ships on and the user can turn it off under AI Settings; nothing is read until AI responses are enabled, and the server (never the browser) requests the top result pages, so those sites see the instance and no user cookies or IP
 
 ## Data Protection
 

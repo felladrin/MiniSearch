@@ -1,21 +1,22 @@
 # Page Content Grounding
 
-By default the AI answer is built from what SearXNG returns: a title, a one- or
-two-sentence snippet, and a URL per result. That is a thin base to cite from,
-and it is the main reason an answer can read as confident and still be wrong -
-the model is asked to source facts it can only infer from fragments.
+What SearXNG returns for a result is a title, a one- or two-sentence snippet,
+and a URL. That is a thin base to cite from, and it is the main reason an
+answer can read as confident and still be wrong - the model is asked to source
+facts it can only infer from fragments.
 
-When the user turns it on, MiniSearch also reads the pages behind the top
-results and feeds the passages that match the query into the prompt.
+So MiniSearch also reads the pages behind the top results and feeds the
+passages that match the query into the prompt.
 
-One switch controls the feature, and it is off by default:
+One switch controls the feature, and it is on by default:
 
 | Switch | Who sets it | What it does |
 |---|---|---|
-| **Read Page Content** | The user, under AI Settings | Turns page reading on for that browser |
+| **Read Page Content** | The user, under AI Settings | Whether this browser reads the pages behind its results |
 
 The endpoint is always available; the user toggle decides whether each browser
-actually uses it.
+actually uses it. Turning it off returns that browser to snippet-only answers,
+and no page is read either way until AI responses are on.
 
 ## Flow
 
@@ -150,15 +151,19 @@ they did on snippets alone (see `docs/conversation-memory.md`).
 
 ## Privacy
 
-The setting is off by default because it changes who learns about a search.
-Snippet-only answers are seen by SearXNG and its upstream engines. Reading a
-page adds one request from the instance to each site behind the top results,
-which tells those sites their page was fetched. The request comes from the
-instance, never from the browser, so it carries no user cookies and no client
-IP; it identifies itself as MiniSearch. It sends `Accept-Language: *` rather
-than a preference, which asks for no particular edition of a page and leaks
-nothing about the reader; the cost is that a site picks the edition itself,
-usually by the instance's own address.
+The setting stays reachable because reading a page changes who learns about a
+search. Snippet-only answers are seen by SearXNG and its upstream engines.
+Reading a page adds one request from the instance to each site behind the top
+results, which tells those sites their page was fetched. The request comes from
+the instance, never from the browser, so it carries no user cookies and no
+client IP; it identifies itself as MiniSearch. It sends `Accept-Language: *`
+rather than a preference, which asks for no particular edition of a page and
+leaks nothing about the reader; the cost is that a site picks the edition
+itself, usually by the instance's own address.
+
+That trade is made on the user's behalf, not behind their back: the switch is
+in the same panel that turns AI responses on, and turning it off is all it
+takes to go back to snippet-only answers.
 
 ## Safety
 
@@ -192,8 +197,8 @@ Two things reduce the blast radius: every excerpt line is prefixed with `>` so
 a page cannot forge what looks like another search result, and the block is
 introduced by a disclaimer telling the model to treat those lines as material
 to weigh and cite. Neither is a guarantee - a model can still be talked into
-following text it was told to distrust - which is the other reason the feature
-ships off.
+following text it was told to distrust - and that residual risk is the other
+reason the switch stays reachable.
 
 The `>` prefix holds because `splitIntoPassages` collapses every run of
 whitespace inside a passage to a single space, so a passage cannot contain a
@@ -241,7 +246,7 @@ grounded on before:
 | Page times out, errors, or is not a document | That page is skipped |
 | Page yields less than 200 characters | That page is skipped |
 | `/page-content` fails or times out | Answer falls back to snippets |
-| Setting off, AI responses off, or the instance has not enabled reading | No page is ever read |
+| Setting turned off, or AI responses off | No page is ever read |
 | A newer search starts while pages are still being read | The late result is dropped instead of grounding the new answer |
 
 ## Related Topics

@@ -75,7 +75,7 @@ Search results:
   reasoningStartMarker: "<think>",
   reasoningEndMarker: "</think>",
   enableNotificationOnAiComplete: false,
-  enablePageContentFetch: false,
+  enablePageContentFetch: true,
 };
 
 addLogEntry(

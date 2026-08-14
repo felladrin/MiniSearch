@@ -85,7 +85,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `enterToSubmit` | boolean | `true` | Press Enter to submit query (vs Shift+Enter for new line) |
 | `enableAiResponseScrolling` | boolean | `true` | Auto-scroll AI response as it generates |
 | `enableNotificationOnAiComplete` | boolean | `false` | Show a browser notification when AI response generation finishes |
-| `enablePageContentFetch` | boolean | `false` | Read the pages behind the top results and ground the answer on their text instead of on snippets alone. |
+| `enablePageContentFetch` | boolean | `true` | Read the pages behind the top results and ground the answer on their text instead of on snippets alone. |
 
 ### Inference Settings
 
