@@ -17,6 +17,7 @@ import {
   describeUnresponsiveEngines,
   fetchSearXNG,
   getWebSearchStatus,
+  SearXNGSearchError,
 } from "./webSearchService";
 
 function createMockResponse(
@@ -121,13 +122,13 @@ describe("WebSearchService", () => {
     }
   });
 
-  it("should return empty array on fetchSearXNG error", async () => {
+  it("rejects when SearXNG is unreachable", async () => {
     (global.fetch as MockedFunction<typeof fetch>).mockRejectedValue(
       new Error("Network failure"),
     );
-    const results = await fetchSearXNG("test query", "text");
-    expect(Array.isArray(results)).toBe(true);
-    expect(results).toHaveLength(0);
+    await expect(fetchSearXNG("test query", "text")).rejects.toThrow(
+      SearXNGSearchError,
+    );
   });
 });
 
@@ -179,15 +180,20 @@ describe("retry logic", () => {
     expect(results).toHaveLength(1);
   });
 
-  it("returns empty array when all retries return 500", async () => {
+  it("rejects when every retry answers 500", async () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 500));
 
     const promise = fetchSearXNG("test", "text");
+    const guarded = promise.catch((error: unknown) => {
+      throw error;
+    });
+    guarded.catch(() => {});
     await vi.runAllTimersAsync();
-    const results = await promise;
 
+    await expect(guarded).rejects.toThrow(
+      "SearXNG request failed with status 500",
+    );
     expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect(results).toHaveLength(0);
   });
 });
 
@@ -210,8 +216,15 @@ describe("graceful degradation", () => {
    */
   async function searchThroughRetries(breaker: CircuitBreaker) {
     const promise = fetchSearXNG("failure injection", "text", 30, breaker);
+    const guarded = promise.catch((error: unknown) => {
+      throw error;
+    });
+    // Observe the rejection now so the failed retry cycle is not flagged as
+    // unhandled while the backoff timers drain; callers still see it through
+    // `guarded`.
+    guarded.catch(() => {});
     await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_TOTAL_MS);
-    return promise;
+    return guarded;
   }
 
   beforeEach(() => {
@@ -227,8 +240,9 @@ describe("graceful degradation", () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 500));
 
     for (let cycle = 0; cycle < breakerOptions.failureThreshold - 1; cycle++) {
-      const results = await searchThroughRetries(breaker);
-      expect(results).toEqual([]);
+      await expect(searchThroughRetries(breaker)).rejects.toThrow(
+        SearXNGSearchError,
+      );
     }
 
     // Four full cycles of upstream requests, still one failure short of opening.
@@ -243,7 +257,7 @@ describe("graceful degradation", () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 500));
 
     for (let cycle = 0; cycle < breakerOptions.failureThreshold; cycle++) {
-      await searchThroughRetries(breaker);
+      await expect(searchThroughRetries(breaker)).rejects.toThrow();
     }
 
     expect(fetchMock).toHaveBeenCalledTimes(
@@ -252,9 +266,7 @@ describe("graceful degradation", () => {
     expect(breaker.getState("searxng")).toBe("OPEN");
 
     const callsWhileOpen = fetchMock.mock.calls.length;
-    const results = await searchThroughRetries(breaker);
-
-    expect(results).toEqual([]);
+    await expect(searchThroughRetries(breaker)).rejects.toThrow();
     expect(fetchMock).toHaveBeenCalledTimes(callsWhileOpen);
   });
 
@@ -267,7 +279,9 @@ describe("graceful degradation", () => {
       failure < breakerOptions.failureThreshold;
       failure++
     ) {
-      await fetchSearXNG("failure injection", "text", 30, breaker);
+      await expect(
+        fetchSearXNG("failure injection", "text", 30, breaker),
+      ).rejects.toThrow();
     }
 
     expect(breaker.getState("searxng")).toBe("OPEN");
@@ -286,15 +300,12 @@ describe("graceful degradation", () => {
     expect(breaker.getState("searxng")).toBe("CLOSED");
   });
 
-  it("cannot be told apart downstream: provider down and genuinely empty both yield []", async () => {
+  it("lets callers tell a provider outage apart from a genuinely empty result set", async () => {
     const downBreaker = new CircuitBreaker({ failureThreshold: 1 });
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
-    const providerDown = await fetchSearXNG(
-      "failure injection",
-      "text",
-      30,
-      downBreaker,
-    );
+    await expect(
+      fetchSearXNG("failure injection", "text", 30, downBreaker),
+    ).rejects.toThrow(SearXNGSearchError);
 
     const emptyBreaker = new CircuitBreaker({ failureThreshold: 1 });
     fetchMock.mockResolvedValue(
@@ -307,24 +318,25 @@ describe("graceful degradation", () => {
       emptyBreaker,
     );
 
-    // The breaker knows which one was a failure; the return value does not.
+    // The breaker always knew which one was a failure; now the return value
+    // carries the same distinction: the outage rejects, the empty result set
+    // resolves to [].
     expect(downBreaker.getState("searxng")).toBe("OPEN");
     expect(emptyBreaker.getState("searxng")).toBe("CLOSED");
-    expect(providerDown).toEqual([]);
     expect(noResults).toEqual([]);
   });
 
-  it("returns an empty array when SearXNG answers 200 with a malformed body", async () => {
+  it("rejects when SearXNG answers 200 with a malformed body", async () => {
     fetchMock.mockResolvedValue(createMockResponse("<html>gateway</html>"));
 
-    const results = await fetchSearXNG(
-      "failure injection",
-      "text",
-      30,
-      new CircuitBreaker(breakerOptions),
-    );
-
-    expect(results).toEqual([]);
+    await expect(
+      fetchSearXNG(
+        "failure injection",
+        "text",
+        30,
+        new CircuitBreaker(breakerOptions),
+      ),
+    ).rejects.toThrow(SearXNGSearchError);
   });
 
   it("returns an empty array when every result is dropped during processing", async () => {
@@ -422,14 +434,24 @@ describe("query privacy", () => {
       createMockResponse("<html>gateway</html>"),
     ]) {
       fetchMock.mockResolvedValue(response);
-      await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
+      await fetchSearXNG(
+        DISTINCTIVE_QUERY,
+        "text",
+        30,
+        new CircuitBreaker(),
+      ).catch(() => {});
     }
 
     fetchMock.mockResolvedValue(imageResultsResponse());
     await fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker());
 
     fetchMock.mockRejectedValue(new Error("Network failure"));
-    await fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker());
+    await fetchSearXNG(
+      DISTINCTIVE_QUERY,
+      "images",
+      30,
+      new CircuitBreaker(),
+    ).catch(() => {});
 
     const output = logLines.join("\n");
     expect(logLines.length).toBeGreaterThan(0);
@@ -476,11 +498,11 @@ describe("circuit breaker", () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
 
     for (let i = 0; i < 5; i++) {
-      await fetchSearXNG("test", "text", 30, breaker);
+      await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
     }
 
     const callsBeforeBreak = fetchMock.mock.calls.length;
-    await fetchSearXNG("test", "text", 30, breaker);
+    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
 
     expect(fetchMock.mock.calls.length).toBe(callsBeforeBreak);
   });
@@ -490,11 +512,11 @@ describe("circuit breaker", () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
 
     for (let i = 0; i < 4; i++) {
-      await fetchSearXNG("test", "text", 30, breaker);
+      await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
     }
 
     const callsBefore = fetchMock.mock.calls.length;
-    await fetchSearXNG("test", "text", 30, breaker);
+    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
 
     expect(fetchMock.mock.calls.length).toBe(callsBefore + 1);
   });

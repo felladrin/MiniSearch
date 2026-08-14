@@ -317,15 +317,16 @@ describe("Search Module", () => {
   });
 
   describe("Cache Failure Scenarios", () => {
-    it("should return empty results instead of throwing when a text search fails end-to-end", async () => {
+    it("should propagate the failure when a text search fails end-to-end", async () => {
       // getCachedResult/cacheResult swallow their own read/write errors, so a
       // cache failure surfaces as a miss followed by a real fetch — searchText
-      // must still resolve gracefully instead of throwing.
+      // must reject so callers can tell an outage apart from an empty result
+      // set instead of collapsing both into [].
       mockFetch.mockRejectedValue(new Error("Cache read error"));
 
-      const results = await searchModule.searchText("test query");
-
-      expect(results).toEqual([]);
+      await expect(searchModule.searchText("test query")).rejects.toThrow(
+        "Cache read error",
+      );
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("Text search failed"),
       );
@@ -344,15 +345,16 @@ describe("Search Module", () => {
   });
 
   describe("Database Integrity Failures", () => {
-    it("should return empty results instead of throwing when an image search fails end-to-end", async () => {
+    it("should propagate the failure when an image search fails end-to-end", async () => {
       // ensureIntegrity/cleanExpiredCache swallow their own errors, so a
       // corrupted database surfaces as a miss followed by a real fetch —
-      // searchImages must still resolve gracefully instead of throwing.
+      // searchImages must reject so callers can tell an outage apart from an
+      // empty result set instead of collapsing both into [].
       mockFetch.mockRejectedValue(new Error("Database integrity check failed"));
 
-      const results = await searchModule.searchImages("test query");
-
-      expect(results).toEqual([]);
+      await expect(searchModule.searchImages("test query")).rejects.toThrow(
+        "Database integrity check failed",
+      );
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("Image search failed"),
       );

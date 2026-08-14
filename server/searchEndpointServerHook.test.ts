@@ -20,6 +20,12 @@ vi.mock("./searchesSinceLastRestart", () => ({
 
 vi.mock("./webSearchService", () => ({
   fetchSearXNG: vi.fn(),
+  SearXNGSearchError: class SearXNGSearchError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "SearXNGSearchError";
+    }
+  },
 }));
 
 import { handleTokenVerification } from "./handleTokenVerification";
@@ -30,7 +36,7 @@ import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
 } from "./searchesSinceLastRestart";
-import { fetchSearXNG } from "./webSearchService";
+import { fetchSearXNG, SearXNGSearchError } from "./webSearchService";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -443,7 +449,47 @@ describe("searchEndpointServerHook", () => {
       }
     });
 
-    it("serves an empty result set instead of an error when SearXNG is down", async () => {
+    it("answers 503 when SearXNG is down", async () => {
+      vi.mocked(fetchSearXNG).mockRejectedValue(
+        new SearXNGSearchError("SearXNG request failed with status 503"),
+      );
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/text?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(response.statusCode).toBe(503);
+      expect(response.end).toHaveBeenCalledWith(
+        JSON.stringify({ error: "Search provider unavailable" }),
+      );
+    });
+
+    it("answers 503 on an image search when SearXNG is down", async () => {
+      vi.mocked(fetchSearXNG).mockRejectedValue(
+        new SearXNGSearchError("SearXNG request failed with status 503"),
+      );
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/images?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(response.statusCode).toBe(503);
+      expect(response.end).toHaveBeenCalledWith(
+        JSON.stringify({ error: "Search provider unavailable" }),
+      );
+    });
+
+    it("serves an empty result set when SearXNG returns no results", async () => {
       vi.mocked(fetchSearXNG).mockResolvedValue([]);
 
       const handler = getRegisteredHandler();

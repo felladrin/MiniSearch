@@ -14,9 +14,10 @@ needed.
 | SearXNG answers 500 on every attempt | Retry cycle exhausts (4 requests) and costs a single circuit-breaker failure | `server/webSearchService.test.ts` › graceful degradation |
 | SearXNG fails five cycles in a row | Circuit opens; further searches short-circuit without calling the upstream | `server/webSearchService.test.ts` › graceful degradation |
 | SearXNG recovers after the reset timeout | One healthy response closes the circuit again | `server/webSearchService.test.ts` › graceful degradation |
-| SearXNG answers 200 with a non-JSON body | Empty result set, no throw | `server/webSearchService.test.ts` › graceful degradation |
+| SearXNG answers 200 with a non-JSON body | Search fails: 503 from `/search/*`, client state `failed` | `server/webSearchService.test.ts` › graceful degradation |
 | SearXNG returns results that are all unusable | Empty result set, no throw | `server/webSearchService.test.ts` › graceful degradation |
-| Provider down vs. genuinely zero results | Both yield `[]` (indistinguishable downstream, see Known Limitations) | `server/webSearchService.test.ts` › graceful degradation |
+| SearXNG is down (bad status, network error, or open circuit) | Search fails: 503 from `/search/*`, client state `failed`, no keyword fallback | `server/webSearchService.test.ts` › graceful degradation, `server/searchEndpointServerHook.test.ts` › graceful degradation, `client/modules/textGeneration.degradation.test.ts` |
+| SearXNG answers with genuinely zero results | HTTP 200 with `[]`; client state `completed`, empty-state alert renders | `server/webSearchService.test.ts` › graceful degradation, `server/searchEndpointServerHook.test.ts` › graceful degradation, `client/modules/textGeneration.degradation.test.ts` |
 | Reranker is not ready | Results served in SearXNG order, HTTP 200 | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranking throws mid-request | Results served in SearXNG order, HTTP 200 | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranker is not ready on an image search | Images still served with thumbnails | `server/searchEndpointServerHook.test.ts` › graceful degradation |
@@ -25,7 +26,10 @@ needed.
 | Thumbnail host never answers | Request aborted after the timeout, image dropped | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Search returns nothing to the endpoint | HTTP 200 with `[]`, not an error | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Text search returns nothing to the client | Keyword-only query retried as a fallback | `client/modules/textGeneration.degradation.test.ts` |
-| Keyword fallback also returns nothing | Text search state becomes `failed` | `client/modules/textGeneration.degradation.test.ts` |
+| Keyword fallback also returns nothing | Text search state becomes `completed`, empty-state alert renders | `client/modules/textGeneration.degradation.test.ts` |
+| Text search provider is down | State becomes `failed`, keyword fallback is not attempted | `client/modules/textGeneration.degradation.test.ts` |
+| Image search provider is down | Image search state becomes `failed` | `client/modules/textGeneration.degradation.test.ts` |
+| Image search returns nothing | Image search state becomes `completed`, empty-state alert renders | `client/modules/textGeneration.degradation.test.ts` |
 | Result page host resolves into a private range | Page skipped, no request is made | `server/pageContentService.test.ts` › fetchPageContents |
 | Result page redirects into a private range | Redirect not followed, page skipped | `server/pageContentService.test.ts` › fetchPageContents |
 | Result page errors, is not a document, or yields no text | That page is skipped, the others still return | `server/pageContentService.test.ts` › fetchPageContents |
@@ -41,12 +45,14 @@ needed.
 | `/inference` answers 503 | Generation state becomes `failed`, nothing persisted | `client/modules/textGeneration.degradation.test.ts` |
 | Generation interrupted mid-stream | Partial answer preserved, state stays `interrupted` | `client/modules/textGeneration.degradation.test.ts` |
 
-## Known Limitations
+## Failure vs. empty results
 
-`fetchSearXNG` catches every failure and returns `[]`, so "the provider is down"
-and "there are no results for this query" reach the client as the same response.
-The matrix pins that behavior rather than hiding it: changing it means changing
-the endpoint contract, and the test is where that decision becomes visible.
+`fetchSearXNG` rethrows upstream failures as `SearXNGSearchError`, the endpoint
+answers 503 for them, and the client maps that to the `failed` state — so an
+outage no longer masquerades as "no results for this query". A genuinely empty
+result set still travels as HTTP 200 with `[]` and lands on the `completed`
+state with the empty-state alert, and the keyword fallback only fires for real
+empty result sets, never for an outage.
 
 ## Adding a Row
 

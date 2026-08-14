@@ -6,6 +6,7 @@ const harness = vi.hoisted(() => {
     response: "",
     textGenerationState: "idle",
     textSearchState: "idle",
+    imageSearchState: "idle",
     textSearchResults: [] as unknown[],
     pageContents: {} as Record<string, string>,
     searchRunId: "run-1",
@@ -40,7 +41,9 @@ vi.mock("./pubSub", () => ({
   updateChatMessages: vi.fn(),
   updateConversationSummary: vi.fn(),
   updateImageSearchResults: vi.fn(),
-  updateImageSearchState: vi.fn(),
+  updateImageSearchState: (value: string) => {
+    harness.state.imageSearchState = value;
+  },
   updateLlmTextSearchResults: vi.fn(),
   updatePageContents: (contents: Record<string, string>) => {
     harness.state.pageContents = contents;
@@ -149,6 +152,7 @@ describe("search degradation", () => {
     harness.state.response = "";
     harness.state.textGenerationState = "idle";
     harness.state.textSearchState = "idle";
+    harness.state.imageSearchState = "idle";
     harness.state.textSearchResults = [];
     harness.state.settings.enableAiResponse = false;
     harness.state.settings.enableTextSearch = true;
@@ -179,7 +183,7 @@ describe("search degradation", () => {
     expect(harness.state.textSearchState).toBe("completed");
   });
 
-  it("reports the text search as failed when the keyword fallback is also empty", async () => {
+  it("leaves the text search completed with no results when the keyword fallback is also empty", async () => {
     vi.mocked(searchText).mockResolvedValue([]);
 
     await searchAndRespond();
@@ -187,7 +191,67 @@ describe("search degradation", () => {
 
     expect(searchText).toHaveBeenCalledTimes(2);
     expect(harness.state.textSearchResults).toEqual([]);
+    expect(harness.state.textSearchState).toBe("completed");
+  });
+
+  it("reports the text search as failed when the provider is down", async () => {
+    vi.mocked(searchText).mockRejectedValue(
+      new Error("HTTP error! status: 503"),
+    );
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    // An outage is not an empty result set, so there is no keyword fallback.
+    expect(searchText).toHaveBeenCalledTimes(1);
+    expect(harness.state.textSearchResults).toEqual([]);
     expect(harness.state.textSearchState).toBe("failed");
+  });
+
+  it("reports the text search as failed when the keyword fallback also fails", async () => {
+    vi.mocked(searchText)
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("HTTP error! status: 503"));
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(searchText).toHaveBeenCalledTimes(2);
+    expect(harness.state.textSearchResults).toEqual([]);
+    expect(harness.state.textSearchState).toBe("failed");
+  });
+});
+
+describe("image search degradation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    harness.state.query = "cat pictures";
+    harness.state.imageSearchState = "idle";
+    harness.state.settings.enableAiResponse = false;
+    harness.state.settings.enableTextSearch = false;
+    harness.state.settings.enableImageSearch = true;
+  });
+
+  it("leaves the image search completed with no results when the search comes back empty", async () => {
+    vi.mocked(searchImages).mockResolvedValue([]);
+
+    await searchAndRespond();
+
+    await vi.waitFor(() =>
+      expect(harness.state.imageSearchState).toBe("completed"),
+    );
+  });
+
+  it("reports the image search as failed when the provider is down", async () => {
+    vi.mocked(searchImages).mockRejectedValue(
+      new Error("HTTP error! status: 503"),
+    );
+
+    await searchAndRespond();
+
+    await vi.waitFor(() =>
+      expect(harness.state.imageSearchState).toBe("failed"),
+    );
   });
 });
 

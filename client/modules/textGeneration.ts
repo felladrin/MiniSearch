@@ -425,29 +425,35 @@ async function startTextSearch(query: string) {
   if (getSettings().enableTextSearch) {
     updateTextSearchState("running");
 
-    let textResults = await searchText(
-      searchQuery,
-      getSettings().searchResultsLimit,
-    );
-
-    if (textResults.length === 0) {
-      const queryKeywords = await getKeywords(query, 10);
-      const keywordResults = await searchText(
-        queryKeywords.join(" "),
+    let textResults: TextSearchResults;
+    let searchFailed = false;
+    try {
+      textResults = await searchText(
+        searchQuery,
         getSettings().searchResultsLimit,
       );
-      textResults = keywordResults;
+
+      if (textResults.length === 0) {
+        const queryKeywords = await getKeywords(query, 10);
+        textResults = await searchText(
+          queryKeywords.join(" "),
+          getSettings().searchResultsLimit,
+        );
+      }
+    } catch (error) {
+      // The provider is down, not the query: don't retry with keywords, and
+      // let the failed state surface instead of the empty-results alert.
+      searchFailed = true;
+      addLogEntry(
+        `Text search failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      textResults = [];
     }
 
     results.textResults = textResults;
 
-    updateTextSearchState(
-      results.textResults.length === 0 ? "failed" : "completed",
-    );
+    updateTextSearchState(searchFailed ? "failed" : "completed");
     updateTextSearchResults(textResults);
-
-    const resultsForLlm = textResults.slice(0, searchResultsToConsider);
-    updateLlmTextSearchResults(resultsForLlm);
 
     updateSearchResults(getCurrentSearchRunId(), {
       type: "text",
@@ -458,9 +464,18 @@ async function startTextSearch(query: string) {
       })),
     });
 
-    // Started here but awaited last: only the AI answer waits on it, while
-    // image search and the history write carry on.
-    pageContentsRead = readPageContents(searchQuery, resultsForLlm);
+    if (searchFailed) {
+      // Keep the next answer from grounding on the previous query's
+      // results when the provider is down.
+      updateLlmTextSearchResults([]);
+    } else {
+      const resultsForLlm = textResults.slice(0, searchResultsToConsider);
+      updateLlmTextSearchResults(resultsForLlm);
+
+      // Started here but awaited last: only the AI answer waits on it, while
+      // image search and the history write carry on.
+      pageContentsRead = readPageContents(searchQuery, resultsForLlm);
+    }
   }
 
   if (getSettings().enableImageSearch) {
@@ -476,25 +491,35 @@ async function startImageSearch(
   searchQuery: string,
   results: { textResults: TextSearchResults; imageResults: ImageSearchResults },
 ) {
-  const imageResults = await searchImages(
-    searchQuery,
-    getSettings().searchResultsLimit,
-  );
-  results.imageResults = imageResults;
-  updateImageSearchState(
-    results.imageResults.length === 0 ? "failed" : "completed",
-  );
-  updateImageSearchResults(imageResults);
+  try {
+    const imageResults = await searchImages(
+      searchQuery,
+      getSettings().searchResultsLimit,
+    );
+    results.imageResults = imageResults;
+    updateImageSearchState("completed");
+    updateImageSearchResults(imageResults);
 
-  updateSearchResults(getCurrentSearchRunId(), {
-    type: "image",
-    items: imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
-      title,
-      url,
-      thumbnail: thumbnailUrl,
-      sourceUrl,
-    })),
-  });
+    updateSearchResults(getCurrentSearchRunId(), {
+      type: "image",
+      items: imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
+        title,
+        url,
+        thumbnail: thumbnailUrl,
+        sourceUrl,
+      })),
+    });
+  } catch (error) {
+    addLogEntry(
+      `Image search failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    updateImageSearchState("failed");
+    updateImageSearchResults([]);
+    updateSearchResults(getCurrentSearchRunId(), {
+      type: "image",
+      items: [],
+    });
+  }
 }
 
 function canDownloadModels(): Promise<void> {

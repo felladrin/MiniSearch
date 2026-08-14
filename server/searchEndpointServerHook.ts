@@ -7,7 +7,7 @@ import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
 } from "./searchesSinceLastRestart.ts";
-import { fetchSearXNG } from "./webSearchService.ts";
+import { fetchSearXNG, SearXNGSearchError } from "./webSearchService.ts";
 
 const THUMBNAIL_TIMEOUT_MS = 1000;
 const DEFAULT_SEARCH_LIMIT = 30;
@@ -176,9 +176,18 @@ export function searchEndpointServerHook<
         "Error processing search:",
         error instanceof Error ? error.message : error,
       );
-      response.statusCode = 500;
+      // A failed SearXNG call means the provider is down, not that the query
+      // has no results — those two cases must reach the client differently.
+      const isUpstreamFailure = error instanceof SearXNGSearchError;
+      response.statusCode = isUpstreamFailure ? 503 : 500;
       response.setHeader("Content-Type", "application/json");
-      response.end(JSON.stringify({ error: "Internal server error" }));
+      response.end(
+        JSON.stringify({
+          error: isUpstreamFailure
+            ? "Search provider unavailable"
+            : "Internal server error",
+        }),
+      );
     }
   });
 }

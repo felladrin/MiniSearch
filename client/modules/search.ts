@@ -497,7 +497,7 @@ const searchService = {
       addLogEntry(
         `Text search failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return [];
+      throw error;
     }
   },
 
@@ -525,7 +525,7 @@ const searchService = {
       addLogEntry(
         `Image search failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return [];
+      throw error;
     }
   },
 

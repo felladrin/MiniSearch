@@ -29,6 +29,19 @@ const searxngCircuitBreaker = new CircuitBreaker({
 
 type SearchType = "text" | "images";
 
+/**
+ * Raised when the search could not be completed because the upstream
+ * (SearXNG) is unavailable or answered with something unusable. The endpoint
+ * maps it to a 503 so callers can tell an outage apart from a legitimately
+ * empty result set.
+ */
+export class SearXNGSearchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SearXNGSearchError";
+  }
+}
+
 interface SearxngSearchResult {
   title: string;
   url: string;
@@ -233,7 +246,7 @@ export async function fetchSearXNG(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     printMessage(`Search failed: ${errorMessage}`);
-    return [];
+    throw new SearXNGSearchError(errorMessage);
   }
 }
 
