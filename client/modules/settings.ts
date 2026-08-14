@@ -44,11 +44,9 @@ export const defaultSettings = {
 
 Cite each fact with a Markdown link right after it, using the site's domain as the link text. Example: [youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ).
 
-Start with the answer. No preamble, no repeating the question, no closing summary.
+If you answer from your own knowledge because the results do not cover it, say so.
 
 Use only these Markdown elements: link, bold, italic, code, quote, table.
-
-If the results disagree, say so. If you answer from your own knowledge because the results do not cover it, say so.
 
 Today's date is {{currentDate}}. Use it for relative dates such as "yesterday".
 
