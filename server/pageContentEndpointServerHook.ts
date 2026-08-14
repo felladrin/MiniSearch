@@ -24,7 +24,10 @@ const pageContentParamsSchema = z.object({
         .max(MAX_URL_LENGTH),
     )
     .min(1, "Missing url parameter")
-    .max(MAX_URLS, `No more than ${MAX_URLS} URLs can be read per request`),
+    .max(MAX_URLS, `No more than ${MAX_URLS} URLs can be read per request`)
+    // Repeats would otherwise multiply the requests one caller can aim at a
+    // single site, and a page read twice adds nothing to the excerpt.
+    .transform((urls) => [...new Set(urls)]),
 });
 
 /**

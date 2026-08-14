@@ -65,15 +65,26 @@ const sentenceSegmenter = new Intl.Segmenter(undefined, {
 });
 
 /**
- * Bounds on the prefix rule below. Three characters is the shortest prefix
- * worth trusting, and three more is about as long as an inflectional ending
- * runs, which together keep "cat" on "cats" and off "catalogue".
+ * A query term and a word on the page count as the same word when one is a
+ * prefix of the other within these bounds. Suffix inflection is the common case
+ * wherever it happens at all ("gato"/"gatos", "sleep"/"sleeping",
+ * "बिल्ली"/"बिल्लियाँ"), so a shared prefix catches it without a suffix table per
+ * language, and scripts that do not inflect fall back to equality.
+ *
+ * Three characters is the shortest prefix worth trusting, and three more is
+ * about as long as an inflectional ending runs, which together keep "cat" on
+ * "cats" and off "catalogue".
  *
  * Measuring in characters is a compromise, since a character is worth a
  * different amount per script: the floor rules out Chinese compounds like
  * "睡"/"睡眠". Making the rule proportional instead admits those and also lets
  * "do" match "dog", which cost more on the pages this was measured against
  * than the compounds gained.
+ *
+ * A false positive costs more than the noise it adds: it raises the term's
+ * document frequency, which lowers the weight of a term that may have been the
+ * one worth ranking on. A query for "war" against a page repeating "warm" loses
+ * most of that term's weight.
  */
 const MIN_PREFIX_MATCH_CHARS = 3;
 const MAX_INFLECTION_CHARS = 3;
@@ -271,26 +282,6 @@ export function splitIntoPassages(text: string): string[] {
   return passages.flatMap(splitLongPassage);
 }
 
-/**
- * Treats a query term and a word on the page as the same word when one is a
- * prefix of the other, within a few characters. Suffix inflection is the
- * common case wherever it happens at all ("gato"/"gatos", "sleep"/"sleeping",
- * "बिल्ली"/"बिल्लियाँ"), so a shared prefix catches it without a suffix table
- * per language, and scripts that do not inflect fall back to equality.
- */
-function isSameWord(term: string, word: string): boolean {
-  if (term === word) return true;
-
-  const [shorter, longer] =
-    term.length < word.length ? [term, word] : [word, term];
-
-  return (
-    shorter.length >= MIN_PREFIX_MATCH_CHARS &&
-    longer.length - shorter.length <= MAX_INFLECTION_CHARS &&
-    longer.startsWith(shorter)
-  );
-}
-
 function tokenize(text: string): string[] {
   const tokens: string[] = [];
   for (const { segment, isWordLike } of wordSegmenter.segment(text)) {
@@ -302,15 +293,78 @@ function tokenize(text: string): string[] {
   return tokens;
 }
 
-function matchingPassages(term: string, passageWords: Set<string>[]): number[] {
-  const matches: number[] = [];
+function recordPassage(
+  index: Map<string, Set<number>>,
+  key: string,
+  passage: number,
+): void {
+  const passages = index.get(key);
+  if (passages === undefined) index.set(key, new Set([passage]));
+  else passages.add(passage);
+}
 
-  for (const [index, words] of passageWords.entries()) {
+/**
+ * Indexes the words of a page by the keys a query term can reach them under,
+ * applying the prefix rule once at build time: every word is stored whole, and
+ * again under each of its prefixes that a shorter term could match.
+ *
+ * Comparing each term against every word instead is quadratic in a product the
+ * page controls. 500,000 words of Han against a 2,000-character query is 7.5e8
+ * comparisons, measured at 8s for a single page, and the endpoint reads six of
+ * them concurrently on one event loop. Indexing is linear in the page and makes
+ * a lookup a handful of map reads.
+ */
+function buildWordIndex(passageWords: Set<string>[]): {
+  whole: Map<string, Set<number>>;
+  prefixes: Map<string, Set<number>>;
+} {
+  const whole = new Map<string, Set<number>>();
+  const prefixes = new Map<string, Set<number>>();
+
+  for (const [passage, words] of passageWords.entries()) {
     for (const word of words) {
-      if (isSameWord(term, word)) {
-        matches.push(index);
-        break;
+      recordPassage(whole, word, passage);
+      for (
+        let length = Math.max(
+          MIN_PREFIX_MATCH_CHARS,
+          word.length - MAX_INFLECTION_CHARS,
+        );
+        length < word.length;
+        length++
+      ) {
+        recordPassage(prefixes, word.slice(0, length), passage);
       }
+    }
+  }
+
+  return { whole, prefixes };
+}
+
+/**
+ * The passages holding a word the prefix rule accepts for this term: the term
+ * itself, the longer words it is a prefix of, and the shorter words that are a
+ * prefix of it. A term below `MIN_PREFIX_MATCH_CHARS` reaches only the first,
+ * which is what keeps a single Han character an exact match.
+ */
+function matchingPassages(
+  term: string,
+  index: ReturnType<typeof buildWordIndex>,
+): Set<number> {
+  const matches = new Set<number>();
+
+  for (const passage of index.whole.get(term) ?? []) matches.add(passage);
+  for (const passage of index.prefixes.get(term) ?? []) matches.add(passage);
+
+  for (
+    let length = Math.max(
+      MIN_PREFIX_MATCH_CHARS,
+      term.length - MAX_INFLECTION_CHARS,
+    );
+    length < term.length;
+    length++
+  ) {
+    for (const passage of index.whole.get(term.slice(0, length)) ?? []) {
+      matches.add(passage);
     }
   }
 
@@ -331,17 +385,18 @@ function weighTerms(
   queryTerms: string[],
   passageWords: Set<string>[],
 ): { matchedWeights: number[]; totalWeight: number } {
+  const index = buildWordIndex(passageWords);
   const matchedWeights = passageWords.map(() => 0);
   let totalWeight = 0;
 
   for (const term of queryTerms) {
-    const matches = matchingPassages(term, passageWords);
+    const matches = matchingPassages(term, index);
     const weight = Math.log(
-      1 + (passageWords.length - matches.length + 0.5) / (matches.length + 0.5),
+      1 + (passageWords.length - matches.size + 0.5) / (matches.size + 0.5),
     );
 
     totalWeight += weight;
-    for (const index of matches) matchedWeights[index] += weight;
+    for (const passage of matches) matchedWeights[passage] += weight;
   }
 
   return { matchedWeights, totalWeight };

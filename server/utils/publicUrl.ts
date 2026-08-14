@@ -129,9 +129,11 @@ export function isBlockedAddress(address: string): boolean {
  *
  * The DNS answer is checked, not pinned: a name that resolves to a public
  * address here and to a private one microseconds later during the fetch would
- * still get through. Closing that gap means connecting to the vetted IP
- * directly, which breaks TLS hostname verification, so instead the reachable
- * surface is kept small - only HTTP(S) GETs whose extracted text is returned.
+ * still get through, and returning the extracted text is what would carry the
+ * result back, so this is a real gap rather than one the response shape closes.
+ * Pinning means connecting to the vetted IP with the hostname preserved for TLS,
+ * which needs a custom `undici` dispatcher this project has no other use for.
+ * The residual risk is one GET per redirect hop from the instance's own network.
  *
  * @param rawUrl - The URL to validate
  * @returns The parsed URL when it is safe to fetch

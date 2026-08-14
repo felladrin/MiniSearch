@@ -84,6 +84,16 @@ anything written for one language:
 Both segmenters are script-driven, so the locale is left unset and the result
 is the same on every host.
 
+One deployment requirement comes with that: word segmentation for Chinese,
+Japanese, Thai, Khmer, Lao and Burmese is dictionary-driven, and those
+dictionaries ship in the full ICU data bundle. On a `small-icu` build, or with
+`NODE_ICU_DATA` pointed at a trimmed bundle, `Intl.Segmenter` still constructs
+and still returns segments, it just stops finding boundaries, which silently
+restores the behavior described above. The official Node images the `Dockerfile`
+builds on carry full ICU, so this only affects a hand-rolled deployment. The
+per-script cases in `server/pageContentService.test.ts` fail loudly on such a
+host, which is the check to run if excerpts ever look like page navigation.
+
 What this does not solve: compounds that place the query word anywhere but the
 front, such as Thai `ที่นอน` for a query about `นอน`, and Chinese compounds
 below the 3-character prefix floor. Substring matching would catch both and also
@@ -161,6 +171,13 @@ introduced by a disclaimer telling the model to treat those lines as material
 to weigh and cite. Neither is a guarantee - a model can still be talked into
 following text it was told to distrust - which is the other reason the feature
 ships off.
+
+The `>` prefix holds because `splitIntoPassages` collapses every run of
+whitespace inside a passage to a single space, so a passage cannot contain a
+newline and `formatExcerpt` has one line to prefix per passage. A page therefore
+cannot open a line of its own choosing in the prompt. That property is load
+bearing, and it is a side effect of normalizing whitespace rather than a check:
+anything that stops collapsing newlines removes it silently.
 
 ## Failure Behavior
 
