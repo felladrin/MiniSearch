@@ -227,8 +227,32 @@ The `/status` endpoint returns a JSON object:
 | `averageGraphicalSearchesPerSession` | number | Image searches / sessions ratio |
 | `rerankerServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `webSearchServiceStatus` | string | `"healthy"` or `"unhealthy"` |
+| `pageReads` | object | Page-reading counters since last restart, see below |
 | `build.timestamp` | string | ISO 8601 build time |
 | `build.gitCommit` | string | Short Git commit hash |
+
+`pageReads` reports what happened to the pages read for AI answers. Each field
+is attached to a constant that someone will want to move, which is the reason it
+is counted at all (see `docs/page-content.md`):
+
+| Field | Type | Tunes |
+|---|---|---|
+| `requested` | number | Nothing; the denominator for the rest |
+| `read` | number | Nothing; how often the feature contributed anything |
+| `readRate` | number | Nothing; `read` as a percentage of `requested` |
+| `averageReadMs` | number | `REQUEST_TIMEOUT_MS`, including the reads that hit it |
+| `bodiesTruncated` | number | `MAX_RESPONSE_BYTES` |
+| `excerptsTruncated` | number | `MAX_PAGE_CHARS` |
+| `skipped.blocked` | number | The SSRF guard, and how often callers aim at private space |
+| `skipped.notADocument` | number | `READABLE_CONTENT_TYPES` |
+| `skipped.httpError` | number | Nothing; how often sites refuse the instance |
+| `skipped.redirectLimit` | number | `MAX_REDIRECTS` |
+| `skipped.timedOut` | number | `REQUEST_TIMEOUT_MS` |
+| `skipped.tooLittleText` | number | `MIN_USEFUL_CHARS`, and the extractor's selectors |
+| `skipped.failed` | number | Nothing; the residue worth watching for a pattern |
+
+`read` plus every `skipped` entry sums to `requested`, so a page that goes
+uncounted shows up as a gap rather than being lost silently.
 
 ## Data Persistence Architecture
 

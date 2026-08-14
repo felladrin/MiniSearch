@@ -1,5 +1,6 @@
 import prettyMilliseconds from "pretty-ms";
 import type { PreviewServer, ViteDevServer } from "vite";
+import { getPageReadStats } from "./pageReadsSinceLastRestart.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
 import {
   getGraphicalSearchesSinceLastRestart,
@@ -50,6 +51,7 @@ export function statusEndpointServerHook<
       averageGraphicalSearchesPerSession,
       rerankerServiceStatus,
       webSearchServiceStatus,
+      pageReads: getPageReadStats(),
       build: {
         timestamp: new Date(
           server.config.define?.VITE_BUILD_DATE_TIME || "",

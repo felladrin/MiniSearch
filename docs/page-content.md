@@ -192,6 +192,34 @@ cannot open a line of its own choosing in the prompt. That property is load
 bearing, and it is a side effect of normalizing whitespace rather than a check:
 anything that stops collapsing newlines removes it silently.
 
+## What Gets Recorded
+
+Nothing that says what anyone searched for. Reading pages is the part of
+MiniSearch most tempting to log, because the useful line to write while
+debugging is the query and the URL, and that pair is the search itself. So
+`pageContentService` logs neither, nor the host, nor a timestamp per read.
+
+What it keeps is counters, in `server/pageReadsSinceLastRestart.ts`, served
+under `pageReads` on `/status` and reset by a restart. Every one of them is
+attached to a constant in the table above, so the question they answer is "is
+this limit set where it should be", not "who read what":
+
+| Counter | The question it settles |
+| --- | --- |
+| `readRate` | Is the feature worth its latency at all |
+| `averageReadMs` | Is a 6 s deadline generous or stingy |
+| `skipped.timedOut` | How much is being lost to that deadline |
+| `skipped.tooLittleText` | Is the 200-character floor discarding real pages, or is the extractor missing their text |
+| `skipped.notADocument` | Are useful content types being turned away |
+| `skipped.blocked` | Are callers aiming at private space, deliberately or otherwise |
+| `bodiesTruncated` | Is the 1.5 MB body cap biting |
+| `excerptsTruncated` | Is the 6,000-character excerpt budget cutting material that mattered |
+
+A counter can only be read in aggregate, so a single search cannot be recovered
+from it. The weakest point is an instance nobody else is using, where one search
+moves the numbers on its own; that reveals how many pages were read and how they
+failed, never which pages or what was asked.
+
 ## Failure Behavior
 
 Every failure degrades to the snippet-only prompt, which is what the answer was

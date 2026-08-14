@@ -13,6 +13,7 @@ import {
   selectPassages,
   splitIntoPassages,
 } from "./pageContentService";
+import { getPageReadStats } from "./pageReadsSinceLastRestart";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -295,6 +296,124 @@ describe("selectPassages across scripts", () => {
       expect(selected).toEqual([onTopic]);
     });
   }
+});
+
+describe("page read counters", () => {
+  /** Counts what one call to `fetchPageContents` added, by outcome. */
+  async function countOutcomes(url: string, query = "cats") {
+    const before = getPageReadStats();
+    await fetchPageContents(query, [url]);
+    const after = getPageReadStats();
+
+    return {
+      read: after.read - before.read,
+      skipped: Object.fromEntries(
+        Object.entries(after.skipped)
+          .map(([outcome, count]) => [
+            outcome,
+            count - before.skipped[outcome as keyof typeof before.skipped],
+          ])
+          .filter(([, count]) => count !== 0),
+      ),
+      bodiesTruncated: after.bodiesTruncated - before.bodiesTruncated,
+      excerptsTruncated: after.excerptsTruncated - before.excerptsTruncated,
+    };
+  }
+
+  it("counts a page it could read", async () => {
+    respondWithHtml(articlePage);
+
+    const counted = await countOutcomes("https://example.com/cats");
+
+    expect(counted.read).toBe(1);
+    expect(counted.skipped).toEqual({});
+  });
+
+  it("counts a host that resolves privately as blocked", async () => {
+    lookupMock.mockResolvedValue([{ address: "127.0.0.1", family: 4 }]);
+
+    expect((await countOutcomes("http://router.local/")).skipped).toEqual({
+      blocked: 1,
+    });
+  });
+
+  it("tells an error status apart from a page that is not a document", async () => {
+    fetchMock.mockResolvedValue(new Response("nope", { status: 403 }));
+    expect((await countOutcomes("https://example.com/x")).skipped).toEqual({
+      httpError: 1,
+    });
+
+    fetchMock.mockResolvedValue(
+      new Response("%PDF-1.7", {
+        status: 200,
+        headers: { "content-type": "application/pdf" },
+      }),
+    );
+    expect((await countOutcomes("https://example.com/a.pdf")).skipped).toEqual({
+      notADocument: 1,
+    });
+  });
+
+  it("counts a redirect chain that never lands", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://example.com/next" },
+      }),
+    );
+
+    expect((await countOutcomes("https://example.com/loop")).skipped).toEqual({
+      redirectLimit: 1,
+    });
+  });
+
+  it("counts a timeout separately from any other failure", async () => {
+    const timeout = new Error("The operation was aborted due to timeout");
+    timeout.name = "TimeoutError";
+    fetchMock.mockRejectedValue(timeout);
+    expect((await countOutcomes("https://slow.example.com/")).skipped).toEqual({
+      timedOut: 1,
+    });
+
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+    expect(
+      (await countOutcomes("https://broken.example.com/")).skipped,
+    ).toEqual({ failed: 1 });
+  });
+
+  it("counts a page that yielded almost no text", async () => {
+    respondWithHtml("<html><body><p>Accept cookies</p></body></html>");
+
+    expect((await countOutcomes("https://example.com/wall")).skipped).toEqual({
+      tooLittleText: 1,
+    });
+  });
+
+  it("counts an excerpt the character budget had to cut", async () => {
+    const longPage = `<html><body><article>${Array.from(
+      { length: 40 },
+      (_, index) =>
+        `<p>Passage number ${index} about cats sleeping. ${"Filler that makes this block long enough to stand alone. ".repeat(4)}</p>`,
+    ).join("")}</article></body></html>`;
+    respondWithHtml(longPage);
+
+    const counted = await countOutcomes("https://example.com/long");
+
+    expect(counted.read).toBe(1);
+    expect(counted.excerptsTruncated).toBe(1);
+  });
+
+  it("records no query or URL anywhere in what it reports", async () => {
+    respondWithHtml(articlePage);
+    await fetchPageContents("a very distinctive private query", [
+      "https://secret.example.com/private-page",
+    ]);
+
+    const reported = JSON.stringify(getPageReadStats());
+
+    expect(reported).not.toContain("distinctive");
+    expect(reported).not.toContain("secret.example.com");
+  });
 });
 
 describe("fetchPageContents", () => {

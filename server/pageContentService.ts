@@ -1,11 +1,9 @@
-import { basename } from "node:path";
-import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
+import {
+  type PageReadOutcome,
+  recordPageRead,
+} from "./pageReadsSinceLastRestart.ts";
 import { resolvePublicUrl } from "./utils/publicUrl.ts";
-
-const fileName = basename(import.meta.url);
-const printMessage = debug(fileName);
-printMessage.enabled = true;
 
 const REQUEST_TIMEOUT_MS = 6000;
 const MAX_REDIRECTS = 3;
@@ -139,70 +137,113 @@ function decodeDocument(bytes: Uint8Array, contentType: string): string {
  * page must not be able to pin the server's memory, and the extractor gains
  * nothing from the tail of a document it will trim to a few passages anyway.
  */
-async function readCappedBytes(response: Response): Promise<Uint8Array> {
+async function readCappedBytes(
+  response: Response,
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
   const reader = response.body?.getReader();
-  if (!reader) return new Uint8Array();
+  if (!reader) return { bytes: new Uint8Array(), truncated: false };
 
   const chunks: Uint8Array[] = [];
   let bytesRead = 0;
+  let reachedEnd = false;
 
   while (bytesRead < MAX_RESPONSE_BYTES) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      reachedEnd = true;
+      break;
+    }
     bytesRead += value.byteLength;
     chunks.push(value);
   }
 
   await reader.cancel().catch(() => {});
 
-  const body = new Uint8Array(bytesRead);
+  const bytes = new Uint8Array(bytesRead);
   let offset = 0;
   for (const chunk of chunks) {
-    body.set(chunk, offset);
+    bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return body;
+  return { bytes, truncated: !reachedEnd };
 }
+
+/** `AbortSignal.timeout` rejects with this; a network failure is a `TypeError`. */
+function isTimeout(error: unknown): boolean {
+  return error instanceof Error && error.name === "TimeoutError";
+}
+
+type DownloadResult =
+  | { outcome: "ok"; html: string; bodyTruncated: boolean }
+  | { outcome: Exclude<PageReadOutcome, "read" | "tooLittleText"> };
 
 /**
  * Follows redirects by hand so that every hop is validated: `redirect:
  * "follow"` would let a public URL bounce the server into a private address.
  * The whole chain shares one deadline, so a page cannot buy extra time by
  * redirecting.
+ *
+ * Returns why it gave up rather than throwing, because the caller counts the
+ * reasons and a thrown `Error` would have to be identified by its message.
  */
-async function downloadDocument(rawUrl: string): Promise<string | null> {
+async function downloadDocument(rawUrl: string): Promise<DownloadResult> {
   let target = rawUrl;
   const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    const url = await resolvePublicUrl(target);
-    const response = await fetch(url, {
-      headers: REQUEST_HEADERS,
-      redirect: "manual",
-      signal: deadline,
-    });
+    let url: URL;
+    try {
+      url = await resolvePublicUrl(target);
+    } catch {
+      return { outcome: "blocked" };
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: REQUEST_HEADERS,
+        redirect: "manual",
+        signal: deadline,
+      });
+    } catch (error) {
+      return { outcome: isTimeout(error) ? "timedOut" : "failed" };
+    }
 
     const location = response.headers.get("location");
     if (isRedirect(response.status) && location) {
       await response.body?.cancel().catch(() => {});
-      target = new URL(location, url).toString();
+      try {
+        target = new URL(location, url).toString();
+      } catch {
+        return { outcome: "failed" };
+      }
       continue;
     }
 
     if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
+      await response.body?.cancel().catch(() => {});
+      return { outcome: "httpError" };
     }
 
     const contentType = response.headers.get("content-type") ?? "";
     if (!READABLE_CONTENT_TYPES.test(contentType.trim())) {
       await response.body?.cancel().catch(() => {});
-      return null;
+      return { outcome: "notADocument" };
     }
 
-    return decodeDocument(await readCappedBytes(response), contentType);
+    try {
+      const { bytes, truncated } = await readCappedBytes(response);
+      return {
+        outcome: "ok",
+        html: decodeDocument(bytes, contentType),
+        bodyTruncated: truncated,
+      };
+    } catch (error) {
+      return { outcome: isTimeout(error) ? "timedOut" : "failed" };
+    }
   }
 
-  throw new Error(`Exceeded ${MAX_REDIRECTS} redirects`);
+  return { outcome: "redirectLimit" };
 }
 
 /**
@@ -467,23 +508,49 @@ async function fetchPageContent(
   query: string,
   url: string,
 ): Promise<PageContent | null> {
-  try {
-    const html = await downloadDocument(url);
-    if (html === null) return null;
+  const startedAt = performance.now();
+  const since = () => performance.now() - startedAt;
 
-    const passages = splitIntoPassages(extractReadableText(html));
-    const content = selectPassages(query, passages, MAX_PAGE_CHARS).join("\n");
+  const download = await downloadDocument(url);
+
+  if (download.outcome !== "ok") {
+    recordPageRead({ outcome: download.outcome, durationMs: since() });
+    return null;
+  }
+
+  const { bodyTruncated } = download;
+
+  try {
+    const passages = splitIntoPassages(extractReadableText(download.html));
+    const selected = selectPassages(query, passages, MAX_PAGE_CHARS);
+    const content = selected.join("\n");
+    // The budget dropped material the page had, which is the signal for whether
+    // `MAX_PAGE_CHARS` is set where it should be.
+    const excerptTruncated = selected.length < passages.length;
 
     if (content.length < MIN_USEFUL_CHARS) {
-      printMessage(`Skipped ${url}: too little readable text`);
+      recordPageRead({
+        outcome: "tooLittleText",
+        durationMs: since(),
+        bodyTruncated,
+      });
       return null;
     }
 
+    recordPageRead({
+      outcome: "read",
+      durationMs: since(),
+      bodyTruncated,
+      excerptTruncated,
+    });
+
     return { url, content };
-  } catch (error) {
-    printMessage(
-      `Could not read ${url}: ${error instanceof Error ? error.message : String(error)}`,
-    );
+  } catch {
+    recordPageRead({
+      outcome: "failed",
+      durationMs: since(),
+      bodyTruncated,
+    });
     return null;
   }
 }
@@ -492,6 +559,10 @@ async function fetchPageContent(
  * Reads the given pages and returns the passages most relevant to the query.
  * Pages that fail, time out, or carry no readable text are left out instead of
  * failing the batch: a partial set of excerpts still grounds the answer.
+ *
+ * Nothing here is logged. Every read is counted instead, by outcome, in
+ * `pageReadsSinceLastRestart`, since a line naming the query or the URL would
+ * record what someone searched for.
  *
  * @param query - The user's search query, used to rank passages
  * @param urls - Page URLs to read, already ranked by the search pipeline
@@ -505,13 +576,5 @@ export async function fetchPageContents(
     urls.map((url) => fetchPageContent(query, url)),
   );
 
-  const readable = contents.filter(
-    (content): content is PageContent => content !== null,
-  );
-
-  printMessage(
-    `Read ${readable.length} of ${urls.length} page(s) for: ${query}`,
-  );
-
-  return readable;
+  return contents.filter((content): content is PageContent => content !== null);
 }
