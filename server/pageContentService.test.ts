@@ -86,6 +86,20 @@ describe("splitIntoPassages", () => {
     }
   });
 
+  it("breaks a long block at sentence boundaries in any script", () => {
+    // A regular expression over `[.!?]` finds no boundary here, so the block
+    // used to be cut at an arbitrary character in the middle of a sentence.
+    const passages = splitIntoPassages(
+      "猫每天睡十二到十六个小时，年长的猫睡得更久。".repeat(80),
+    );
+
+    expect(passages.length).toBeGreaterThan(1);
+    for (const passage of passages) {
+      expect(passage.length).toBeLessThanOrEqual(1200);
+      expect(passage.endsWith("。")).toBe(true);
+    }
+  });
+
   it("collapses whitespace and drops empty blocks", () => {
     expect(splitIntoPassages("\n\n  \n\nfirst   block\n\n\n")).toEqual([
       "first block",
@@ -132,6 +146,112 @@ describe("selectPassages", () => {
       inflected[1],
     ]);
   });
+
+  it("does not match a query term against a merely similar word", () => {
+    const similar = [
+      "The catalogue lists every accessory the shop has ever carried.",
+      "A short note about the weather, which has nothing to do with pets.",
+    ];
+
+    // "cat" is a prefix of "catalogue", but too far from it to be the same word,
+    // so nothing matches and the lead passage wins on position alone.
+    expect(selectPassages("cat", similar, 70)).toEqual([similar[0]]);
+    expect(selectPassages("catalogue", similar, 70)).toEqual([similar[0]]);
+  });
+});
+
+/**
+ * The picker used to score by splitting on `[^\p{L}\p{N}]+`, which finds no
+ * boundary in scripts that write none and shredded the ones that write words
+ * with combining marks. Every query below then matched nothing, scoring fell
+ * through to document order, and the boilerplate placed first won. Each case
+ * puts the off-topic passage first and allows a budget that fits exactly one,
+ * so document order and relevance cannot both be right.
+ */
+describe("selectPassages across scripts", () => {
+  const cases = [
+    {
+      script: "Latin (English)",
+      query: "how long do cats sleep",
+      offTopic:
+        "Diesel engines need oil changes at shorter intervals than petrol engines do, and the fuel filter is the neglected part.",
+      onTopic:
+        "Cats sleep between twelve and sixteen hours a day, and older cats sleep longer still, in short naps through the day.",
+    },
+    {
+      script: "Latin (Portuguese)",
+      query: "quanto tempo os gatos dormem",
+      offTopic:
+        "Os motores a diesel exigem trocas de oleo em intervalos mais curtos do que os motores a gasolina, e o filtro fica de fora.",
+      onTopic:
+        "Os gatos dormem entre doze e dezesseis horas por dia, e os gatos mais velhos dormem ainda mais, em sonecas curtas.",
+    },
+    {
+      script: "Cyrillic (Russian)",
+      query: "сколько спят кошки",
+      offTopic:
+        "Дизельные двигатели требуют более частой замены масла, чем бензиновые, а топливный фильтр забывают при обслуживании.",
+      onTopic:
+        "Кошки спят от двенадцати до шестнадцати часов в сутки, а пожилые кошки спят дольше, короткими периодами отдыха.",
+    },
+    {
+      script: "Arabic",
+      query: "كم تنام القطط في اليوم",
+      offTopic:
+        "تحتاج محركات الديزل إلى تغيير الزيت على فترات أقصر من محركات البنزين، ومرشح الوقود هو الجزء الأكثر إهمالا هنا.",
+      onTopic:
+        "تنام القطط من اثنتي عشرة إلى ست عشرة ساعة في اليوم، والقطط المسنة تنام أطول، على شكل غفوات قصيرة متفرقة.",
+    },
+    {
+      script: "Devanagari (Hindi)",
+      query: "बिल्लियाँ कितने घंटे सोती हैं",
+      offTopic:
+        "डीज़ल इंजन को पेट्रोल इंजन की तुलना में तेल बदलने के लिए कम अंतराल की आवश्यकता होती है और ईंधन फ़िल्टर उपेक्षित रहता है।",
+      onTopic:
+        "बिल्लियाँ दिन में बारह से सोलह घंटे सोती हैं और बड़ी उम्र की बिल्लियाँ और भी अधिक सोती हैं, छोटी झपकियों में।",
+    },
+    {
+      script: "Thai",
+      query: "แมวนอนกี่ชั่วโมงต่อวัน",
+      offTopic:
+        "เครื่องยนต์ดีเซลต้องเปลี่ยนถ่ายน้ำมันเครื่องบ่อยกว่าเครื่องยนต์เบนซิน และไส้กรองน้ำมันเชื้อเพลิงมักถูกมองข้าม",
+      onTopic:
+        "แมวนอนวันละสิบสองถึงสิบหกชั่วโมง และแมวที่มีอายุมากจะนอนนานกว่านั้น โดยแบ่งเป็นการงีบสั้นๆ หลายครั้ง",
+    },
+    {
+      script: "Han (Chinese)",
+      query: "猫每天睡多久",
+      offTopic:
+        "柴油发动机的换油间隔比汽油发动机更短，而燃油滤清器是日常保养中最容易被忽视的部件，建议定期更换以保证运转。",
+      onTopic:
+        "猫每天睡十二到十六个小时，年长的猫睡得更久。它们的睡眠是多相性的，被分成许多短暂的小睡，而不是一整段休息。",
+    },
+    {
+      script: "Japanese",
+      query: "猫は一日何時間寝るのか",
+      offTopic:
+        "ディーゼルエンジンはガソリンエンジンよりも短い間隔でのオイル交換が必要であり、燃料フィルターは見落とされます。",
+      onTopic:
+        "猫は一日に十二時間から十六時間眠り、高齢の猫はさらに長く眠ります。睡眠は多相性で、短い仮眠の繰り返しです。",
+    },
+    {
+      script: "Hangul (Korean)",
+      query: "고양이는 하루에 몇 시간 자나요",
+      offTopic:
+        "디젤 엔진은 가솔린 엔진보다 짧은 간격으로 오일을 교환해야 하며, 연료 필터는 정비에서 가장 자주 빠지는 부품입니다.",
+      onTopic:
+        "고양이는 하루에 열두 시간에서 열여섯 시간을 자며, 나이 든 고양이는 더 오래 잡니다. 잠은 짧은 낮잠으로 나뉩니다.",
+    },
+  ];
+
+  for (const { script, query, offTopic, onTopic } of cases) {
+    it(`picks the relevant passage over the lead one in ${script}`, () => {
+      const budget = Math.max(offTopic.length, onTopic.length);
+      const selected = selectPassages(query, [offTopic, onTopic], budget);
+
+      expect(selected).toEqual([onTopic]);
+    });
+  }
 });
 
 describe("fetchPageContents", () => {

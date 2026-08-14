@@ -19,7 +19,10 @@ const MAX_PASSAGE_CHARS = 1200;
 
 const REQUEST_HEADERS = {
   Accept: "text/html,application/xhtml+xml;q=0.9,text/plain;q=0.8",
-  "Accept-Language": "en;q=0.9,*;q=0.5",
+  // No language preference: searches arrive in every language, and asking for
+  // English made a multilingual site serve its English edition for a query
+  // written in something else.
+  "Accept-Language": "*",
   "User-Agent":
     "Mozilla/5.0 (compatible; MiniSearch/1.0; +https://github.com/felladrin/MiniSearch)",
 } as const;
@@ -47,39 +50,33 @@ const SKIPPED_SELECTORS = [
   "textarea",
 ];
 
-const STOP_WORDS = new Set([
-  "and",
-  "are",
-  "but",
-  "for",
-  "from",
-  "has",
-  "have",
-  "how",
-  "into",
-  "its",
-  "not",
-  "the",
-  "that",
-  "their",
-  "them",
-  "there",
-  "these",
-  "they",
-  "this",
-  "was",
-  "were",
-  "what",
-  "when",
-  "where",
-  "which",
-  "who",
-  "why",
-  "will",
-  "with",
-  "you",
-  "your",
-]);
+/**
+ * Word and sentence boundaries come from ICU rather than from an expression
+ * over character classes. `[^\p{L}\p{N}]+` cut Brahmic scripts and Thai at
+ * every combining vowel mark and discarded the marks, turning a Hindi query
+ * into one meaningless fragment, and no expression can find a boundary in
+ * Chinese, Japanese or Thai, which write none: a whole sentence arrived as a
+ * single token that matched nothing. Both segmenters are script-driven, so the
+ * locale is left unset and the result is the same on every host.
+ */
+const wordSegmenter = new Intl.Segmenter(undefined, { granularity: "word" });
+const sentenceSegmenter = new Intl.Segmenter(undefined, {
+  granularity: "sentence",
+});
+
+/**
+ * Bounds on the prefix rule below. Three characters is the shortest prefix
+ * worth trusting, and three more is about as long as an inflectional ending
+ * runs, which together keep "cat" on "cats" and off "catalogue".
+ *
+ * Measuring in characters is a compromise, since a character is worth a
+ * different amount per script: the floor rules out Chinese compounds like
+ * "睡"/"睡眠". Making the rule proportional instead admits those and also lets
+ * "do" match "dog", which cost more on the pages this was measured against
+ * than the compounds gained.
+ */
+const MIN_PREFIX_MATCH_CHARS = 3;
+const MAX_INFLECTION_CHARS = 3;
 
 /** Extracted text for a single page, keyed by the URL it was read from. */
 export interface PageContent {
@@ -232,8 +229,8 @@ function splitLongPassage(passage: string): string[] {
   const chunks: string[] = [];
   let current = "";
 
-  for (const sentence of passage.match(/[^.!?]+[.!?]*\s*/g) ?? [passage]) {
-    for (const piece of sliceEvery(sentence, MAX_PASSAGE_CHARS)) {
+  for (const { segment } of sentenceSegmenter.segment(passage)) {
+    for (const piece of sliceEvery(segment, MAX_PASSAGE_CHARS)) {
       if (
         current.length + piece.length > MAX_PASSAGE_CHARS &&
         current.length > 0
@@ -275,48 +272,95 @@ export function splitIntoPassages(text: string): string[] {
 }
 
 /**
- * Trims the inflections that would otherwise make a passage about "cats
- * sleeping" look unrelated to a query about how long a cat sleeps. Both sides
- * are trimmed the same way, so the stem only has to be consistent, not correct.
+ * Treats a query term and a word on the page as the same word when one is a
+ * prefix of the other, within a few characters. Suffix inflection is the
+ * common case wherever it happens at all ("gato"/"gatos", "sleep"/"sleeping",
+ * "बिल्ली"/"बिल्लियाँ"), so a shared prefix catches it without a suffix table
+ * per language, and scripts that do not inflect fall back to equality.
  */
-function stem(token: string): string {
-  for (const suffix of ["ing", "ies", "ed", "es", "s"]) {
-    if (token.endsWith(suffix) && token.length - suffix.length >= 3) {
-      return suffix === "ies"
-        ? `${token.slice(0, -suffix.length)}y`
-        : token.slice(0, -suffix.length);
-    }
-  }
-  return token;
+function isSameWord(term: string, word: string): boolean {
+  if (term === word) return true;
+
+  const [shorter, longer] =
+    term.length < word.length ? [term, word] : [word, term];
+
+  return (
+    shorter.length >= MIN_PREFIX_MATCH_CHARS &&
+    longer.length - shorter.length <= MAX_INFLECTION_CHARS &&
+    longer.startsWith(shorter)
+  );
 }
 
 function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter((token) => token.length > 1 && !STOP_WORDS.has(token))
-    .map(stem);
+  const tokens: string[] = [];
+  for (const { segment, isWordLike } of wordSegmenter.segment(text)) {
+    // Single characters are kept: they are whole words in Chinese, Japanese and
+    // Korean. The weighting below is what discounts the ones that carry no
+    // signal, in any language.
+    if (isWordLike) tokens.push(segment.toLowerCase());
+  }
+  return tokens;
+}
+
+function matchingPassages(term: string, passageWords: Set<string>[]): number[] {
+  const matches: number[] = [];
+
+  for (const [index, words] of passageWords.entries()) {
+    for (const word of words) {
+      if (isSameWord(term, word)) {
+        matches.push(index);
+        break;
+      }
+    }
+  }
+
+  return matches;
+}
+
+/**
+ * Weighs each query term by inverse document frequency across the passages of
+ * this one page, and returns how much weight each passage matched along with
+ * the total available.
+ *
+ * This is what replaced a stop-word list, which could only ever cover the one
+ * language it was written in: a term found in most passages of a page cannot
+ * say which passage to quote, and a term confined to a few of them can, and
+ * that holds whatever language the page is in.
+ */
+function weighTerms(
+  queryTerms: string[],
+  passageWords: Set<string>[],
+): { matchedWeights: number[]; totalWeight: number } {
+  const matchedWeights = passageWords.map(() => 0);
+  let totalWeight = 0;
+
+  for (const term of queryTerms) {
+    const matches = matchingPassages(term, passageWords);
+    const weight = Math.log(
+      1 + (passageWords.length - matches.length + 0.5) / (matches.length + 0.5),
+    );
+
+    totalWeight += weight;
+    for (const index of matches) matchedWeights[index] += weight;
+  }
+
+  return { matchedWeights, totalWeight };
 }
 
 function scorePassage(
-  passage: string,
-  queryTerms: Set<string>,
+  matchedWeight: number,
+  totalWeight: number,
+  termCount: number,
   index: number,
 ): number {
   const position = 1 / (1 + index);
-  if (queryTerms.size === 0) return position;
-
-  const words = new Set(tokenize(passage));
-  let matched = 0;
-  for (const term of queryTerms) {
-    if (words.has(term)) matched++;
-  }
+  if (termCount === 0) return position;
 
   // Lead passages carry the definition or summary on most pages, so they get a
   // prior worth half a matched term: enough to break ties and to float the
   // intro of a page whose body never repeats the query, never enough to
   // outrank a passage that covers more of it.
-  return (matched + 0.5 * position) / queryTerms.size;
+  return matchedWeight / totalWeight + (0.5 * position) / termCount;
 }
 
 /**
@@ -333,12 +377,20 @@ export function selectPassages(
   passages: string[],
   maxChars: number,
 ): string[] {
-  const queryTerms = new Set(tokenize(query));
+  const passageWords = passages.map((text) => new Set(tokenize(text)));
+  const queryTerms = [...new Set(tokenize(query))];
+  const { matchedWeights, totalWeight } = weighTerms(queryTerms, passageWords);
+
   const ranked = passages
     .map((text, index) => ({
       index,
       text,
-      score: scorePassage(text, queryTerms, index),
+      score: scorePassage(
+        matchedWeights[index],
+        totalWeight,
+        queryTerms.length,
+        index,
+      ),
     }))
     .sort((a, b) => b.score - a.score || a.index - b.index);
 

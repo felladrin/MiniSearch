@@ -65,11 +65,38 @@ Encoding comes from the `Content-Type` header, falling back to the `<meta
 charset>` the document declares, so a page that is not UTF-8 does not reach the
 model as mojibake.
 
-Passages are ranked by how much of the query they cover, after light stemming
-so that a query about "sleep" matches a page about "sleeping", with a prior for
-lead passages (the definition or summary usually opens a page). The prior is
-worth at most half a matched term, so it settles ties without outweighing
-coverage.
+Passages are ranked by how much of the query they cover, with a prior for lead
+passages (the definition or summary usually opens a page). The prior is worth at
+most half a matched term, so it settles ties without outweighing coverage.
+
+## Ranking Across Languages
+
+The interface is in English; the searches are not. Ranking therefore avoids
+anything written for one language:
+
+| Concern | How it is handled | Why not the obvious thing |
+| --- | --- | --- |
+| Word boundaries | `Intl.Segmenter`, word granularity | `[^\p{L}\p{N}]+` cut Brahmic scripts and Thai at every combining vowel mark and dropped the marks, and it finds no boundary at all in Chinese, Japanese or Thai, which write none: a whole sentence arrived as one token that matched nothing, scoring fell through to document order, and the page's own navigation won |
+| Sentence boundaries | `Intl.Segmenter`, sentence granularity | `[.!?]` never matches `。`, `！`, `？` or `।`, so long CJK and Indic blocks were cut at an arbitrary character mid-sentence |
+| Uninformative words | Inverse document frequency over the passages of the page being read | A stop-word list only covers the language it was written in. A term found in most passages of a page cannot say which passage to quote, in any language, and this needs no word list and no language detection |
+| Inflection | A query term and a page word match when one is a prefix of the other, from 3 characters and within 3 | Stripping `-ing`, `-es`, `-s` is English morphology applied to every language: it turned the Portuguese `mães` into `mã` and never matched `mãe` |
+
+Both segmenters are script-driven, so the locale is left unset and the result
+is the same on every host.
+
+What this does not solve: compounds that place the query word anywhere but the
+front, such as Thai `ที่นอน` for a query about `นอน`, and Chinese compounds
+below the 3-character prefix floor. Substring matching would catch both and also
+match `cat` inside `advocate`, so the floor stays.
+
+`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`, already resident for
+`docs/reranking.md`, is XLM-RoBERTa trained on mMARCO and would rank passages
+semantically in all of these languages. It is not used here because it scores
+one pair per call: the pages above yield 24 to 441 passages each, six pages per
+search, which is minutes of blocked event loop against a 20 s client timeout.
+Reranking a shortlist of passages per page is the open option, and it needs the
+first stage above to be sound in the query's language before it is worth
+anything.
 
 ## Budgets and Limits
 
@@ -101,7 +128,10 @@ Snippet-only answers are seen by SearXNG and its upstream engines. Reading a
 page adds one request from the instance to each site behind the top results,
 which tells those sites their page was fetched. The request comes from the
 instance, never from the browser, so it carries no user cookies and no client
-IP; it identifies itself as MiniSearch.
+IP; it identifies itself as MiniSearch. It sends `Accept-Language: *` rather
+than a preference, which asks for no particular edition of a page and leaks
+nothing about the reader; the cost is that a site picks the edition itself,
+usually by the instance's own address.
 
 ## Safety
 
