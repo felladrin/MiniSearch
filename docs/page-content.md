@@ -88,11 +88,18 @@ One deployment requirement comes with that: word segmentation for Chinese,
 Japanese, Thai, Khmer, Lao and Burmese is dictionary-driven, and those
 dictionaries ship in the full ICU data bundle. On a `small-icu` build, or with
 `NODE_ICU_DATA` pointed at a trimmed bundle, `Intl.Segmenter` still constructs
-and still returns segments, it just stops finding boundaries, which silently
-restores the behavior described above. The official Node images the `Dockerfile`
-builds on carry full ICU, so this only affects a hand-rolled deployment. The
-per-script cases in `server/pageContentService.test.ts` fail loudly on such a
-host, which is the check to run if excerpts ever look like page navigation.
+and still returns segments, it just stops finding the boundaries those
+dictionaries encode, and it reports no error while doing it. The official Node
+images the `Dockerfile` builds on carry full ICU, so this only affects a
+hand-rolled deployment.
+
+Which languages degrade there is not something this project has measured. Thai,
+Khmer, Lao and Burmese have no other boundary signal, so they are the ones to
+expect trouble from. Chinese and Japanese would likely still break between
+ideographs, since that break comes from the UAX #29 rules rather than the
+dictionary, leaving usable single-character words. So treat the per-script cases
+in `server/pageContentService.test.ts` as a check worth running on a new host,
+not as proof the host is fine.
 
 What this does not solve: compounds that place the query word anywhere but the
 front, such as Thai `ที่นอน` for a query about `นอน`, and Chinese compounds
@@ -154,10 +161,16 @@ multicast or reserved space - and it re-checks on every redirect hop, since
 the private network it runs in.
 
 The DNS answer is checked, not pinned, so a name that flips to a private
-address between the check and the fetch would still get through. Closing that
-gap means connecting to the vetted IP directly, which breaks TLS hostname
-verification; instead the reachable surface is kept small, since the only thing
-that comes back is extracted text.
+address between the check and the fetch would still get through. This is a real
+gap, and worth stating without the usual comfort: the excerpt is returned to the
+caller, so a successful rebind reads back the text of whatever it reached, up to
+one request per redirect hop from inside the instance's network. What it is not
+is a blind request whose response nobody sees.
+
+Closing it means connecting to the already-vetted IP while keeping the hostname
+for TLS, which needs a custom `undici` dispatcher that nothing else here would
+use. That is the trade being made, and it is the first thing to revisit if this
+endpoint ever runs somewhere with more to reach than the public internet.
 
 Extracted text is data, not instruction, and it cannot be treated at the same
 trust level as a snippet. A snippet is 200 characters written by the search

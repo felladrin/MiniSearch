@@ -133,7 +133,8 @@ export function isBlockedAddress(address: string): boolean {
  * result back, so this is a real gap rather than one the response shape closes.
  * Pinning means connecting to the vetted IP with the hostname preserved for TLS,
  * which needs a custom `undici` dispatcher this project has no other use for.
- * The residual risk is one GET per redirect hop from the instance's own network.
+ * The residual risk is up to one GET per redirect hop from inside the instance's
+ * network, and the readable text of whatever those GETs return.
  *
  * @param rawUrl - The URL to validate
  * @returns The parsed URL when it is safe to fetch

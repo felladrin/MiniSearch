@@ -70,6 +70,31 @@ describe("pageContentEndpointServerHook", () => {
     expect(fetchPageContents).toHaveBeenCalled();
   });
 
+  it("reads a repeated URL once", async () => {
+    const { handled } = callEndpoint(
+      "/page-content?q=cats&url=https%3A%2F%2Fa.example%2F&url=https%3A%2F%2Fa.example%2F&url=https%3A%2F%2Fb.example%2F&token=abc",
+    );
+    await handled;
+
+    expect(fetchPageContents).toHaveBeenCalledWith("cats", [
+      "https://a.example/",
+      "https://b.example/",
+    ]);
+  });
+
+  it("counts the repeats against the URL limit before deduping them", async () => {
+    // Deduping first would let a caller send any number of `url` params and
+    // still get a full batch of reads out of the endpoint.
+    const url = "&url=https%3A%2F%2Fa.example%2F";
+    const { response, handled } = callEndpoint(
+      `/page-content?q=cats${url.repeat(7)}&token=abc`,
+    );
+    await handled;
+
+    expect(response.statusCode).toBe(400);
+    expect(fetchPageContents).not.toHaveBeenCalled();
+  });
+
   it("passes through a path that only starts like the endpoint", async () => {
     const { next, handled } = callEndpoint("/page-content-something-else");
     await handled;
