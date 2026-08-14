@@ -31,6 +31,7 @@ This is your navigation hub. Start here, follow the links, and return when you n
 - **`docs/search-history.md`** - History database schema and management
 - **`docs/conversation-memory.md`** - Token budgeting and rolling summaries
 - **`docs/reranking.md`** - Reranker subsystem and model lifecycle
+- **`docs/page-content.md`** - Reading result pages to ground AI answers
 - **`docs/glossary.md`** - Codebase-specific terms and domain concepts
 
 ### Development
@@ -82,6 +83,7 @@ Need to:
 
 ### Server-Side Modules
 - `server/searchEndpointServerHook.ts` - `/search` endpoints
+- `server/pageContentEndpointServerHook.ts` - `/page-content` endpoint
 - `server/internalApiEndpointServerHook.ts` - `/inference` proxy
 - `server/webSearchService.ts` - SearXNG integration
 - `server/rerankerService.ts` - Local result reranking
@@ -117,6 +119,7 @@ Need to:
 - `client/modules/accessKey.ts` - Validates and stores access keys using argon2id hashing and localStorage
 - `client/modules/parentWindow.ts` - PostMessage API for embedding in parent windows
 - `client/modules/searchTokenHash.ts` - CSRF protection token generation
+- `client/modules/pageContent.ts` - Requests extracted page text from `/page-content`
 - `client/modules/systemPrompt.ts` - System prompt templates
 - `client/modules/logEntries.ts` - Application logging with unique IDs
 - `client/modules/appInfo.ts` - Application metadata and version info
@@ -135,6 +138,8 @@ Need to:
 - `server/crossOriginServerHook.ts` - COOP/COEP headers for SharedArrayBuffer
 - `server/cacheServerHook.ts` - Cache-Control headers (preview server only)
 - `server/webSearchService.ts` - SearXNG integration with circuit breaker and retry logic
+- `server/pageContentService.ts` - Reads result pages and extracts query-relevant passages
+- `server/utils/publicUrl.ts` - Blocks private and reserved addresses before a server-side fetch
 - `server/rerankerService.ts` - Reranker service (ONNX Runtime inference)
 - `server/rankSearchResults.ts` - Score-based filtering and result reordering
 - `server/searchToken.ts` - CSRF token generation and storage

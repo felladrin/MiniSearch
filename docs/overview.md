@@ -97,7 +97,7 @@ The system executes two parallel flows when a user submits a query:
 
 1. `textGeneration.ts` orchestrates response generation after search completes
 2. State machine transitions: `idle` -> `loadingModel`/`preparingToGenerate` -> `awaitingSearchResults` -> `generating` -> `completed`/`failed`/`interrupted` (see Text Generation States below; `loadingModel` only occurs on the browser/Wllama path, other backends use `preparingToGenerate`)
-3. Search results are formatted and injected into system prompt via `{{searchResults}}` placeholder
+3. Search results are formatted and injected into system prompt via `{{searchResults}}` placeholder. With `enablePageContentFetch` on, the pages behind the top results are read through `/page-content` first and their excerpts are appended to each result (see `docs/page-content.md`)
 4. LLM generates response with streaming tokens
 5. Response updates throttled to ~12 updates/sec via `throttleit` to prevent React render overload
 6. Response saved to history database via `saveLlmResponseForQuery`
@@ -188,6 +188,7 @@ MiniSearch implements all server-side logic as Vite plugin hooks. Each hook regi
 | `compressionServerHook` | `server/compressionServerHook.ts` | gzip/brotli compression for all responses |
 | `crossOriginServerHook` | `server/crossOriginServerHook.ts` | COOP/COEP headers for SharedArrayBuffer |
 | `searchEndpointServerHook` | `server/searchEndpointServerHook.ts` | `/search/text` and `/search/images` endpoints proxied to SearXNG |
+| `pageContentEndpointServerHook` | `server/pageContentEndpointServerHook.ts` | `/page-content` endpoint that reads result pages for answer grounding |
 | `statusEndpointServerHook` | `server/statusEndpointServerHook.ts` | `/status` health check endpoint |
 | `cacheServerHook` | `server/cacheServerHook.ts` | Cache-Control headers (preview only) |
 | `validateAccessKeyServerHook` | `server/validateAccessKeyServerHook.ts` | Access key validation endpoint |
@@ -197,6 +198,7 @@ MiniSearch implements all server-side logic as Vite plugin hooks. Each hook regi
 Key server-side modules:
 
 - **`server/webSearchService.ts`**: Integrates with SearXNG at `http://127.0.0.1:8888`. Implements a circuit breaker (opens after 5 failures, resets after 60s) and retry logic (up to 3 retries with exponential backoff for 500 errors).
+- **`server/pageContentService.ts`**: Reads result pages for answer grounding: SSRF-guarded fetches with a byte cap, readable-text extraction, and query-relevant passage selection.
 - **`server/searchToken.ts`**: Manages a token at `{os.tempdir()}/minisearch-token` used for CSRF protection on search requests.
 - **`server/verifiedTokens.ts`**: In-memory `Set<string>` of verified session tokens.
 - **`server/searchesSinceLastRestart.ts`**: In-memory counters for search analytics.
@@ -225,8 +227,32 @@ The `/status` endpoint returns a JSON object:
 | `averageGraphicalSearchesPerSession` | number | Image searches / sessions ratio |
 | `rerankerServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `webSearchServiceStatus` | string | `"healthy"` or `"unhealthy"` |
+| `pageReads` | object | Page-reading counters since last restart, see below |
 | `build.timestamp` | string | ISO 8601 build time |
 | `build.gitCommit` | string | Short Git commit hash |
+
+`pageReads` reports what happened to the pages read for AI answers. Each field
+is attached to a constant that someone will want to move, which is the reason it
+is counted at all (see `docs/page-content.md`):
+
+| Field | Type | Tunes |
+|---|---|---|
+| `requested` | number | Nothing; the denominator for the rest |
+| `read` | number | Nothing; how often the feature contributed anything |
+| `readRate` | number | Nothing; `read` as a percentage of `requested` |
+| `averageReadMs` | number | `REQUEST_TIMEOUT_MS`, including the reads that hit it |
+| `bodiesTruncated` | number | `MAX_RESPONSE_BYTES` |
+| `excerptKeptRate` | number | `MAX_PAGE_CHARS`, as the share of a page's passages that fit it |
+| `skipped.blocked` | number | The SSRF guard, and how often callers aim at private space |
+| `skipped.notADocument` | number | `READABLE_CONTENT_TYPES` |
+| `skipped.httpError` | number | Nothing; how often sites refuse the instance |
+| `skipped.redirectLimit` | number | `MAX_REDIRECTS` |
+| `skipped.timedOut` | number | `REQUEST_TIMEOUT_MS` |
+| `skipped.tooLittleText` | number | `MIN_USEFUL_CHARS`, and the extractor's selectors |
+| `skipped.failed` | number | Nothing; the residue worth watching for a pattern |
+
+`read` plus every `skipped` entry sums to `requested`, so a page that goes
+uncounted shows up as a gap rather than being lost silently.
 
 ## Data Persistence Architecture
 

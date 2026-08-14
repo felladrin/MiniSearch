@@ -7,6 +7,8 @@ const harness = vi.hoisted(() => {
     textGenerationState: "idle",
     textSearchState: "idle",
     textSearchResults: [] as unknown[],
+    pageContents: {} as Record<string, string>,
+    searchRunId: "run-1",
     searchPromise: Promise.resolve({}) as Promise<unknown>,
     settings: {
       inferenceType: "internal",
@@ -14,6 +16,7 @@ const harness = vi.hoisted(() => {
       enableTextSearch: true,
       enableImageSearch: false,
       enableNotificationOnAiComplete: false,
+      enablePageContentFetch: false,
       allowAiModelDownload: true,
       searchResultsLimit: 10,
     },
@@ -39,6 +42,9 @@ vi.mock("./pubSub", () => ({
   updateImageSearchResults: vi.fn(),
   updateImageSearchState: vi.fn(),
   updateLlmTextSearchResults: vi.fn(),
+  updatePageContents: (contents: Record<string, string>) => {
+    harness.state.pageContents = contents;
+  },
   updateResponse: (value: string) => {
     harness.state.response = value;
     harness.onResponseUpdate.current(value);
@@ -58,8 +64,13 @@ vi.mock("./pubSub", () => ({
   },
 }));
 
+vi.mock("./config", () => ({
+  FALLBACK_CONFIG: {},
+  getConfig: vi.fn(() => Promise.resolve({})),
+}));
+
 vi.mock("./history", () => ({
-  getCurrentSearchRunId: vi.fn(() => "run-1"),
+  getCurrentSearchRunId: vi.fn(() => harness.state.searchRunId),
   saveLlmResponseForQuery: vi.fn(() => Promise.resolve()),
   updateSearchResults: vi.fn(() => Promise.resolve()),
 }));
@@ -67,6 +78,10 @@ vi.mock("./history", () => ({
 vi.mock("./logEntries", () => ({ addLogEntry: vi.fn() }));
 
 vi.mock("./notifications", () => ({ showAiCompleteNotification: vi.fn() }));
+
+vi.mock("./pageContent", () => ({
+  fetchPageContents: vi.fn(() => Promise.resolve({})),
+}));
 
 vi.mock("./search", () => ({
   searchImages: vi.fn(() => Promise.resolve([])),
@@ -102,7 +117,8 @@ vi.mock("gpt-tokenizer", () => ({
 }));
 
 import { saveLlmResponseForQuery } from "./history";
-import { searchText } from "./search";
+import { fetchPageContents } from "./pageContent";
+import { searchImages, searchText } from "./search";
 import { searchAndRespond } from "./textGeneration";
 import type { TextSearchResults } from "./types";
 
@@ -172,6 +188,128 @@ describe("search degradation", () => {
     expect(searchText).toHaveBeenCalledTimes(2);
     expect(harness.state.textSearchResults).toEqual([]);
     expect(harness.state.textSearchState).toBe("failed");
+  });
+});
+
+describe("page content grounding", () => {
+  const textResults: TextSearchResults = Array.from({ length: 8 }, (_, i) => [
+    `Result ${i}`,
+    `Snippet ${i}`,
+    `https://example.com/${i}`,
+  ]);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    harness.state.query = "how do cats sleep";
+    harness.state.pageContents = {};
+    harness.state.searchRunId = "run-1";
+    harness.state.settings.enableAiResponse = false;
+    harness.state.settings.enableImageSearch = false;
+    harness.state.settings.enableTextSearch = true;
+    harness.state.settings.enablePageContentFetch = true;
+    vi.mocked(searchText).mockResolvedValue(textResults);
+  });
+
+  /** Holds the page read open so a test can observe what happens meanwhile. */
+  function deferPageRead() {
+    let release: (contents: Record<string, string>) => void = () => {};
+    vi.mocked(fetchPageContents).mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    return (contents: Record<string, string> = {}) => release(contents);
+  }
+
+  it("starts image search without waiting for the pages to be read", async () => {
+    const releasePageRead = deferPageRead();
+    harness.state.settings.enableAiResponse = true;
+    harness.state.settings.enableImageSearch = true;
+    mockFetch.mockResolvedValue(
+      sseStream([contentFrame("Answer"), "data: [DONE]\n"]),
+    );
+
+    const responded = searchAndRespond();
+    await vi.waitFor(() => expect(searchImages).toHaveBeenCalled());
+
+    releasePageRead();
+    await responded;
+    await harness.state.searchPromise;
+  });
+
+  it("drops a read that lands after a newer search took over", async () => {
+    const releasePageRead = deferPageRead();
+    harness.state.settings.enableAiResponse = true;
+    mockFetch.mockResolvedValue(
+      sseStream([contentFrame("Answer"), "data: [DONE]\n"]),
+    );
+
+    const responded = searchAndRespond();
+    await vi.waitFor(() => expect(fetchPageContents).toHaveBeenCalled());
+
+    harness.state.searchRunId = "run-2";
+    releasePageRead({ "https://example.com/0": "text from the old search" });
+
+    await responded;
+    await harness.state.searchPromise;
+
+    expect(harness.state.pageContents).toEqual({});
+  });
+
+  it("reads only the results that reach the prompt", async () => {
+    vi.mocked(fetchPageContents).mockResolvedValue({
+      "https://example.com/0": "What the first page says.",
+    });
+    harness.state.settings.enableAiResponse = true;
+    mockFetch.mockResolvedValue(
+      sseStream([contentFrame("Answer"), "data: [DONE]\n"]),
+    );
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(fetchPageContents).toHaveBeenCalledWith(
+      harness.state.query,
+      textResults.slice(0, 6).map(([, , url]) => url),
+    );
+    expect(harness.state.pageContents).toEqual({
+      "https://example.com/0": "What the first page says.",
+    });
+  });
+
+  it("does not read any page while the setting is off", async () => {
+    harness.state.settings.enableAiResponse = true;
+    harness.state.settings.enablePageContentFetch = false;
+    mockFetch.mockResolvedValue(
+      sseStream([contentFrame("Answer"), "data: [DONE]\n"]),
+    );
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(fetchPageContents).not.toHaveBeenCalled();
+  });
+
+  it("does not read any page when the answer is not AI-generated", async () => {
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(fetchPageContents).not.toHaveBeenCalled();
+  });
+
+  it("still completes the search when no page could be read", async () => {
+    vi.mocked(fetchPageContents).mockResolvedValue({});
+    harness.state.settings.enableAiResponse = true;
+    mockFetch.mockResolvedValue(
+      sseStream([contentFrame("Answer"), "data: [DONE]\n"]),
+    );
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(harness.state.textSearchState).toBe("completed");
+    expect(harness.state.pageContents).toEqual({});
+    expect(harness.state.textGenerationState).toBe("completed");
   });
 });
 

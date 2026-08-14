@@ -20,14 +20,13 @@ export default function AISettingsForm() {
   const { openAiModels, useTextInput } = useOpenAiModels(settings);
   const hordeModels = useHordeModels(settings);
   const hordeUserInfo = useHordeUserInfo(settings);
-  const [inferenceTypes, setInferenceTypes] = useState(
-    getInferenceTypes(FALLBACK_CONFIG),
-  );
+  const [serverConfig, setServerConfig] = useState(FALLBACK_CONFIG);
+  const inferenceTypes = getInferenceTypes(serverConfig);
 
   useEffect(() => {
     getConfig()
       .catch(() => FALLBACK_CONFIG)
-      .then((config) => setInferenceTypes(getInferenceTypes(config)));
+      .then(setServerConfig);
   }, []);
 
   const form = useForm({
@@ -74,6 +73,15 @@ export default function AISettingsForm() {
             onChange={handleNotificationToggle}
             labelPosition="left"
             description="Show a browser notification when the AI response is ready. Useful for longer queries that take time to process."
+          />
+
+          <Switch
+            label="Read Page Content"
+            {...form.getInputProps("enablePageContentFetch", {
+              type: "checkbox",
+            })}
+            labelPosition="left"
+            description="Ground answers on the actual text of the top results instead of only their search snippets. Note that those pages have to be downloaded, which takes a few extra seconds and tells the sites they were read."
           />
 
           <Select

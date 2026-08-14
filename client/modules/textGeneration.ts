@@ -7,6 +7,7 @@ import {
 } from "./history";
 import { addLogEntry } from "./logEntries";
 import { showAiCompleteNotification } from "./notifications";
+import { fetchPageContents } from "./pageContent";
 import {
   getConversationSummary,
   getQuery,
@@ -19,6 +20,7 @@ import {
   updateImageSearchResults,
   updateImageSearchState,
   updateLlmTextSearchResults,
+  updatePageContents,
   updateResponse,
   updateSearchPromise,
   updateTextGenerationState,
@@ -234,6 +236,8 @@ export async function searchAndRespond() {
 
   updateChatMessages([]);
 
+  updatePageContents({});
+
   updateSearchPromise(startTextSearch(getQuery()));
 
   if (!getSettings().enableAiResponse) return;
@@ -375,11 +379,41 @@ async function getKeywords(text: string, limit?: number) {
     .slice(0, limit);
 }
 
+/**
+ * Reads the pages behind the top results so the answer is grounded on their
+ * text instead of on search snippets alone. Awaited by the search promise, so
+ * generation waits for it while the results are already on screen.
+ */
+async function readPageContents(query: string, results: TextSearchResults) {
+  const settings = getSettings();
+
+  if (
+    !settings.enablePageContentFetch ||
+    !settings.enableAiResponse ||
+    results.length === 0
+  ) {
+    return;
+  }
+
+  const searchRunId = getCurrentSearchRunId();
+  const contents = await fetchPageContents(
+    query,
+    results.map(([, , url]) => url),
+  );
+
+  // A newer search has already cleared the channel; publishing now would mix
+  // this run's pages into the next one's answer.
+  if (getCurrentSearchRunId() !== searchRunId) return;
+
+  updatePageContents(contents);
+}
+
 async function startTextSearch(query: string) {
   const results = {
     textResults: [] as TextSearchResults,
     imageResults: [] as ImageSearchResults,
   };
+  let pageContentsRead = Promise.resolve();
 
   const searchQuery =
     query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query;
@@ -411,7 +445,9 @@ async function startTextSearch(query: string) {
       results.textResults.length === 0 ? "failed" : "completed",
     );
     updateTextSearchResults(textResults);
-    updateLlmTextSearchResults(textResults.slice(0, searchResultsToConsider));
+
+    const resultsForLlm = textResults.slice(0, searchResultsToConsider);
+    updateLlmTextSearchResults(resultsForLlm);
 
     updateSearchResults(getCurrentSearchRunId(), {
       type: "text",
@@ -421,11 +457,17 @@ async function startTextSearch(query: string) {
         snippet,
       })),
     });
+
+    // Started here but awaited last: only the AI answer waits on it, while
+    // image search and the history write carry on.
+    pageContentsRead = readPageContents(searchQuery, resultsForLlm);
   }
 
   if (getSettings().enableImageSearch) {
     startImageSearch(searchQuery, results);
   }
+
+  await pageContentsRead;
 
   return results;
 }

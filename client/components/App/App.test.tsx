@@ -56,6 +56,54 @@ describe("App", () => {
     expect(screen.queryByTestId("main-page")).not.toBeInTheDocument();
   });
 
+  /**
+   * Renders a fresh module instance so the settings module reads the profile
+   * seeded here, since it captures localStorage once at import.
+   */
+  async function renderWithStoredSettings(stored: Record<string, unknown>) {
+    vi.resetModules();
+    localStorage.setItem("settings", JSON.stringify(stored));
+
+    const [
+      { getConfig: freshGetConfig },
+      { default: FreshApp },
+      { getSettings },
+    ] = await Promise.all([
+      import("@/modules/config"),
+      import("./App"),
+      import("@/modules/pubSub"),
+    ]);
+    vi.mocked(freshGetConfig).mockResolvedValue(serverConfig);
+
+    render(<FreshApp />);
+    await screen.findByTestId("main-page");
+
+    return getSettings;
+  }
+
+  it("fills in a setting the stored profile predates", async () => {
+    const getSettings = await renderWithStoredSettings({
+      enableAiResponse: true,
+    });
+
+    await waitFor(() =>
+      expect(getSettings().enablePageContentFetch).toBe(true),
+    );
+  });
+
+  // The other half of that merge: a stored value is a choice, including one
+  // that turns off something shipped on.
+  it("keeps a setting the user turned off", async () => {
+    const getSettings = await renderWithStoredSettings({
+      enableAiResponse: true,
+      enablePageContentFetch: false,
+    });
+
+    await waitFor(() =>
+      expect(getSettings().enablePageContentFetch).toBe(false),
+    );
+  });
+
   // Guards the fail-open regression: an unreachable /api/config used to look
   // exactly like `accessKeysEnabled: false`, letting the app through the gate.
   it("refuses to render the app when the config cannot be loaded", async () => {

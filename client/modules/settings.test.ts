@@ -22,6 +22,7 @@ describe("Settings Module", () => {
     expect(defaultSettings.enableAiResponse).toBe(false);
     expect(defaultSettings.enableImageSearch).toBe(true);
     expect(defaultSettings.searchResultsLimit).toBe(15);
+    expect(defaultSettings.enablePageContentFetch).toBe(true);
     expect(defaultSettings.inferenceType).toBeDefined();
   });
 
