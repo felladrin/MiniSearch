@@ -109,4 +109,40 @@ describe("ImageResultsList", () => {
     expect(slide).toBeInTheDocument();
     expect(slide?.getAttribute("style") ?? "").not.toContain("transition");
   });
+
+  it("renders when a result's source URL is protocol-relative or relative", async () => {
+    const resultsWithUnparseableSource: ImageSearchResult[] = [
+      [
+        "Protocol-relative source",
+        "https://example.com/protocol-relative",
+        "https://example.com/protocol-relative.jpg",
+        "//cdn.example.com/protocol-relative.jpg",
+      ],
+      [
+        "Relative source",
+        "https://example.com/relative",
+        "https://example.com/relative.jpg",
+        "/img/relative.jpg",
+      ],
+    ];
+
+    render(
+      <MantineProvider>
+        <ImageResultsList imageResults={resultsWithUnparseableSource} />
+      </MantineProvider>,
+    );
+
+    // The lightbox slides are built on every render, so an unparseable source
+    // URL used to throw here and take down the whole image section.
+    expect(
+      await screen.findByRole("button", {
+        name: "Open image preview: Protocol-relative source",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", {
+        name: "Open image preview: Relative source",
+      }),
+    ).toBeInTheDocument();
+  });
 });

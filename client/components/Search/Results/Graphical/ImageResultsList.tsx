@@ -115,7 +115,7 @@ export default function ImageResultsList({
               )}
               {sourceUrl && (
                 <Text size="xs" c="dimmed">
-                  Source: {new URL(sourceUrl).hostname}
+                  Source: {getHostname(sourceUrl)}
                 </Text>
               )}
               <Group align="center" justify="center" gap="xs">
