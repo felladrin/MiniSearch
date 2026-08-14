@@ -351,8 +351,8 @@ describe("graceful degradation", () => {
 });
 
 describe("query privacy", () => {
-  // The space is here on purpose: a leak of the search URL would carry the
-  // percent-encoded form, which the raw string alone would not catch.
+  // The space is here on purpose: a leaked search URL carries it encoded (as
+  // `+`, from URLSearchParams), which a match on the raw string alone misses.
   const DISTINCTIVE_QUERY = "borogoves outgrabe mimsy-42";
 
   let logLines: string[];
