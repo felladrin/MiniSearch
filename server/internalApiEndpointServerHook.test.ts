@@ -687,6 +687,48 @@ describe("internalApiEndpointServerHook", () => {
       expect(vi.mocked(streamText)).toHaveBeenCalledTimes(1);
     });
 
+    it("does not log the request body when a stream error carries requestBodyValues", async () => {
+      const capturedLogs: unknown[][] = [];
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation((...args: unknown[]) => {
+          capturedLogs.push(args);
+        });
+
+      try {
+        const bodyError = new Error("upstream down") as Error & {
+          requestBodyValues?: unknown;
+        };
+        bodyError.requestBodyValues = {
+          messages: [
+            { role: "system", content: "SYSTEM-PROMPT-SECRET" },
+            { role: "user", content: "QUERY-SECRET" },
+          ],
+        };
+        vi.mocked(streamText).mockImplementation(() => {
+          throw bodyError;
+        });
+
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+        await handler(
+          createRequest({
+            messages: [{ role: "user", content: "QUERY-SECRET" }],
+          }),
+          response,
+          vi.fn(),
+        );
+
+        expect(response.statusCode).toBe(503);
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const logged = JSON.stringify(capturedLogs);
+        expect(logged).not.toContain("SYSTEM-PROMPT-SECRET");
+        expect(logged).not.toContain("QUERY-SECRET");
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
     it("retries on model failure and succeeds on second attempt", async () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
 
