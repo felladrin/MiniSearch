@@ -105,6 +105,41 @@ describe("verifyTokenAndRateLimit", () => {
     expect(result.error).toBe("Too many requests.");
   });
 
+  it("should rate-limit invalid tokens instead of skipping the limiter", async () => {
+    mockArgon2VerifyResult = false;
+    mockRateLimiterShouldFail = true;
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const result = await verifyTokenAndRateLimit("invalid-token");
+    expect(result.statusCode).toBe(429);
+    expect(result.error).toBe("Too many requests.");
+  });
+
+  it("should not run argon2 verification when the request is already rate limited", async () => {
+    mockRateLimiterShouldFail = true;
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const hashWasm = await import("hash-wasm");
+    const result = await verifyTokenAndRateLimit("some-token");
+    expect(result.statusCode).toBe(429);
+    expect(hashWasm.argon2Verify).not.toHaveBeenCalled();
+  });
+
+  it("should rate-limit requests with a missing token", async () => {
+    mockRateLimiterShouldFail = true;
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const result = await verifyTokenAndRateLimit(null);
+    expect(result.statusCode).toBe(429);
+    expect(result.error).toBe("Too many requests.");
+  });
+
   it("should key rate limiter on the socket address by default (untrusted proxy)", async () => {
     mockRateLimiterShouldFail = false;
     vi.resetModules();
