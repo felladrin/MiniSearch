@@ -109,4 +109,60 @@ describe("ImageResultsList", () => {
     expect(slide).toBeInTheDocument();
     expect(slide?.getAttribute("style") ?? "").not.toContain("transition");
   });
+
+  it("opens the lightbox when a source URL is protocol-relative", async () => {
+    const user = userEvent.setup();
+    render(
+      <MantineProvider>
+        <ImageResultsList
+          imageResults={[
+            [
+              "Protocol-relative image",
+              "https://example.com/protocol-relative",
+              "https://example.com/protocol-relative.jpg",
+              "//cdn.example.com/protocol-relative.jpg",
+            ],
+          ]}
+        />
+      </MantineProvider>,
+    );
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Open image preview: Protocol-relative image",
+      }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain(
+      "Source: //cdn.example.com/protocol-relative.jpg",
+    );
+  });
+
+  it("opens the lightbox when a source URL is relative", async () => {
+    const user = userEvent.setup();
+    render(
+      <MantineProvider>
+        <ImageResultsList
+          imageResults={[
+            [
+              "Relative image",
+              "https://example.com/relative",
+              "https://example.com/relative.jpg",
+              "/images/relative.jpg",
+            ],
+          ]}
+        />
+      </MantineProvider>,
+    );
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Open image preview: Relative image",
+      }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain("Source: /images/relative.jpg");
+  });
 });
