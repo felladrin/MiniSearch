@@ -11,23 +11,25 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 // Configuration
-const docsDir = path.join(__dirname, "..");
+const defaultDocsDir = path.join(__dirname, "..");
+// The .yml issue forms are listed so a renamed or deleted template is caught;
+// they only link out today, so the link check finds nothing in them.
 const documentationFiles = [
   "README.md",
   ".github/CONTRIBUTING.md",
   ".github/CODE_OF_CONDUCT.md",
   ".github/SECURITY.md",
   ".github/PULL_REQUEST_TEMPLATE.md",
-  ".github/ISSUE_TEMPLATE/bug_report.md",
-  ".github/ISSUE_TEMPLATE/feature_request.md",
-  ".github/ISSUE_TEMPLATE/security_vulnerability.md",
+  ".github/ISSUE_TEMPLATE/bug_report.yml",
+  ".github/ISSUE_TEMPLATE/feature_request.yml",
+  ".github/ISSUE_TEMPLATE/security_vulnerability.yml",
 ];
 
 // Regex patterns for finding internal links
 const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
 const htmlLinkRegex = /<a[^>]+href="([^"]+)"[^>]*>/g;
 
-function validateFile(filePath) {
+function validateFile(filePath, docsDir = defaultDocsDir) {
   try {
     const content = fs.readFileSync(filePath, "utf8");
     const relativePath = path.relative(docsDir, filePath);
@@ -103,7 +105,7 @@ function validateFile(filePath) {
   }
 }
 
-function main() {
+function main(docsDir = defaultDocsDir) {
   console.log("🔍 Validating documentation links...\n");
 
   let totalIssues = 0;
@@ -114,14 +116,16 @@ function main() {
 
     if (!fs.existsSync(filePath)) {
       console.log(`❌ File not found: ${docFile}`);
+      totalIssues++;
       continue;
     }
 
     totalFiles++;
-    const result = validateFile(filePath);
+    const result = validateFile(filePath, docsDir);
 
     if (result.error) {
       console.log(`❌ Error reading ${result.file}: ${result.error}`);
+      totalIssues++;
       continue;
     }
 
@@ -140,7 +144,7 @@ function main() {
   }
 
   console.log(`\n📊 Summary:`);
-  console.log(`   Files checked: ${totalFiles}`);
+  console.log(`   Files checked: ${totalFiles}/${documentationFiles.length}`);
   console.log(`   Issues found: ${totalIssues}`);
 
   if (totalIssues > 0) {
@@ -155,7 +159,17 @@ function main() {
 }
 
 if (require.main === module) {
-  main();
+  const rootDirArg = process.argv[2];
+
+  if (
+    rootDirArg &&
+    !fs.statSync(rootDirArg, { throwIfNoEntry: false })?.isDirectory()
+  ) {
+    console.error(`❌ Directory not found: ${rootDirArg}`);
+    process.exit(1);
+  }
+
+  main(rootDirArg || undefined);
 }
 
-module.exports = { validateFile };
+module.exports = { validateFile, documentationFiles };
