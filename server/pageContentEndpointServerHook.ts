@@ -39,12 +39,8 @@ const pageContentParamsSchema = z.object({
  * ordering to ever be reached.
  *
  * Unlike `/search/`, which only ever reaches the configured SearXNG instance,
- * this endpoint fetches URLs the caller chose. The operator grants this
- * capability by deploying the image; users then opt in per browser under AI
- * Settings > Read Page Content.
- *
- * @param server - The Vite dev server or preview server instance
- * @returns void - Modifies the server middleware in place
+ * this endpoint fetches URLs the caller chose. It is always available; each
+ * browser decides whether to call it, under AI Settings > Read Page Content.
  */
 export function pageContentEndpointServerHook<
   T extends ViteDevServer | PreviewServer,

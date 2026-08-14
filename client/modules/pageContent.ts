@@ -9,15 +9,12 @@ import type { PageContents } from "./types";
 const REQUEST_TIMEOUT = 20000;
 
 /**
- * Reads the pages behind the given result URLs and returns the passages most
- * relevant to the query, keyed by URL.
+ * Reads the pages behind the given result URLs, in ranked order, and returns
+ * the passages most relevant to the query, keyed by URL. Empty when nothing
+ * could be read.
  *
  * A failure here is not an error the user needs to see: the answer falls back
  * to search snippets, which is what it was grounded on before.
- *
- * @param query - The current search query
- * @param urls - Result URLs to read, in ranked order
- * @returns Extracted page text keyed by URL, empty when nothing could be read
  */
 export async function fetchPageContents(
   query: string,

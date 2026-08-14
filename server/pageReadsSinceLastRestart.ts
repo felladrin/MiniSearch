@@ -39,13 +39,8 @@ let totalPassagesKept = 0;
 let totalPassagesAvailable = 0;
 
 /**
- * Records one finished page read.
- *
- * @param outcome - How the read ended
- * @param durationMs - Wall time spent on it, including redirects
- * @param bodyTruncated - Whether the response hit the byte cap, which tunes `MAX_RESPONSE_BYTES`
- * @param passagesKept - Passages that fit the character budget, which tunes `MAX_PAGE_CHARS`
- * @param passagesAvailable - Passages the page offered
+ * Records one finished page read. `durationMs` covers the redirect hops too,
+ * so it stays comparable with the timeout it is there to tune.
  */
 export function recordPageRead({
   outcome,
@@ -68,10 +63,8 @@ export function recordPageRead({
 }
 
 /**
- * Reports the page-reading counters for the status endpoint.
- *
- * @returns Totals since the last restart, with `read` plus every `skipped`
- * entry summing to `requested`
+ * `read` plus every `skipped` entry sums to `requested`, so a page that goes
+ * uncounted shows up as a gap rather than being lost silently.
  */
 export function getPageReadStats() {
   const { read, ...skipped } = outcomes;

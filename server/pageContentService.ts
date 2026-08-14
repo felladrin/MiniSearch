@@ -470,10 +470,8 @@ function scorePassage(
  * article is its navigation and its infobox, so the ranking below decided only
  * what was transferred and never what the model read.
  *
- * @param query - The user's search query
- * @param passages - Candidate passages from a single page
- * @param maxChars - Character budget for the page's excerpt
- * @returns The selected passages, best match first
+ * @param passages - Candidate passages from a single page, which is the scope
+ * the weighting below is relative to
  */
 export function selectPassages(
   query: string,
@@ -569,7 +567,6 @@ async function fetchPageContent(
  * `pageReadsSinceLastRestart`, since a line naming the query or the URL would
  * record what someone searched for.
  *
- * @param query - The user's search query, used to rank passages
  * @param urls - Page URLs to read, already ranked by the search pipeline
  * @returns One entry per page that yielded usable text
  */

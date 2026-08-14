@@ -58,7 +58,6 @@ function getPageContentTokenBudget() {
  * short pages leave unused rolls over to the ones that need it.
  *
  * @param contents - Extracted text per result, in result order; empty strings for results without page content
- * @param tokenBudget - Total tokens the excerpts may occupy
  * @returns Excerpts in the same order, trimmed to fit
  */
 export function allocatePageExcerpts(

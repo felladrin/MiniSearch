@@ -136,7 +136,6 @@ export function isBlockedAddress(address: string): boolean {
  * The residual risk is up to one GET per redirect hop from inside the instance's
  * network, and the readable text of whatever those GETs return.
  *
- * @param rawUrl - The URL to validate
  * @returns The parsed URL when it is safe to fetch
  * @throws When the scheme is unsupported or the host resolves into a blocked range
  */

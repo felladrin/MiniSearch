@@ -68,7 +68,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 ## Server-Side Security Modules
 
 | Module | Purpose |
-| -------- | --------- |
+|--------|---------|
 | `server/searchToken.ts` | Reads/writes the CSRF token from `{tempdir}/minisearch-token` |
 | `server/verifiedTokens.ts` | In-memory `Set<string>` of verified session tokens |
 | `server/searchesSinceLastRestart.ts` | In-memory counters for abuse monitoring |

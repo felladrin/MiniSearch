@@ -81,7 +81,6 @@ describe("App", () => {
     return getSettings;
   }
 
-  // How a profile saved before a setting existed picks up its shipped default.
   it("fills in a setting the stored profile predates", async () => {
     const getSettings = await renderWithStoredSettings({
       enableAiResponse: true,
