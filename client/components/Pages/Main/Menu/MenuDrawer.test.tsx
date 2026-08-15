@@ -97,7 +97,7 @@ describe("MenuDrawer", () => {
     }
   });
 
-  it("shows the tips with the default-search-engine URL when enabled", async () => {
+  it("shows the tips with both search URLs when enabled", async () => {
     await renderMenuDrawer(createMenuState({ showFeatureTips: true }));
 
     expect(screen.getByText("Tips")).toBeInTheDocument();
