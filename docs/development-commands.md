@@ -21,6 +21,16 @@
 
 Failure-injection cases (dependency down, empty results, aborted stream) are catalogued in `docs/failure-injection.md`.
 
+## Offline eval
+
+`eval/` is an offline eval that gives a regression signal for changes to the
+reranker, the system prompt, the search-results formatting, or the model. See
+`eval/README.md` for details and the LLM-judge environment variables.
+
+- **`npm run eval`**: Run the full eval (retrieval + answer)
+- **`npm run eval:retrieval`**: Retrieval eval (real ONNX reranker; local only, needs the model in `server/models/`)
+- **`npm run eval:answer`**: Answer eval (LLM judge; gated on `EVAL_LLM_API_KEY`, skips without one)
+
 ### Coverage Reports for AI Analysis
 
 After running `test:coverage`, AI agents can analyze these JSON files:

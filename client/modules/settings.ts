@@ -1,3 +1,4 @@
+import { DEFAULT_SYSTEM_PROMPT } from "@shared/defaultSystemPrompt";
 import {
   DEFAULT_INFERENCE_TYPE,
   DEFAULT_WLLAMA_MODEL_ID,
@@ -40,19 +41,7 @@ export const defaultSettings = {
   wllamaModelId: DEFAULT_WLLAMA_MODEL_ID,
   cpuThreads: getDefaultCpuThreads(),
   searchResultsLimit: 15,
-  systemPrompt: `Answer the question using the search results below. Reply in the same language as the question.
-
-Cite each fact with a Markdown link right after it, using the site's domain as the link text. Example: [youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ).
-
-If you answer from your own knowledge because the results do not cover it, say so.
-
-Use only these Markdown elements: link, bold, italic, code, quote, table.
-
-Today's date is {{currentDate}}. Use it for relative dates such as "yesterday".
-
-Search results:
-
-{{searchResults}}`,
+  systemPrompt: DEFAULT_SYSTEM_PROMPT,
   inferenceType: DEFAULT_INFERENCE_TYPE,
   openAiApiBaseUrl: "",
   openAiApiKey: "",
