@@ -38,7 +38,7 @@ export default function EnableAiResponsePrompt({
   );
 
   return (
-    <Alert variant="light" color="blue" p="xs">
+    <Alert role="status" variant="light" color="blue" p="xs">
       <Grid justify="space-between" align="center">
         <Grid.Col span="content">
           <Group gap="xs">

@@ -109,7 +109,7 @@ describe("MainPage", () => {
     vi.clearAllMocks();
   });
 
-  it("shows only the search form when the query is empty", async () => {
+  it("hides results and the AI section when the query is empty", async () => {
     await renderMainPage(createPageState());
 
     expect(screen.getByTestId("search-form")).toBeInTheDocument();
@@ -120,6 +120,62 @@ describe("MainPage", () => {
     expect(
       screen.queryByTestId("enable-ai-response-prompt"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the value proposition in the empty state", async () => {
+    await renderMainPage(createPageState());
+
+    expect(
+      screen.getByText(/answers with sources, on your own instance/),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show the value proposition once a query is present", async () => {
+    await renderMainPage(createPageState({ query: "cats" }));
+
+    expect(
+      screen.queryByText(/answers with sources, on your own instance/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the AI opt-in in the empty state before searching", async () => {
+    await renderMainPage(
+      createPageState({ settings: { showEnableAiResponsePrompt: true } }),
+    );
+
+    expect(
+      await screen.findByTestId("enable-ai-response-prompt"),
+    ).toBeInTheDocument();
+  });
+
+  it("enables AI response without triggering a search when accepted in the empty state", async () => {
+    const user = userEvent.setup();
+    const { setSettings } = await renderMainPage(
+      createPageState({ settings: { showEnableAiResponsePrompt: true } }),
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Accept" }));
+
+    expect(setSettings).toHaveBeenCalledWith({
+      showEnableAiResponsePrompt: false,
+      enableAiResponse: true,
+    });
+    expect(searchAndRespond).not.toHaveBeenCalled();
+  });
+
+  it("disables AI response without triggering a search when declined in the empty state", async () => {
+    const user = userEvent.setup();
+    const { setSettings } = await renderMainPage(
+      createPageState({ settings: { showEnableAiResponsePrompt: true } }),
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Decline" }));
+
+    expect(setSettings).toHaveBeenCalledWith({
+      showEnableAiResponsePrompt: false,
+      enableAiResponse: false,
+    });
+    expect(searchAndRespond).not.toHaveBeenCalled();
   });
 
   it("shows search results once a search is underway and the query is non-empty", async () => {
