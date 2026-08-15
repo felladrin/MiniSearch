@@ -12,6 +12,21 @@ import type {
 } from "./types";
 
 /**
+ * Whether two values share the same JSON top-level kind (array, null, or a
+ * primitive type), so a stored value is checked against the default's shape
+ * before it is trusted.
+ */
+function isSameJsonKind(value: unknown, reference: unknown): boolean {
+  if (Array.isArray(value) || Array.isArray(reference)) {
+    return Array.isArray(value) === Array.isArray(reference);
+  }
+  if (value === null || reference === null) {
+    return value === null && reference === null;
+  }
+  return typeof value === typeof reference;
+}
+
+/**
  * Creates a PubSub instance that persists data to localStorage
  * @param localStorageKey - The key to use for localStorage storage
  * @param defaultValue - The default value if no localStorage value exists
@@ -21,13 +36,22 @@ function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   const localStorageValue = localStorage.getItem(localStorageKey);
   let initialValue: T = defaultValue;
   if (localStorageValue) {
+    let parsed: unknown;
     try {
-      initialValue = JSON.parse(localStorageValue) as T;
+      parsed = JSON.parse(localStorageValue);
     } catch {
-      // This runs at module load, so a corrupted stored value must fall back
-      // to the default instead of crashing the app. Log it, since the corrupt
-      // value stays in storage and the fallback repeats on every load.
-      addLogEntry(`Discarded corrupted stored value for '${localStorageKey}'`);
+      parsed = undefined;
+    }
+    if (parsed !== undefined && isSameJsonKind(parsed, defaultValue)) {
+      initialValue = parsed as T;
+    } else {
+      // Runs at module load, so an unparseable or wrong-type stored value must
+      // not crash the app. Remove it (so the fallback doesn't repeat on every
+      // load) and log it for the in-app log panel.
+      localStorage.removeItem(localStorageKey);
+      addLogEntry(
+        `Discarded an unusable stored value for '${localStorageKey}'`,
+      );
     }
   }
   const localStoragePubSub = createPubSub(initialValue);

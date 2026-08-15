@@ -105,6 +105,7 @@ describe("MenuDrawer", () => {
       screen.getByText(/Make it your browser's default search engine/),
     ).toBeInTheDocument();
     expect(screen.getByText(/\/\?q=%s/)).toBeInTheDocument();
+    expect(screen.getByText(/Raycast Quicklink/)).toBeInTheDocument();
     expect(
       screen.getByText(/use the speaker button on an answer/),
     ).toBeInTheDocument();
