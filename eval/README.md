@@ -49,10 +49,11 @@ costs the ranking, and without it the eval could not tell a good pin from a
 bad one. This is the regression signal for the reranker and for the score
 filter / top-result logic in `rankSearchResults.ts`.
 
-Known limit: with `preserveTopResults=true`, `rankSearchResults` keeps only the
-top `nextTopResultsCount` (9) reranked results. The golden entries have 4-5
-candidates, so that slice never binds here; it would matter only for much
-larger result sets.
+Known limit: with `preserveTopResults=true`, `rankSearchResults` sorts the first
+`nextTopResultsCount` (9) surviving results and everything after them as two
+separate blocks, so the tail is never interleaved with the head. Nothing is
+dropped. The golden entries have 4-5 candidates, so that split never binds
+here; it would matter only for much larger result sets.
 
 The metrics live in `metrics.ts` (pure, unit-tested in `metrics.test.ts`).
 

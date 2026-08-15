@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dcgAtK, ndcgAtK, recallAtK } from "./metrics";
+import { dcgAtK, ndcgAtK, recallAtK } from "./metrics.ts";
 
 describe("dcgAtK", () => {
   it("discounts relevance by position", () => {

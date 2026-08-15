@@ -117,8 +117,8 @@ describe("golden set", () => {
     // Score the golden set as a reranker that just preserves the input order
     // (the failure mode the retrieval eval exists to catch). If this mean
     // climbs to the eval's floors, the set no longer distinguishes a working
-    // reranker from a dead one - usually because an entry keeps both relevant
-    // results in the input top-3.
+    // reranker from a dead one - usually because an entry keeps its relevant
+    // results in the input top-K.
     const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
     const scored = goldenQueries.map((g) => {
       const urls = g.results.map((r) => r.url);
