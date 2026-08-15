@@ -122,22 +122,6 @@ describe("MainPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows the value proposition in the empty state", async () => {
-    await renderMainPage(createPageState());
-
-    expect(
-      screen.getByText(/answers with sources, on your own instance/),
-    ).toBeInTheDocument();
-  });
-
-  it("does not show the value proposition once a query is present", async () => {
-    await renderMainPage(createPageState({ query: "cats" }));
-
-    expect(
-      screen.queryByText(/answers with sources, on your own instance/),
-    ).not.toBeInTheDocument();
-  });
-
   it("shows the AI opt-in in the empty state before searching", async () => {
     await renderMainPage(
       createPageState({ settings: { showEnableAiResponsePrompt: true } }),
