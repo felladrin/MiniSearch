@@ -91,14 +91,22 @@ Respond with just the question, no additional text or explanations.`,
       .split("\n")
       .map((line) => line.trim())
       .reverse()
-      .find((line) => line.endsWith("?"));
+      .find(
+        (line) =>
+          line.endsWith("?") || line.endsWith("？") || line.endsWith("؟"),
+      );
 
     if (!lines) {
       addLogEntry("No valid follow-up question generated");
       return "";
     }
 
-    let questionLine = lines.replace(/^[^a-zA-Z]+/, "");
+    // Strips leading bullets, numbering, and quotes without touching the
+    // question text itself. The old [^a-zA-Z] class matched every character
+    // of a non-Latin question (Chinese, Japanese, Korean, Arabic, ...) and
+    // wiped it to an empty string, even though the prompt above requires the
+    // follow-up question to be in the same language as the original.
+    let questionLine = lines.replace(/^[^\p{L}]+/u, "");
 
     questionLine = questionLine.charAt(0).toUpperCase() + questionLine.slice(1);
 
