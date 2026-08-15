@@ -452,8 +452,10 @@ describe("searchEndpointServerHook", () => {
       }
     });
 
-    it("serves an empty result set instead of an error when SearXNG is down", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+    it("answers 502 when SearXNG is down", async () => {
+      vi.mocked(fetchSearXNG).mockRejectedValue(
+        new Error("SearXNG request failed with status 503"),
+      );
 
       const handler = getRegisteredHandler();
       const response = createResponse();
@@ -464,8 +466,28 @@ describe("searchEndpointServerHook", () => {
         vi.fn(),
       );
 
-      expect(response.statusCode).toBe(200);
-      expect(response.end).toHaveBeenCalledWith("[]");
+      expect(response.statusCode).toBe(502);
+      expect(response.end).toHaveBeenCalledWith(
+        JSON.stringify({ error: "Search service unavailable" }),
+      );
+    });
+
+    it("answers 502 on image searches when SearXNG is down", async () => {
+      vi.mocked(fetchSearXNG).mockRejectedValue(new Error("network down"));
+
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(
+        createRequest("/search/images?q=cats&token=abc"),
+        response,
+        vi.fn(),
+      );
+
+      expect(response.statusCode).toBe(502);
+      expect(response.end).toHaveBeenCalledWith(
+        JSON.stringify({ error: "Search service unavailable" }),
+      );
     });
 
     it("drops an image whose thumbnail resolves to a private address", async () => {

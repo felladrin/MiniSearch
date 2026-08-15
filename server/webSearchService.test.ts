@@ -121,13 +121,13 @@ describe("WebSearchService", () => {
     }
   });
 
-  it("should return empty array on fetchSearXNG error", async () => {
+  it("should throw when SearXNG is unreachable", async () => {
     (global.fetch as MockedFunction<typeof fetch>).mockRejectedValue(
       new Error("Network failure"),
     );
-    const results = await fetchSearXNG("test query", "text");
-    expect(Array.isArray(results)).toBe(true);
-    expect(results).toHaveLength(0);
+    await expect(fetchSearXNG("test query", "text")).rejects.toThrow(
+      "Network failure",
+    );
   });
 });
 
@@ -179,15 +179,17 @@ describe("retry logic", () => {
     expect(results).toHaveLength(1);
   });
 
-  it("returns empty array when all retries return 500", async () => {
+  it("throws when all retries return 500", async () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 500));
 
     const promise = fetchSearXNG("test", "text");
+    const outcome = expect(promise).rejects.toThrow(
+      "SearXNG request failed with status 500",
+    );
     await vi.runAllTimersAsync();
-    const results = await promise;
+    await outcome;
 
     expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect(results).toHaveLength(0);
   });
 });
 
@@ -207,11 +209,15 @@ describe("graceful degradation", () => {
    * Advances only far enough to drain the retry backoff. `runAllTimersAsync`
    * would also fire the breaker's own reset timer, flipping an open circuit to
    * half-open and letting the next call reach SearXNG again.
+   *
+   * The rejection assertion is attached before the timers advance, so the
+   * failure stays a handled rejection the whole way through.
    */
   async function searchThroughRetries(breaker: CircuitBreaker) {
     const promise = fetchSearXNG("failure injection", "text", 30, breaker);
+    const outcome = expect(promise).rejects.toThrow();
     await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_TOTAL_MS);
-    return promise;
+    await outcome;
   }
 
   beforeEach(() => {
@@ -227,8 +233,7 @@ describe("graceful degradation", () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 500));
 
     for (let cycle = 0; cycle < breakerOptions.failureThreshold - 1; cycle++) {
-      const results = await searchThroughRetries(breaker);
-      expect(results).toEqual([]);
+      await searchThroughRetries(breaker);
     }
 
     // Four full cycles of upstream requests, still one failure short of opening.
@@ -252,9 +257,8 @@ describe("graceful degradation", () => {
     expect(breaker.getState("searxng")).toBe("OPEN");
 
     const callsWhileOpen = fetchMock.mock.calls.length;
-    const results = await searchThroughRetries(breaker);
+    await searchThroughRetries(breaker);
 
-    expect(results).toEqual([]);
     expect(fetchMock).toHaveBeenCalledTimes(callsWhileOpen);
   });
 
@@ -267,7 +271,9 @@ describe("graceful degradation", () => {
       failure < breakerOptions.failureThreshold;
       failure++
     ) {
-      await fetchSearXNG("failure injection", "text", 30, breaker);
+      await expect(
+        fetchSearXNG("failure injection", "text", 30, breaker),
+      ).rejects.toThrow();
     }
 
     expect(breaker.getState("searxng")).toBe("OPEN");
@@ -286,10 +292,10 @@ describe("graceful degradation", () => {
     expect(breaker.getState("searxng")).toBe("CLOSED");
   });
 
-  it("cannot be told apart downstream: provider down and genuinely empty both yield []", async () => {
+  it("throws when the provider is down and returns an empty array for zero results", async () => {
     const downBreaker = new CircuitBreaker({ failureThreshold: 1 });
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
-    const providerDown = await fetchSearXNG(
+    const providerDown = fetchSearXNG(
       "failure injection",
       "text",
       30,
@@ -307,24 +313,25 @@ describe("graceful degradation", () => {
       emptyBreaker,
     );
 
-    // The breaker knows which one was a failure; the return value does not.
+    // The breaker still records which one was a failure, and now the caller
+    // can tell them apart from the outcome as well.
     expect(downBreaker.getState("searxng")).toBe("OPEN");
     expect(emptyBreaker.getState("searxng")).toBe("CLOSED");
-    expect(providerDown).toEqual([]);
+    await expect(providerDown).rejects.toThrow();
     expect(noResults).toEqual([]);
   });
 
-  it("returns an empty array when SearXNG answers 200 with a malformed body", async () => {
+  it("throws when SearXNG answers 200 with a malformed body", async () => {
     fetchMock.mockResolvedValue(createMockResponse("<html>gateway</html>"));
 
-    const results = await fetchSearXNG(
-      "failure injection",
-      "text",
-      30,
-      new CircuitBreaker(breakerOptions),
-    );
-
-    expect(results).toEqual([]);
+    await expect(
+      fetchSearXNG(
+        "failure injection",
+        "text",
+        30,
+        new CircuitBreaker(breakerOptions),
+      ),
+    ).rejects.toThrow();
   });
 
   it("returns an empty array when every result is dropped during processing", async () => {
@@ -416,20 +423,25 @@ describe("query privacy", () => {
   }
 
   it("never writes the query to the log", async () => {
-    for (const response of [
-      emptyResponse(),
-      unusableResultsResponse(),
-      createMockResponse("<html>gateway</html>"),
-    ]) {
+    for (const response of [emptyResponse(), unusableResultsResponse()]) {
       fetchMock.mockResolvedValue(response);
       await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
     }
+
+    // The malformed body and the network failure both make fetchSearXNG
+    // throw; the point here is that neither path ever logs the query.
+    fetchMock.mockResolvedValue(createMockResponse("<html>gateway</html>"));
+    await expect(
+      fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker()),
+    ).rejects.toThrow();
 
     fetchMock.mockResolvedValue(imageResultsResponse());
     await fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker());
 
     fetchMock.mockRejectedValue(new Error("Network failure"));
-    await fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker());
+    await expect(
+      fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker()),
+    ).rejects.toThrow();
 
     const output = logLines.join("\n");
     expect(logLines.length).toBeGreaterThan(0);
@@ -476,11 +488,11 @@ describe("circuit breaker", () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
 
     for (let i = 0; i < 5; i++) {
-      await fetchSearXNG("test", "text", 30, breaker);
+      await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
     }
 
     const callsBeforeBreak = fetchMock.mock.calls.length;
-    await fetchSearXNG("test", "text", 30, breaker);
+    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
 
     expect(fetchMock.mock.calls.length).toBe(callsBeforeBreak);
   });
@@ -490,11 +502,11 @@ describe("circuit breaker", () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
 
     for (let i = 0; i < 4; i++) {
-      await fetchSearXNG("test", "text", 30, breaker);
+      await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
     }
 
     const callsBefore = fetchMock.mock.calls.length;
-    await fetchSearXNG("test", "text", 30, breaker);
+    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
 
     expect(fetchMock.mock.calls.length).toBe(callsBefore + 1);
   });

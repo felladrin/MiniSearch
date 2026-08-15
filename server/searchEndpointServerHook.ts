@@ -165,7 +165,17 @@ export function searchEndpointServerHook<
       const isTextSearch = request.url?.startsWith("/search/text");
       const searchType = isTextSearch ? "text" : "images";
 
-      const searxngResults = await fetchSearXNG(query, searchType, limit);
+      let searxngResults: TextResult[] | ImageResult[];
+      try {
+        searxngResults = await fetchSearXNG(query, searchType, limit);
+      } catch {
+        // SearXNG is unreachable: answer non-200 so the client can tell an
+        // outage apart from a search that genuinely has no results.
+        response.statusCode = 502;
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify({ error: "Search service unavailable" }));
+        return;
+      }
 
       if (isTextSearch) {
         const results = searxngResults as TextResult[];
