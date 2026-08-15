@@ -131,11 +131,11 @@ describe("golden set", () => {
 
     expect(
       mean(scored.map((s) => s.ndcg)),
-      "a golden entry keeps its relevant results in the input top-3",
+      `a golden entry keeps its relevant results in the input top-${K}`,
     ).toBeLessThanOrEqual(MAX_NOOP_MEAN_NDCG);
     expect(
       mean(scored.map((s) => s.recall)),
-      "a golden entry keeps its relevant results in the input top-3",
+      `a golden entry keeps its relevant results in the input top-${K}`,
     ).toBeLessThanOrEqual(MAX_NOOP_MEAN_RECALL);
   });
 });

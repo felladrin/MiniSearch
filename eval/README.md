@@ -51,9 +51,10 @@ filter / top-result logic in `rankSearchResults.ts`.
 
 Known limit: with `preserveTopResults=true`, `rankSearchResults` sorts the first
 `nextTopResultsCount` (9) surviving results and everything after them as two
-separate blocks, so the tail is never interleaved with the head. Nothing is
-dropped. The golden entries have 4-5 candidates, so that split never binds
-here; it would matter only for much larger result sets.
+separate blocks, so the tail is never interleaved with the head. The split
+itself drops nothing; anything missing from the output was removed earlier by
+the score filter. The golden entries have 4-5 candidates, so that split never
+binds here; it would matter only for much larger result sets.
 
 The metrics live in `metrics.ts` (pure, unit-tested in `metrics.test.ts`).
 
