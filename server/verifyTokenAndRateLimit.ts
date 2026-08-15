@@ -59,6 +59,22 @@ export async function verifyTokenAndRateLimit(
   statusCode?: number;
   error?: string;
 }> {
+  // Rate-limit before anything else. An invalid or missing token used to skip
+  // the limiter entirely, and every rejected request still pays for a full
+  // argon2 verification, which is expensive enough to be a DoS lever on a
+  // publicly reachable instance: a caller could send an endless stream of
+  // bogus tokens and pin the server's CPU without ever hitting the limiter.
+  const rateLimitKey = request ? getClientIp(request) : (token ?? "anonymous");
+  try {
+    await rateLimiter.consume(rateLimitKey);
+  } catch {
+    return {
+      isAuthorized: false,
+      statusCode: 429,
+      error: "Too many requests.",
+    };
+  }
+
   if (!token) {
     return {
       isAuthorized: false,
@@ -90,18 +106,6 @@ export async function verifyTokenAndRateLimit(
 
   // Records a new session or refreshes an active one's last-seen time.
   addVerifiedToken(token);
-
-  const rateLimitKey = request ? getClientIp(request) : token;
-
-  try {
-    await rateLimiter.consume(rateLimitKey);
-  } catch {
-    return {
-      isAuthorized: false,
-      statusCode: 429,
-      error: "Too many requests.",
-    };
-  }
 
   return { isAuthorized: true };
 }
