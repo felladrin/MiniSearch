@@ -32,16 +32,9 @@ import { goldenQueries } from "./goldenSet.ts";
 import { ndcgAtK, recallAtK } from "./metrics.ts";
 import { K, MIN_MEAN_NDCG, MIN_MEAN_RECALL } from "./thresholds.ts";
 
-// The floors are set in the middle of the band between a working reranker
-// (0.950 / 0.981) and a no-op reranker (0.587 / 0.500) on this golden set, so
-// a dead or no-op reranker fails and a working one passes with margin. The
-// headroom (the working reranker clears the floors by ~0.2) is intentional:
-// the reranker is a quantized ONNX graph whose scores drift and can reorder
-// results across execution providers (see server/rerankerService.ts), so a
-// floor pinned to the measured baseline would be flaky on a different CPU.
-// Re-tune if the golden set changes substantially. The no-op ceilings that
-// keep these floors falsifiable live in thresholds.ts and are pinned by
-// goldenSet.test.ts.
+// The floors (MIN_MEAN_NDCG / MIN_MEAN_RECALL) and the no-op ceilings that
+// keep them falsifiable live in thresholds.ts; see that file for the band
+// they're set in and why the headroom is intentional.
 
 interface PerQueryScore {
   id: string;

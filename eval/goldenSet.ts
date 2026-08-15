@@ -12,13 +12,12 @@
  * unambiguous (a result is clearly about the query or clearly not) so the
  * metric does not depend on a borderline call.
  *
- * Retrieval constraint: keep at least one relevant result OUTSIDE the top-3 of
- * the input order (the `results` array). If an entry keeps both relevant
- * results in the input top-3, a no-op reranker (which preserves input order)
- * scores it as well as a working one, and the retrieval eval's floors stop
- * being falsifiable. The "stays falsifiable" test in goldenSet.test.ts pins
- * this; re-tune the floors in retrieval.integration.test.ts if the set changes
- * substantially.
+ * Retrieval constraint: the input top-3 (the `results` array order) must not
+ * already hold every relevant result it can fit. If it does, a no-op reranker
+ * (which preserves input order) scores that entry as well as a working one,
+ * and the retrieval eval's floors stop being falsifiable. The per-entry
+ * validator and the "stays falsifiable" aggregate in goldenSet.test.ts pin
+ * this; re-tune the floors in thresholds.ts if the set changes substantially.
  */
 
 interface GoldenResult {

@@ -30,11 +30,12 @@ change, not an absolute quality score.
 
 The set is a starting point. Grow it by adding entries with the same shape;
 keep the relevant labels unambiguous so the metric does not hinge on a
-borderline call. Keep at least one relevant result outside the top-3 of the
-input order (`results`): if an entry keeps both relevant results in the input
-top-3, a no-op reranker scores it as well as a working one and the retrieval
-floors stop being falsifiable (the "stays falsifiable" test in
-`goldenSet.test.ts` pins this).
+borderline call. Keep the input top-3 from already holding every relevant
+result it can fit: if it does, a no-op reranker (which preserves input order)
+scores that entry as well as a working one and the retrieval floors stop being
+falsifiable. `goldenSet.test.ts` pins this two ways: a per-entry validator that
+rejects a saturated entry, and a "stays falsifiable" aggregate that scores the
+whole set as a no-op reranker and asserts the mean stays below the floors.
 
 ## Retrieval eval (reranker)
 

@@ -55,14 +55,18 @@ function validateGoldenSet() {
         `${g.id}: relevant index ${i} out of range (0..${g.results.length - 1})`,
       ).toBe(true);
     }
-    // Retrieval falsifiability, per entry: at least one relevant result must
-    // sit outside the input top-K, or a no-op reranker (which preserves input
-    // order) scores this entry as well as a working one. This is the per-entry
+    // Retrieval falsifiability, per entry: the input top-K must not already
+    // hold every relevant result it can fit, or a no-op reranker (which
+    // preserves input order) scores this entry as well as a working one.
+    // Comparing against min(K, relevant.length) rather than "some index >= K"
+    // also covers entries with more than K labels, where the input top-K can
+    // be saturated while a label still sits outside it. This is the per-entry
     // form of the "stays falsifiable" aggregate below; the aggregate alone
     // would let a single degenerate entry pass silently.
+    const relevantInTopK = g.relevant.filter((i) => i < K).length;
     expect(
-      g.relevant.some((i) => i >= K),
-      `${g.id}: every relevant result sits in the input top-${K}, so a no-op reranker scores it perfectly`,
+      relevantInTopK < Math.min(K, g.relevant.length),
+      `${g.id}: the input top-${K} already holds every relevant result it can fit, so a no-op reranker already scores it as well as a working one`,
     ).toBe(true);
     // The answer eval builds the prompt from these results, but the app slices
     // to searchResultsToConsider (6) before sending it. A longer entry would
