@@ -43,4 +43,12 @@ describe("PubSub localStorage persistence", () => {
     const stored = JSON.parse(localStorage.getItem("settings") as string);
     expect(stored).toEqual(modified);
   });
+
+  it("falls back to the default when the stored value is corrupted JSON", async () => {
+    localStorage.setItem("menuExpandedAccordions", "{not valid json");
+    vi.resetModules();
+    const { menuExpandedAccordionsPubSub } = await import("./pubSub");
+    const [, , getMenuExpandedAccordions] = menuExpandedAccordionsPubSub;
+    expect(getMenuExpandedAccordions()).toEqual([]);
+  });
 });

@@ -19,9 +19,18 @@ import type {
  */
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   const localStorageValue = localStorage.getItem(localStorageKey);
-  const localStoragePubSub = createPubSub(
-    localStorageValue ? (JSON.parse(localStorageValue) as T) : defaultValue,
-  );
+  let initialValue: T = defaultValue;
+  if (localStorageValue) {
+    try {
+      initialValue = JSON.parse(localStorageValue) as T;
+    } catch {
+      // This runs at module load, so a corrupted stored value must fall back
+      // to the default instead of crashing the app. Log it, since the corrupt
+      // value stays in storage and the fallback repeats on every load.
+      addLogEntry(`Discarded corrupted stored value for '${localStorageKey}'`);
+    }
+  }
+  const localStoragePubSub = createPubSub(initialValue);
 
   const [, onValueChange] = localStoragePubSub;
 
