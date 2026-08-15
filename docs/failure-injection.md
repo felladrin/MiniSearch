@@ -14,9 +14,10 @@ needed.
 | SearXNG answers 500 on every attempt | Retry cycle exhausts (4 requests) and costs a single circuit-breaker failure | `server/webSearchService.test.ts` › graceful degradation |
 | SearXNG fails five cycles in a row | Circuit opens; further searches short-circuit without calling the upstream | `server/webSearchService.test.ts` › graceful degradation |
 | SearXNG recovers after the reset timeout | One healthy response closes the circuit again | `server/webSearchService.test.ts` › graceful degradation |
-| SearXNG answers 200 with a non-JSON body | Empty result set, no throw | `server/webSearchService.test.ts` › graceful degradation |
+| SearXNG answers 200 with a non-JSON body | `fetchSearXNG` throws and the endpoint answers HTTP 502 | `server/webSearchService.test.ts` › graceful degradation |
 | SearXNG returns results that are all unusable | Empty result set, no throw | `server/webSearchService.test.ts` › graceful degradation |
-| Provider down vs. genuinely zero results | Both yield `[]` (indistinguishable downstream, see Known Limitations) | `server/webSearchService.test.ts` › graceful degradation |
+| Provider down vs. genuinely zero results | Provider down: `fetchSearXNG` throws, the endpoint answers HTTP 502, and the client search state becomes `failed`; genuinely zero results: HTTP 200 with `[]`, state stays `completed` and the no-results alert renders | `server/webSearchService.test.ts` and `server/searchEndpointServerHook.test.ts` › graceful degradation |
+| SearXNG is down | `/search/text` and `/search/images` answer HTTP 502 with a JSON error | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranker is not ready | Results served in SearXNG order, HTTP 200 | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranking throws mid-request | Results served in SearXNG order, HTTP 200 | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranker is not ready on an image search | Images still served with thumbnails | `server/searchEndpointServerHook.test.ts` › graceful degradation |
@@ -25,7 +26,8 @@ needed.
 | Thumbnail host never answers | Request aborted after the timeout, image dropped | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Search returns nothing to the endpoint | HTTP 200 with `[]`, not an error | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Text search returns nothing to the client | Keyword-only query retried as a fallback | `client/modules/textGeneration.degradation.test.ts` |
-| Keyword fallback also returns nothing | Text search state becomes `failed` | `client/modules/textGeneration.degradation.test.ts` |
+| Keyword fallback also returns nothing | Text search state stays `completed` with the no-results alert | `client/modules/textGeneration.degradation.test.ts` |
+| SearXNG is down on the client | Text search state becomes `failed`, keyword fallback does not fire | `client/modules/textGeneration.degradation.test.ts` |
 | Result page host resolves into a private range | Page skipped, no request is made | `server/pageContentService.test.ts` › fetchPageContents |
 | Result page redirects into a private range | Redirect not followed, page skipped | `server/pageContentService.test.ts` › fetchPageContents |
 | Result page errors, is not a document, or yields no text | That page is skipped, the others still return | `server/pageContentService.test.ts` › fetchPageContents |
@@ -40,13 +42,6 @@ needed.
 | Response is already unwritable when streaming would start | No headers set, the upstream is never called | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | `/inference` answers 503 | Generation state becomes `failed`, nothing persisted | `client/modules/textGeneration.degradation.test.ts` |
 | Generation interrupted mid-stream | Partial answer preserved, state stays `interrupted` | `client/modules/textGeneration.degradation.test.ts` |
-
-## Known Limitations
-
-`fetchSearXNG` catches every failure and returns `[]`, so "the provider is down"
-and "there are no results for this query" reach the client as the same response.
-The matrix pins that behavior rather than hiding it: changing it means changing
-the endpoint contract, and the test is where that decision becomes visible.
 
 ## Adding a Row
 

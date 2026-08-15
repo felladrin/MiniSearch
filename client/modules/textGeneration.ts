@@ -425,42 +425,46 @@ async function startTextSearch(query: string) {
   if (getSettings().enableTextSearch) {
     updateTextSearchState("running");
 
-    let textResults = await searchText(
-      searchQuery,
-      getSettings().searchResultsLimit,
-    );
-
-    if (textResults.length === 0) {
-      const queryKeywords = await getKeywords(query, 10);
-      const keywordResults = await searchText(
-        queryKeywords.join(" "),
+    try {
+      let textResults = await searchText(
+        searchQuery,
         getSettings().searchResultsLimit,
       );
-      textResults = keywordResults;
+
+      if (textResults.length === 0) {
+        const queryKeywords = await getKeywords(query, 10);
+        const keywordResults = await searchText(
+          queryKeywords.join(" "),
+          getSettings().searchResultsLimit,
+        );
+        textResults = keywordResults;
+      }
+
+      results.textResults = textResults;
+
+      updateTextSearchState("completed");
+      updateTextSearchResults(textResults);
+
+      const resultsForLlm = textResults.slice(0, searchResultsToConsider);
+      updateLlmTextSearchResults(resultsForLlm);
+
+      updateSearchResults(getCurrentSearchRunId(), {
+        type: "text",
+        items: textResults.map(([title, snippet, url]) => ({
+          title,
+          url,
+          snippet,
+        })),
+      });
+
+      // Started here but awaited last: only the AI answer waits on it, while
+      // image search and the history write carry on.
+      pageContentsRead = readPageContents(searchQuery, resultsForLlm);
+    } catch {
+      // An outage (non-200 from /search/*) is not the same as a query with no
+      // results; only the former leaves the search in the failed state.
+      updateTextSearchState("failed");
     }
-
-    results.textResults = textResults;
-
-    updateTextSearchState(
-      results.textResults.length === 0 ? "failed" : "completed",
-    );
-    updateTextSearchResults(textResults);
-
-    const resultsForLlm = textResults.slice(0, searchResultsToConsider);
-    updateLlmTextSearchResults(resultsForLlm);
-
-    updateSearchResults(getCurrentSearchRunId(), {
-      type: "text",
-      items: textResults.map(([title, snippet, url]) => ({
-        title,
-        url,
-        snippet,
-      })),
-    });
-
-    // Started here but awaited last: only the AI answer waits on it, while
-    // image search and the history write carry on.
-    pageContentsRead = readPageContents(searchQuery, resultsForLlm);
   }
 
   if (getSettings().enableImageSearch) {
@@ -476,25 +480,29 @@ async function startImageSearch(
   searchQuery: string,
   results: { textResults: TextSearchResults; imageResults: ImageSearchResults },
 ) {
-  const imageResults = await searchImages(
-    searchQuery,
-    getSettings().searchResultsLimit,
-  );
-  results.imageResults = imageResults;
-  updateImageSearchState(
-    results.imageResults.length === 0 ? "failed" : "completed",
-  );
-  updateImageSearchResults(imageResults);
+  try {
+    const imageResults = await searchImages(
+      searchQuery,
+      getSettings().searchResultsLimit,
+    );
+    results.imageResults = imageResults;
+    updateImageSearchState("completed");
+    updateImageSearchResults(imageResults);
 
-  updateSearchResults(getCurrentSearchRunId(), {
-    type: "image",
-    items: imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
-      title,
-      url,
-      thumbnail: thumbnailUrl,
-      sourceUrl,
-    })),
-  });
+    updateSearchResults(getCurrentSearchRunId(), {
+      type: "image",
+      items: imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
+        title,
+        url,
+        thumbnail: thumbnailUrl,
+        sourceUrl,
+      })),
+    });
+  } catch {
+    // Same distinction as the text path: an outage fails the search, an empty
+    // result set does not.
+    updateImageSearchState("failed");
+  }
 }
 
 function canDownloadModels(): Promise<void> {

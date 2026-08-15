@@ -179,13 +179,28 @@ describe("search degradation", () => {
     expect(harness.state.textSearchState).toBe("completed");
   });
 
-  it("reports the text search as failed when the keyword fallback is also empty", async () => {
+  it("keeps the text search completed when the keyword fallback is also empty", async () => {
     vi.mocked(searchText).mockResolvedValue([]);
 
     await searchAndRespond();
     await harness.state.searchPromise;
 
     expect(searchText).toHaveBeenCalledTimes(2);
+    expect(harness.state.textSearchResults).toEqual([]);
+    expect(harness.state.textSearchState).toBe("completed");
+  });
+
+  it("marks the text search as failed when the search request errors", async () => {
+    vi.mocked(searchText).mockRejectedValue(
+      new Error("HTTP error! status: 502"),
+    );
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    // An outage is not an empty result set: the keyword fallback must not
+    // fire, and the search ends failed so the retry UI shows up.
+    expect(searchText).toHaveBeenCalledTimes(1);
     expect(harness.state.textSearchResults).toEqual([]);
     expect(harness.state.textSearchState).toBe("failed");
   });

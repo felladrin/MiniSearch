@@ -494,10 +494,12 @@ const searchService = {
         },
       );
     } catch (error) {
+      // Rethrow so the caller can tell a failed search apart from one that
+      // genuinely has no results; an empty array means zero results only.
       addLogEntry(
         `Text search failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return [];
+      throw error;
     }
   },
 
@@ -522,10 +524,12 @@ const searchService = {
         },
       );
     } catch (error) {
+      // Rethrow so the caller can tell a failed search apart from one that
+      // genuinely has no results; an empty array means zero results only.
       addLogEntry(
         `Image search failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return [];
+      throw error;
     }
   },
 

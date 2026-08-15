@@ -231,9 +231,12 @@ export async function fetchSearXNG(
   try {
     return await processSearchResults(query, searchType, limit, breaker);
   } catch (error) {
+    // Upstream failure (bad status, network error, malformed body, open
+    // circuit) propagates so the endpoint can answer non-200; an empty array
+    // then means exactly one thing: zero results.
     const errorMessage = error instanceof Error ? error.message : String(error);
     printMessage(`Search failed: ${errorMessage}`);
-    return [];
+    throw error;
   }
 }
 
