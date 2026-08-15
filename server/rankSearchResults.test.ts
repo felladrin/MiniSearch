@@ -55,9 +55,13 @@ describe("rankSearchResults", () => {
   });
 
   it("should preserve top result when preserveTopResults is true", async () => {
+    // Index 0 has the LOWER score, so a plain descending sort would put
+    // "Other" first; only the pin keeps "Top" first. (A vacuous version gives
+    // index 0 the highest score, which plain sort satisfies too, so it would
+    // pass even with the pin deleted.)
     mockRerank.mockResolvedValue([
-      { index: 0, relevance_score: 0.95 },
-      { index: 1, relevance_score: 0.8 },
+      { index: 0, relevance_score: 0.1 },
+      { index: 1, relevance_score: 0.9 },
     ] as { index: number; relevance_score: number }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
     const result = await rankSearchResults(

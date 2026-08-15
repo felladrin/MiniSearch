@@ -1,25 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { goldenQueries } from "./goldenSet.ts";
 import { ndcgAtK, recallAtK } from "./metrics.ts";
+import {
+  K,
+  MAX_NOOP_MEAN_NDCG,
+  MAX_NOOP_MEAN_RECALL,
+  MIN_MEAN_NDCG,
+  MIN_MEAN_RECALL,
+} from "./thresholds.ts";
 
 /**
  * Bumped deliberately whenever the golden set grows, so an edit to the set
  * forces the author to re-read (and re-tune if needed) the thresholds in
- * retrieval.integration.test.ts.
+ * thresholds.ts.
  */
 const EXPECTED_QUERY_COUNT = 26;
-
-/**
- * The identity-ranking (no-op reranker) baseline the retrieval eval's floors
- * are placed against. If a golden entry keeps all its relevant results inside
- * the top-K of the input order, a dead reranker scores as well as a working
- * one and MIN_MEAN_NDCG / MIN_MEAN_RECALL in retrieval.integration.test.ts
- * stop being falsifiable. These ceilings must stay below those floors
- * (0.75 / 0.70); the current set sits at 0.587 / 0.500.
- */
-const K = 3;
-const MAX_NOOP_MEAN_NDCG = 0.65;
-const MAX_NOOP_MEAN_RECALL = 0.6;
 
 // Sequences that String.replace treats as special. The app's getSystemPrompt
 // substitutes the search results into the prompt via String.replace, and
@@ -60,6 +55,15 @@ function validateGoldenSet() {
         `${g.id}: relevant index ${i} out of range (0..${g.results.length - 1})`,
       ).toBe(true);
     }
+    // Retrieval falsifiability, per entry: at least one relevant result must
+    // sit outside the input top-K, or a no-op reranker (which preserves input
+    // order) scores this entry as well as a working one. This is the per-entry
+    // form of the "stays falsifiable" aggregate below; the aggregate alone
+    // would let a single degenerate entry pass silently.
+    expect(
+      g.relevant.some((i) => i >= K),
+      `${g.id}: every relevant result sits in the input top-${K}, so a no-op reranker scores it perfectly`,
+    ).toBe(true);
     // The answer eval builds the prompt from these results, but the app slices
     // to searchResultsToConsider (6) before sending it. A longer entry would
     // grade a prompt the app can never send.
@@ -96,6 +100,13 @@ describe("golden set", () => {
 
   it("has the expected number of queries", () => {
     expect(goldenQueries).toHaveLength(EXPECTED_QUERY_COUNT);
+  });
+
+  it("keeps the no-op ceilings below the eval's floors", () => {
+    // If a ceiling reached or passed its floor, a no-op reranker would clear
+    // the floor and the retrieval eval would stop being falsifiable.
+    expect(MAX_NOOP_MEAN_NDCG).toBeLessThan(MIN_MEAN_NDCG);
+    expect(MAX_NOOP_MEAN_RECALL).toBeLessThan(MIN_MEAN_RECALL);
   });
 
   it("stays falsifiable: a no-op reranker scores below the eval's floors", () => {
