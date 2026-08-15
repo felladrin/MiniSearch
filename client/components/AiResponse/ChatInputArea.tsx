@@ -37,11 +37,17 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
   const handleKeyDownWithPlaceholder = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
+    // Same IME guard as handleEnterKeyDown: the Enter that confirms a
+    // composition candidate must not fire the follow-up question while the
+    // composition text has not reached the input value yet.
+    const isComposing = event.nativeEvent.isComposing || event.keyCode === 229;
+
     if (
       input.trim() === "" &&
       followUpQuestion &&
       !isRestoringFromHistory &&
-      !suppressNextFollowUp
+      !suppressNextFollowUp &&
+      !isComposing
     ) {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
