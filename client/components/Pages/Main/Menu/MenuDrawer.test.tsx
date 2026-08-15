@@ -101,9 +101,7 @@ describe("MenuDrawer", () => {
     await renderMenuDrawer(createMenuState({ showFeatureTips: true }));
 
     expect(screen.getByText("Tips")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Make it your browser's default search engine/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Search from anywhere/)).toBeInTheDocument();
     expect(screen.getByText(/\/\?q=%s/)).toBeInTheDocument();
     expect(screen.getByText(/\/\?q=\{Query\}/)).toBeInTheDocument();
     expect(screen.getByText(/Raycast Quicklink/)).toBeInTheDocument();

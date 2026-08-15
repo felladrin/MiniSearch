@@ -122,9 +122,9 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
           >
             <Stack gap="xs">
               <Text size="xs" lh="sm">
-                Make it your browser's default search engine: add{" "}
-                <Code>{`${self.location.origin}/?q=%s`}</Code> as a custom
-                search engine, or{" "}
+                Search from anywhere: add{" "}
+                <Code>{`${self.location.origin}/?q=%s`}</Code> as your browser's
+                custom search engine, or{" "}
                 <Code>{`${self.location.origin}/?q={Query}`}</Code> as a Raycast
                 Quicklink.
               </Text>

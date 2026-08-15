@@ -73,6 +73,17 @@ describe("PubSub localStorage persistence", () => {
     );
   });
 
+  it("falls back to the default and drops the value when the stored value is empty", async () => {
+    localStorage.setItem("menuExpandedAccordions", "");
+    const { menuExpandedAccordionsPubSub } = await import("./pubSub");
+    const [, , getMenuExpandedAccordions] = menuExpandedAccordionsPubSub;
+    expect(getMenuExpandedAccordions()).toEqual([]);
+    expect(localStorage.getItem("menuExpandedAccordions")).toBeNull();
+    expect(addLogEntry).toHaveBeenCalledWith(
+      "Discarded an unusable stored value for 'menuExpandedAccordions'",
+    );
+  });
+
   it("keeps a dismissed feature-tips flag across a reload", async () => {
     const { showFeatureTipsPubSub } = await import("./pubSub");
     const [dismissTips] = showFeatureTipsPubSub;
