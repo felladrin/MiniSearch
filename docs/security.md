@@ -46,6 +46,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 - **SearXNG Integration**: All web searches routed through privacy-focused metasearch
 - **No External Requests**: Optional browser-only mode for complete privacy
 - **Page Reading Is On By Default, And Reversible**: `enablePageContentFetch` ships on and the user can turn it off under AI Settings; nothing is read until AI responses are enabled, and the server (never the browser) requests the top result pages, so those sites see the instance and no user cookies or IP
+- **Server Logs Carry No Queries**: the query never reaches the server log, and neither does the URL of a page read for grounding. The aggregate lives in the `/status` counters (`searchesWithoutResults`, `searchesWithAllResultsDiscarded`, `pageReads`)
 
 ## Data Protection
 
@@ -71,7 +72,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 |--------|---------|
 | `server/searchToken.ts` | Reads/writes the CSRF token from `{tempdir}/minisearch-token` |
 | `server/verifiedTokens.ts` | In-memory `Set<string>` of verified session tokens |
-| `server/searchesSinceLastRestart.ts` | In-memory counters for abuse monitoring |
+| `server/searchesSinceLastRestart.ts` | In-memory aggregate counters for search outcomes since the last restart, exposed via `/status` |
 | `server/searchEndpointServerHook.ts` | Proxies text/image search to SearXNG after token verification (via `handleTokenVerification`) |
 | `server/verifyTokenAndRateLimit.ts` | Verifies the Argon2 token hash and enforces rate limiting (10 requests per 10 seconds) shared by the search, page-content and inference endpoints |
 | `server/handleTokenVerification.ts` | Middleware bridge that calls `verifyTokenAndRateLimit` and writes 400/401/429 error responses for the search, page-content and inference endpoints |
