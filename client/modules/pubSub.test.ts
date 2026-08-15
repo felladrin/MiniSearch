@@ -20,6 +20,7 @@ beforeEach(() => {
     },
   });
   vi.clearAllMocks();
+  vi.resetModules();
 });
 
 describe("PubSub localStorage persistence", () => {
@@ -52,7 +53,6 @@ describe("PubSub localStorage persistence", () => {
 
   it("falls back to the default and drops the value when the stored JSON is corrupted", async () => {
     localStorage.setItem("menuExpandedAccordions", "{not valid json");
-    vi.resetModules();
     const { menuExpandedAccordionsPubSub } = await import("./pubSub");
     const [, , getMenuExpandedAccordions] = menuExpandedAccordionsPubSub;
     expect(getMenuExpandedAccordions()).toEqual([]);
@@ -64,7 +64,6 @@ describe("PubSub localStorage persistence", () => {
 
   it("falls back to the default and drops the value when the stored JSON has the wrong type", async () => {
     localStorage.setItem("showFeatureTips", '"false"');
-    vi.resetModules();
     const { showFeatureTipsPubSub } = await import("./pubSub");
     const [, , getTips] = showFeatureTipsPubSub;
     expect(getTips()).toBe(true);

@@ -35,7 +35,7 @@ function isSameJsonKind(value: unknown, reference: unknown): boolean {
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   const localStorageValue = localStorage.getItem(localStorageKey);
   let initialValue: T = defaultValue;
-  if (localStorageValue) {
+  if (localStorageValue !== null) {
     let parsed: unknown;
     try {
       parsed = JSON.parse(localStorageValue);

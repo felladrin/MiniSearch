@@ -124,7 +124,9 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
               <Text size="xs" lh="sm">
                 Make it your browser's default search engine: add{" "}
                 <Code>{`${self.location.origin}/?q=%s`}</Code> as a custom
-                search engine (the same pattern works in a Raycast Quicklink).
+                search engine, or{" "}
+                <Code>{`${self.location.origin}/?q={Query}`}</Code> as a Raycast
+                Quicklink.
               </Text>
               <Text size="xs" lh="sm">
                 Turn on AI Response, then use the speaker button on an answer to
