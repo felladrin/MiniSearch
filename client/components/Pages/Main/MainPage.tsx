@@ -1,4 +1,4 @@
-import { Container, Stack, VisuallyHidden } from "@mantine/core";
+import { Container, Stack, Text, VisuallyHidden } from "@mantine/core";
 import { usePubSub } from "create-pubsub/react";
 import { lazy, Suspense } from "react";
 import SearchForm from "@/components/Search/Form/SearchForm";
@@ -42,34 +42,39 @@ export default function MainPage() {
         mih="100vh"
         justify={isQueryEmpty ? "center" : undefined}
       >
+        {isQueryEmpty && (
+          <Text ta="center" size="sm">
+            Private AI search: answers with sources, on your own instance.
+          </Text>
+        )}
         <SearchForm
           query={query}
           updateQuery={updateQuery}
           additionalButtons={<MenuButton />}
         />
+        {settings.showEnableAiResponsePrompt && (
+          <Suspense>
+            <EnableAiResponsePrompt
+              onAccept={() => {
+                setSettings({
+                  ...settings,
+                  showEnableAiResponsePrompt: false,
+                  enableAiResponse: true,
+                });
+                if (!isQueryEmpty) searchAndRespond();
+              }}
+              onDecline={() =>
+                setSettings({
+                  ...settings,
+                  showEnableAiResponsePrompt: false,
+                  enableAiResponse: false,
+                })
+              }
+            />
+          </Suspense>
+        )}
         {!isQueryEmpty && (
           <>
-            {settings.showEnableAiResponsePrompt && (
-              <Suspense>
-                <EnableAiResponsePrompt
-                  onAccept={() => {
-                    setSettings({
-                      ...settings,
-                      showEnableAiResponsePrompt: false,
-                      enableAiResponse: true,
-                    });
-                    searchAndRespond();
-                  }}
-                  onDecline={() => {
-                    setSettings({
-                      ...settings,
-                      showEnableAiResponsePrompt: false,
-                      enableAiResponse: false,
-                    });
-                  }}
-                />
-              </Suspense>
-            )}
             {!settings.showEnableAiResponsePrompt &&
               textGenerationState !== "idle" && (
                 <Suspense>
