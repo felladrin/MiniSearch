@@ -51,4 +51,15 @@ describe("PubSub localStorage persistence", () => {
     const [, , getMenuExpandedAccordions] = menuExpandedAccordionsPubSub;
     expect(getMenuExpandedAccordions()).toEqual([]);
   });
+
+  it("keeps a dismissed feature-tips flag across a reload", async () => {
+    const { showFeatureTipsPubSub } = await import("./pubSub");
+    const [dismissTips] = showFeatureTipsPubSub;
+    dismissTips(false);
+    expect(localStorage.getItem("showFeatureTips")).toBe("false");
+    vi.resetModules();
+    const reloaded = await import("./pubSub");
+    const [, , getTips] = reloaded.showFeatureTipsPubSub;
+    expect(getTips()).toBe(false);
+  });
 });

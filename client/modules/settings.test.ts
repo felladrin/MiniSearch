@@ -26,6 +26,14 @@ describe("Settings Module", () => {
     expect(defaultSettings.inferenceType).toBeDefined();
   });
 
+  it("keeps the feature-tips flag out of settings", () => {
+    // The menu's feature-tips hint persists in its own localStorage channel
+    // (showFeatureTipsPubSub). If it were a settings field, the settings forms
+    // (which snapshot settings at mount and write the whole object back) would
+    // resurrect a dismissed hint on the next toggle.
+    expect(defaultSettings).not.toHaveProperty("showFeatureTips");
+  });
+
   describe("getDefaultCpuThreads", () => {
     it("should always leave at least one thread on tiny machines", () => {
       expect(getDefaultCpuThreads(1)).toBe(1);
