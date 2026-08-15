@@ -34,17 +34,20 @@ import { ndcgAtK, recallAtK } from "./metrics.ts";
 const K = 3;
 
 /**
- * Regression thresholds, set with explicit headroom rather than pinned to the
- * measured baseline. Baseline (this machine, 26 queries): mean nDCG@3 0.947,
- * mean recall@3 0.981. The floors below tolerate roughly three or four queries
- * losing a relevant result from the top-3 (recall) before failing. That
- * headroom is intentional: the reranker is a quantized ONNX graph whose scores
- * drift and can reorder results across execution providers (see
- * server/rerankerService.ts), so a floor measured to two decimals would be
- * flaky on a different CPU. Re-tune if the golden set changes substantially.
+ * Regression thresholds, set in the middle of the band between a working
+ * reranker and a no-op (identity) reranker, with headroom on both sides. On
+ * this golden set a no-op reranker (which preserves the input order) scores
+ * mean nDCG@3 0.587 / recall@3 0.500, while the working reranker scores
+ * 0.950 / 0.981. The floors below sit between the two, so a dead or no-op
+ * reranker fails and a working one passes with margin. The headroom (the
+ * working reranker clears the floors by ~0.2) is intentional: the reranker is
+ * a quantized ONNX graph whose scores drift and can reorder results across
+ * execution providers (see server/rerankerService.ts), so a floor pinned to
+ * the measured baseline would be flaky on a different CPU. Re-tune if the
+ * golden set changes substantially.
  */
-const MIN_MEAN_NDCG = 0.88;
-const MIN_MEAN_RECALL = 0.9;
+const MIN_MEAN_NDCG = 0.75;
+const MIN_MEAN_RECALL = 0.7;
 
 interface PerQueryScore {
   id: string;
@@ -94,11 +97,16 @@ describe("retrieval eval (real reranker)", () => {
   }
 
   it("meets the aggregate regression thresholds", () => {
-    expect(scores).toHaveLength(goldenQueries.length);
-
-    const meanNdcg = scores.reduce((sum, s) => sum + s.ndcg, 0) / scores.length;
+    // Print the breakdown before asserting, so a per-query failure still shows
+    // which queries scored what (the diagnostic you need when a regression fires).
+    const meanNdcg =
+      scores.length > 0
+        ? scores.reduce((sum, s) => sum + s.ndcg, 0) / scores.length
+        : 0;
     const meanRecall =
-      scores.reduce((sum, s) => sum + s.recall, 0) / scores.length;
+      scores.length > 0
+        ? scores.reduce((sum, s) => sum + s.recall, 0) / scores.length
+        : 0;
 
     console.table(
       scores.map((s) => ({
@@ -111,6 +119,7 @@ describe("retrieval eval (real reranker)", () => {
       `mean nDCG@${K}=${meanNdcg.toFixed(3)}  mean recall@${K}=${meanRecall.toFixed(3)}`,
     );
 
+    expect(scores).toHaveLength(goldenQueries.length);
     expect(meanNdcg, `mean nDCG@${K} regressed`).toBeGreaterThanOrEqual(
       MIN_MEAN_NDCG,
     );

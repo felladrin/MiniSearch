@@ -28,12 +28,38 @@ function validateGoldenSet() {
     ).toBeUndefined();
     expect(g.query.length, `${g.id}: empty query`).toBeGreaterThan(0);
     expect(g.rubric.length, `${g.id}: empty rubric`).toBeGreaterThan(0);
+    expect(
+      g.referenceAnswer.length,
+      `${g.id}: empty referenceAnswer (weakens the judge)`,
+    ).toBeGreaterThan(0);
     expect(g.relevant.length, `${g.id}: no relevant labels`).toBeGreaterThan(0);
+    expect(
+      new Set(g.relevant).size === g.relevant.length,
+      `${g.id}: duplicate relevant index (dedupes to a trivial entry)`,
+    ).toBe(true);
     for (const i of g.relevant) {
+      expect(
+        Number.isInteger(i),
+        `${g.id}: relevant index ${i} is not an integer`,
+      ).toBe(true);
       expect(
         i >= 0 && i < g.results.length,
         `${g.id}: relevant index ${i} out of range (0..${g.results.length - 1})`,
       ).toBe(true);
+    }
+    // The answer eval builds the prompt from these results, but the app slices
+    // to searchResultsToConsider (6) before sending it. A longer entry would
+    // grade a prompt the app can never send.
+    expect(
+      g.results.length <= 6,
+      `${g.id}: ${g.results.length} results exceeds the app's 6-result prompt budget`,
+    ).toBe(true);
+    for (const r of g.results) {
+      expect(r.title.length, `${g.id}: empty result title`).toBeGreaterThan(0);
+      expect(r.snippet.length, `${g.id}: empty result snippet`).toBeGreaterThan(
+        0,
+      );
+      expect(r.url.length, `${g.id}: empty result url`).toBeGreaterThan(0);
     }
     for (const special of REPLACE_SPECIAL_SEQUENCES) {
       for (const r of g.results) {

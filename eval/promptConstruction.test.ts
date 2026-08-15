@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { defaultSettings } from "../client/modules/settings.ts";
+import { DEFAULT_SYSTEM_PROMPT } from "../shared/defaultSystemPrompt.ts";
 import { goldenQueries } from "./goldenSet.ts";
 
 /**
@@ -40,6 +42,12 @@ vi.mock("../client/modules/pubSub", () => ({
 import { buildMessagesForGolden } from "./goldenPrompt.ts";
 
 describe("answer eval: prompt construction", () => {
+  it("keeps the client's default system prompt in sync with the shared source", () => {
+    // The eval grades against DEFAULT_SYSTEM_PROMPT; if the client's default
+    // drifted from it, the eval would grade a prompt the app never sends.
+    expect(defaultSettings.systemPrompt).toBe(DEFAULT_SYSTEM_PROMPT);
+  });
+
   it("builds a non-empty prompt that embeds the query and the results", () => {
     const golden = goldenQueries[0];
     const messages = buildMessagesForGolden(state, golden.id);

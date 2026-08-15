@@ -272,15 +272,18 @@ describe("answer eval: LLM-judged quality", () => {
   it.skipIf(!hasLlmKey)(
     "keeps the mean rubric pass fraction above the threshold",
     async () => {
-      // Completeness: the mean is only meaningful if every query was graded.
-      // (A failed per-query test is already red, but this keeps the printed
-      // headline from being a partial-run average.)
-      expect(results).toHaveLength(goldenQueries.length);
-
+      // Print the breakdown before asserting, so a per-query failure still
+      // shows which queries scored what (the diagnostic you need when a
+      // regression fires). The length assert below keeps the headline from
+      // being a partial-run average on a complete run.
       const mean =
-        results.reduce((sum, r) => sum + r.passFraction, 0) / results.length;
+        results.length > 0
+          ? results.reduce((sum, r) => sum + r.passFraction, 0) / results.length
+          : 0;
       const citationRate =
-        results.filter((r) => r.cited).length / results.length;
+        results.length > 0
+          ? results.filter((r) => r.cited).length / results.length
+          : 0;
 
       console.table(
         results.map((r) => ({
@@ -294,6 +297,7 @@ describe("answer eval: LLM-judged quality", () => {
         `mean rubric pass fraction: ${mean.toFixed(3)}  citation rate: ${citationRate.toFixed(3)}`,
       );
 
+      expect(results).toHaveLength(goldenQueries.length);
       expect(mean).toBeGreaterThanOrEqual(MIN_MEAN_RUBRIC_PASS);
       expect(
         citationRate,

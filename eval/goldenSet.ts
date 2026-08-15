@@ -101,12 +101,6 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://css-tools.com/reset",
       },
       {
-        title: "CSS Flexbox - MDN Web Docs",
-        snippet:
-          "The flex container's main and cross axes let you center items with justify-content and align-items.",
-        url: "https://developer.mozilla.org/flexbox",
-      },
-      {
         title: "What is a div tag in HTML?",
         snippet:
           "The div element is a generic container for flow content with no required attributes.",
@@ -118,8 +112,14 @@ export const goldenQueries: GoldenQuery[] = [
           "Printable poster of all flexbox properties. Order now and master layout at a glance.",
         url: "https://printables.com/flexbox-poster",
       },
+      {
+        title: "CSS Flexbox - MDN Web Docs",
+        snippet:
+          "The flex container's main and cross axes let you center items with justify-content and align-items.",
+        url: "https://developer.mozilla.org/flexbox",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 4],
     referenceAnswer:
       "Set the parent to display: flex, then use justify-content: center (main axis) and align-items: center (cross axis) to center the child both horizontally and vertically.",
     rubric: [
@@ -145,19 +145,19 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://travel.com/sydney-things-to-do",
       },
       {
-        title: "Austrália - Wikipédia",
-        snippet:
-          "A capital da Austrália é Camberra, e a maior cidade é Sydney.",
-        url: "https://pt.wikipedia.org/wiki/Austrália",
-      },
-      {
         title: "Australian visa: eligibility and how to apply",
         snippet:
           "Check if you qualify for an Australian visitor, work or student visa and start your application.",
         url: "https://immigration.gov/australia-visa",
       },
+      {
+        title: "Austrália - Wikipédia",
+        snippet:
+          "A capital da Austrália é Camberra, e a maior cidade é Sydney.",
+        url: "https://pt.wikipedia.org/wiki/Austrália",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "A capital da Austrália é Camberra (Canberra). Sydney é a cidade mais populosa, mas não é a capital.",
     rubric: [
@@ -184,12 +184,6 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://gitkraken.com/download",
       },
       {
-        title: "git-rebase - Git documentation",
-        snippet:
-          "Rebase rewrites your branch's commits to sit on top of the upstream, producing a linear history.",
-        url: "https://git-scm.com/docs/git-rebase",
-      },
-      {
         title: "Git logo and brand assets",
         snippet:
           "Download the official Git logo in SVG and PNG for your site or slides.",
@@ -201,8 +195,14 @@ export const goldenQueries: GoldenQuery[] = [
           "Compare free, team and enterprise plans for private repositories and CI minutes.",
         url: "https://codehost.dev/pricing",
       },
+      {
+        title: "git-rebase - Git documentation",
+        snippet:
+          "Rebase rewrites your branch's commits to sit on top of the upstream, producing a linear history.",
+        url: "https://git-scm.com/docs/git-rebase",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 4],
     referenceAnswer:
       "git merge combines two branches into a new merge commit, preserving both histories. git rebase replays your commits on top of another branch, rewriting them for a linear history.",
     rubric: [
@@ -228,19 +228,19 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://boardgames.com/wwii-strategy",
       },
       {
-        title: "The end of World War II - History.com",
-        snippet:
-          "V-E Day in May 1945 and V-J Day in September 1945 marked the end of the war in Europe and the Pacific.",
-        url: "https://history.com/wwii-end",
-      },
-      {
         title: "Vintage WWII poster prints",
         snippet:
           "Restored wartime posters, ready to frame. A bold piece for any wall.",
         url: "https://prints.com/wwii-posters",
       },
+      {
+        title: "The end of World War II - History.com",
+        snippet:
+          "V-E Day in May 1945 and V-J Day in September 1945 marked the end of the war in Europe and the Pacific.",
+        url: "https://history.com/wwii-end",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "World War II ended in 1945 (Europe in May 1945, and globally with Japan's surrender in September 1945).",
     rubric: ["Gives 1945 as the end year.", "Does not give a wrong year."],
@@ -262,12 +262,6 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://tutorials.com/rest-101",
       },
       {
-        title: "JWT Security Best Practices - OWASP",
-        snippet:
-          "Validate alg, nbf and exp claims; never put secrets in the payload; rotate signing keys.",
-        url: "https://owasp.org/jwt-best-practices",
-      },
-      {
         title: "JWT logo vector download",
         snippet: "The official JWT wordmark as an SVG for your docs.",
         url: "https://logos.com/jwt-svg",
@@ -278,8 +272,14 @@ export const goldenQueries: GoldenQuery[] = [
           "Start free, then pay per monthly active user for hosted auth.",
         url: "https://authvendor.io/pricing",
       },
+      {
+        title: "JWT Security Best Practices - OWASP",
+        snippet:
+          "Validate alg, nbf and exp claims; never put secrets in the payload; rotate signing keys.",
+        url: "https://owasp.org/jwt-best-practices",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 4],
     referenceAnswer:
       "Use short-lived signed access tokens, validate the signature and claims (exp, nbf, aud) on every request, keep the signing secret strong and rotated, and use refresh tokens for re-authentication.",
     rubric: [
@@ -305,19 +305,19 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://cruises.com/south-pacific",
       },
       {
-        title: "Geografia: os cinco oceanos do planeta",
-        snippet:
-          "O Pacífico é o maior oceano, seguido do Atlântico, Índico, Ártico e Antártico.",
-        url: "https://geografia.br/os-oceanos",
-      },
-      {
         title: "Ocean life: meet the marine animals",
         snippet:
           "From jellyfish to blue whales, explore the creatures that live in the sea.",
         url: "https://nature.com/ocean-animals",
       },
+      {
+        title: "Geografia: os cinco oceanos do planeta",
+        snippet:
+          "O Pacífico é o maior oceano, seguido do Atlântico, Índico, Ártico e Antártico.",
+        url: "https://geografia.br/os-oceanos",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer: "O maior oceano do mundo é o Oceano Pacífico.",
     rubric: [
       "Names the Pacific (Pacífico) as the largest ocean.",
@@ -342,19 +342,19 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://theatre.com/hamlet-tickets",
       },
       {
-        title: "William Shakespeare: the Bard of Avon",
-        snippet:
-          "Shakespeare wrote 39 plays including Hamlet, Macbeth and Othello, defining the English language stage.",
-        url: "https://bard.org/william-shakespeare",
-      },
-      {
         title: "What is a hamlet (settlement)?",
         snippet:
           "A hamlet is a small rural settlement, typically smaller than a village and without a church.",
         url: "https://geography.com/hamlet-settlement",
       },
+      {
+        title: "William Shakespeare: the Bard of Avon",
+        snippet:
+          "Shakespeare wrote 39 plays including Hamlet, Macbeth and Othello, defining the English language stage.",
+        url: "https://bard.org/william-shakespeare",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer: "Hamlet was written by William Shakespeare.",
     rubric: [
       "Names William Shakespeare as the author.",
@@ -377,12 +377,6 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://reactjs.org/brand",
       },
       {
-        title: "Why does my useEffect run twice? - Stack Overflow",
-        snippet:
-          "Updating state that is in the dependency array (or returning a new reference each render) re-runs the effect, which updates state again.",
-        url: "https://stackoverflow.com/q/useeffect-twice",
-      },
-      {
         title: "React Native: build mobile apps",
         snippet:
           "Use the latest JavaScript to build native iOS and Android apps with a single codebase.",
@@ -394,8 +388,14 @@ export const goldenQueries: GoldenQuery[] = [
           "Lifetime access to 40 hours of React and TypeScript video lessons.",
         url: "https://course.dev/react-pricing",
       },
+      {
+        title: "Why does my useEffect run twice? - Stack Overflow",
+        snippet:
+          "Updating state that is in the dependency array (or returning a new reference each render) re-runs the effect, which updates state again.",
+        url: "https://stackoverflow.com/q/useeffect-twice",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 4],
     referenceAnswer:
       "A useEffect infinite loop is usually caused by a dependency that changes on every render (a new object/function reference) or by updating state that is itself in the dependency array, which re-runs the effect, which updates the state again. Stabilize the dependency (useMemo/useCallback) or restructure the effect.",
     rubric: [
@@ -421,19 +421,19 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://appliance.com/electric-kettle",
       },
       {
-        title: "Water properties reference - Chemistry LibreTexts",
-        snippet:
-          "At 1 atm, water boils at 100 °C; the point drops with altitude as pressure falls.",
-        url: "https://chem.libretexts.com/water-properties",
-      },
-      {
         title: "Industrial water boiler for process heat",
         snippet:
           "Steam generators rated to 15 bar for continuous industrial use.",
         url: "https://industrial.com/water-boiler",
       },
+      {
+        title: "Water properties reference - Chemistry LibreTexts",
+        snippet:
+          "At 1 atm, water boils at 100 °C; the point drops with altitude as pressure falls.",
+        url: "https://chem.libretexts.com/water-properties",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer: "At sea level (1 atm), water boils at 100 °C (212 °F).",
     rubric: [
       "Gives 100 °C or 212 °F.",
@@ -457,19 +457,19 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://sports.com/football-boots",
       },
       {
-        title: "Why free kicks bend - BBC Sport",
-        snippet:
-          "Striking the ball off-centre spins it; the resulting Magnus effect is what bends a free kick around the wall.",
-        url: "https://bbc.com/sport/free-kicks",
-      },
-      {
         title: "Football (soccer) rules overview",
         snippet:
           "The basic laws of the game: offside, fouls, corners and how a match is structured.",
         url: "https://rules.com/soccer-laws",
       },
+      {
+        title: "Why free kicks bend - BBC Sport",
+        snippet:
+          "Striking the ball off-centre spins it; the resulting Magnus effect is what bends a free kick around the wall.",
+        url: "https://bbc.com/sport/free-kicks",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "The curve is caused by the Magnus effect: a spinning ball creates a pressure difference in the surrounding air that pushes it sideways, bending its trajectory.",
     rubric: [
@@ -494,19 +494,19 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://gardening.com/plant-light",
       },
       {
-        title: "The equation of photosynthesis - Khan Academy",
-        snippet:
-          "Carbon dioxide plus water, using light energy, yields glucose and oxygen.",
-        url: "https://khanacademy.org/photosynthesis-equation",
-      },
-      {
         title: "Succulent care 101",
         snippet:
           "Water less often, use a gritty mix, and give bright indirect light.",
         url: "https://plants101.com/succulents",
       },
+      {
+        title: "The equation of photosynthesis - Khan Academy",
+        snippet:
+          "Carbon dioxide plus water, using light energy, yields glucose and oxygen.",
+        url: "https://khanacademy.org/photosynthesis-equation",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "6 CO2 + 6 H2O + light energy -> C6H12O6 (glucose) + 6 O2.",
     rubric: [
@@ -531,19 +531,19 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://home.com/led-bulbs",
       },
       {
-        title: "The constant c in physics - HyperPhysics",
-        snippet:
-          "c = 299792458 m/s is the invariant speed that sets the maximum speed of causality.",
-        url: "https://hyperphysics.com/speed-of-light",
-      },
-      {
         title: "Fiber internet: gigabit 'speed of light' plans",
         snippet:
           "Blazing-fast fiber up to 1 Gbps. Marketing calls it the speed of light.",
         url: "https://isp.com/fiber-gigabit",
       },
+      {
+        title: "The constant c in physics - HyperPhysics",
+        snippet:
+          "c = 299792458 m/s is the invariant speed that sets the maximum speed of causality.",
+        url: "https://hyperphysics.com/speed-of-light",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "The speed of light in a vacuum is exactly 299,792,458 metres per second (about 3.00 x 10^8 m/s).",
     rubric: [
@@ -568,19 +568,19 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://costumes.com/mona-lisa-mask",
       },
       {
-        title: "Mona Lisa - Wikipedia",
-        snippet:
-          "The Mona Lisa is a portrait painting by the Italian Renaissance artist Leonardo da Vinci.",
-        url: "https://wikipedia.org/wiki/Mona_Lisa",
-      },
-      {
         title: "Mona Lisa (singer): discography",
         snippet:
           "A French singer-songwriter's albums, singles and touring dates.",
         url: "https://music.com/mona-lisa-singer",
       },
+      {
+        title: "Mona Lisa - Wikipedia",
+        snippet:
+          "The Mona Lisa is a portrait painting by the Italian Renaissance artist Leonardo da Vinci.",
+        url: "https://wikipedia.org/wiki/Mona_Lisa",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer: "The Mona Lisa was painted by Leonardo da Vinci.",
     rubric: [
       "Names Leonardo da Vinci as the painter.",
@@ -604,18 +604,18 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://grocery.com/baking-soda-4lb",
       },
       {
+        title: "Classic lemon drizzle cake recipe",
+        snippet: "A moist lemon cake with a sweet drizzle topping. Serves 10.",
+        url: "https://recipes.com/lemon-drizzle",
+      },
+      {
         title: "What is the difference? - wikiHow",
         snippet:
           "Baking powder contains baking soda plus an acid and starch, so it leavens on its own.",
         url: "https://wikihow.com/baking-soda-vs-powder",
       },
-      {
-        title: "Classic lemon drizzle cake recipe",
-        snippet: "A moist lemon cake with a sweet drizzle topping. Serves 10.",
-        url: "https://recipes.com/lemon-drizzle",
-      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "Baking soda is sodium bicarbonate alone and needs an acid to leaven; baking powder is baking soda plus a built-in acid (and usually starch), so it leavens by itself.",
     rubric: [
@@ -640,18 +640,18 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://treks.com/everest-base-camp",
       },
       {
+        title: "Mountain bike sale: full-suspension",
+        snippet: "Trail-ready full-suspension mountain bikes, from $699.",
+        url: "https://cycles.com/mountain-bike",
+      },
+      {
         title: "Highest peaks on Earth - Britannica",
         snippet:
           "Mount Everest is the highest mountain above sea level at 8,848.86 m.",
         url: "https://britannica.com/highest-peaks",
       },
-      {
-        title: "Mountain bike sale: full-suspension",
-        snippet: "Trail-ready full-suspension mountain bikes, from $699.",
-        url: "https://cycles.com/mountain-bike",
-      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "Mount Everest is the tallest mountain in the world (highest above sea level), at about 8,849 m.",
     rubric: [
@@ -675,19 +675,19 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://tires.com/all-season-prices",
       },
       {
-        title: "Spare tire change step by step - YouTube",
-        snippet:
-          "A 3-minute video walking through jacking, swapping and tightening the lug nuts.",
-        url: "https://youtube.com/watch/change-flat",
-      },
-      {
         title: "Alloy wheel accessories and caps",
         snippet:
           "Decorative wheel covers and valve caps to finish off your rims.",
         url: "https://auto.com/wheel-caps",
       },
+      {
+        title: "Spare tire change step by step - YouTube",
+        snippet:
+          "A 3-minute video walking through jacking, swapping and tightening the lug nuts.",
+        url: "https://youtube.com/watch/change-flat",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "Park on level ground, set the handbrake, loosen the lug nuts, jack up the car, remove the flat, fit the spare, tighten the nuts, and lower the car.",
     rubric: [
@@ -713,19 +713,19 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://techreview.com/iphone-16-pro",
       },
       {
-        title: "Apple unveils iPhone - Apple Newsroom (2007)",
-        snippet:
-          "Today Apple reinvented the phone. The iPhone combines three revolutionary devices.",
-        url: "https://apple.com/newsroom/2007-iphone",
-      },
-      {
         title: "iPhone cases and screen protectors",
         snippet:
           "Shop rugged cases and tempered-glass protectors for every iPhone model.",
         url: "https://cases.com/iphone",
       },
+      {
+        title: "Apple unveils iPhone - Apple Newsroom (2007)",
+        snippet:
+          "Today Apple reinvented the phone. The iPhone combines three revolutionary devices.",
+        url: "https://apple.com/newsroom/2007-iphone",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "The first iPhone was released in 2007 (announced January 2007, released June 29, 2007).",
     rubric: [
@@ -750,18 +750,18 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://techreview.com/mesh-wifi",
       },
       {
+        title: "Cable modem and router bundles",
+        snippet: "Save with a combo modem-router for your home internet.",
+        url: "https://isp.com/modem-router-bundle",
+      },
+      {
         title: "How to factory reset any router - CNET",
         snippet:
           "Find the reset pinhole, hold it with a paperclip until the status light flashes, and reconfigure.",
         url: "https://cnet.com/router-factory-reset",
       },
-      {
-        title: "Cable modem and router bundles",
-        snippet: "Save with a combo modem-router for your home internet.",
-        url: "https://isp.com/modem-router-bundle",
-      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "Press and hold the router's recessed reset button (with a paperclip) for about 10 seconds until the lights blink, which restores factory defaults.",
     rubric: [
@@ -786,18 +786,18 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://jewelry.com/gold-rings",
       },
       {
+        title: "Gold Rewards credit card benefits",
+        snippet: "Earn points on every purchase with the Gold Rewards card.",
+        url: "https://bank.com/gold-card",
+      },
+      {
         title: "The Periodic Table: Au (gold)",
         snippet:
           "Au, atomic number 79, a transition metal widely used in electronics.",
         url: "https://periodic-table.com/au",
       },
-      {
-        title: "Gold Rewards credit card benefits",
-        snippet: "Earn points on every purchase with the Gold Rewards card.",
-        url: "https://bank.com/gold-card",
-      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "The chemical symbol for gold is Au (from the Latin 'aurum').",
     rubric: [
@@ -805,11 +805,6 @@ export const goldenQueries: GoldenQuery[] = [
       "Does not give the symbol for a different element.",
     ],
   },
-  // The three entries below list an IRRELEVANT result first. The app pins the
-  // original top result for text search (rankSearchResults' preserveTopResults),
-  // so these are the cases where that pin costs the ranking something. Without
-  // them every entry's pinned result is relevant and the eval can't tell a
-  // good pin from a bad one.
   {
     id: "remove-stain-white-shirt",
     query: "how to remove a stain from a white shirt",
@@ -915,12 +910,6 @@ export const goldenQueries: GoldenQuery[] = [
       "Does not answer with a repair service or an insurance plan.",
     ],
   },
-  // The three entries below are about fictional organizations and products. The
-  // specific facts (a founding year, a battery figure, a payload figure) exist
-  // ONLY in the snippets, so the model cannot answer them from parametric
-  // knowledge: this forces the search-results path, which is exactly what the
-  // answer eval is meant to guard. If getFormattedSearchResults broke and
-  // returned nothing, these would fail.
   {
     id: "halcyon-robotics-founding",
     query: "When was the Halcyon Robotics Institute founded?",
@@ -938,24 +927,24 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://careers.com/robotics-fair",
       },
       {
+        title: "Robot building kits for kids",
+        snippet: "Snap-together robot kits, ages 8 and up. Ships free.",
+        url: "https://toys.com/robot-kits",
+      },
+      {
         title: "Halcyon Robotics Institute - Wikipedia",
         snippet:
           "The Halcyon Robotics Institute (HRI) is a research organization founded in 1987.",
         url: "https://wikipedia.org/wiki/Halcyon_Robotics_Institute",
       },
-      {
-        title: "Robot building kits for kids",
-        snippet: "Snap-together robot kits, ages 8 and up. Ships free.",
-        url: "https://toys.com/robot-kits",
-      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer: "The Halcyon Robotics Institute was founded in 1987.",
-    snippetOnly: true,
     rubric: [
       "States 1987 as the founding year.",
       "Does not give a different year or say it is unknown.",
     ],
+    snippetOnly: true,
   },
   {
     id: "nimbus-t3-battery",
@@ -973,25 +962,25 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://gadgets.com/laptop-stands",
       },
       {
+        title: "USB-C chargers and adapters",
+        snippet: "65W and 100W GaN chargers for laptops and phones.",
+        url: "https://gadgets.com/usb-c-chargers",
+      },
+      {
         title: "Nimbus T3 specifications",
         snippet:
           "Battery: up to 22 hours of video playback on a single charge.",
         url: "https://nimbuspc.com/t3-specs",
       },
-      {
-        title: "USB-C chargers and adapters",
-        snippet: "65W and 100W GaN chargers for laptops and phones.",
-        url: "https://gadgets.com/usb-c-chargers",
-      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "The Nimbus T3 laptop has up to 22 hours of battery life on a single charge.",
-    snippetOnly: true,
     rubric: [
       "States 22 hours of battery life.",
       "Does not give a different battery figure.",
     ],
+    snippetOnly: true,
   },
   {
     id: "gale-7-drone-payload",
@@ -1009,23 +998,23 @@ export const goldenQueries: GoldenQuery[] = [
         url: "https://drones.com/insurance",
       },
       {
-        title: "Gale-7 review: built for surveying",
-        snippet: "The Gale-7 carries up to 6.2 kg of survey equipment.",
-        url: "https://geospatial.com/gale-7-review",
-      },
-      {
         title: "Camera gimbals for drones",
         snippet: "3-axis gimbals for 4K cameras, from $199.",
         url: "https://dronegear.com/gimbals",
       },
+      {
+        title: "Gale-7 review: built for surveying",
+        snippet: "The Gale-7 carries up to 6.2 kg of survey equipment.",
+        url: "https://geospatial.com/gale-7-review",
+      },
     ],
-    relevant: [0, 2],
+    relevant: [0, 3],
     referenceAnswer:
       "The Gale-7 survey drone carries a maximum payload of 6.2 kg.",
-    snippetOnly: true,
     rubric: [
       "States 6.2 kg as the maximum payload.",
       "Does not give a different payload figure.",
     ],
+    snippetOnly: true,
   },
 ];
