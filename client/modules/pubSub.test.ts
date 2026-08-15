@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { addLogEntry } from "./logEntries";
+
+vi.mock("./logEntries", () => ({
+  addLogEntry: vi.fn(),
+}));
 
 beforeEach(() => {
   const storage: Record<string, string> = {};
@@ -14,6 +19,8 @@ beforeEach(() => {
       for (const k in storage) delete storage[k];
     },
   });
+  vi.clearAllMocks();
+  vi.resetModules();
 });
 
 describe("PubSub localStorage persistence", () => {
@@ -42,5 +49,49 @@ describe("PubSub localStorage persistence", () => {
     expect(getCurrentSettings()).toEqual(modified);
     const stored = JSON.parse(localStorage.getItem("settings") as string);
     expect(stored).toEqual(modified);
+  });
+
+  it("falls back to the default and drops the value when the stored JSON is corrupted", async () => {
+    localStorage.setItem("menuExpandedAccordions", "{not valid json");
+    const { menuExpandedAccordionsPubSub } = await import("./pubSub");
+    const [, , getMenuExpandedAccordions] = menuExpandedAccordionsPubSub;
+    expect(getMenuExpandedAccordions()).toEqual([]);
+    expect(localStorage.getItem("menuExpandedAccordions")).toBeNull();
+    expect(addLogEntry).toHaveBeenCalledWith(
+      "Discarded an unusable stored value for 'menuExpandedAccordions'",
+    );
+  });
+
+  it("falls back to the default and drops the value when the stored JSON has the wrong type", async () => {
+    localStorage.setItem("showFeatureTips", '"false"');
+    const { showFeatureTipsPubSub } = await import("./pubSub");
+    const [, , getTips] = showFeatureTipsPubSub;
+    expect(getTips()).toBe(true);
+    expect(localStorage.getItem("showFeatureTips")).toBeNull();
+    expect(addLogEntry).toHaveBeenCalledWith(
+      "Discarded an unusable stored value for 'showFeatureTips'",
+    );
+  });
+
+  it("falls back to the default and drops the value when the stored value is empty", async () => {
+    localStorage.setItem("menuExpandedAccordions", "");
+    const { menuExpandedAccordionsPubSub } = await import("./pubSub");
+    const [, , getMenuExpandedAccordions] = menuExpandedAccordionsPubSub;
+    expect(getMenuExpandedAccordions()).toEqual([]);
+    expect(localStorage.getItem("menuExpandedAccordions")).toBeNull();
+    expect(addLogEntry).toHaveBeenCalledWith(
+      "Discarded an unusable stored value for 'menuExpandedAccordions'",
+    );
+  });
+
+  it("keeps a dismissed feature-tips flag across a reload", async () => {
+    const { showFeatureTipsPubSub } = await import("./pubSub");
+    const [dismissTips] = showFeatureTipsPubSub;
+    dismissTips(false);
+    expect(localStorage.getItem("showFeatureTips")).toBe("false");
+    vi.resetModules();
+    const reloaded = await import("./pubSub");
+    const [, , getTips] = reloaded.showFeatureTipsPubSub;
+    expect(getTips()).toBe(false);
   });
 });

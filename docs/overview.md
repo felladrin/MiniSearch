@@ -303,6 +303,7 @@ Lightweight state persisted across sessions via `createLocalStoragePubSub` patte
 - `querySuggestions`: Shuffled search suggestion pool
 - `lastSearchTokenHash`: Cached security token hash
 - `menuExpandedAccordions`: UI state for settings menu sections
+- `showFeatureTips`: Whether the menu's dismissible feature-tips hint is still shown
 
 ## Application Bootstrap Flow
 
