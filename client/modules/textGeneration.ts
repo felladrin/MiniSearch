@@ -232,6 +232,8 @@ export async function searchAndRespond() {
 
   updateTextSearchResults([]);
 
+  updateLlmTextSearchResults([]);
+
   updateImageSearchResults([]);
 
   updateChatMessages([]);

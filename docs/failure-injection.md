@@ -9,7 +9,7 @@ needed.
 ## Degradation Matrix
 
 | Failure injected | Expected degradation | Where it is pinned |
-|---|---|---|
+| --- | --- | --- |
 | SearXNG answers 500 once, then recovers | Retried with exponential backoff, results returned | `server/webSearchService.test.ts` › retry logic |
 | SearXNG answers 500 on every attempt | Retry cycle exhausts (4 requests) and costs a single circuit-breaker failure | `server/webSearchService.test.ts` › graceful degradation |
 | SearXNG fails five cycles in a row | Circuit opens; further searches short-circuit without calling the upstream | `server/webSearchService.test.ts` › graceful degradation |
@@ -28,6 +28,7 @@ needed.
 | Text search returns nothing to the client | Keyword-only query retried as a fallback | `client/modules/textGeneration.degradation.test.ts` |
 | Keyword fallback also returns nothing | Text search state stays `completed` with the no-results alert | `client/modules/textGeneration.degradation.test.ts` |
 | SearXNG is down on the client | Text search state becomes `failed`, keyword fallback does not fire | `client/modules/textGeneration.degradation.test.ts` |
+| Client search fails after a previous search populated the LLM channel | The grounding channel is cleared, so the AI can't ground on the previous query's results | `client/modules/textGeneration.degradation.test.ts` |
 | Result page host resolves into a private range | Page skipped, no request is made | `server/pageContentService.test.ts` › fetchPageContents |
 | Result page redirects into a private range | Redirect not followed, page skipped | `server/pageContentService.test.ts` › fetchPageContents |
 | Result page errors, is not a document, or yields no text | That page is skipped, the others still return | `server/pageContentService.test.ts` › fetchPageContents |

@@ -7,6 +7,7 @@ const harness = vi.hoisted(() => {
     textGenerationState: "idle",
     textSearchState: "idle",
     textSearchResults: [] as unknown[],
+    llmTextSearchResults: [] as unknown[],
     pageContents: {} as Record<string, string>,
     searchRunId: "run-1",
     searchPromise: Promise.resolve({}) as Promise<unknown>,
@@ -41,7 +42,9 @@ vi.mock("./pubSub", () => ({
   updateConversationSummary: vi.fn(),
   updateImageSearchResults: vi.fn(),
   updateImageSearchState: vi.fn(),
-  updateLlmTextSearchResults: vi.fn(),
+  updateLlmTextSearchResults: (results: unknown[]) => {
+    harness.state.llmTextSearchResults = results;
+  },
   updatePageContents: (contents: Record<string, string>) => {
     harness.state.pageContents = contents;
   },
@@ -150,6 +153,7 @@ describe("search degradation", () => {
     harness.state.textGenerationState = "idle";
     harness.state.textSearchState = "idle";
     harness.state.textSearchResults = [];
+    harness.state.llmTextSearchResults = [];
     harness.state.settings.enableAiResponse = false;
     harness.state.settings.enableTextSearch = true;
     harness.stateTransitions.length = 0;
@@ -195,13 +199,21 @@ describe("search degradation", () => {
       new Error("HTTP error! status: 502"),
     );
 
+    // A previous search left the LLM grounding channel populated; the failed
+    // search must clear it so the AI can't ground on stale results.
+    harness.state.llmTextSearchResults = [
+      ["Stale result", "Old snippet", "https://stale.example.com"],
+    ];
+
     await searchAndRespond();
     await harness.state.searchPromise;
 
     // An outage is not an empty result set: the keyword fallback must not
-    // fire, and the search ends failed so the retry UI shows up.
+    // fire, the search ends failed so the retry UI shows up, and the stale
+    // grounding is dropped.
     expect(searchText).toHaveBeenCalledTimes(1);
     expect(harness.state.textSearchResults).toEqual([]);
+    expect(harness.state.llmTextSearchResults).toEqual([]);
     expect(harness.state.textSearchState).toBe("failed");
   });
 });
