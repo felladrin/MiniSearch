@@ -11,6 +11,14 @@
  * To grow the set, add an entry with the same shape. Keep the relevant labels
  * unambiguous (a result is clearly about the query or clearly not) so the
  * metric does not depend on a borderline call.
+ *
+ * Retrieval constraint: keep at least one relevant result OUTSIDE the top-3 of
+ * the input order (the `results` array). If an entry keeps both relevant
+ * results in the input top-3, a no-op reranker (which preserves input order)
+ * scores it as well as a working one, and the retrieval eval's floors stop
+ * being falsifiable. The "stays falsifiable" test in goldenSet.test.ts pins
+ * this; re-tune the floors in retrieval.integration.test.ts if the set changes
+ * substantially.
  */
 
 interface GoldenResult {

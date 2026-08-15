@@ -75,6 +75,14 @@ describe("retrieval eval (real reranker)", () => {
       const ranked = await rankSearchResults(golden.query, candidates, true);
       expect(ranked.length, `${golden.id}: empty ranking`).toBeGreaterThan(0);
 
+      // The pin is the point of the [1,3] entries: the first candidate must
+      // stay first regardless of the model's scores. A floor-only assert can't
+      // catch a broken pin (it would raise the mean), so pin it directly.
+      expect(
+        ranked[0][2],
+        `${golden.id}: preserveTopResults did not pin the first candidate`,
+      ).toBe(golden.results[0].url);
+
       const rankedUrls = ranked.map(([, , url]) => url);
       const relevantUrls = golden.relevant.map((i) => golden.results[i].url);
 

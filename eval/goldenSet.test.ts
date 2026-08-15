@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { goldenQueries } from "./goldenSet.ts";
+import { ndcgAtK, recallAtK } from "./metrics.ts";
 
 /**
  * Bumped deliberately whenever the golden set grows, so an edit to the set
@@ -7,6 +8,18 @@ import { goldenQueries } from "./goldenSet.ts";
  * retrieval.integration.test.ts.
  */
 const EXPECTED_QUERY_COUNT = 26;
+
+/**
+ * The identity-ranking (no-op reranker) baseline the retrieval eval's floors
+ * are placed against. If a golden entry keeps all its relevant results inside
+ * the top-K of the input order, a dead reranker scores as well as a working
+ * one and MIN_MEAN_NDCG / MIN_MEAN_RECALL in retrieval.integration.test.ts
+ * stop being falsifiable. These ceilings must stay below those floors
+ * (0.75 / 0.70); the current set sits at 0.587 / 0.500.
+ */
+const K = 3;
+const MAX_NOOP_MEAN_NDCG = 0.65;
+const MAX_NOOP_MEAN_RECALL = 0.6;
 
 // Sequences that String.replace treats as special. The app's getSystemPrompt
 // substitutes the search results into the prompt via String.replace, and
@@ -83,5 +96,31 @@ describe("golden set", () => {
 
   it("has the expected number of queries", () => {
     expect(goldenQueries).toHaveLength(EXPECTED_QUERY_COUNT);
+  });
+
+  it("stays falsifiable: a no-op reranker scores below the eval's floors", () => {
+    // Score the golden set as a reranker that just preserves the input order
+    // (the failure mode the retrieval eval exists to catch). If this mean
+    // climbs to the eval's floors, the set no longer distinguishes a working
+    // reranker from a dead one - usually because an entry keeps both relevant
+    // results in the input top-3.
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const scored = goldenQueries.map((g) => {
+      const urls = g.results.map((r) => r.url);
+      const relevant = g.relevant.map((i) => urls[i]);
+      return {
+        ndcg: ndcgAtK(urls, relevant, K),
+        recall: recallAtK(urls, relevant, K),
+      };
+    });
+
+    expect(
+      mean(scored.map((s) => s.ndcg)),
+      "a golden entry keeps its relevant results in the input top-3",
+    ).toBeLessThanOrEqual(MAX_NOOP_MEAN_NDCG);
+    expect(
+      mean(scored.map((s) => s.recall)),
+      "a golden entry keeps its relevant results in the input top-3",
+    ).toBeLessThanOrEqual(MAX_NOOP_MEAN_RECALL);
   });
 });
