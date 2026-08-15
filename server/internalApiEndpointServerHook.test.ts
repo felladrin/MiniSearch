@@ -806,5 +806,100 @@ describe("internalApiEndpointServerHook", () => {
       const payload = JSON.parse(response.end.mock.calls[0][0]);
       expect(payload.error).toBe("No model available");
     });
+
+    describe("error logging", () => {
+      it("logs only the error message when a stream fails", async () => {
+        vi.mocked(streamText).mockImplementation(
+          () =>
+            streamOf([
+              { type: "error", error: new Error("upstream exploded") },
+            ]) as never,
+        );
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+        try {
+          const handler = getRegisteredHandler();
+          const response = createResponse();
+          await handler(
+            createRequest({ messages: [{ role: "user", content: "hi" }] }),
+            response,
+            vi.fn(),
+          );
+          const streamingCall = errorSpy.mock.calls.find(
+            (call) => call[0] === "Error during streaming:",
+          );
+          expect(streamingCall).toBeDefined();
+          expect(streamingCall?.[1]).toBe("upstream exploded");
+          expect(
+            errorSpy.mock.calls.every((call) => !(call[1] instanceof Error)),
+          ).toBe(true);
+        } finally {
+          errorSpy.mockRestore();
+        }
+      });
+
+      it("logs only the error message on unexpected endpoint failure", async () => {
+        vi.mocked(streamText).mockImplementation(() => {
+          throw new Error("upstream down");
+        });
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+        try {
+          const handler = getRegisteredHandler();
+          const response = createResponse();
+          response.setHeader.mockImplementationOnce(() => {
+            throw new Error("setHeader exploded");
+          });
+          await handler(
+            createRequest({ messages: [{ role: "user", content: "hi" }] }),
+            response,
+            vi.fn(),
+          );
+          const endpointCall = errorSpy.mock.calls.find(
+            (call) => call[0] === "Error in internal API endpoint:",
+          );
+          expect(endpointCall).toBeDefined();
+          expect(endpointCall?.[1]).toBe("setHeader exploded");
+          expect(
+            errorSpy.mock.calls.every((call) => !(call[1] instanceof Error)),
+          ).toBe(true);
+          expect(response.statusCode).toBe(500);
+        } finally {
+          errorSpy.mockRestore();
+        }
+      });
+
+      it("logs only the error message when the model list fetch fails", async () => {
+        vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
+        vi.mocked(listOpenAiCompatibleModels).mockRejectedValue(
+          new Error("registry timeout"),
+        );
+        const errorSpy = vi
+          .spyOn(console, "error")
+          .mockImplementation(() => {});
+        try {
+          const handler = getRegisteredHandler();
+          const response = createResponse();
+          await handler(
+            createRequest({ messages: [{ role: "user", content: "hi" }] }),
+            response,
+            vi.fn(),
+          );
+          const fetchCall = errorSpy.mock.calls.find(
+            (call) => call[0] === "Error fetching models:",
+          );
+          expect(fetchCall).toBeDefined();
+          expect(fetchCall?.[1]).toBe("registry timeout");
+          expect(
+            errorSpy.mock.calls.every((call) => !(call[1] instanceof Error)),
+          ).toBe(true);
+          expect(response.statusCode).toBe(500);
+        } finally {
+          errorSpy.mockRestore();
+        }
+      });
+    });
   });
 });

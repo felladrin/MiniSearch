@@ -245,7 +245,10 @@ export function internalApiEndpointServerHook<
             const selectedModel = selectRandomModel(availableModels);
             model = selectedModel || undefined;
           } catch (error) {
-            console.error("Error fetching models:", error);
+            console.error(
+              "Error fetching models:",
+              error instanceof Error ? error.message : error,
+            );
             sendJsonError(response, 500, {
               error: "Failed to fetch available models",
             });
@@ -315,7 +318,10 @@ export function internalApiEndpointServerHook<
             throw new Error("Stream ended unexpectedly");
           } catch (error) {
             lastError = error;
-            console.error("Error during streaming:", error);
+            console.error(
+              "Error during streaming:",
+              error instanceof Error ? error.message : error,
+            );
 
             if (hasEmittedContent) break;
             if (attempt >= maxAttempts) break;
@@ -330,7 +336,12 @@ export function internalApiEndpointServerHook<
                   process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
                 );
               } catch (refetchError) {
-                console.warn("Failed to refetch models:", refetchError);
+                console.warn(
+                  "Failed to refetch models:",
+                  refetchError instanceof Error
+                    ? refetchError.message
+                    : refetchError,
+                );
               }
             }
 
@@ -363,7 +374,10 @@ export function internalApiEndpointServerHook<
           model,
         );
       } catch (error) {
-        console.error("Error in internal API endpoint:", error);
+        console.error(
+          "Error in internal API endpoint:",
+          error instanceof Error ? error.message : error,
+        );
         sendJsonError(response, 500, {
           error: "Internal server error",
           message: error instanceof Error ? error.message : "Unknown error",
