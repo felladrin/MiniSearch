@@ -32,9 +32,6 @@ const AccessPage = lazy(() => import("../Pages/AccessPage"));
 /** The server config while it is being fetched, or after the fetch failed. */
 type ConfigState = ServerConfig | "loading" | "unavailable";
 
-/**
- * Main application component with access key validation and routing
- */
 function App() {
   const config = useServerConfig();
   useInitializeSettings(config);
@@ -88,9 +85,6 @@ function FullScreenMessage({
 
 export default App;
 
-/**
- * Fetches the runtime server config once on mount.
- */
 function useServerConfig(): ConfigState {
   const [config, setConfig] = useState<ConfigState>("loading");
 
@@ -138,8 +132,6 @@ function useInitializeSettings(config: ConfigState) {
  * @remarks
  * Starts out unvalidated and stays that way while the config is missing, so an
  * unreachable server can never be mistaken for "access keys are disabled".
- *
- * @returns An object containing the validation state and loading state
  */
 function useAccessKeyValidation(config: ConfigState) {
   const [state, setState] = useState({

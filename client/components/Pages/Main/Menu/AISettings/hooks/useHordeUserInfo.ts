@@ -7,25 +7,15 @@ import {
 } from "@/modules/textGenerationWithHorde";
 import type { HordeUserInfo } from "../types";
 
-/**
- * Type alias for the settings object
- */
 type Settings = typeof defaultSettings;
 
-/**
- * Hook for fetching and managing AI Horde user information
- * @param settings - Application settings object
- * @returns Horde user information or null if not authenticated
- */
+/** The logged-in Horde user, or null when the key is empty or the anonymous one. */
 export const useHordeUserInfo = (settings: Settings) => {
   const [hordeUserInfo, setHordeUserInfo] = useState<HordeUserInfo | null>(
     null,
   );
 
   useEffect(() => {
-    /**
-     * Fetches user information from AI Horde API
-     */
     async function fetchUserInfo() {
       try {
         if (

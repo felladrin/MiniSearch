@@ -27,12 +27,7 @@ export class CircuitBreaker {
     this.options = { ...defaultOptions, ...options };
   }
 
-  /**
-   * Execute a function with circuit breaker protection
-   * @param key - Unique identifier for the circuit (e.g., model name)
-   * @param fn - Function to execute
-   * @returns Promise that resolves with the function result or rejects with an error
-   */
+  /** Runs `fn` under the named circuit, tripping it after repeated failures. */
   async execute<T>(key: string, fn: () => Promise<T>): Promise<T> {
     const metrics = this.getOrCreateMetrics(key);
 
@@ -54,11 +49,6 @@ export class CircuitBreaker {
     }
   }
 
-  /**
-   * Get the current state of a circuit
-   * @param key - Circuit identifier
-   * @returns Current circuit state
-   */
   getState(key: string): CircuitState {
     return this.metrics.get(key)?.state || "CLOSED";
   }

@@ -71,18 +71,12 @@ addLogEntry(
   }`,
 );
 
-/**
- * Core inference types that are always available.
- */
 const coreInferenceTypes = [
   { value: "browser", label: "In the browser" },
   { value: "openai", label: "Remote server (OpenAI-compatible API)" },
   { value: "horde", label: "AI Horde" },
 ] as const;
 
-/**
- * Returns the full list of inference types based on runtime server config.
- */
 export function getInferenceTypes(config: ServerConfig) {
   return [
     ...coreInferenceTypes,

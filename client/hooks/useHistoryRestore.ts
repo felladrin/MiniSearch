@@ -27,12 +27,7 @@ import {
 } from "../modules/pubSub";
 import type { ImageSearchResults, TextSearchResults } from "../modules/types";
 
-/**
- * Hook for restoring search history and navigating to previous searches
- * @param updateQuery - Function to update the query state
- * @param textAreaRef - Optional ref to the textarea element
- * @returns Object containing restoreSearch function
- */
+/** Restores a full search (results, AI response, chat) from a history entry and navigates to it. */
 export function useHistoryRestore(
   updateQuery: (query: string) => void,
   textAreaRef?: React.RefObject<HTMLTextAreaElement | null>,

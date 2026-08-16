@@ -1,13 +1,7 @@
 import { repository } from "@root/package.json";
 import { getSemanticVersion } from "@/modules/stringFormatters";
 
-/**
- * Application name extracted from repository URL
- */
 export const appName = repository.url.split("/").pop();
-/**
- * Full repository URL
- */
 export const appRepository = repository.url;
 /**
  * Application version with build timestamp and, when the build had a git
