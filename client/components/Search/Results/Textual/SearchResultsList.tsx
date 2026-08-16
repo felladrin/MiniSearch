@@ -1,103 +1,56 @@
-import {
-  Box,
-  em,
-  Flex,
-  Stack,
-  Text,
-  Tooltip,
-  Transition,
-  UnstyledButton,
-} from "@mantine/core";
-import { useMediaQuery, useReducedMotion } from "@mantine/hooks";
-import { useEffect, useState } from "react";
+import { Stack, Text, UnstyledButton } from "@mantine/core";
+import { memo } from "react";
 import { addLogEntry } from "@/modules/logEntries";
 import { getHostname } from "@/modules/stringFormatters";
 import type { TextSearchResult } from "@/modules/types";
+import classes from "./SearchResultsList.module.css";
+
+const ResultRow = memo(function ResultRow({
+  title,
+  snippet,
+  url,
+}: {
+  title: string;
+  snippet: string;
+  url: string;
+}) {
+  return (
+    <div className={classes.row} data-testid="search-result-row">
+      <UnstyledButton
+        variant="transparent"
+        component="a"
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-testid="search-result-link"
+        onClick={() => {
+          addLogEntry("User clicked a text result");
+        }}
+        className={classes.titleLink}
+      >
+        <Text fw={600} className={classes.title}>
+          {title}
+        </Text>
+      </UnstyledButton>
+      <Text size="xs" c="dimmed" className={classes.domain}>
+        {getHostname(url)}
+      </Text>
+      <Text size="sm" c="dimmed" className={classes.snippet}>
+        {snippet}
+      </Text>
+    </div>
+  );
+});
 
 export default function SearchResultsList({
   searchResults,
 }: {
   searchResults: TextSearchResult[];
 }) {
-  const shouldDisplayDomainBelowTitle = useMediaQuery(
-    `(max-width: ${em(720)})`,
-  );
-  const shouldReduceMotion = useReducedMotion();
-  const [canStartTransition, setCanStartTransition] = useState(false);
-
-  useEffect(() => {
-    setCanStartTransition(true);
-  }, []);
-
   return (
-    <Stack gap={40}>
-      {searchResults.map(([title, snippet, url], index) => (
-        <Transition
-          key={url}
-          mounted={canStartTransition}
-          transition="fade"
-          timingFunction="ease"
-          enterDelay={shouldReduceMotion ? 0 : Math.min(index, 5) * 40}
-          duration={shouldReduceMotion ? 0 : 250}
-        >
-          {(styles) => (
-            <Stack gap={16} style={styles}>
-              <Flex
-                gap={shouldDisplayDomainBelowTitle ? 0 : 16}
-                align="flex-start"
-                direction={shouldDisplayDomainBelowTitle ? "column" : "row"}
-              >
-                <Box
-                  w={shouldDisplayDomainBelowTitle ? "100%" : "auto"}
-                  flex={shouldDisplayDomainBelowTitle ? 0 : 1}
-                  style={{ overflow: "hidden" }}
-                >
-                  <UnstyledButton
-                    variant="transparent"
-                    component="a"
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-testid="search-result-link"
-                    onClick={() => {
-                      addLogEntry("User clicked a text result");
-                    }}
-                  >
-                    <Text
-                      fw="bold"
-                      c="var(--mantine-color-blue-3)"
-                      style={{
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {title}
-                    </Text>
-                  </UnstyledButton>
-                </Box>
-                <Tooltip label={url}>
-                  <UnstyledButton
-                    variant="transparent"
-                    component="a"
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    fs="italic"
-                    onClick={() => {
-                      addLogEntry("User clicked a text result");
-                    }}
-                  >
-                    {getHostname(url)}
-                  </UnstyledButton>
-                </Tooltip>
-              </Flex>
-              <Text size="sm" c="dimmed" style={{ wordWrap: "break-word" }}>
-                {snippet}
-              </Text>
-            </Stack>
-          )}
-        </Transition>
+    <Stack gap="md">
+      {searchResults.map(([title, snippet, url]) => (
+        <ResultRow key={url} title={title} snippet={snippet} url={url} />
       ))}
     </Stack>
   );

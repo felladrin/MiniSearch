@@ -13,6 +13,7 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
+import { useReducedMotion } from "@mantine/hooks";
 import {
   IconChartBar,
   IconClock,
@@ -44,6 +45,7 @@ export default function HistoryDrawer({
   const [activeTab, setActiveTab] = useState<string | null>("history");
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
   const [settings] = usePubSub(settingsPubSub);
+  const shouldReduceMotion = useReducedMotion();
   const {
     filteredSearches,
     groupedSearches,
@@ -220,7 +222,17 @@ export default function HistoryDrawer({
 
   if (!settings.enableHistory) {
     return (
-      <Drawer {...drawerProps} position="left" size="md" title="Search History">
+      <Drawer
+        {...drawerProps}
+        position="left"
+        size="md"
+        title="Search History"
+        transitionProps={{
+          transition: "slide-right",
+          duration: shouldReduceMotion ? 0 : 250,
+          timingFunction: "ease-out",
+        }}
+      >
         <Center h={200}>
           <Stack align="center" gap="xs">
             <Text c="dimmed">Search history is disabled</Text>
@@ -243,6 +255,11 @@ export default function HistoryDrawer({
           <Text fw={600}>Search History & Analytics</Text>
         </Group>
       }
+      transitionProps={{
+        transition: "slide-right",
+        duration: shouldReduceMotion ? 0 : 250,
+        timingFunction: "ease-out",
+      }}
     >
       <Tabs value={activeTab} onChange={setActiveTab}>
         <Tabs.List grow>

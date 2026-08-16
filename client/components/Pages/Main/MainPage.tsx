@@ -12,6 +12,8 @@ import {
 import { searchAndRespond } from "@/modules/textGeneration";
 import MenuButton from "./Menu/MenuButton";
 
+const HomePage = lazy(() => import("./HomePage"));
+
 const AiResponseSection = lazy(
   () => import("@/components/AiResponse/AiResponseSection"),
 );
@@ -42,13 +44,25 @@ export default function MainPage() {
         mih="100vh"
         justify={isQueryEmpty ? "center" : undefined}
       >
-        <SearchForm
-          query={query}
-          updateQuery={updateQuery}
-          additionalButtons={<MenuButton />}
-        />
-        {!isQueryEmpty && (
+        {isQueryEmpty ? (
+          <Suspense
+            fallback={
+              <SearchForm
+                query={query}
+                updateQuery={updateQuery}
+                additionalButtons={<MenuButton />}
+              />
+            }
+          >
+            <HomePage query={query} updateQuery={updateQuery} />
+          </Suspense>
+        ) : (
           <>
+            <SearchForm
+              query={query}
+              updateQuery={updateQuery}
+              additionalButtons={<MenuButton />}
+            />
             {settings.showEnableAiResponsePrompt && (
               <Suspense>
                 <EnableAiResponsePrompt

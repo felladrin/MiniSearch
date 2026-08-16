@@ -13,6 +13,7 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
+import { useReducedMotion } from "@mantine/hooks";
 import { repository } from "@root/package.json";
 import { IconBrandGithub, IconBulb } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
@@ -60,12 +61,18 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
   const [showFeatureTips, setShowFeatureTips] = usePubSub(
     showFeatureTipsPubSub,
   );
+  const shouldReduceMotion = useReducedMotion();
 
   return (
     <Drawer
       {...drawerProps}
       position="right"
       size="md"
+      transitionProps={{
+        transition: "slide-left",
+        duration: shouldReduceMotion ? 0 : 250,
+        timingFunction: "ease-out",
+      }}
       title={
         <Group gap="xs">
           <Tooltip label="View source code on GitHub">
