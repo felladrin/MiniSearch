@@ -1,0 +1,46 @@
+/* Flat, functional result rows: no cards, no decoration.
+   Only typographic hierarchy (scannability), a consistent snippet shape,
+   and cheap scroll rendering via content-visibility. */
+
+.row {
+  content-visibility: auto;
+  contain-intrinsic-size: 88px;
+  min-width: 0;
+}
+
+.titleLink {
+  display: block;
+  max-width: 100%;
+}
+
+.title {
+  font-size: 15px;
+  line-height: 1.4;
+  color: light-dark(var(--mantine-color-blue-7), var(--mantine-color-blue-3));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titleLink:hover .title,
+.titleLink:focus-visible .title {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.domain {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.snippet {
+  margin-top: 4px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
