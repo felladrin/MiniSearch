@@ -1,10 +1,7 @@
 import compression from "http-compression";
 import type { PreviewServer, ViteDevServer } from "vite";
 
-/**
- * Vite server hook for enabling HTTP compression
- * @param server - Vite dev server or preview server instance
- */
+/** Enables gzip/brotli compression on all responses. */
 export function compressionServerHook<T extends ViteDevServer | PreviewServer>(
   server: T,
 ) {

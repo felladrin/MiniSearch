@@ -10,19 +10,10 @@ import {
 import { getSystemPrompt } from "./systemPrompt";
 import type { ChatMessage } from "./types";
 
-/**
- * Default context size for text generation in tokens
- */
 export const defaultContextSize = 4096;
 
-/**
- * Number of top text search results included in the AI context
- */
 export const searchResultsToConsider = 6;
 
-/**
- * Custom error class for chat generation failures
- */
 export class ChatGenerationError extends Error {
   constructor(message: string) {
     super(message);
@@ -56,9 +47,6 @@ function getPageContentTokenBudget() {
  * Pages are served shortest-first, each taking at most an equal share of what
  * is left, so a single long article cannot crowd out the others and whatever
  * short pages leave unused rolls over to the ones that need it.
- *
- * @param contents - Extracted text per result, in result order; empty strings for results without page content
- * @returns Excerpts in the same order, trimmed to fit
  */
 export function allocatePageExcerpts(
   contents: string[],
@@ -116,10 +104,8 @@ function formatExcerpt(excerpt: string) {
 }
 
 /**
- * Formats search results for inclusion in chat prompts, appending the excerpt
- * read from each page when page content is available for it
- * @param shouldIncludeUrl - Whether to include URLs in the formatted output
- * @returns Formatted search results string
+ * Formats the results for the prompt, appending the excerpt read from each
+ * page when one is available for it.
  */
 export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
   const searchResults = getLlmTextSearchResults();
@@ -147,18 +133,11 @@ export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
     : formattedResults;
 }
 
-/**
- * Waits for search results if they are required before starting response generation
- */
 export async function canStartResponding() {
   updateTextGenerationState("awaitingSearchResults");
   await getSearchPromise();
 }
 
-/**
- * Gets default parameters for streaming chat completion requests
- * @returns Default chat completion parameters
- */
 export function getDefaultChatCompletionCreateParamsStreaming() {
   const settings = getSettings();
   return {

@@ -7,10 +7,6 @@ function generateSearchRunId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
-/**
- * Gets the current search run ID, generating one if it doesn't exist
- * @returns The current search run ID
- */
 export function getCurrentSearchRunId(): string {
   if (!currentSearchRunId) {
     currentSearchRunId = generateSearchRunId();
@@ -18,17 +14,10 @@ export function getCurrentSearchRunId(): string {
   return currentSearchRunId;
 }
 
-/**
- * Sets the current search run ID
- * @param id - The search run ID to set
- */
 export function setCurrentSearchRunId(id: string): void {
   currentSearchRunId = id;
 }
 
-/**
- * Resets the current search run ID to null
- */
 export function resetSearchRunId(): void {
   currentSearchRunId = null;
 }
@@ -58,9 +47,6 @@ function measurePerformance<T>(
   );
 }
 
-/**
- * Text search results structure
- */
 export interface TextResults {
   type: "text";
   items: Array<{
@@ -70,9 +56,6 @@ export interface TextResults {
   }>;
 }
 
-/**
- * Image search results structure
- */
 export interface ImageResults {
   type: "image";
   items: Array<{
@@ -83,9 +66,7 @@ export interface ImageResults {
   }>;
 }
 
-/**
- * Search history entry structure
- */
+/** One saved search; `results` is kept for entries written before the split text/image fields. */
 export interface SearchEntry {
   id?: number;
   searchRunId?: string;
@@ -201,32 +182,16 @@ class HistoryDatabase extends Dexie {
   }
 }
 
-/**
- * History database instance for search history management
- */
 export const historyDatabase = new HistoryDatabase();
 
-/**
- * Helper function to get results from a search entry with backward compatibility
- * @param entry - The search entry
- * @returns The appropriate results object (text or image) or null
- */
 export function getResultsFromEntry(
   entry: SearchEntry,
 ): TextResults | ImageResults | null {
-  // First try new structure
   if (entry.textResults) return entry.textResults;
   if (entry.imageResults) return entry.imageResults;
-
-  // Fallback to legacy structure
   return entry.results || null;
 }
 
-/**
- * Helper function to check if an entry has text results
- * @param entry - The search entry
- * @returns True if the entry has text results
- */
 export function hasTextResults(entry: SearchEntry): boolean {
   return !!(
     entry.textResults ||
@@ -234,11 +199,6 @@ export function hasTextResults(entry: SearchEntry): boolean {
   );
 }
 
-/**
- * Helper function to check if an entry has image results
- * @param entry - The search entry
- * @returns True if the entry has image results
- */
 export function hasImageResults(entry: SearchEntry): boolean {
   return !!(
     entry.imageResults ||
@@ -246,11 +206,6 @@ export function hasImageResults(entry: SearchEntry): boolean {
   );
 }
 
-/**
- * Updates search results for a given search run ID
- * @param searchRunId - The search run ID to update
- * @param results - The search results to update (text or image)
- */
 export async function updateSearchResults(
   searchRunId: string,
   results: TextResults | ImageResults,
@@ -277,13 +232,6 @@ export async function updateSearchResults(
   }
 }
 
-/**
- * Adds a search entry to the history
- * @param query - The search query
- * @param results - The search results (text or image)
- * @param source - The source of the search (user, followup, or suggestion)
- * @returns Promise resolving to the ID of the added entry
- */
 export async function addSearchToHistory(
   query: string,
   results: TextResults | ImageResults,
@@ -293,7 +241,7 @@ export async function addSearchToHistory(
     return await historyDatabase.searches.add({
       searchRunId: getCurrentSearchRunId(),
       query,
-      results, // Store in legacy field for backward compatibility
+      results,
       ...(results.type === "text"
         ? { textResults: results }
         : { imageResults: results }),
@@ -307,11 +255,6 @@ export async function addSearchToHistory(
   });
 }
 
-/**
- * Gets recent searches from history
- * @param limit - Maximum number of searches to retrieve
- * @returns Promise resolving to array of recent search entries
- */
 export async function getRecentSearches(
   limit: number = 10,
 ): Promise<SearchEntry[]> {

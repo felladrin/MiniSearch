@@ -16,77 +16,39 @@ import {
 } from "./textGenerationUtilities";
 import type { ChatMessage } from "./types";
 
-/**
- * Response from AI Horde API
- */
 interface HordeResponse {
-  /** Request ID */
   id: string;
-  /** Kudos cost for the request */
   kudos: number;
 }
 
-/**
- * Status response from AI Horde API
- */
 interface HordeStatusResponse {
-  /** Generated text results */
   generations?: { text: string; model: string }[];
-  /** Whether generation is complete */
   done?: boolean;
-  /** Whether generation failed */
   faulted?: boolean;
-  /** Whether generation is still possible */
   is_possible?: boolean;
 }
 
-/**
- * Model information from AI Horde
- */
 interface HordeModelInfo {
-  /** Model performance rating */
   performance: number;
-  /** Number of queued requests */
   queued: number;
-  /** Number of active jobs */
   jobs: number;
-  /** Estimated time to completion */
   eta: number;
-  /** Model type */
   type: string;
-  /** Model name */
   name: string;
-  /** Number of available instances */
   count: number;
 }
 
-/**
- * User information from AI Horde
- */
 interface HordeUserInfo {
-  /** Username */
   username: string;
-  /** Available kudos */
   kudos: number;
 }
 
-/**
- * Base URL for the public AI Horde API (browser-safe)
- */
 const AI_HORDE_BASE_URL = "https://aihorde.net/api/v2";
 
-/**
- * Client agent identifier for AI Horde API
- */
 const aiHordeClientAgent = `${appName}:${appVersion}:${appRepository}`;
-/**
- * Marker for user messages in chat history */
 const userMarker = "**USER**:";
-/**
- * Marker for assistant messages in chat history */
 const assistantMarker = "**ASSISTANT**:";
 
-// HTTP header constants for consistency
 const HTTP_HEADERS = {
   CONTENT_TYPE: "Content-Type",
   CLIENT_AGENT: "Client-Agent",
@@ -98,6 +60,7 @@ function buildHordeUrl(path: string) {
   return `${AI_HORDE_BASE_URL}${path}`;
 }
 
+/** Anonymous AI Horde API key; the lowest-priority tier when the horde is busy. */
 export const aiHordeDefaultApiKey = "0000000000";
 
 function getEffectiveHordeApiKey(
@@ -363,12 +326,10 @@ async function executeHordeGeneration(
       handleGenerationStatus(
         generation.id,
         (text: string) => {
-          // Atomic check and set to prevent race conditions
           if (!raceState.hasWinner) {
             raceState.winnerId = generation.id;
             raceState.hasWinner = true;
           }
-          // Only update if this generation is the winner
           if (raceState.winnerId === generation.id) {
             onUpdate(text);
           }
@@ -380,8 +341,9 @@ async function executeHordeGeneration(
     const winner = await Promise.race(statusPromises);
 
     await Promise.all(
-      generations.map(async (generation) => {
-        if (generation.id !== winner.generationId) {
+      generations
+        .filter((generation) => generation.id !== winner.generationId)
+        .map((generation) => {
           try {
             generation.ctrl.abort();
           } catch (abortError) {
@@ -389,15 +351,12 @@ async function executeHordeGeneration(
               `Failed to abort generation ${generation.id}: ${abortError}`,
             );
           }
-          try {
-            await cancelGeneration(generation.id);
-          } catch (cancelError) {
+          return cancelGeneration(generation.id).catch((cancelError: Error) => {
             addLogEntry(
               `Failed to cancel generation ${generation.id}: ${cancelError}`,
             );
-          }
-        }
-      }),
+          });
+        }),
     );
 
     return winner.result;

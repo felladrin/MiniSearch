@@ -4,23 +4,13 @@ import { addLogEntry } from "./logEntries";
 import { getSearchTokenHash } from "./searchTokenHash";
 import type { ImageSearchResults, TextSearchResults } from "./types";
 
-/**
- * Configuration constants for search caching
- */
 const CACHE_CONFIG = {
-  /** Time to live for cache entries in milliseconds */
   TTL: 15 * 60 * 1000,
-  /** Maximum number of entries to cache */
   MAX_ENTRIES: 100,
-  /** Whether caching is enabled */
   ENABLED: true,
-  /** Cache write operations before pruning */
   PRUNE_INTERVAL: 10,
-  /** Metrics logging interval */
   METRICS_LOG_INTERVAL: 10,
-  /** Request timeout in milliseconds */
   REQUEST_TIMEOUT: 30000,
-  /** Maximum query length */
   MAX_QUERY_LENGTH: 2000,
 } as const;
 
@@ -29,17 +19,11 @@ const cacheConfig: {
   maxEntries: number;
   enabled: boolean;
 } = {
-  /** Time to live for cache entries in milliseconds */
   ttl: CACHE_CONFIG.TTL,
-  /** Maximum number of entries to cache */
   maxEntries: CACHE_CONFIG.MAX_ENTRIES,
-  /** Whether caching is enabled */
   enabled: CACHE_CONFIG.ENABLED,
 };
 
-/**
- * Metrics for tracking cache performance
- */
 const cacheMetrics = {
   textHits: 0,
   textMisses: 0,
@@ -48,27 +32,16 @@ const cacheMetrics = {
   totalOperations: 0,
   maxMetricsValue: Number.MAX_SAFE_INTEGER - 1000,
 
-  /**
-   * Calculates the text search cache hit rate
-   * @returns Hit rate as a percentage between 0 and 1
-   */
   getTextHitRate(): number {
     const total = this.textHits + this.textMisses;
     return total > 0 ? this.textHits / total : 0;
   },
 
-  /**
-   * Calculates the image search cache hit rate
-   * @returns Hit rate as a percentage between 0 and 1
-   */
   getImageHitRate(): number {
     const total = this.imageHits + this.imageMisses;
     return total > 0 ? this.imageHits / total : 0;
   },
 
-  /**
-   * Logs current cache performance metrics
-   */
   logPerformance(): void {
     addLogEntry(
       `Cache performance - Text: ${(this.getTextHitRate() * 100).toFixed(1)}% hits, ` +
@@ -76,9 +49,6 @@ const cacheMetrics = {
     );
   },
 
-  /**
-   * Resets all metrics to prevent overflow
-   */
   resetMetrics(): void {
     this.textHits = 0;
     this.textMisses = 0;
@@ -87,16 +57,10 @@ const cacheMetrics = {
     this.totalOperations = 0;
   },
 
-  /**
-   * Increments total operations counter
-   */
   incrementTotalOperations(): void {
     this.totalOperations = this.safeIncrement(this.totalOperations);
   },
 
-  /**
-   * Checks if metrics should be logged and potentially reset
-   */
   shouldLogAndReset(): boolean {
     return (
       this.totalOperations % CACHE_CONFIG.METRICS_LOG_INTERVAL === 0 &&
@@ -104,9 +68,6 @@ const cacheMetrics = {
     );
   },
 
-  /**
-   * Safely increments a metric value, preventing overflow
-   */
   safeIncrement(current: number, increment: number = 1): number {
     const maxValue = this.maxMetricsValue;
     if (current >= maxValue) {
@@ -204,35 +165,19 @@ async function executeCachedSearch<T extends SearchResults>(
   return results;
 }
 
-/**
- * Base interface for search cache entries
- */
 interface SearchCacheEntry {
-  /** Unique key for the cache entry */
   key: string;
-  /** Timestamp when the entry was created */
   timestamp: number;
 }
 
-/**
- * Interface for text search cache entries
- */
 interface TextSearchCache extends SearchCacheEntry {
-  /** Cached text search results */
   results: TextSearchResults;
 }
 
-/**
- * Interface for image search cache entries
- */
 interface ImageSearchCache extends SearchCacheEntry {
-  /** Cached image search results */
   results: ImageSearchResults;
 }
 
-/**
- * IndexedDB database for search cache management
- */
 class SearchCacheDatabase extends Dexie {
   textSearchHistory!: Table<TextSearchCache, string>;
   imageSearchHistory!: Table<ImageSearchCache, string>;
@@ -246,9 +191,6 @@ class SearchCacheDatabase extends Dexie {
     });
   }
 
-  /**
-   * Resets the cache write counter
-   */
   resetCacheWriteCount(): void {
     this._cacheWriteCount = 0;
   }
@@ -414,14 +356,12 @@ const searchService = {
     query: string,
     limit?: number,
   ): Promise<T> {
-    // Validate endpoint type
     if (!["text", "images"].includes(endpoint)) {
       throw new Error(
         `Invalid endpoint type: ${endpoint}. Must be "text" or "images"`,
       );
     }
 
-    // Validate query
     if (!query || query.trim() === "") {
       throw new Error("Query cannot be empty or whitespace only");
     }
@@ -535,19 +475,10 @@ const searchService = {
 
   async clearSearchCache(): Promise<void> {
     try {
-      // Close existing connection before deletion
       await db.close();
-
-      // Delete and recreate database
       await db.delete();
-
-      // Reset cache write counter
       db.resetCacheWriteCount();
-
-      // Reopen database with same schema
       await db.open();
-
-      // Reset metrics
       cacheMetrics.resetMetrics();
 
       addLogEntry("Search cache cleared successfully");
@@ -571,7 +502,6 @@ const searchService = {
   },
 
   updateCacheConfig(newConfig: Partial<typeof cacheConfig>) {
-    // Validate configuration values
     if (newConfig.ttl !== undefined && newConfig.ttl < 0) {
       throw new Error(
         `Invalid TTL value: ${newConfig.ttl}. TTL must be non-negative`,

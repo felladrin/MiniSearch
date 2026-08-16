@@ -1,10 +1,7 @@
 import { argon2Verify } from "hash-wasm";
 import type { PreviewServer, ViteDevServer } from "vite";
 
-/**
- * Vite server hook for validating access keys
- * @param server - Vite dev server or preview server instance
- */
+/** POST /api/validate-access-key: checks an argon2id hash against the configured `ACCESS_KEYS`. */
 export function validateAccessKeyServerHook<
   T extends ViteDevServer | PreviewServer,
 >(server: T) {

@@ -5,10 +5,6 @@ import type { ServerResponse } from "node:http";
  * upstream must not be able to pin the server's memory, and callers that only
  * need the head of a document (page text, thumbnails) gain nothing from the
  * tail anyway.
- *
- * @param response - The response whose body should be read
- * @param maxBytes - Upper bound on how many bytes to read
- * @returns The bytes read, and whether the body was truncated by the cap
  */
 export async function readCappedBytes(
   response: Response,
@@ -48,13 +44,7 @@ export async function readCappedBytes(
   return { bytes, truncated: !reachedEnd };
 }
 
-/**
- * Calculate backoff time with exponential jitter
- * @param attempt - Current attempt number (1-based)
- * @param baseDelayMs - Base delay in milliseconds (default: 100ms)
- * @param maxDelayMs - Maximum delay in milliseconds (default: 5000ms)
- * @returns Calculated delay in milliseconds
- */
+/** Calculates the backoff delay for a retry attempt, with jitter. */
 export function calculateBackoffTime(
   attempt: number,
   baseDelayMs = 100,
@@ -64,21 +54,10 @@ export function calculateBackoffTime(
   return delay * (0.7 + Math.random() * 0.3);
 }
 
-/**
- * Check if a response is still writable
- * @param response - The HTTP response object
- * @returns boolean indicating if the response can still be written to
- */
 export function isResponseWritable(response: ServerResponse): boolean {
   return !response.writableEnded && !response.destroyed;
 }
 
-/**
- * Safely write to a response stream
- * @param response - The HTTP response object
- * @param data - Data to write
- * @returns boolean indicating if the write was successful
- */
 export function safeWriteResponse(
   response: ServerResponse,
   data: string,
@@ -93,11 +72,6 @@ export function safeWriteResponse(
   }
 }
 
-/**
- * Safely end a response
- * @param response - The HTTP response object
- * @param data - Optional data to write before ending
- */
 export function safeEndResponse(response: ServerResponse, data?: string): void {
   if (response.writableEnded || response.destroyed) return;
 

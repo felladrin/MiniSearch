@@ -95,7 +95,6 @@ const inferenceStrategyLoaders: Record<
   },
 };
 
-/** Returns the resolved strategy for the current inference type. */
 async function getCurrentInferenceStrategy(): Promise<InferenceStrategy> {
   const type = getSettings().inferenceType as string;
   const effective: InferenceType =
@@ -103,7 +102,6 @@ async function getCurrentInferenceStrategy(): Promise<InferenceStrategy> {
   return inferenceStrategyLoaders[effective]();
 }
 
-/** Returns true when the effective inference type needs the model-download gate. */
 function needsModelDownloadGate(): boolean {
   const type = getSettings().inferenceType as string;
   return (
@@ -217,9 +215,8 @@ function summarizeDroppedMessages(
 }
 
 /**
- * Initiates a search and generates an AI response for the current query.
- * Updates the document title, clears previous responses, and starts text search.
- * If AI responses are enabled, generates a response using the configured inference type.
+ * Runs the search for the current query and, when AI responses are enabled,
+ * generates an answer with the configured backend after it completes.
  */
 export async function searchAndRespond() {
   if (getQuery() === "") return;
@@ -287,11 +284,6 @@ export async function searchAndRespond() {
   );
 }
 
-/**
- * Generates a chat response using AI for the given messages.
- * @param newMessages - Array of chat messages to generate response for
- * @param onUpdate - Callback function called with partial response updates
- */
 export async function generateChatResponse(
   newMessages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
@@ -522,9 +514,6 @@ function canDownloadModels(): Promise<void> {
   });
 }
 
-/**
- * Collection of text generation utility functions for external use.
- */
 export const textGenerationFunctions = {
   getCurrentModelName,
   getConversationId,

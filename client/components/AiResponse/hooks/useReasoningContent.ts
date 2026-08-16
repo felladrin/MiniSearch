@@ -3,9 +3,9 @@ import { useCallback } from "react";
 import { settingsPubSub } from "@/modules/pubSub";
 
 /**
- * Hook for extracting reasoning content from AI responses
- * @param text - The full text response from the AI
- * @returns Object containing separated reasoning and main content
+ * Splits a streamed AI response into the part between the reasoning markers
+ * and the rest, flagging `isGenerating` while the closing marker has not
+ * arrived yet.
  */
 export function useReasoningContent(text: string) {
   const [settings] = usePubSub(settingsPubSub);

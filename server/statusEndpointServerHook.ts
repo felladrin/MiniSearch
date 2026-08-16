@@ -11,15 +11,9 @@ import {
 import { getVerifiedTokensAmount } from "./verifiedTokens.ts";
 import { getWebSearchStatus } from "./webSearchService.ts";
 
-/**
- * Server start time for uptime calculation
- */
 const serverStartTime = Date.now();
 
-/**
- * Vite server hook for providing status endpoint
- * @param server - Vite dev server or preview server instance
- */
+/** Serves `/status`: uptime, search counters, and the health of the reranker and SearXNG. */
 export function statusEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
 >(server: T) {
@@ -42,6 +36,18 @@ export function statusEndpointServerHook<
       ? "healthy"
       : "unhealthy";
 
+    // `vite.config.ts` sets this define with `JSON.stringify`, so in a Vite
+    // build it is always a valid JSON string literal; the guard only fires if
+    // a non-Vite consumer sets it to something malformed.
+    let gitCommit: string;
+    try {
+      gitCommit = JSON.parse(
+        server.config.define?.VITE_COMMIT_SHORT_HASH || '""',
+      );
+    } catch {
+      throw new Error("Malformed VITE_COMMIT_SHORT_HASH build define");
+    }
+
     const status = {
       uptime: prettyMilliseconds(Date.now() - serverStartTime, {
         verbose: true,
@@ -61,9 +67,7 @@ export function statusEndpointServerHook<
         timestamp: new Date(
           server.config.define?.VITE_BUILD_DATE_TIME || "",
         ).toISOString(),
-        gitCommit: JSON.parse(
-          server.config.define?.VITE_COMMIT_SHORT_HASH || '""',
-        ),
+        gitCommit,
       },
     };
 

@@ -97,14 +97,12 @@ describe("MenuDrawer", () => {
     }
   });
 
-  it("shows the tips with both search URLs when enabled", async () => {
+  it("shows the tips with the search URL when enabled", async () => {
     await renderMenuDrawer(createMenuState({ showFeatureTips: true }));
 
     expect(screen.getByText("Tips")).toBeInTheDocument();
     expect(screen.getByText(/Search from anywhere/)).toBeInTheDocument();
     expect(screen.getByText(/\/\?q=%s/)).toBeInTheDocument();
-    expect(screen.getByText(/\/\?q=\{Query\}/)).toBeInTheDocument();
-    expect(screen.getByText(/Raycast Quicklink/)).toBeInTheDocument();
     expect(
       screen.getByText(/use the speaker button on an answer/),
     ).toBeInTheDocument();

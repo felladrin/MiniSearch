@@ -7,18 +7,11 @@ const WllamaModelSelect = lazy(
   () => import("@/components/AiResponse/WllamaModelSelect"),
 );
 
-/**
- * Props for the BrowserSettings component
- */
 interface BrowserSettingsProps {
-  /** Form instance for managing browser AI settings */
   form: UseFormReturnType<typeof defaultSettings>;
 }
 
-/**
- * Component for managing browser-based AI settings.
- * Provides controls for model selection and CPU thread configuration.
- */
+/** Browser inference settings: the model to run (lazy-loaded) and its CPU threads. */
 export const BrowserSettings = ({ form }: BrowserSettingsProps) => (
   <>
     <Suspense fallback={<Skeleton height={50} />}>

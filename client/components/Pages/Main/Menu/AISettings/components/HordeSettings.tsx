@@ -4,22 +4,13 @@ import type { defaultSettings } from "@/modules/settings";
 import { aiHordeDefaultApiKey } from "@/modules/textGenerationWithHorde";
 import type { HordeUserInfo, ModelOption } from "../types";
 
-/**
- * Props for the HordeSettings component
- */
 interface HordeSettingsProps {
-  /** Form instance for managing Horde AI settings */
   form: UseFormReturnType<typeof defaultSettings>;
-  /** User information from AI Horde, or null if not logged in */
   hordeUserInfo: HordeUserInfo | null;
-  /** Available models from AI Horde */
   hordeModels: ModelOption[];
 }
 
-/**
- * Component for managing AI Horde settings.
- * Provides controls for API key input and model selection.
- */
+/** AI Horde settings: the API key (with the anonymous-mode hint) and an optional model pin. */
 export const HordeSettings = ({
   form,
   hordeUserInfo,
