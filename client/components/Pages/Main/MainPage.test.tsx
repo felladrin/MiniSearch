@@ -122,44 +122,18 @@ describe("MainPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows the AI opt-in in the empty state before searching", async () => {
+  it("keeps the AI opt-in hidden until the first search", async () => {
     await renderMainPage(
       createPageState({ settings: { showEnableAiResponsePrompt: true } }),
     );
 
-    expect(
-      await screen.findByTestId("enable-ai-response-prompt"),
-    ).toBeInTheDocument();
-  });
-
-  it("enables AI response without triggering a search when accepted in the empty state", async () => {
-    const user = userEvent.setup();
-    const { setSettings } = await renderMainPage(
-      createPageState({ settings: { showEnableAiResponsePrompt: true } }),
-    );
-
-    await user.click(await screen.findByRole("button", { name: "Accept" }));
-
-    expect(setSettings).toHaveBeenCalledWith({
-      showEnableAiResponsePrompt: false,
-      enableAiResponse: true,
-    });
-    expect(searchAndRespond).not.toHaveBeenCalled();
-  });
-
-  it("disables AI response without triggering a search when declined in the empty state", async () => {
-    const user = userEvent.setup();
-    const { setSettings } = await renderMainPage(
-      createPageState({ settings: { showEnableAiResponsePrompt: true } }),
-    );
-
-    await user.click(await screen.findByRole("button", { name: "Decline" }));
-
-    expect(setSettings).toHaveBeenCalledWith({
-      showEnableAiResponsePrompt: false,
-      enableAiResponse: false,
-    });
-    expect(searchAndRespond).not.toHaveBeenCalled();
+    // findBy, not queryBy: the prompt is lazy, so a synchronous query would
+    // pass even if MainPage did render it.
+    await expect(
+      screen.findByTestId("enable-ai-response-prompt", undefined, {
+        timeout: 300,
+      }),
+    ).rejects.toThrow();
   });
 
   it("shows search results once a search is underway and the query is non-empty", async () => {

@@ -47,29 +47,29 @@ export default function MainPage() {
           updateQuery={updateQuery}
           additionalButtons={<MenuButton />}
         />
-        {settings.showEnableAiResponsePrompt && (
-          <Suspense>
-            <EnableAiResponsePrompt
-              onAccept={() => {
-                setSettings({
-                  ...settings,
-                  showEnableAiResponsePrompt: false,
-                  enableAiResponse: true,
-                });
-                if (!isQueryEmpty) searchAndRespond();
-              }}
-              onDecline={() =>
-                setSettings({
-                  ...settings,
-                  showEnableAiResponsePrompt: false,
-                  enableAiResponse: false,
-                })
-              }
-            />
-          </Suspense>
-        )}
         {!isQueryEmpty && (
           <>
+            {settings.showEnableAiResponsePrompt && (
+              <Suspense>
+                <EnableAiResponsePrompt
+                  onAccept={() => {
+                    setSettings({
+                      ...settings,
+                      showEnableAiResponsePrompt: false,
+                      enableAiResponse: true,
+                    });
+                    searchAndRespond();
+                  }}
+                  onDecline={() =>
+                    setSettings({
+                      ...settings,
+                      showEnableAiResponsePrompt: false,
+                      enableAiResponse: false,
+                    })
+                  }
+                />
+              </Suspense>
+            )}
             {!settings.showEnableAiResponsePrompt &&
               textGenerationState !== "idle" && (
                 <Suspense>
