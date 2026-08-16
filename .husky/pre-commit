@@ -1,2 +1,6 @@
 #!/usr/bin/env sh
-npm install --no-save @biomejs/biome && npx @biomejs/biome check --write --staged --no-errors-on-unmatched && git diff --name-only --cached | while read -r file; do [ -f "$file" ] && git add "$file"; done
+npm install --no-save @biomejs/biome
+if git diff --cached --name-only | grep -qE '\.(ts|tsx|js|jsx|mjs|cjs)$'; then
+  npx @biomejs/biome check --write --staged --no-errors-on-unmatched
+fi
+git diff --cached --name-only --diff-filter=d | while read -r file; do [ -f "$file" ] && git add "$file"; done
