@@ -7,11 +7,13 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: resolve(__dirname, "client/setupTests.ts"),
     // Loads the real model; runs via vitest.integration.config.ts instead.
+    // The offline eval integration tests run via vitest.eval.config.ts.
     exclude: [
       "**/node_modules/**",
       "**/dist/**",
       "e2e/**",
       "server/**/*.integration.test.ts",
+      "eval/**/*.integration.test.ts",
     ],
     alias: {
       "@": resolve(__dirname, "client"),
