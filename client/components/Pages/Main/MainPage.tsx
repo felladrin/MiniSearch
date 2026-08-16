@@ -10,9 +10,8 @@ import {
   textSearchStatePubSub,
 } from "@/modules/pubSub";
 import { searchAndRespond } from "@/modules/textGeneration";
+import HomePage from "./HomePage";
 import MenuButton from "./Menu/MenuButton";
-
-const HomePage = lazy(() => import("./HomePage"));
 
 const AiResponseSection = lazy(
   () => import("@/components/AiResponse/AiResponseSection"),
@@ -45,17 +44,7 @@ export default function MainPage() {
         justify={isQueryEmpty ? "center" : undefined}
       >
         {isQueryEmpty ? (
-          <Suspense
-            fallback={
-              <SearchForm
-                query={query}
-                updateQuery={updateQuery}
-                additionalButtons={<MenuButton />}
-              />
-            }
-          >
-            <HomePage query={query} updateQuery={updateQuery} />
-          </Suspense>
+          <HomePage query={query} updateQuery={updateQuery} />
         ) : (
           <>
             <SearchForm
