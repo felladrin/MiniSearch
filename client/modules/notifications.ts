@@ -8,8 +8,7 @@ export const REQUEST_PERMISSION_TIMEOUT_MS = 8000;
  * Requests permission to show browser notifications. Some browsers can
  * silently never resolve this request (e.g. Brave has been observed doing
  * this on localhost), so it falls back to "default" after a timeout instead
- * of leaving the caller waiting forever
- * @returns Promise resolving to the notification permission state
+ * of leaving the caller waiting forever.
  */
 export async function requestNotificationPermission(): Promise<NotificationPermission> {
   if (!("Notification" in window)) {
@@ -38,9 +37,8 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 }
 
 /**
- * Shows a browser notification when AI generation is complete, unless the
- * user already has this page focused
- * @param query - The search query that triggered the AI generation
+ * Shows a browser notification that the AI answer is ready, unless this page
+ * already has the focus.
  */
 export function showAiCompleteNotification(query: string) {
   if (!("Notification" in window)) {

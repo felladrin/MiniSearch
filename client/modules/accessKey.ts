@@ -27,9 +27,8 @@ async function hashAccessKey(accessKey: string): Promise<string> {
 }
 
 /**
- * Validates an access key by hashing it and sending it to the server for validation
- * @param accessKey - The plain text access key to validate
- * @returns Promise<boolean> - True if the access key is valid, false otherwise
+ * Validates the key against the server; on success the hash is stored locally
+ * so later loads can go through `verifyStoredAccessKey`.
  */
 export async function validateAccessKey(accessKey: string): Promise<boolean> {
   try {
@@ -64,9 +63,8 @@ export async function validateAccessKey(accessKey: string): Promise<boolean> {
 }
 
 /**
- * Verifies a stored access key hash against the server
- * @param timeoutHours - How long a validated key stays usable; 0 requires validation on every load
- * @returns Promise<boolean> - True if the stored access key is still valid, false otherwise
+ * Re-validates the stored hash, still usable for `timeoutHours` since it was
+ * first validated; 0 means every load asks for the key again.
  */
 export async function verifyStoredAccessKey(
   timeoutHours: number,

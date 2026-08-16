@@ -1,9 +1,6 @@
 import type { PreviewServer, ViteDevServer } from "vite";
 
-/**
- * Vite server hook for configuring cache control headers
- * @param server - Vite dev server or preview server instance
- */
+/** Cache-Control per asset class: immutable for hashed assets, no-cache for HTML. */
 export function cacheServerHook<T extends ViteDevServer | PreviewServer>(
   server: T,
 ) {

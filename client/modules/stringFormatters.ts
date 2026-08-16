@@ -1,10 +1,5 @@
 import uFuzzy from "@leeoniya/ufuzzy";
 
-/**
- * Extracts hostname from a URL, removing www. prefix
- * @param url - The URL to extract hostname from
- * @returns The hostname without www. prefix, or the original string if parsing fails
- */
 export function getHostname(url: string) {
   try {
     return new URL(url).hostname.replace("www.", "");
@@ -13,11 +8,6 @@ export function getHostname(url: string) {
   }
 }
 
-/**
- * Converts a date to semantic version format (YYYY.MM.DD)
- * @param date - The date to convert
- * @returns Semantic version string
- */
 export function getSemanticVersion(date: number | string | Date) {
   const targetDate =
     typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
@@ -26,11 +16,6 @@ export function getSemanticVersion(date: number | string | Date) {
   return `${targetDate.getUTCFullYear()}.${targetDate.getUTCMonth() + 1}.${targetDate.getUTCDate()}`;
 }
 
-/**
- * Formats a timestamp as relative time (e.g., "2h ago", "3d ago")
- * @param timestamp - The timestamp to format
- * @returns Relative time string
- */
 export function formatRelativeTime(timestamp: number): string {
   const now = Date.now();
   const diff = now - timestamp;
@@ -58,14 +43,7 @@ const uf = new uFuzzy({
 
 const infoThresh = 1000;
 
-/**
- * Fuzzy search implementation using uFuzzy library
- * @param items - Array of items to search through
- * @param query - Search query string
- * @param extractText - Function to extract searchable text from each item
- * @param limit - Maximum number of results to return
- * @returns Array of items with their search scores
- */
+/** Fuzzy-matches the items with uFuzzy and returns the ranked matches with a 0..1 score. */
 export function searchWithFuzzy<T>(
   items: T[],
   query: string,
@@ -98,11 +76,6 @@ export function searchWithFuzzy<T>(
   }));
 }
 
-/**
- * Groups search results by date categories (Today, Yesterday, This Week, etc.)
- * @param items - Array of items with timestamps to group
- * @returns Object with date group keys as properties and arrays of items as values
- */
 export function groupSearchResultsByDate<T>(
   items: Array<{ item: T; timestamp: number }>,
 ): Record<string, Array<{ item: T; timestamp: number }>> {

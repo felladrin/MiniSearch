@@ -124,11 +124,8 @@ async function handleRanking(
 }
 
 /**
- * Sets up search endpoint middleware for the Vite server.
- * Handles both text and image search requests with token verification, result ranking, and thumbnail processing.
- *
- * @param server - The Vite dev server or preview server instance
- * @returns void - Modifies the server middleware in place
+ * Serves `/search/text` and `/search/images`: verified requests go through
+ * SearXNG, with reranking, score filtering, and thumbnail data-URLs.
  */
 export function searchEndpointServerHook<
   T extends ViteDevServer | PreviewServer,

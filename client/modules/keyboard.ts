@@ -1,11 +1,6 @@
 import type { KeyboardEvent } from "react";
 
-/**
- * Handles Enter key press events for form submission
- * @param event - The keyboard event from the textarea
- * @param settings - Object containing enterToSubmit setting
- * @param onSubmit - Callback function to execute when Enter key should submit
- */
+/** Submits on Enter when the setting allows, ignoring the Enter that confirms an IME composition. */
 export const handleEnterKeyDown = (
   event: KeyboardEvent<HTMLTextAreaElement>,
   settings: { enterToSubmit: boolean },
