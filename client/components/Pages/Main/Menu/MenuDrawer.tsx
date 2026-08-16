@@ -124,9 +124,7 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
               <Text size="xs" lh="sm">
                 Search from anywhere: add{" "}
                 <Code>{`${self.location.origin}/?q=%s`}</Code> as your browser's
-                custom search engine, or{" "}
-                <Code>{`${self.location.origin}/?q={Query}`}</Code> as a Raycast
-                Quicklink.
+                custom search engine.
               </Text>
               <Text size="xs" lh="sm">
                 Turn on AI Response, then use the speaker button on an answer to
