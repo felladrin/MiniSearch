@@ -3,6 +3,7 @@ import { usePubSub } from "create-pubsub/react";
 import {
   type ChangeEvent,
   type KeyboardEvent,
+  memo,
   type ReactNode,
   useCallback,
   useEffect,
@@ -51,7 +52,7 @@ interface SearchFormState {
   suggestedQuery: string;
 }
 
-export default function SearchForm({
+export default memo(function SearchForm({
   query,
   updateQuery,
   additionalButtons,
@@ -273,4 +274,4 @@ export default function SearchForm({
       </Stack>
     </form>
   );
-}
+});
