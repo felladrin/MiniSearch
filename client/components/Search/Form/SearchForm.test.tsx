@@ -1,7 +1,10 @@
 import { MantineProvider } from "@mantine/core";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import SearchForm from "@/components/Search/Form/SearchForm";
+import SearchForm, {
+  resetAutoSearchedQuery,
+} from "@/components/Search/Form/SearchForm";
+import { searchAndRespond } from "@/modules/textGeneration";
 
 vi.mock("create-pubsub/react", () => ({
   usePubSub: vi.fn((pubSub: unknown) => {
@@ -68,6 +71,12 @@ const waitForPlaceholder = async () => {
 };
 
 describe("SearchForm component", () => {
+  beforeEach(() => {
+    vi.mocked(searchAndRespond).mockClear();
+    resetAutoSearchedQuery();
+    window.history.replaceState({}, "", "/");
+  });
+
   it("renders textarea with placeholder when empty", async () => {
     const mockUpdate = vi.fn();
     renderSearchForm("", mockUpdate);
@@ -85,5 +94,27 @@ describe("SearchForm component", () => {
     await user.click(button);
 
     expect(mockUpdate).toHaveBeenCalledWith("test query");
+  });
+
+  it("does not re-trigger the search when the form remounts for the same query", async () => {
+    window.history.replaceState({}, "", "/?q=remount-case");
+    const { unmount } = renderSearchForm("remount case", vi.fn());
+    await waitFor(() => expect(searchAndRespond).toHaveBeenCalledTimes(1));
+
+    unmount();
+    renderSearchForm("remount case", vi.fn());
+    await waitFor(() =>
+      expect(screen.getByRole("textbox")).toBeInTheDocument(),
+    );
+
+    expect(searchAndRespond).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs the search only once when the url query has surrounding whitespace", async () => {
+    window.history.replaceState({}, "", "/?q=whitespace-case+");
+    renderSearchForm("whitespace case ", vi.fn());
+    await waitFor(() => expect(searchAndRespond).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(searchAndRespond).toHaveBeenCalledTimes(1);
   });
 });

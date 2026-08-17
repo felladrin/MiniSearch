@@ -151,6 +151,7 @@ class ArchitecturalLinter {
       lines.length > 100 &&
       content.includes("export function") &&
       !content.includes("React.memo") &&
+      !content.includes("memo(") &&
       (content.includes("useEffect") ||
         content.includes("useState") ||
         content.includes("useCallback") ||

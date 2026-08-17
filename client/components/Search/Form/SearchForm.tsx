@@ -3,6 +3,7 @@ import { usePubSub } from "create-pubsub/react";
 import {
   type ChangeEvent,
   type KeyboardEvent,
+  memo,
   type ReactNode,
   useCallback,
   useEffect,
@@ -32,12 +33,26 @@ function getUrlQuery() {
   return new URLSearchParams(window.location.search).get("q");
 }
 
+/**
+ * The query whose auto-search already ran. Module-level so it survives
+ * the remount when MainPage swaps HomePage for SearchForm as the query
+ * goes from empty to non-empty. Kept as a single slot (not a Set) so it
+ * suppresses only the most recent auto-search, matching the behavior the
+ * user expects when navigating back to a previously searched query.
+ */
+let autoSearchedQuery: string | null = null;
+
+/** Exposed for tests to reset module state between runs. */
+export function resetAutoSearchedQuery(): void {
+  autoSearchedQuery = null;
+}
+
 interface SearchFormState {
   textAreaValue: string;
   suggestedQuery: string;
 }
 
-export default function SearchForm({
+export default memo(function SearchForm({
   query,
   updateQuery,
   additionalButtons,
@@ -47,7 +62,6 @@ export default function SearchForm({
   additionalButtons?: ReactNode;
 }) {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
-  const autoInitializedQueriesRef = useRef(new Set<string>());
   const defaultSuggestedQuery = "Anything you need!";
   const [state, setState] = useState<SearchFormState>({
     textAreaValue: query,
@@ -76,39 +90,25 @@ export default function SearchForm({
   useEffect(() => {
     const initializeComponent = async () => {
       const urlQuery = getUrlQuery();
+      const normalizedUrlQuery = urlQuery?.trim();
 
-      if (urlQuery && !autoInitializedQueriesRef.current.has(urlQuery)) {
-        autoInitializedQueriesRef.current.add(urlQuery);
+      if (
+        normalizedUrlQuery &&
+        normalizedUrlQuery !== autoSearchedQuery &&
+        !isRestoringFromHistory
+      ) {
+        const hasRestoredResults =
+          textSearchResults.length > 0 || imageSearchResults.length > 0;
+        const hasRestoredResponse = responseValue.trim().length > 0;
+        if (hasRestoredResults || hasRestoredResponse) return;
+
+        if (!urlQuery) return;
+        autoSearchedQuery = normalizedUrlQuery;
         updateQuery(urlQuery);
         setState((prevState) => ({
           ...prevState,
           textAreaValue: urlQuery,
         }));
-        await sleepUntilIdle();
-        searchAndRespond();
-      }
-    };
-
-    initializeComponent();
-  }, [updateQuery]);
-
-  useEffect(() => {
-    const initializeComponent = async () => {
-      const urlQuery = getUrlQuery();
-      const normalizedUrlQuery = urlQuery?.trim();
-
-      const hasRestoredResults =
-        textSearchResults.length > 0 || imageSearchResults.length > 0;
-      const hasRestoredResponse = responseValue.trim().length > 0;
-
-      if (
-        normalizedUrlQuery &&
-        !autoInitializedQueriesRef.current.has(normalizedUrlQuery) &&
-        !isRestoringFromHistory &&
-        !hasRestoredResults &&
-        !hasRestoredResponse
-      ) {
-        autoInitializedQueriesRef.current.add(normalizedUrlQuery);
         await sleepUntilIdle();
 
         try {
@@ -127,6 +127,7 @@ export default function SearchForm({
 
     void initializeComponent();
   }, [
+    updateQuery,
     isRestoringFromHistory,
     textSearchResults.length,
     imageSearchResults.length,
@@ -190,7 +191,7 @@ export default function SearchForm({
     const normalizedQuery = queryToEncode.trim();
 
     if (normalizedQuery.length > 0) {
-      autoInitializedQueriesRef.current.add(normalizedQuery);
+      autoSearchedQuery = normalizedQuery;
     }
 
     setState((prev) => ({ ...prev, textAreaValue: queryToEncode }));
@@ -273,4 +274,4 @@ export default function SearchForm({
       </Stack>
     </form>
   );
-}
+});
