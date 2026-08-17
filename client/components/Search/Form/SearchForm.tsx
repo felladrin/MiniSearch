@@ -101,6 +101,7 @@ export default function SearchForm({
         const hasRestoredResponse = responseValue.trim().length > 0;
         if (hasRestoredResults || hasRestoredResponse) return;
 
+        if (!urlQuery) return;
         autoSearchedQuery = normalizedUrlQuery;
         updateQuery(urlQuery);
         setState((prevState) => ({
