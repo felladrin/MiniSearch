@@ -12,6 +12,7 @@ export default function LoadingModelContent({
   const percent =
     isLoadingComplete || isLoadingStarting ? 100 : modelLoadingProgress;
   const strokeColor = percent === 100 ? "#52c41a" : "#3385ff";
+  const isModelSizeKnown = modelSizeInMegabytes > 0;
   const downloadedSize = (modelSizeInMegabytes * modelLoadingProgress) / 100;
   const sizeText = `${downloadedSize.toFixed(0)} MB / ${modelSizeInMegabytes.toFixed(0)} MB`;
 
@@ -24,11 +25,13 @@ export default function LoadingModelContent({
         <Stack gap="xs">
           <Progress color={strokeColor} value={percent} animated />
           {!isLoadingStarting && (
-            <Group justify="space-between">
-              <Text size="sm" c="dimmed">
-                {sizeText}
-              </Text>
-              <Text size="sm" c="dimmed">
+            <Group>
+              {isModelSizeKnown && (
+                <Text size="sm" c="dimmed">
+                  {sizeText}
+                </Text>
+              )}
+              <Text size="sm" c="dimmed" ml="auto">
                 {percent.toFixed(1)}%
               </Text>
             </Group>

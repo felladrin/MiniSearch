@@ -94,9 +94,13 @@ async function generateWithWllama({
   try {
     const progressCallback: ProgressCallback | undefined = shouldCheckCanRespond
       ? ({ loaded, total }) => {
+          if (total <= 0) return;
           const progressPercentage = Math.round((loaded / total) * 100);
           if (loadingPercentage !== progressPercentage) {
             loadingPercentage = progressPercentage;
+            // Republished on every step so the size is never missed by a
+            // subscriber that mounted after the initial estimate.
+            updateModelSizeInMegabytes(total / 1024 / 1024);
             updateModelLoadingProgress(progressPercentage);
           }
         }
