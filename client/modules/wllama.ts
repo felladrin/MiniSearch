@@ -134,12 +134,7 @@ const createDefaultModelConfig = (): Omit<
   flash_attn: true,
   contextSize: defaultContextSize,
   shouldIncludeUrlsOnPrompt: true,
-  getSampling: () => ({
-    samplers: "top_k;temperature",
-    temperature: 0.35,
-    dynatemp_range: 0.15,
-    top_k: 40,
-  }),
+  getSampling: () => ({}),
 });
 
 export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
