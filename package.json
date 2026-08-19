@@ -51,7 +51,7 @@
     "dexie": "^4.0.11",
     "dotenv": "^17.0.0",
     "embla-carousel-react": "^8.3.0",
-    "gpt-tokenizer": "^3.0.0",
+    "gpt-tokenizer": "^4.0.0",
     "hash-wasm": "^4.11.0",
     "helper-git-hash": "^1.0.0",
     "html-to-text": "^10.0.0",
