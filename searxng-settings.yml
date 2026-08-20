@@ -15,13 +15,3 @@ server:
 search:
   formats:
     - json
-
-# Engines are merged into the upstream defaults by name; only the keys below are
-# overridden. Engines left unlisted keep their upstream default.
-engines:
-  - name: yahoo
-    disabled: false
-    weight: 0.5
-  - name: mwmbl
-    disabled: false
-    weight: 0.1
