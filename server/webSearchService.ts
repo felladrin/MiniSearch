@@ -5,6 +5,7 @@ import { strip as stripEmojis } from "node-emoji";
 import {
   incrementSearchesWithAllResultsDiscardedSinceLastRestart,
   incrementSearchesWithoutResultsSinceLastRestart,
+  incrementSearchesWithUnresponsiveEnginesSinceLastRestart,
 } from "./searchesSinceLastRestart.ts";
 import { CircuitBreaker } from "./utils/circuitBreaker.ts";
 
@@ -152,12 +153,24 @@ async function performSearch(
     const results = Array.isArray(data.results) ? data.results : [];
 
     if (results.length === 0) {
-      incrementSearchesWithoutResultsSinceLastRestart();
       const reason = describeUnresponsiveEngines(data.unresponsive_engines);
+
+      // SearXNG answers 200 with an empty result set when its engines are
+      // rate-limited, suspended or CAPTCHA-challenged, so the only sign that
+      // the search layer is down arrives in `unresponsive_engines`. Returned as
+      // an empty array it is indistinguishable from a query that genuinely
+      // matches nothing, and the user is told there are no results for a query
+      // that works again once the engines recover.
+      if (reason) {
+        incrementSearchesWithUnresponsiveEnginesSinceLastRestart();
+        throw new Error(
+          `No results returned from SearXNG. Unresponsive engines: ${reason}`,
+        );
+      }
+
+      incrementSearchesWithoutResultsSinceLastRestart();
       printMessage(
-        reason
-          ? `No results returned from SearXNG. Unresponsive engines: ${reason}`
-          : "No results returned from SearXNG. No engine errors were reported; all engines returned zero results.",
+        "No results returned from SearXNG. No engine errors were reported; all engines returned zero results.",
       );
     }
 

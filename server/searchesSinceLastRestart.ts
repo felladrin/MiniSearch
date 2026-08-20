@@ -18,11 +18,12 @@ export function incrementGraphicalSearchesSinceLastRestart() {
   graphicalSearchesSinceLastRestart++;
 }
 
-// The two counters below stand in for the per-search log lines that used to
-// carry the query text: how often either case happens is what anyone acts on,
-// and that survives without recording what was searched for.
+// The three counters below stand in for the per-search log lines that used to
+// carry the query text: how often each case happens is what anyone acts on, and
+// that survives without recording what was searched for.
 
 let searchesWithoutResultsSinceLastRestart = 0;
+let searchesWithUnresponsiveEnginesSinceLastRestart = 0;
 let searchesWithAllResultsDiscardedSinceLastRestart = 0;
 
 export function getSearchesWithoutResultsSinceLastRestart() {
@@ -31,6 +32,14 @@ export function getSearchesWithoutResultsSinceLastRestart() {
 
 export function incrementSearchesWithoutResultsSinceLastRestart() {
   searchesWithoutResultsSinceLastRestart++;
+}
+
+export function getSearchesWithUnresponsiveEnginesSinceLastRestart() {
+  return searchesWithUnresponsiveEnginesSinceLastRestart;
+}
+
+export function incrementSearchesWithUnresponsiveEnginesSinceLastRestart() {
+  searchesWithUnresponsiveEnginesSinceLastRestart++;
 }
 
 export function getSearchesWithAllResultsDiscardedSinceLastRestart() {
