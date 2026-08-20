@@ -225,7 +225,8 @@ The `/status` endpoint returns a JSON object:
 | `graphicalSearches` | number | Image search count since last restart |
 | `averageTextualSearchesPerSession` | number | Text searches / sessions ratio |
 | `averageGraphicalSearchesPerSession` | number | Image searches / sessions ratio |
-| `searchesWithoutResults` | number | Searches, text and image together, that SearXNG answered with zero results |
+| `searchesWithoutResults` | number | Searches, text and image together, that SearXNG answered with zero results and no unresponsive engines |
+| `searchesWithUnresponsiveEngines` | number | Searches, text and image together, that SearXNG answered with zero results while naming unresponsive engines |
 | `searchesWithAllResultsDiscarded` | number | Text searches whose results were all dropped during processing |
 | `rerankerServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `webSearchServiceStatus` | string | `"healthy"` or `"unhealthy"` |
@@ -233,13 +234,18 @@ The `/status` endpoint returns a JSON object:
 | `build.timestamp` | string | ISO 8601 build time |
 | `build.gitCommit` | string | Short Git commit hash |
 
-`searchesWithoutResults` and `searchesWithAllResultsDiscarded` are the aggregate
-form of two log lines that used to carry the query text. The log still names the
-unresponsive engines behind an empty response and the size and type of a
-discarded batch; how often either happens is read from here instead. The
-discarded count covers text searches only, because an image result is never
-dropped at this stage: an unusable thumbnail is dropped later, when
-`searchEndpointServerHook` fetches it.
+The three `searches...` counters are the aggregate form of the log lines that
+used to carry the query text. The log still names the unresponsive engines
+behind an empty response and the size and type of a discarded batch; how often
+each happens is read from here instead. `searchesWithoutResults` counts only
+the searches that genuinely matched nothing, since an empty response naming
+unresponsive engines fails the search rather than returning zero results (see
+`docs/failure-injection.md`); `searchesWithUnresponsiveEngines` counts those,
+which is the way to tell whether the case is being over-classified. It
+undercounts a sustained outage, where the circuit breaker short-circuits before
+`performSearch` is reached. The discarded count covers text searches only,
+because an image result is never dropped at this stage: an unusable
+thumbnail is dropped later, when `searchEndpointServerHook` fetches it.
 
 `pageReads` reports what happened to the pages read for AI answers. Each field
 is attached to a constant that someone will want to move, which is the reason it

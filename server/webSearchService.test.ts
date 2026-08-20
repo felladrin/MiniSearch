@@ -11,6 +11,7 @@ import {
 import {
   getSearchesWithAllResultsDiscardedSinceLastRestart,
   getSearchesWithoutResultsSinceLastRestart,
+  getSearchesWithUnresponsiveEnginesSinceLastRestart,
 } from "./searchesSinceLastRestart";
 import { CircuitBreaker } from "./utils/circuitBreaker";
 import {
@@ -321,6 +322,37 @@ describe("graceful degradation", () => {
     expect(noResults).toEqual([]);
   });
 
+  it("treats an empty response naming unresponsive engines as a failure", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 1 });
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [],
+          unresponsive_engines: [["google", "CAPTCHA"]],
+        }),
+      ),
+    );
+    const searchesWithoutResults = getSearchesWithoutResultsSinceLastRestart();
+    const searchesWithUnresponsiveEngines =
+      getSearchesWithUnresponsiveEnginesSinceLastRestart();
+
+    const search = fetchSearXNG("failure injection", "text", 30, breaker);
+    const outcome = expect(search).rejects.toThrow("google (CAPTCHA)");
+    await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_TOTAL_MS);
+    await outcome;
+
+    expect(breaker.getState("searxng")).toBe("OPEN");
+    // Rate limits and CAPTCHA do not clear inside the backoff, and a retry
+    // would push another request into the engine that just refused.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(getSearchesWithoutResultsSinceLastRestart()).toBe(
+      searchesWithoutResults,
+    );
+    expect(getSearchesWithUnresponsiveEnginesSinceLastRestart()).toBe(
+      searchesWithUnresponsiveEngines + 1,
+    );
+  });
+
   it("throws when SearXNG answers 200 with a malformed body", async () => {
     fetchMock.mockResolvedValue(createMockResponse("<html>gateway</html>"));
 
@@ -423,13 +455,17 @@ describe("query privacy", () => {
   }
 
   it("never writes the query to the log", async () => {
-    for (const response of [emptyResponse(), unusableResultsResponse()]) {
-      fetchMock.mockResolvedValue(response);
-      await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
-    }
+    fetchMock.mockResolvedValue(unusableResultsResponse());
+    await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
 
-    // The malformed body and the network failure both make fetchSearXNG
-    // throw; the point here is that neither path ever logs the query.
+    // The unresponsive engines, the malformed body and the network failure all
+    // make fetchSearXNG throw; the point here is that no path ever logs the
+    // query.
+    fetchMock.mockResolvedValue(emptyResponse());
+    await expect(
+      fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker()),
+    ).rejects.toThrow("Unresponsive engines");
+
     fetchMock.mockResolvedValue(createMockResponse("<html>gateway</html>"));
     await expect(
       fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker()),
@@ -455,16 +491,36 @@ describe("query privacy", () => {
     }
   });
 
-  it("still reports the unresponsive engines behind an empty response", async () => {
+  it("still names the unresponsive engines behind a failed empty response", async () => {
     fetchMock.mockResolvedValue(emptyResponse());
-    const before = getSearchesWithoutResultsSinceLastRestart();
 
-    await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
+    await expect(
+      fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker()),
+    ).rejects.toThrow();
 
     expect(logLines.join("\n")).toContain(
       "Unresponsive engines: google (Timeout)",
     );
-    expect(getSearchesWithoutResultsSinceLastRestart()).toBe(before + 1);
+  });
+
+  it("counts an empty response with no engine errors as a search without results", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(JSON.stringify({ results: [] })),
+    );
+    const searchesWithoutResults = getSearchesWithoutResultsSinceLastRestart();
+
+    const results = await fetchSearXNG(
+      DISTINCTIVE_QUERY,
+      "text",
+      30,
+      new CircuitBreaker(),
+    );
+
+    expect(results).toEqual([]);
+    expect(logLines.join("\n")).toContain("No engine errors were reported");
+    expect(getSearchesWithoutResultsSinceLastRestart()).toBe(
+      searchesWithoutResults + 1,
+    );
   });
 
   it("still reports the count and search type of a discarded batch", async () => {

@@ -6,6 +6,7 @@ import {
   getGraphicalSearchesSinceLastRestart,
   getSearchesWithAllResultsDiscardedSinceLastRestart,
   getSearchesWithoutResultsSinceLastRestart,
+  getSearchesWithUnresponsiveEnginesSinceLastRestart,
   getTextualSearchesSinceLastRestart,
 } from "./searchesSinceLastRestart.ts";
 import { getVerifiedTokensAmount } from "./verifiedTokens.ts";
@@ -58,6 +59,8 @@ export function statusEndpointServerHook<
       averageTextualSearchesPerSession,
       averageGraphicalSearchesPerSession,
       searchesWithoutResults: getSearchesWithoutResultsSinceLastRestart(),
+      searchesWithUnresponsiveEngines:
+        getSearchesWithUnresponsiveEnginesSinceLastRestart(),
       searchesWithAllResultsDiscarded:
         getSearchesWithAllResultsDiscardedSinceLastRestart(),
       rerankerServiceStatus,
