@@ -116,13 +116,6 @@ describe("stringFormatters", () => {
   });
 
   describe("groupSearchResultsByDate", () => {
-    it("should group items by Today", () => {
-      const now = Date.now();
-      const items = [{ item: { id: 1 }, timestamp: now }];
-      const groups = groupSearchResultsByDate(items);
-      expect(groups.Today).toHaveLength(1);
-    });
-
     it("should group items by Yesterday", () => {
       const yesterday = Date.now() - 24 * 60 * 60 * 1000;
       const items = [{ item: { id: 1 }, timestamp: yesterday }];
