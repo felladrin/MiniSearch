@@ -8,6 +8,10 @@ vi.mock("node:dns/promises", () => ({
   lookup: lookupMock,
 }));
 
+vi.mock("pdf-parse", () => ({
+  default: vi.fn().mockResolvedValue({ text: "" }),
+}));
+
 import {
   extractReadableText,
   fetchPageContents,
@@ -406,13 +410,29 @@ describe("page read counters", () => {
       httpError: 1,
     });
 
+    // A PDF is no longer dropped as notADocument; it goes through the passage
+    // pipeline and is counted as read (or tooLittleText if the text is short).
+    const { default: pdfParse } = await import("pdf-parse");
+    vi.mocked(pdfParse).mockResolvedValue({
+      text: "CAT SLEEPS 16 HOURS A DAY. ".repeat(20),
+      info: {},
+    } as never);
     fetchMock.mockResolvedValue(
-      new Response("%PDF-1.7", {
+      new Response("%PDF-1.7\n%%EOF", {
         status: 200,
         headers: { "content-type": "application/pdf" },
       }),
     );
-    expect((await countOutcomes("https://example.com/a.pdf")).skipped).toEqual({
+    const pdfOutcome = await countOutcomes("https://example.com/a.pdf");
+    expect(pdfOutcome.read).toBe(1);
+    // The notADocument case is still covered by a non-document type.
+    fetchMock.mockResolvedValue(
+      new Response("binary goo", {
+        status: 200,
+        headers: { "content-type": "application/octet-stream" },
+      }),
+    );
+    expect((await countOutcomes("https://example.com/x.bin")).skipped).toEqual({
       notADocument: 1,
     });
   });
@@ -605,15 +625,35 @@ describe("fetchPageContents", () => {
 
   it("skips responses that are not documents", async () => {
     fetchMock.mockResolvedValue(
-      new Response("%PDF-1.7", {
+      new Response("binary goo", {
+        status: 200,
+        headers: { "content-type": "application/octet-stream" },
+      }),
+    );
+
+    expect(
+      await fetchPageContents("cats", ["https://example.com/x.bin"]),
+    ).toEqual([]);
+  });
+
+  it("reads a PDF and returns its text as passages", async () => {
+    const { default: pdfParse } = await import("pdf-parse");
+    vi.mocked(pdfParse).mockResolvedValue({
+      text: "CAT SLEEPS 16 HOURS A DAY. ".repeat(20),
+      info: {},
+    } as never);
+    fetchMock.mockResolvedValue(
+      new Response("%PDF-1.7\nCAT SLEEPS 16 HOURS A DAY.\n%%EOF", {
         status: 200,
         headers: { "content-type": "application/pdf" },
       }),
     );
 
-    expect(
-      await fetchPageContents("cats", ["https://example.com/a.pdf"]),
-    ).toEqual([]);
+    const contents = await fetchPageContents("cats sleep", [
+      "https://example.com/a.pdf",
+    ]);
+    expect(contents).toHaveLength(1);
+    expect(contents[0].content).toContain("CAT SLEEPS");
   });
 
   it("skips pages that answer with an error status", async () => {
