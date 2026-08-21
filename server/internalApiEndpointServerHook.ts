@@ -237,6 +237,10 @@ export function internalApiEndpointServerHook<
         let model = process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL;
         let availableModels: { id: string }[] = [];
         const attemptedModels = new Set<string>();
+        // Tracks whether a mid-request model-list re-fetch has already run.
+        // Set before the try so a failing `/models` endpoint does not trigger
+        // another refetch on the next failed attempt — we already gave it a shot.
+        let hasRefetched = false;
 
         if (!model) {
           try {
@@ -295,6 +299,19 @@ export function internalApiEndpointServerHook<
           recordModelAttempt(model);
           attempts++;
 
+          // An idle timeout bounds how long the upstream may stay silent.
+          // A long answer is allowed to proceed; only a stall is cut.
+          const abortController = new AbortController();
+          let idleTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
+          function resetIdleTimeout(): void {
+            if (idleTimeoutId !== undefined) clearTimeout(idleTimeoutId);
+            idleTimeoutId = setTimeout(
+              () => abortController.abort(),
+              config.requestTimeoutMs,
+            );
+          }
+
           try {
             const result = streamText({
               model: openaiProvider.chatModel(model),
@@ -303,14 +320,23 @@ export function internalApiEndpointServerHook<
               topP: clampedTopP,
               maxOutputTokens: clampedMaxTokens,
               maxRetries: 0,
+              abortSignal: abortController.signal,
             });
 
+            // Arm the timer before the first part so a stall before the first
+            // token is also bounded — not just the gap between parts.
+            resetIdleTimeout();
             for await (const part of result.stream) {
               if (!isResponseWritable(response)) {
                 outcome = "abandoned";
                 recordModelAbandoned(model);
+                clearTimeout(idleTimeoutId);
                 return;
               }
+
+              // Any part counts as liveness: a reasoning model may spend more
+              // than requestTimeoutMs in reasoning-delta before emitting text.
+              resetIdleTimeout();
 
               if (part.type === "text-delta") {
                 if (!hasEmittedContent)
@@ -318,8 +344,18 @@ export function internalApiEndpointServerHook<
                 hasEmittedContent = true;
                 sendSseData(response, createChunkPayload(model, part.text));
               } else if (part.type === "error") {
+                clearTimeout(idleTimeoutId);
                 throw part.error;
+              } else if (part.type === "abort") {
+                // The AI SDK v7 enqueues an abort part and closes the stream
+                // cleanly rather than throwing; re-throw so the catch block
+                // records the failure and walks the retry ladder.
+                clearTimeout(idleTimeoutId);
+                throw new Error(
+                  `Upstream stalled for ${config.requestTimeoutMs}ms`,
+                );
               } else if (part.type === "finish") {
+                clearTimeout(idleTimeoutId);
                 sendSseData(
                   response,
                   createChunkPayload(model, undefined, "stop"),
@@ -331,9 +367,11 @@ export function internalApiEndpointServerHook<
               }
             }
 
+            clearTimeout(idleTimeoutId);
             recordStreamEndedWithoutFinish();
             throw new Error("Stream ended unexpectedly");
           } catch (error) {
+            clearTimeout(idleTimeoutId);
             lastError = error;
             recordModelFailure(model);
             console.error(
@@ -344,10 +382,16 @@ export function internalApiEndpointServerHook<
             if (hasEmittedContent) break;
             if (attempt >= maxAttempts) break;
 
+            // Re-list when every model in the current pool has been attempted
+            // and we have not already re-listed this request. A provider whose
+            // pool changes mid-flight needs a fresh listing to recover; without
+            // the `!hasRefetched` guard we would loop on a stale list.
             if (
-              availableModels.length === 0 &&
-              !process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL
+              !process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL &&
+              availableModels.every((m) => attemptedModels.has(m.id)) &&
+              !hasRefetched
             ) {
+              hasRefetched = true;
               try {
                 availableModels = await listOpenAiCompatibleModels(
                   process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
