@@ -1,4 +1,5 @@
 import { convert as convertHtmlToPlainText } from "html-to-text";
+import pdfParse from "pdf-parse";
 import { repository, version } from "../package.json" with { type: "json" };
 import {
   type PageReadOutcome,
@@ -141,7 +142,7 @@ function isTimeout(error: unknown): boolean {
 }
 
 type DownloadResult =
-  | { outcome: "ok"; html: string; bodyTruncated: boolean }
+  | { outcome: "ok"; html?: string; text?: string; bodyTruncated: boolean }
   | { outcome: Exclude<PageReadOutcome, "read" | "tooLittleText"> };
 
 /**
@@ -194,8 +195,11 @@ async function downloadDocument(rawUrl: string): Promise<DownloadResult> {
 
     const contentType = response.headers.get("content-type") ?? "";
     if (!READABLE_CONTENT_TYPES.test(contentType.trim())) {
-      await response.body?.cancel().catch(() => {});
-      return { outcome: "notADocument" };
+      // PDF is not in READABLE_CONTENT_TYPES but we still want to read it.
+      if (!contentType.trim().toLowerCase().startsWith("application/pdf")) {
+        await response.body?.cancel().catch(() => {});
+        return { outcome: "notADocument" };
+      }
     }
 
     try {
@@ -203,6 +207,10 @@ async function downloadDocument(rawUrl: string): Promise<DownloadResult> {
         response,
         MAX_RESPONSE_BYTES,
       );
+      if (contentType.trim().toLowerCase().startsWith("application/pdf")) {
+        const { text } = await pdfParse(bytes);
+        return { outcome: "ok", text, bodyTruncated: truncated };
+      }
       return {
         outcome: "ok",
         html: decodeDocument(bytes, contentType),
@@ -494,7 +502,11 @@ async function fetchPageContent(
   const { bodyTruncated } = download;
 
   try {
-    const passages = splitIntoPassages(extractReadableText(download.html));
+    const passages = splitIntoPassages(
+      download.text !== undefined
+        ? download.text
+        : extractReadableText(download.html!),
+    );
     const selected = selectPassages(query, passages, MAX_PAGE_CHARS);
     const content = selected.join("\n");
 
