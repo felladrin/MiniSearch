@@ -36,10 +36,13 @@ describe("HistorySettings component", () => {
       </MantineProvider>,
     );
 
-    expect(screen.getByText("Enable Search History")).toBeInTheDocument();
-    expect(screen.getAllByRole("switch")[0]).toBeChecked();
+    expect(
+      screen.getByRole("switch", { name: /Enable Search History/ }),
+    ).toBeChecked();
     expect(screen.getByText("Maximum Entries")).toBeInTheDocument();
     expect(screen.getByText("Automatic Cleanup")).toBeInTheDocument();
+    // Behind the auto-cleanup switch, which the mock leaves on.
+    expect(screen.getByText("Retention Days")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Clear all history" }),
     ).toBeInTheDocument();

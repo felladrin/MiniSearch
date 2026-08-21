@@ -229,7 +229,7 @@ describe("graceful degradation", () => {
     vi.useRealTimers();
   });
 
-  it("counts a whole exhausted retry cycle as a single breaker failure", async () => {
+  it("counts a whole exhausted retry cycle as one breaker failure, and opens on the fifth", async () => {
     const breaker = new CircuitBreaker(breakerOptions);
     fetchMock.mockResolvedValue(createMockResponse("", false, 500));
 
@@ -242,21 +242,15 @@ describe("graceful degradation", () => {
       (breakerOptions.failureThreshold - 1) * ATTEMPTS_PER_CALL,
     );
     expect(breaker.getState("searxng")).toBe("CLOSED");
-  });
 
-  it("opens the circuit after five exhausted retry cycles and stops calling SearXNG", async () => {
-    const breaker = new CircuitBreaker(breakerOptions);
-    fetchMock.mockResolvedValue(createMockResponse("", false, 500));
-
-    for (let cycle = 0; cycle < breakerOptions.failureThreshold; cycle++) {
-      await searchThroughRetries(breaker);
-    }
+    await searchThroughRetries(breaker);
 
     expect(fetchMock).toHaveBeenCalledTimes(
       breakerOptions.failureThreshold * ATTEMPTS_PER_CALL,
     );
     expect(breaker.getState("searxng")).toBe("OPEN");
 
+    // Open now, so the next call is refused without reaching SearXNG.
     const callsWhileOpen = fetchMock.mock.calls.length;
     await searchThroughRetries(breaker);
 
@@ -296,12 +290,10 @@ describe("graceful degradation", () => {
   it("throws when the provider is down and returns an empty array for zero results", async () => {
     const downBreaker = new CircuitBreaker({ failureThreshold: 1 });
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
-    const providerDown = fetchSearXNG(
-      "failure injection",
-      "text",
-      30,
-      downBreaker,
-    );
+
+    await expect(
+      fetchSearXNG("failure injection", "text", 30, downBreaker),
+    ).rejects.toThrow();
 
     const emptyBreaker = new CircuitBreaker({ failureThreshold: 1 });
     fetchMock.mockResolvedValue(
@@ -318,7 +310,6 @@ describe("graceful degradation", () => {
     // can tell them apart from the outcome as well.
     expect(downBreaker.getState("searxng")).toBe("OPEN");
     expect(emptyBreaker.getState("searxng")).toBe("CLOSED");
-    await expect(providerDown).rejects.toThrow();
     expect(noResults).toEqual([]);
   });
 

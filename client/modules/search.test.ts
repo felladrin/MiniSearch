@@ -188,76 +188,71 @@ describe("Search Module", () => {
           "text",
           "   ",
         ),
-      ).rejects.toThrow(/Query cannot be/i);
+      ).rejects.toThrow("Query cannot be empty");
     });
 
-    it("should handle network failure", async () => {
-      mockFetch.mockRejectedValue(new Error("Network unavailable"));
+    // Each row has to reach the branch it is named for. The three tests these
+    // replaced did not: one asserted `response.json()` on the fetch mock
+    // without ever calling `performSearch`, and the other two rejected with a
+    // plain Error, which matches neither `AbortError` nor the lowercase
+    // "network" the wrapper looks for, so both only watched a raw error
+    // propagate.
+    it.each([
+      [
+        "wraps a body it cannot parse",
+        () =>
+          mockFetch.mockResolvedValue({
+            ok: true,
+            json: vi
+              .fn()
+              .mockRejectedValue(new SyntaxError("Unexpected token")),
+          }),
+        "JSON parsing error: Unexpected token",
+      ],
+      [
+        "labels a network failure",
+        () => mockFetch.mockRejectedValue(new Error("network is unreachable")),
+        "Network error: network is unreachable",
+      ],
+      [
+        "labels an aborted request as a timeout",
+        () =>
+          mockFetch.mockRejectedValue(
+            Object.assign(new Error("The operation was aborted"), {
+              name: "AbortError",
+            }),
+          ),
+        "Request timeout - server did not respond within 30 seconds",
+      ],
+    ])("%s", async (_, arrange, expected) => {
+      arrange();
 
       await expect(
         searchModule.searchServiceInstance.performSearch<string[][]>(
           "text",
           "test",
         ),
-      ).rejects.toThrow("Network unavailable");
-    });
-
-    it("should handle timeout scenario", async () => {
-      mockFetch.mockRejectedValue(new Error("Request timeout"));
-
-      await expect(
-        searchModule.searchServiceInstance.performSearch<string[][]>(
-          "text",
-          "test",
-        ),
-      ).rejects.toThrow("Request timeout");
-    });
-
-    it("should handle malformed JSON response", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockRejectedValue(new SyntaxError("Unexpected token")),
-      });
-
-      const response = await mockFetch();
-      await expect(response.json()).rejects.toThrow("Unexpected token");
+      ).rejects.toThrow(expected);
     });
   });
 
   describe("Update Cache Config Function", () => {
-    it("should update ttl when provided", () => {
-      const newTTL = 60000;
-      searchModule.searchServiceInstance.updateCacheConfig({ ttl: newTTL });
+    it.each([
+      ["ttl", 60000],
+      ["maxEntries", 50],
+      ["enabled", false],
+    ] as const)("should update %s when provided", (field, value) => {
+      searchModule.searchServiceInstance.updateCacheConfig({ [field]: value });
 
-      const statsTTL =
-        searchModule.searchServiceInstance.getCacheStats().config.ttl;
-      expect(statsTTL).toBe(newTTL);
-    });
-
-    it("should update maxEntries when provided", () => {
-      searchModule.searchServiceInstance.updateCacheConfig({
-        maxEntries: 50,
-      });
-
-      const maxEntries =
-        searchModule.searchServiceInstance.getCacheStats().config.maxEntries;
-      expect(maxEntries).toBe(50);
-    });
-
-    it("should update enabled when provided", () => {
-      searchModule.searchServiceInstance.updateCacheConfig({
-        enabled: false,
-      });
-
-      const enabled =
-        searchModule.searchServiceInstance.getCacheStats().config.enabled;
-      expect(enabled).toBe(false);
+      expect(
+        searchModule.searchServiceInstance.getCacheStats().config[field],
+      ).toBe(value);
     });
 
     it("should reject invalid TTL value", () => {
       expect(() =>
         searchModule.searchServiceInstance.updateCacheConfig({ ttl: -1 }),
-      ).toThrow();
+      ).toThrow("Invalid TTL value: -1");
     });
 
     it("should reject invalid maxEntries value", () => {
@@ -265,19 +260,19 @@ describe("Search Module", () => {
         searchModule.searchServiceInstance.updateCacheConfig({
           maxEntries: -1,
         }),
-      ).toThrow();
+      ).toThrow("Invalid maxEntries value: -1");
     });
   });
 
   describe("Search Failures", () => {
-    // The cache layer swallows its own read/write and integrity errors, so a
-    // cache failure surfaces as a miss followed by a real fetch. That fetch
-    // failure must propagate, so the caller can mark the search as failed.
+    // The cache layer swallows its own read, write and integrity errors, so a
+    // failed search is always a failed fetch by the time it reaches the caller,
+    // and it has to stay one so the caller can mark the search as failed.
     it("should rethrow when a text search fails end-to-end", async () => {
-      mockFetch.mockRejectedValue(new Error("Cache read error"));
+      mockFetch.mockRejectedValue(new Error("upstream refused the connection"));
 
       await expect(searchModule.searchText("test query")).rejects.toThrow(
-        "Cache read error",
+        "upstream refused the connection",
       );
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("Text search failed"),
@@ -285,10 +280,10 @@ describe("Search Module", () => {
     });
 
     it("should rethrow when an image search fails end-to-end", async () => {
-      mockFetch.mockRejectedValue(new Error("Database integrity check failed"));
+      mockFetch.mockRejectedValue(new Error("upstream refused the connection"));
 
       await expect(searchModule.searchImages("test query")).rejects.toThrow(
-        "Database integrity check failed",
+        "upstream refused the connection",
       );
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("Image search failed"),

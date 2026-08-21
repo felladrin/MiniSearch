@@ -12,6 +12,8 @@ describe("stringFormatters", () => {
     it.each([
       ["https://example.com/page", "example.com"],
       ["https://www.example.com/page", "example.com"],
+      // Only the leading www goes; the rest of the name is not a prefix.
+      ["https://docs.example.com/page", "docs.example.com"],
       // The hostname, so the port stays out of it.
       ["https://localhost:3000", "localhost"],
       // Not a URL at all: hand back what came in, for display.
@@ -92,12 +94,14 @@ describe("stringFormatters", () => {
       expect(results).toHaveLength(0);
     });
 
-    it("should return scores between 0 and 1", () => {
-      const results = searchWithFuzzy(items, "a", (item) => item.name);
-      results.forEach((r) => {
-        expect(r.score).toBeGreaterThanOrEqual(0);
-        expect(r.score).toBeLessThanOrEqual(1);
-      });
+    it("should score earlier matches above later ones", () => {
+      const results = searchWithFuzzy(items, "app", (item) => item.name);
+
+      expect(results.length).toBeGreaterThan(1);
+      expect(results[0].score).toBeGreaterThan(
+        results[results.length - 1].score,
+      );
+      expect(results[0].score).toBeLessThanOrEqual(1);
     });
   });
 
