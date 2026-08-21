@@ -783,6 +783,143 @@ describe("internalApiEndpointServerHook", () => {
       expect(writes).toContain("[DONE]");
     });
 
+    it("re-lists the model pool when every model has been attempted", async () => {
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
+      // Only model-a in the initial pool; it fails, then the pool is refreshed
+      // to include model-b, which succeeds.
+      vi.mocked(listOpenAiCompatibleModels)
+        .mockResolvedValueOnce([{ id: "model-a" }])
+        .mockResolvedValueOnce([{ id: "model-b" }]);
+      vi.mocked(selectRandomModel)
+        .mockReturnValueOnce("model-a")
+        .mockReturnValueOnce("model-b");
+
+      let callCount = 0;
+      vi.mocked(streamText).mockImplementation(() => {
+        callCount += 1;
+        return (
+          callCount === 1
+            ? streamOf([{ type: "error", error: new Error("upstream down") }])
+            : streamOf([
+                { type: "text-delta", text: "Recovered" },
+                { type: "finish" },
+              ])
+        ) as never;
+      });
+
+      vi.useFakeTimers();
+      try {
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+        const pending = handler(
+          createRequest({ messages: [{ role: "user", content: "hi" }] }),
+          response,
+          vi.fn(),
+        );
+        await vi.runAllTimersAsync();
+        await pending;
+
+        // The pool was refreshed once, and the new model succeeded.
+        expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(2);
+        expect(streamText).toHaveBeenCalledTimes(2);
+        const writes = response.write.mock.calls.map((c) => c[0]).join("");
+        expect(writes).toContain("Recovered");
+        expect(writes).not.toContain("all models failed");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not re-list when a model remains in the pool", async () => {
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
+      vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
+        { id: "model-a" },
+        { id: "model-b" },
+      ]);
+      vi.mocked(selectRandomModel)
+        .mockReturnValueOnce("model-a")
+        .mockReturnValueOnce("model-b");
+
+      let callCount = 0;
+      vi.mocked(streamText).mockImplementation(() => {
+        callCount += 1;
+        return (
+          callCount === 1
+            ? streamOf([{ type: "error", error: new Error("upstream down") }])
+            : streamOf([
+                { type: "text-delta", text: "Recovered" },
+                { type: "finish" },
+              ])
+        ) as never;
+      });
+
+      vi.useFakeTimers();
+      try {
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+        const pending = handler(
+          createRequest({ messages: [{ role: "user", content: "hi" }] }),
+          response,
+          vi.fn(),
+        );
+        await vi.runAllTimersAsync();
+        await pending;
+
+        // model-b is still in the pool, so no re-list is needed.
+        expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(1);
+        expect(streamText).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("re-lists only once even when both the original and refetched pools fail", async () => {
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
+      // Only model-a in the initial pool; refetch yields model-b, which also fails.
+      vi.mocked(listOpenAiCompatibleModels)
+        .mockResolvedValueOnce([{ id: "model-a" }])
+        .mockResolvedValueOnce([{ id: "model-b" }]);
+      vi.mocked(selectRandomModel)
+        .mockReturnValueOnce("model-a")
+        .mockReturnValueOnce("model-b");
+
+      vi.mocked(streamText).mockImplementation(
+        () =>
+          streamOf([
+            { type: "error", error: new Error("upstream down") },
+          ]) as never,
+      );
+
+      const before = getInferenceStats();
+      vi.useFakeTimers();
+      try {
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+        const pending = handler(
+          createRequest({ messages: [{ role: "user", content: "hi" }] }),
+          response,
+          vi.fn(),
+        );
+        await vi.runAllTimersAsync();
+        await pending;
+
+        // The pool was refreshed once; even though both models failed we do not
+        // loop on a failing /models endpoint.
+        expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(2);
+        // The refetched pool feeds selection — the second call receives it.
+        expect(vi.mocked(selectRandomModel).mock.calls[1][0]).toEqual([
+          { id: "model-b" },
+        ]);
+        expect(response.statusCode).toBe(503);
+        // The counter moved from the successful refetch.
+        expect(getInferenceStats().modelsRefetched).toBe(
+          before.modelsRefetched + 1,
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("responds 500 when model list fetch fails and no env model set", async () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
       vi.mocked(listOpenAiCompatibleModels).mockRejectedValue(

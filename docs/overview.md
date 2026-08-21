@@ -347,7 +347,8 @@ request that never finished at all.
 Two fields read differently on a single-model deployment. With
 `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` set there is no pool to fall back to, so
 the loop stops after the first failure: `averageAttempts` cannot exceed 1 and
-`modelFallbacks` stays at 0 however badly the upstream behaves. Read
+`modelFallbacks` stays at 0 however badly the upstream behaves. The pool also
+never refreshes in that mode, so `modelsRefetched` stays at 0; read
 `failed.failedBeforeFirstToken` for that case instead.
 
 Model ids are configuration rather than user data, and `/inference` already
