@@ -16,6 +16,7 @@ const MAX_PAGE_CHARS = 6000;
 const MIN_USEFUL_CHARS = 200;
 const MIN_PASSAGE_CHARS = 180;
 const MAX_PASSAGE_CHARS = 1200;
+const OVERLAP_CHARS = 200;
 
 const appName = repository.url.slice(repository.url.lastIndexOf("/") + 1);
 
@@ -245,22 +246,37 @@ function sliceEvery(text: string, size: number): string[] {
   return pieces;
 }
 
-function splitLongPassage(passage: string): string[] {
+function computeOverlap(text: string): string {
+  // Carry the tail of the last sentence into the next piece so a statement
+  // split across the cut is complete in at least one of them. Untrimmed so
+  // the seam preserves the original spacing.
+  const segments = [...sentenceSegmenter.segment(text)];
+  const last = segments[segments.length - 1]?.segment ?? text;
+  return last.length > OVERLAP_CHARS ? last.slice(-OVERLAP_CHARS) : last;
+}
+
+export function splitLongPassage(passage: string): string[] {
   if (passage.length <= MAX_PASSAGE_CHARS) return [passage];
 
   const chunks: string[] = [];
   let current = "";
+  let overlap = "";
 
   for (const { segment } of sentenceSegmenter.segment(passage)) {
-    for (const piece of sliceEvery(segment, MAX_PASSAGE_CHARS)) {
+    for (const piece of sliceEvery(
+      segment,
+      MAX_PASSAGE_CHARS - OVERLAP_CHARS,
+    )) {
       if (
         current.length + piece.length > MAX_PASSAGE_CHARS &&
         current.length > 0
       ) {
         chunks.push(current.trim());
+        overlap = computeOverlap(current);
         current = "";
       }
-      current += piece;
+      current += overlap + piece;
+      overlap = "";
     }
   }
 
