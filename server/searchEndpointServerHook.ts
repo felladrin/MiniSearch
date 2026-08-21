@@ -134,7 +134,19 @@ export function searchEndpointServerHook<
     if (!request.url?.startsWith("/search/")) return next();
 
     const url = new URL(request.url, `http://${request.headers.host}`);
-    const token = url.searchParams.get("token");
+
+    // Verified before the parameters are read, matching `/page-content`: a
+    // malformed query from an unauthenticated caller has to cost the caller a
+    // rate-limit point, and it has to be counted, rather than leaving on a 400
+    // that never reached the limiter.
+    const { shouldContinue } = await handleTokenVerification(
+      url.searchParams.get("token"),
+      response,
+      request,
+    );
+
+    if (!shouldContinue) return;
+
     const parsedParams = searchParamsSchema.safeParse({
       query: url.searchParams.get("q") ?? undefined,
       limit: url.searchParams.get("limit") ?? DEFAULT_SEARCH_LIMIT,
@@ -150,13 +162,6 @@ export function searchEndpointServerHook<
     }
 
     const { query, limit } = parsedParams.data;
-    const { shouldContinue } = await handleTokenVerification(
-      token,
-      response,
-      request,
-    );
-
-    if (!shouldContinue) return;
 
     try {
       const isTextSearch = request.url?.startsWith("/search/text");

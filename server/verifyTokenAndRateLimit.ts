@@ -5,10 +5,29 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { getSearchToken } from "./searchToken.ts";
 import { addVerifiedToken, isVerifiedToken } from "./verifiedTokens.ts";
 
+export const RATE_LIMIT_POINTS = 10;
+export const RATE_LIMIT_DURATION_SECONDS = 10;
+
 const rateLimiter = new RateLimiterMemory({
-  points: 10,
-  duration: 10,
+  points: RATE_LIMIT_POINTS,
+  duration: RATE_LIMIT_DURATION_SECONDS,
 });
+
+/** Why a request was turned away, named by the check that turned it away. */
+export type RejectionReason = "rateLimited" | "missingToken" | "invalidToken";
+
+/**
+ * A rejection always carries its status, its message and its reason together,
+ * so a caller cannot answer 401 without also being able to say what happened.
+ */
+export type TokenVerificationResult =
+  | { isAuthorized: true }
+  | {
+      isAuthorized: false;
+      statusCode: number;
+      error: string;
+      reason: RejectionReason;
+    };
 
 /** Whether to trust proxy-set forwarding headers. Off unless `TRUST_PROXY` is `true`/`1`. */
 function isProxyTrusted(): boolean {
@@ -54,11 +73,7 @@ export function getClientIp(request: IncomingMessage): string {
 export async function verifyTokenAndRateLimit(
   token: string | null,
   request?: IncomingMessage,
-): Promise<{
-  isAuthorized: boolean;
-  statusCode?: number;
-  error?: string;
-}> {
+): Promise<TokenVerificationResult> {
   // Rate-limit before anything else. An invalid or missing token used to skip
   // the limiter entirely, and every rejected request still pays for a full
   // argon2 verification, which is expensive enough to be a DoS lever on a
@@ -72,6 +87,7 @@ export async function verifyTokenAndRateLimit(
       isAuthorized: false,
       statusCode: 429,
       error: "Too many requests.",
+      reason: "rateLimited",
     };
   }
 
@@ -80,6 +96,7 @@ export async function verifyTokenAndRateLimit(
       isAuthorized: false,
       statusCode: 400,
       error: "Missing token.",
+      reason: "missingToken",
     };
   }
 
@@ -100,6 +117,7 @@ export async function verifyTokenAndRateLimit(
         isAuthorized: false,
         statusCode: 401,
         error: "Invalid token.",
+        reason: "invalidToken",
       };
     }
   }

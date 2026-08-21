@@ -1,5 +1,6 @@
 import prettyMilliseconds from "pretty-ms";
 import type { PreviewServer, ViteDevServer } from "vite";
+import { getAuthorizationStats } from "./authorizationSinceLastRestart.ts";
 import { getPageReadStats } from "./pageReadsSinceLastRestart.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
 import {
@@ -14,7 +15,7 @@ import { getWebSearchStatus } from "./webSearchService.ts";
 
 const serverStartTime = Date.now();
 
-/** Serves `/status`: uptime, search counters, and the health of the reranker and SearXNG. */
+/** Serves `/status`: uptime, search and request counters, and the health of the reranker and SearXNG. */
 export function statusEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
 >(server: T) {
@@ -66,6 +67,7 @@ export function statusEndpointServerHook<
       rerankerServiceStatus,
       webSearchServiceStatus,
       pageReads: getPageReadStats(),
+      authorization: getAuthorizationStats(),
       build: {
         timestamp: new Date(
           server.config.define?.VITE_BUILD_DATE_TIME || "",

@@ -48,6 +48,8 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 - **Page Reading Is On By Default, And Reversible**: `enablePageContentFetch` ships on and the user can turn it off under AI Settings; nothing is read until AI responses are enabled, and the server (never the browser) requests the top result pages, so those sites see the instance and no user cookies or IP
 - **Search And Page Reading Leave No Query In The Log**: The search query is never written to the server log, and neither is the URL of a page read for grounding; how often searches come back empty, fail on unresponsive engines or are fully discarded, and how page reads ended, are counted instead and reported on `/status` (`searchesWithoutResults`, `searchesWithUnresponsiveEngines`, `searchesWithAllResultsDiscarded`, `pageReads`). Anything in front of the instance keeps its own access log, where `?q=` appears in full
 
+- **Rejections Are Counted, Not Logged**: A request turned away for a missing or invalid token, or by the rate limiter, is counted by reason and by endpoint family on `/status`; the client address the limiter keys on is never stored or reported
+
 ## Data Protection
 
 - **Access Key Hashing**: Access keys hashed using argon2id before storage (via hash-wasm)

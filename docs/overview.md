@@ -231,6 +231,7 @@ The `/status` endpoint returns a JSON object:
 | `rerankerServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `webSearchServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `pageReads` | object | Page-reading counters since last restart, see below |
+| `authorization` | object | Token and rate-limit outcomes since last restart, see below |
 | `build.timestamp` | string | ISO 8601 build time |
 | `build.gitCommit` | string | Short Git commit hash |
 
@@ -269,6 +270,32 @@ is counted at all (see `docs/page-content.md`):
 
 `read` plus every `skipped` entry sums to `requested`, so a page that goes
 uncounted shows up as a gap rather than being lost silently.
+
+`authorization` reports what happened to the requests that reached token
+verification, the funnel `/search/text`, `/search/images`, `/page-content` and
+`/inference` all pass through:
+
+| Field | Type | Says |
+|---|---|---|
+| `requests` | number | Requests that reached verification; the denominator for the rest |
+| `authorized` | number | Requests that passed it |
+| `rejectedRate` | number | Rejections as a percentage of `requests` |
+| `reasons.rateLimited` | number | Refused by the limiter before anything else ran |
+| `reasons.missingToken` | number | No token on the request, which is what an outdated client looks like |
+| `reasons.invalidToken` | number | A token that failed verification, which is what probing looks like |
+| `bySurface` | object | `authorized` and `rejected` per endpoint family: `search`, `pageContent`, `inference`, `other` |
+| `limiter` | object | The limiter's `points` and `durationSeconds`, without which a rejection count says nothing |
+
+`authorized` plus every entry of `reasons` sums to `requests`, and each half of
+`bySurface` sums to its side of that, on the same principle as `pageReads`.
+
+The limiter keys on the client IP and none of that reaches these counters: no
+address, no token, no query, no per-request timestamp. The cut is by reason and
+by surface, both properties of the request rather than of whoever sent it.
+`bySurface` is the one worth watching: all four endpoints share one budget and
+a single user action fans out into a text search, an image search and a
+page-content read, so its `authorized` side says where the budget goes and its
+`rejected` side says who pays for it running out.
 
 ## Data Persistence Architecture
 

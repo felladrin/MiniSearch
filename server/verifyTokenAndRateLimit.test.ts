@@ -52,9 +52,12 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const result = await verifyTokenAndRateLimit(null);
-    expect(result.isAuthorized).toBe(false);
-    expect(result.statusCode).toBe(400);
-    expect(result.error).toBe("Missing token.");
+    expect(result).toEqual({
+      isAuthorized: false,
+      statusCode: 400,
+      error: "Missing token.",
+      reason: "missingToken",
+    });
   });
 
   it("should reject invalid token", async () => {
@@ -64,9 +67,12 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const result = await verifyTokenAndRateLimit("invalid-token");
-    expect(result.isAuthorized).toBe(false);
-    expect(result.statusCode).toBe(401);
-    expect(result.error).toBe("Invalid token.");
+    expect(result).toEqual({
+      isAuthorized: false,
+      statusCode: 401,
+      error: "Invalid token.",
+      reason: "invalidToken",
+    });
   });
 
   it("should accept valid token and add to verified tokens", async () => {
@@ -100,9 +106,12 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const result = await verifyTokenAndRateLimit("rate-limit-token");
-    expect(result.isAuthorized).toBe(false);
-    expect(result.statusCode).toBe(429);
-    expect(result.error).toBe("Too many requests.");
+    expect(result).toEqual({
+      isAuthorized: false,
+      statusCode: 429,
+      error: "Too many requests.",
+      reason: "rateLimited",
+    });
   });
 
   it("should rate-limit invalid tokens instead of skipping the limiter", async () => {
@@ -113,8 +122,12 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const result = await verifyTokenAndRateLimit("invalid-token");
-    expect(result.statusCode).toBe(429);
-    expect(result.error).toBe("Too many requests.");
+    expect(result).toEqual({
+      isAuthorized: false,
+      statusCode: 429,
+      error: "Too many requests.",
+      reason: "rateLimited",
+    });
   });
 
   it("should not run argon2 verification when the request is already rate limited", async () => {
@@ -125,7 +138,12 @@ describe("verifyTokenAndRateLimit", () => {
     );
     const hashWasm = await import("hash-wasm");
     const result = await verifyTokenAndRateLimit("some-token");
-    expect(result.statusCode).toBe(429);
+    expect(result).toEqual({
+      isAuthorized: false,
+      statusCode: 429,
+      error: "Too many requests.",
+      reason: "rateLimited",
+    });
     expect(hashWasm.argon2Verify).not.toHaveBeenCalled();
   });
 
@@ -136,8 +154,12 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const result = await verifyTokenAndRateLimit(null);
-    expect(result.statusCode).toBe(429);
-    expect(result.error).toBe("Too many requests.");
+    expect(result).toEqual({
+      isAuthorized: false,
+      statusCode: 429,
+      error: "Too many requests.",
+      reason: "rateLimited",
+    });
   });
 
   it("should key rate limiter on the socket address by default (untrusted proxy)", async () => {
