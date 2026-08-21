@@ -35,10 +35,32 @@ describe("stringFormatters", () => {
       // Built in UTC, because the formatter reads UTC fields: a local-time Date
       // would format as the day before for anyone east of UTC.
       [new Date(Date.UTC(2024, 0, 15)), "2024.1.15"],
-      // A date-only string is read as UTC, so the day cannot shift westwards.
+      // Read as UTC, so the fixture pins the same instant on every runner.
       ["2024-06-01", "2024.6.1"],
     ])("dates %s as %s", (date, expected) => {
       expect(getSemanticVersion(date)).toBe(expected);
+    });
+
+    it("does not follow the runner's timezone", () => {
+      const originalTimeZone = process.env.TZ;
+      try {
+        // A UTC-midnight instant reads as the previous day only in a zone
+        // behind UTC; a zone ahead of it needs a late-in-the-day instant to
+        // read as the next day. So each direction pins its own. The
+        // getDate() checks make a silent no-op of the zone change fail
+        // loudly instead of passing vacuously.
+        process.env.TZ = "Pacific/Pago_Pago"; // UTC-11
+        const westMidnight = new Date(Date.UTC(2024, 0, 15));
+        expect(westMidnight.getDate()).toBe(14);
+        expect(getSemanticVersion(westMidnight)).toBe("2024.1.15");
+        process.env.TZ = "Pacific/Kiritimati"; // UTC+14
+        const eastLate = new Date(Date.UTC(2024, 5, 1, 23));
+        expect(eastLate.getDate()).toBe(2);
+        expect(getSemanticVersion(eastLate)).toBe("2024.6.1");
+      } finally {
+        if (originalTimeZone === undefined) delete process.env.TZ;
+        else process.env.TZ = originalTimeZone;
+      }
     });
   });
 
