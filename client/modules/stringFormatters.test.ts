@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   formatRelativeTime,
   getHostname,
@@ -65,30 +65,40 @@ describe("stringFormatters", () => {
   });
 
   describe("formatRelativeTime", () => {
-    it("should return Just now for recent timestamp", () => {
-      const now = Date.now();
-      expect(formatRelativeTime(now)).toBe("Just now");
+    // The function reads Date.now() itself, so under real time the ms between the
+    // test's Date.now() and the function's can only push a fixture further into
+    // the past, out of its bucket for any row sitting at a bucket's top edge.
+    // A frozen clock puts every row exactly on its cutoff.
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
     });
 
-    it("should return minutes ago", () => {
-      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-      expect(formatRelativeTime(fiveMinutesAgo)).toBe("5m ago");
+    // Each row sits at a branch cutoff, where an off-by-one would flip the
+    // output to the adjacent form.
+    it.each([
+      ["the current instant is Just now", 0, "Just now"],
+      ["the last ms under a minute is still Just now", 59_999, "Just now"],
+      ["one minute rolls up to 1m ago", 60_000, "1m ago"],
+      ["59 minutes stays in minutes", 59 * 60_000, "59m ago"],
+      ["60 minutes rolls up to an hour", 60 * 60_000, "1h ago"],
+      ["90 minutes truncates to the hour", 90 * 60_000, "1h ago"],
+      ["23 hours stays in hours", 23 * 3_600_000, "23h ago"],
+      ["24 hours rolls up to a day", 24 * 3_600_000, "1d ago"],
+      ["36 hours truncates to the day", 36 * 3_600_000, "1d ago"],
+      ["6 days stays in days", 6 * 86_400_000, "6d ago"],
+    ])("%s", (_, offsetMs, expected) => {
+      expect(formatRelativeTime(Date.now() - offsetMs)).toBe(expected);
     });
 
-    it("should return hours ago", () => {
-      const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
-      expect(formatRelativeTime(twoHoursAgo)).toBe("2h ago");
-    });
-
-    it("should return days ago", () => {
-      const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
-      expect(formatRelativeTime(threeDaysAgo)).toBe("3d ago");
-    });
-
-    it("should return locale date for older timestamps", () => {
-      const oldTimestamp = Date.now() - 30 * 24 * 60 * 60 * 1000;
-      const result = formatRelativeTime(oldTimestamp);
-      expect(result).not.toContain("ago");
+    it("rolls up to the locale date at 7 days", () => {
+      const sevenDaysAgo = Date.now() - 7 * 86_400_000;
+      expect(formatRelativeTime(sevenDaysAgo)).toBe(
+        new Date(sevenDaysAgo).toLocaleDateString(),
+      );
     });
   });
 

@@ -191,6 +191,31 @@ describe("Search Module", () => {
       ).rejects.toThrow("Query cannot be empty");
     });
 
+    it("should reject a query over the maximum length before fetching", async () => {
+      const overLimit = "a".repeat(2001);
+
+      await expect(
+        searchModule.searchServiceInstance.performSearch<string[][]>(
+          "text",
+          overLimit,
+        ),
+      ).rejects.toThrow("Query length exceeds maximum of 2000 characters");
+      // The guard fires before the request is built, so nothing is fetched.
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("should accept a query at exactly the maximum length", async () => {
+      mockFetchResponse([]);
+
+      await expect(
+        searchModule.searchServiceInstance.performSearch<string[][]>(
+          "text",
+          "a".repeat(2000),
+        ),
+      ).resolves.toEqual([]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
     // Each row has to reach the branch it is named for. The three tests these
     // replaced did not: one asserted `response.json()` on the fetch mock
     // without ever calling `performSearch`, and the other two rejected with a
