@@ -5,6 +5,8 @@ export interface ServerConfig {
   internalApiEnabled: boolean;
   internalApiName: string;
   defaultInferenceType: string;
+  /** The CSRF token to hash into the `?token=` of every request to this server. */
+  searchToken: string;
 }
 
 /**

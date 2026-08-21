@@ -28,6 +28,7 @@ vi.mock("rate-limiter-flexible", () => ({
 
 vi.mock("./searchToken", () => ({
   getSearchToken: vi.fn().mockReturnValue("dummy-token"),
+  hasSearchTokenFileChanged: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock("./verifiedTokens", () => ({

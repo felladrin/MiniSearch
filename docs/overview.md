@@ -122,13 +122,16 @@ The `textGeneration` module orchestrates the entire search-to-response flow, man
 
 ### Search Token Lifecycle
 
-CSRF protection uses a build-time generated token:
+CSRF protection uses a token the server owns for its lifetime:
 
-1. **Generation**: Token created at build time in `vite.config.ts` and injected as `VITE_SEARCH_TOKEN`
-2. **Storage**: Server stores token file at `{os.tempdir()}/minisearch-token`
-3. **Client Hashing**: Client hashes token before sending in requests (never sends raw token)
-4. **Verification**: Server compares request hash against stored token
-5. **Caching**: Verified tokens stored in `server/verifiedTokens.ts` (in-memory `Map` of token to last-seen time) to avoid redundant cryptographic operations
+1. **Generation**: `regenerateSearchToken()` writes a random token at build time, and on first use if the file is absent
+2. **Storage**: Server stores token file at `{os.tempdir()}/minisearch-token`, read once per process and held in memory from then on
+3. **Distribution**: Server serves the token to the client at runtime through `/api/config`, so a client always holds the token of the server answering it
+4. **Client Hashing**: Client hashes token before sending in requests (never sends raw token)
+5. **Verification**: Server compares request hash against the token it is holding
+6. **Caching**: Verified tokens stored in `server/verifiedTokens.ts` (in-memory `Map` of token to last-seen time) to avoid redundant cryptographic operations
+
+Rewriting the token file under a running server does not re-key it: the server keeps the token it is already handing out, and logs once that the file diverged if a request is rejected while it has.
 
 ## Data Flow and Communication
 
@@ -158,7 +161,7 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 ### API Request Authentication
 
 1. Client retrieves cached token hash from `lastSearchTokenHashPubSub` (localStorage-backed)
-2. If expired or missing, generates new hash from `VITE_SEARCH_TOKEN`
+2. If expired or missing, generates new hash from the `searchToken` in `/api/config`
 3. Request includes hashed token as query parameter
 4. Server hook verifies token against stored value
 5. On success, token added to `verifiedTokens` Set for subsequent requests
@@ -436,8 +439,8 @@ Lightweight state persisted across sessions via `createLocalStoragePubSub` patte
 ### Server-Side Bootstrap (vite.config.ts)
 
 1. Loads environment variables via `dotenv.config`
-2. Generates/retrieves search token for CSRF protection
-3. Injects environment-based constants as compile-time replacements (`VITE_SEARCH_TOKEN`, `VITE_ACCESS_KEYS_ENABLED`, etc.)
+2. Regenerates the search token used for CSRF protection, on build only
+3. Injects build metadata as compile-time replacements (`VITE_BUILD_DATE_TIME`, `VITE_COMMIT_SHORT_HASH`)
 4. Registers all middleware hooks (see Server Hook System above)
 
 ### Client-Side Bootstrap (client/index.tsx)

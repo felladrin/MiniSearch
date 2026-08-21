@@ -28,6 +28,7 @@ const serverConfig: ServerConfig = {
   internalApiEnabled: false,
   internalApiName: "Internal API",
   defaultInferenceType: "browser",
+  searchToken: "a".repeat(64),
 };
 
 describe("App", () => {

@@ -19,6 +19,10 @@ export type { ServerConfig };
  * Config to assume only where running without the server's values is harmless.
  * It is deliberately not used for `accessKeysEnabled`: treating an unreachable
  * server as "access keys are off" would skip the access key page entirely.
+ *
+ * `searchToken` has no harmless stand-in, so it is empty here. Anything that
+ * needs it goes through `getConfig`, which rejects rather than handing back a
+ * token the server would turn away.
  */
 export const FALLBACK_CONFIG: ServerConfig = {
   accessKeysEnabled: false,
@@ -27,6 +31,7 @@ export const FALLBACK_CONFIG: ServerConfig = {
   internalApiEnabled: false,
   internalApiName: DEFAULT_INTERNAL_API_NAME,
   defaultInferenceType: DEFAULT_INFERENCE_TYPE,
+  searchToken: "",
 };
 
 const FETCH_TIMEOUT_MS = 5000;

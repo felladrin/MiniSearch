@@ -15,7 +15,7 @@ import { internalApiEndpointServerHook } from "./server/internalApiEndpointServe
 import { pageContentEndpointServerHook } from "./server/pageContentEndpointServerHook.ts";
 import { rerankerServiceHook } from "./server/rerankerServiceHook.ts";
 import { searchEndpointServerHook } from "./server/searchEndpointServerHook.ts";
-import { getSearchToken, regenerateSearchToken } from "./server/searchToken.ts";
+import { regenerateSearchToken } from "./server/searchToken.ts";
 import { statusEndpointServerHook } from "./server/statusEndpointServerHook.ts";
 import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook.ts";
 
@@ -30,7 +30,6 @@ export default defineConfig(({ command }) => {
   return {
     root: "./client",
     define: {
-      VITE_SEARCH_TOKEN: JSON.stringify(getSearchToken()),
       VITE_BUILD_DATE_TIME: Date.now(),
       VITE_COMMIT_SHORT_HASH: JSON.stringify(getGitCommitHash({ short: true })),
     },

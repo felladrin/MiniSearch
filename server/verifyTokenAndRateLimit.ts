@@ -1,9 +1,15 @@
 import type { IncomingMessage } from "node:http";
 import { isIP } from "node:net";
+import path from "node:path";
+import debug from "debug";
 import { argon2Verify } from "hash-wasm";
 import { RateLimiterMemory } from "rate-limiter-flexible";
-import { getSearchToken } from "./searchToken.ts";
+import { getSearchToken, hasSearchTokenFileChanged } from "./searchToken.ts";
 import { addVerifiedToken, isVerifiedToken } from "./verifiedTokens.ts";
+
+const fileName = path.basename(import.meta.url);
+const printMessage = debug(fileName);
+printMessage.enabled = true;
 
 export const RATE_LIMIT_POINTS = 10;
 export const RATE_LIMIT_DURATION_SECONDS = 10;
@@ -91,6 +97,24 @@ export async function consumeRateLimitPoint(
   }
 }
 
+let hasReportedTokenFileChange = false;
+
+/**
+ * Says once, on the way out, why a client holding a real token is being turned
+ * away. Without it the only trace is a 401 per request, which reads as a broken
+ * search rather than as two processes holding different tokens. The file is
+ * only read on a request that is already being rejected, which has just paid
+ * for an argon2 verification, so the read costs nothing next to it.
+ */
+function reportTokenFileChangeOnce() {
+  if (hasReportedTokenFileChange || !hasSearchTokenFileChanged()) return;
+
+  hasReportedTokenFileChange = true;
+  printMessage(
+    "Rejected a token that does not match this server's. The token file was rewritten after startup, so a client that took its token from another process keeps being rejected here until this server restarts.",
+  );
+}
+
 export async function verifyTokenAndRateLimit(
   token: string | null,
   request?: IncomingMessage,
@@ -134,6 +158,8 @@ export async function verifyTokenAndRateLimit(
     }
 
     if (!isValidToken) {
+      reportTokenFileChangeOnce();
+
       return {
         isAuthorized: false,
         statusCode: 401,
