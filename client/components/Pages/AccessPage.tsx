@@ -23,9 +23,12 @@ export default function AccessPage({
     setState((prev) => ({ ...prev, error: "" }));
     try {
       const isValid = await validateAccessKey(state.accessKey);
-      if (isValid) {
+      if (isValid === "valid") {
         addLogEntry("Valid access key entered");
         onAccessKeyValid();
+      } else if (isValid === "rateLimited") {
+        // The module already raised the refusal notice; no wrong-key error.
+        addLogEntry("Access key validation rate-limited");
       } else {
         setState((prev) => ({ ...prev, error: "Invalid access key" }));
         addLogEntry("Invalid access key attempt");
