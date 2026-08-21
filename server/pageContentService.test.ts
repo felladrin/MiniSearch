@@ -13,6 +13,7 @@ import {
   fetchPageContents,
   selectPassages,
   splitIntoPassages,
+  splitLongPassage,
 } from "./pageContentService";
 import { getPageReadStats } from "./pageReadsSinceLastRestart";
 
@@ -122,6 +123,64 @@ describe("splitIntoPassages", () => {
     expect(splitIntoPassages("\n\n  \n\nfirst   block\n\n\n")).toEqual([
       "first block",
     ]);
+  });
+
+  it("carries the last sentence into the next piece when a statement spans the cut", () => {
+    const long = "The quick brown fox jumps over the lazy dog. ";
+    const passages = splitLongPassage(long.repeat(30));
+    expect(passages.length).toBeGreaterThan(1);
+    for (const passage of passages) {
+      expect(passage.length).toBeLessThanOrEqual(1200);
+    }
+    // The overlap: the second piece starts with the tail of the first.
+    const overlap = passages[0].slice(-long.length).trim();
+    expect(passages[1].startsWith(overlap)).toBe(true);
+  });
+
+  it("uses a fixed character tail when a single sentence fills the piece", () => {
+    const sentence = "x".repeat(1300);
+    const passages = splitLongPassage(sentence);
+    expect(passages.length).toBeGreaterThan(1);
+    for (const passage of passages) {
+      expect(passage.length).toBeLessThanOrEqual(1200);
+    }
+    // The overlap is a fixed tail, not a sentence.
+    const overlap = passages[0].slice(-200);
+    expect(passages[1].startsWith(overlap)).toBe(true);
+  });
+
+  it("keeps every word of a long unpunctuated run in at least one piece", () => {
+    // No sentence terminator anywhere, so the whole block is one segment and
+    // the split happens on the character slicer.
+    const words = Array.from({ length: 600 }, (_, index) => `w${index}`);
+    const passages = splitLongPassage(words.join(" "));
+
+    expect(passages.length).toBeGreaterThan(2);
+    const joined = passages.join(" ");
+    for (const word of words) {
+      expect(joined.split(/\s+/)).toContain(word);
+    }
+  });
+
+  it("preserves spacing at the seam between pieces", () => {
+    const long = "The quick brown fox jumps over the lazy dog. ";
+    const passages = splitLongPassage(long.repeat(30));
+    expect(passages.length).toBeGreaterThan(1);
+    // The seam must not merge two sentences into one token (e.g. dog.The).
+    expect(passages[1]).not.toMatch(/[a-z]\\.[A-Z]/);
+  });
+
+  it("does not overlap between passages separated by blank lines", () => {
+    const block1 = "First block. ".repeat(100);
+    const block2 = "Second block. ".repeat(100);
+    const passages = splitIntoPassages(`${block1}\n\n${block2}`);
+    // The first passage of the second block must not start with text from
+    // the first block.
+    const secondBlockPassage = passages.find((p) =>
+      p.startsWith("Second block"),
+    );
+    expect(secondBlockPassage).toBeDefined();
+    expect(secondBlockPassage!.startsWith("First block")).toBe(false);
   });
 });
 
