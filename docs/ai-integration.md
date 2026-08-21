@@ -165,6 +165,11 @@ Content-Type: application/json
 
 The token is passed as a URL query parameter (`?token=`), verified server-side with Argon2 against the build-time `VITE_SEARCH_TOKEN`, not as an `Authorization: Bearer` header. The model field is optional; if `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` is unset, the server fetches and randomly selects from the upstream's available models.
 
+**Observability:** what happens to these requests is counted on `/status`
+under `inference`: how many answers finished, how many failed before or after
+the first token, how many models were tried, and which model ids failed. See
+the `/status` section of `docs/overview.md` for the field reference.
+
 **Features:**
 - Private data stays in your infrastructure
 - Custom model selection

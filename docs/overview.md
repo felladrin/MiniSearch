@@ -232,6 +232,7 @@ The `/status` endpoint returns a JSON object:
 | `webSearchServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `pageReads` | object | Page-reading counters since last restart, see below |
 | `authorization` | object | Token and rate-limit outcomes since last restart, see below |
+| `inference` | object | AI answer counters since last restart, see below |
 | `build.timestamp` | string | ISO 8601 build time |
 | `build.gitCommit` | string | Short Git commit hash |
 
@@ -296,6 +297,49 @@ by surface, both properties of the request rather than of whoever sent it.
 a single user action fans out into a text search, an image search and a
 page-content read, so its `authorized` side says where the budget goes and its
 `rejected` side says who pays for it running out.
+
+`inference` reports what happened to the AI answers served through
+`/inference`. Nothing about the conversation is kept, so the questions it can
+answer are about the upstream and about the wait, not about what was asked:
+
+| Field | Type | Says |
+|---|---|---|
+| `requests` | number | Requests that passed token verification; the denominator for the rest |
+| `streamed` | number | Answers that finished normally |
+| `streamedRate` | number | `streamed` as a percentage of `requests` |
+| `averageTimeToFirstTokenMs` | number | The wait the user actually feels, over the answers that produced a token |
+| `averageDurationMs` | number | Whole-request duration over every outcome, so a 2 ms rejected body and a 25 s answer land in the same average |
+| `averageAttempts` | number | Models tried, over the requests that reached the model loop; above 1 means the pool is carrying failures |
+| `modelFallbacks` | number | Times a retry moved to another model |
+| `modelsRefetched` | number | Times the model pool was re-listed mid-retry |
+| `streamsEndedWithoutFinish` | number | Attempts whose stream closed with no finish part, counted per attempt because the retry can still succeed |
+| `failed.failedBeforeFirstToken` | number | Every model failed before a token was sent, answered 503 |
+| `failed.failedMidStream` | number | The answer broke after content was already sent, so no retry was possible |
+| `failed.abandoned` | number | The client was gone before or during the answer; the only outcome with no response to observe it by |
+| `failed.badRequest` | number | Body too large, unparsable, or failing the schema |
+| `failed.notConfigured` | number | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` or its key is missing |
+| `failed.modelListUnavailable` | number | The upstream's model list could not be fetched |
+| `failed.noModelAvailable` | number | The list was fetched and held nothing usable |
+| `failed.internalError` | number | Anything the handler did not expect |
+| `failed.unclassified` | number | Should always be zero; a non-zero value means a path stopped reporting its outcome |
+| `byModel` | object | `attempted`, `streamed`, `failed` and `abandoned` per model id, which is how a dead member of the pool becomes visible. `attempted` equals the other three added up |
+
+`streamed` plus every `failed` entry sums to `requests`. A request refused at
+token verification is not counted here, since `authorization` above already
+counts it, and one refused for its method or its content type is answered
+before either counter is reached. So `inference.requests` should equal
+`authorization.bySurface.inference.authorized`, and a gap between the two is a
+request that never finished at all.
+
+Two fields read differently on a single-model deployment. With
+`INTERNAL_OPENAI_COMPATIBLE_API_MODEL` set there is no pool to fall back to, so
+the loop stops after the first failure: `averageAttempts` cannot exceed 1 and
+`modelFallbacks` stays at 0 however badly the upstream behaves. Read
+`failed.failedBeforeFirstToken` for that case instead.
+
+Model ids are configuration rather than user data, and `/inference` already
+sends the id to the browser in every chunk, so naming them here publishes
+nothing new.
 
 ## Data Persistence Architecture
 
