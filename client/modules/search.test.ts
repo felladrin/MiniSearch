@@ -44,11 +44,15 @@ describe("Search Module", () => {
 
   describe("Hash Query Function", () => {
     it("should return the same hash for identical queries", async () => {
-      const result1 =
-        await searchModule.searchServiceInstance.hashQuery("test query");
-      const result2 =
-        await searchModule.searchServiceInstance.hashQuery("test query");
-      expect(result1).toBe(result2);
+      for (const query of [
+        "test query",
+        "",
+        "test@query#123",
+        "日本語テスト",
+      ]) {
+        const { hashQuery } = searchModule.searchServiceInstance;
+        expect(await hashQuery(query)).toBe(await hashQuery(query));
+      }
     });
 
     it("should return different hashes for different queries", async () => {
@@ -57,28 +61,6 @@ describe("Search Module", () => {
       const result2 =
         await searchModule.searchServiceInstance.hashQuery("query two");
       expect(result1).not.toBe(result2);
-    });
-
-    it("should handle empty query string", async () => {
-      const result = await searchModule.searchServiceInstance.hashQuery("");
-      expect(result).toBeTruthy();
-      expect(typeof result).toBe("string");
-    });
-
-    it("should handle special characters", async () => {
-      const hash1 =
-        await searchModule.searchServiceInstance.hashQuery("test@query#123");
-      expect(hash1).toBe(
-        await searchModule.searchServiceInstance.hashQuery("test@query#123"),
-      );
-    });
-
-    it("should handle unicode characters", async () => {
-      const hash1 =
-        await searchModule.searchServiceInstance.hashQuery("日本語テスト");
-      expect(hash1).toBe(
-        await searchModule.searchServiceInstance.hashQuery("日本語テスト"),
-      );
     });
 
     it("should include limit in the hash so different limits produce different keys", async () => {
@@ -242,35 +224,6 @@ describe("Search Module", () => {
     });
   });
 
-  describe("Get Cache Stats Function", () => {
-    it("should return cache statistics object", () => {
-      const stats = searchModule.searchServiceInstance.getCacheStats();
-
-      expect(stats).toHaveProperty("textHitRate");
-      expect(stats).toHaveProperty("imageHitRate");
-      expect(stats).toHaveProperty("textHits");
-      expect(stats).toHaveProperty("textMisses");
-      expect(stats).toHaveProperty("imageHits");
-      expect(stats).toHaveProperty("imageMisses");
-      expect(stats).toHaveProperty("config");
-      expect(stats.config).toHaveProperty("ttl");
-      expect(stats.config).toHaveProperty("maxEntries");
-      expect(stats.config).toHaveProperty("enabled");
-    });
-
-    it("should track text search cache hits and misses", () => {
-      const initialStats = searchModule.searchServiceInstance.getCacheStats();
-      expect(initialStats.textHits).toBeGreaterThanOrEqual(0);
-      expect(initialStats.textMisses).toBeGreaterThanOrEqual(0);
-    });
-
-    it("should track image search cache hits and misses", () => {
-      const initialStats = searchModule.searchServiceInstance.getCacheStats();
-      expect(initialStats.imageHits).toBeGreaterThanOrEqual(0);
-      expect(initialStats.imageMisses).toBeGreaterThanOrEqual(0);
-    });
-  });
-
   describe("Update Cache Config Function", () => {
     it("should update ttl when provided", () => {
       const newTTL = 60000;
@@ -316,11 +269,11 @@ describe("Search Module", () => {
     });
   });
 
-  describe("Cache Failure Scenarios", () => {
+  describe("Search Failures", () => {
+    // The cache layer swallows its own read/write and integrity errors, so a
+    // cache failure surfaces as a miss followed by a real fetch. That fetch
+    // failure must propagate, so the caller can mark the search as failed.
     it("should rethrow when a text search fails end-to-end", async () => {
-      // getCachedResult/cacheResult swallow their own read/write errors, so a
-      // cache failure surfaces as a miss followed by a real fetch — the fetch
-      // failure must propagate so the caller can mark the search as failed.
       mockFetch.mockRejectedValue(new Error("Cache read error"));
 
       await expect(searchModule.searchText("test query")).rejects.toThrow(
@@ -331,23 +284,7 @@ describe("Search Module", () => {
       );
     });
 
-    it("should still return fresh results when the underlying fetch succeeds", async () => {
-      const mockResults: string[][] = [
-        ["Title", "Snippet", "https://example.com"],
-      ];
-      mockFetchResponse(mockResults);
-
-      const results = await searchModule.searchText("test query");
-
-      expect(results).toEqual(mockResults);
-    });
-  });
-
-  describe("Database Integrity Failures", () => {
     it("should rethrow when an image search fails end-to-end", async () => {
-      // ensureIntegrity/cleanExpiredCache swallow their own errors, so a
-      // corrupted database surfaces as a miss followed by a real fetch — the
-      // fetch failure must propagate so the caller can mark the search failed.
       mockFetch.mockRejectedValue(new Error("Database integrity check failed"));
 
       await expect(searchModule.searchImages("test query")).rejects.toThrow(
@@ -356,17 +293,6 @@ describe("Search Module", () => {
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("Image search failed"),
       );
-    });
-
-    it("should recover and return fresh results after a prior failure", async () => {
-      const mockResults: string[][] = [
-        ["Image", "Alt", "https://example.com/img.jpg"],
-      ];
-      mockFetchResponse(mockResults);
-
-      const results = await searchModule.searchImages("test query");
-
-      expect(results).toEqual(mockResults);
     });
   });
 

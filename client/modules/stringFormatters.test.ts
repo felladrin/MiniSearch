@@ -9,41 +9,28 @@ import {
 
 describe("stringFormatters", () => {
   describe("getHostname", () => {
-    it("should extract hostname from valid URL", () => {
-      expect(getHostname("https://example.com/page")).toBe("example.com");
-    });
-
-    it("should remove www prefix", () => {
-      expect(getHostname("https://www.example.com/page")).toBe("example.com");
-    });
-
-    it("should handle http URLs", () => {
-      expect(getHostname("http://test.org/path")).toBe("test.org");
-    });
-
-    it("should return original string for invalid URL", () => {
-      expect(getHostname("not-a-url")).toBe("not-a-url");
-    });
-
-    it("should handle URL with port (hostname only)", () => {
-      expect(getHostname("https://localhost:3000")).toBe("localhost");
+    it.each([
+      ["https://example.com/page", "example.com"],
+      ["https://www.example.com/page", "example.com"],
+      // The hostname, so the port stays out of it.
+      ["https://localhost:3000", "localhost"],
+      // Not a URL at all: hand back what came in, for display.
+      ["not-a-url", "not-a-url"],
+    ])("turns %s into %s", (url, expected) => {
+      expect(getHostname(url)).toBe(expected);
     });
   });
 
   describe("getSemanticVersion", () => {
-    it("should convert number timestamp to YYYY.MM.DD format", () => {
-      const result = getSemanticVersion(1700000000000);
-      expect(result).toMatch(/^\d{4}\.\d{1,2}\.\d{1,2}$/);
-    });
-
-    it("should handle Date object", () => {
-      const result = getSemanticVersion(new Date(2024, 0, 15));
-      expect(result).toBe("2024.1.15");
-    });
-
-    it("should handle ISO date string", () => {
-      const result = getSemanticVersion("2024-06-01");
-      expect(result).toMatch(/^2024\.6\.1$/);
+    it.each([
+      [1700000000000, "2023.11.14"],
+      // Built in UTC, because the formatter reads UTC fields: a local-time Date
+      // would format as the day before for anyone east of UTC.
+      [new Date(Date.UTC(2024, 0, 15)), "2024.1.15"],
+      // A date-only string is read as UTC, so the day cannot shift westwards.
+      ["2024-06-01", "2024.6.1"],
+    ])("dates %s as %s", (date, expected) => {
+      expect(getSemanticVersion(date)).toBe(expected);
     });
   });
 

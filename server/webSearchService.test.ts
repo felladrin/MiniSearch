@@ -539,31 +539,28 @@ describe("query privacy", () => {
 });
 
 describe("circuit breaker", () => {
-  it("opens after exactly 5 non-retriable failures", async () => {
+  // The retriable path is covered above, one breaker failure per exhausted
+  // retry cycle. A non-retriable status throws on the first attempt, so this
+  // holds both sides of the threshold for that path.
+  it("opens on the fifth non-retriable failure, not before", async () => {
     const breaker = new CircuitBreaker({ failureThreshold: 5 });
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
 
-    for (let i = 0; i < 5; i++) {
+    for (let failure = 0; failure < 4; failure++) {
       await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
     }
+    expect(breaker.getState("searxng")).toBe("CLOSED");
 
-    const callsBeforeBreak = fetchMock.mock.calls.length;
+    const callsAfterFour = fetchMock.mock.calls.length;
     await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
 
-    expect(fetchMock.mock.calls.length).toBe(callsBeforeBreak);
-  });
+    expect(fetchMock.mock.calls.length).toBe(callsAfterFour + 1);
+    expect(breaker.getState("searxng")).toBe("OPEN");
 
-  it("does not open before 5 failures", async () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 5 });
-    fetchMock.mockResolvedValue(createMockResponse("", false, 503));
-
-    for (let i = 0; i < 4; i++) {
-      await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
-    }
-
-    const callsBefore = fetchMock.mock.calls.length;
+    // Open now, so the next call is refused without reaching SearXNG.
+    const callsWhileOpen = fetchMock.mock.calls.length;
     await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
 
-    expect(fetchMock.mock.calls.length).toBe(callsBefore + 1);
+    expect(fetchMock.mock.calls.length).toBe(callsWhileOpen);
   });
 });

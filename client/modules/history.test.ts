@@ -26,10 +26,7 @@ describe("History Module - Search Run ID Management", () => {
 
   it("should generate a new search run ID when none exists", async () => {
     const { getCurrentSearchRunId } = await import("./history");
-    const id = getCurrentSearchRunId();
-    expect(id).toBeDefined();
-    expect(typeof id).toBe("string");
-    expect(id.length).toBeGreaterThan(0);
+    expect(getCurrentSearchRunId()).toMatch(/^\d+-[a-z0-9]+$/);
   });
 
   it("should return the same ID on subsequent calls", async () => {
@@ -48,28 +45,19 @@ describe("History Module - Search Run ID Management", () => {
     expect(getCurrentSearchRunId()).toBe(customId);
   });
 
-  it("should allow resetting the search run ID", async () => {
+  it("should hand out a fresh ID after every reset", async () => {
     const { getCurrentSearchRunId, setCurrentSearchRunId, resetSearchRunId } =
       await import("./history");
-    resetSearchRunId();
     setCurrentSearchRunId("test-id");
-    expect(getCurrentSearchRunId()).toBe("test-id");
 
     resetSearchRunId();
-    const newId = getCurrentSearchRunId();
-    expect(newId).not.toBe("test-id");
-    expect(newId).toBeDefined();
-  });
+    const first = getCurrentSearchRunId();
+    resetSearchRunId();
+    const second = getCurrentSearchRunId();
 
-  it("should generate unique IDs after reset", async () => {
-    const { getCurrentSearchRunId, resetSearchRunId } = await import(
-      "./history"
-    );
-    resetSearchRunId();
-    const id1 = getCurrentSearchRunId();
-    resetSearchRunId();
-    const id2 = getCurrentSearchRunId();
-    expect(id1).not.toBe(id2);
+    expect(first).not.toBe("test-id");
+    expect(second).not.toBe(first);
+    expect(second).toMatch(/^\d+-[a-z0-9]+$/);
   });
 });
 
@@ -170,47 +158,6 @@ describe("History Module - Entry Helper Functions", () => {
     const { getResultsFromEntry } = await import("./history");
     const entry = createTestEntry();
     expect(getResultsFromEntry(entry)).toBeNull();
-  });
-});
-
-describe("Search run ID management", () => {
-  it("should generate new ID when none exists", async () => {
-    const { getCurrentSearchRunId, resetSearchRunId } = await import(
-      "./history"
-    );
-    resetSearchRunId();
-    const id = getCurrentSearchRunId();
-    expect(id).toBeTruthy();
-    expect(id).toMatch(/^\d+-[a-z0-9]+$/);
-  });
-
-  it("should return same ID on subsequent calls", async () => {
-    const { getCurrentSearchRunId, resetSearchRunId } = await import(
-      "./history"
-    );
-    resetSearchRunId();
-    const id1 = getCurrentSearchRunId();
-    const id2 = getCurrentSearchRunId();
-    expect(id1).toBe(id2);
-  });
-
-  it("should allow setting custom ID", async () => {
-    const { getCurrentSearchRunId, setCurrentSearchRunId, resetSearchRunId } =
-      await import("./history");
-    resetSearchRunId();
-    setCurrentSearchRunId("custom-id-123");
-    expect(getCurrentSearchRunId()).toBe("custom-id-123");
-  });
-
-  it("should reset ID to null", async () => {
-    const { getCurrentSearchRunId, setCurrentSearchRunId, resetSearchRunId } =
-      await import("./history");
-    resetSearchRunId();
-    setCurrentSearchRunId("custom-id-123");
-    resetSearchRunId();
-    const id = getCurrentSearchRunId();
-    expect(id).not.toBe("custom-id-123");
-    expect(id).toMatch(/^\d+-[a-z0-9]+$/);
   });
 });
 

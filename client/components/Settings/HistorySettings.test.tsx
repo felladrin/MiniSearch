@@ -29,21 +29,7 @@ vi.mock("@mantine/notifications", () => ({
 }));
 
 describe("HistorySettings component", () => {
-  it("renders enable history switch", () => {
-    render(
-      <MantineProvider>
-        <HistorySettings />
-      </MantineProvider>,
-    );
-
-    const switches = screen.getAllByRole("switch");
-    expect(switches.length).toBeGreaterThanOrEqual(1);
-    const enableSwitch = switches[0];
-    expect(enableSwitch).toBeInTheDocument();
-    expect(enableSwitch).toBeChecked();
-  });
-
-  it("renders switch label text", () => {
+  it("renders the history controls when history is enabled", () => {
     render(
       <MantineProvider>
         <HistorySettings />
@@ -51,35 +37,9 @@ describe("HistorySettings component", () => {
     );
 
     expect(screen.getByText("Enable Search History")).toBeInTheDocument();
-  });
-
-  it("renders maximum entries input when history is enabled", () => {
-    render(
-      <MantineProvider>
-        <HistorySettings />
-      </MantineProvider>,
-    );
-
+    expect(screen.getAllByRole("switch")[0]).toBeChecked();
     expect(screen.getByText("Maximum Entries")).toBeInTheDocument();
-  });
-
-  it("renders automatic cleanup switch when history is enabled", () => {
-    render(
-      <MantineProvider>
-        <HistorySettings />
-      </MantineProvider>,
-    );
-
     expect(screen.getByText("Automatic Cleanup")).toBeInTheDocument();
-  });
-
-  it("renders clear history button", () => {
-    render(
-      <MantineProvider>
-        <HistorySettings />
-      </MantineProvider>,
-    );
-
     expect(
       screen.getByRole("button", { name: "Clear all history" }),
     ).toBeInTheDocument();
