@@ -1,6 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 vi.mock("./handleTokenVerification", () => ({
   handleTokenVerification: vi.fn(),
@@ -935,6 +943,12 @@ describe("internalApiEndpointServerHook", () => {
 
     beforeEach(setupStreaming);
 
+    // Every case in this block goes through the handler, so this covers all of
+    // them rather than whichever one happened to run last.
+    afterAll(() => {
+      expect(getInferenceStats().failed.unclassified).toBe(0);
+    });
+
     it("counts a finished answer under its model", async () => {
       const before = getInferenceStats();
       vi.mocked(streamText).mockImplementation(
@@ -978,6 +992,41 @@ describe("internalApiEndpointServerHook", () => {
       // reason it is worth counting at all.
       expect(getInferenceStats().failed.abandoned).toBe(
         before.failed.abandoned + 1,
+      );
+    });
+
+    it("counts an attempt the client walked away from mid-answer", async () => {
+      const before = getInferenceStats();
+      const response = createResponse();
+      const mutable = response as {
+        writableEnded: boolean;
+        destroyed: boolean;
+      };
+      vi.mocked(streamText).mockImplementation(
+        () =>
+          streamOf([
+            { type: "text-delta", text: "Half an answer" },
+            { type: "text-delta", text: "never read" },
+          ]) as never,
+      );
+      response.write.mockImplementation(() => {
+        // Writable for the first part, gone before the second, which is the
+        // path that leaves a model attempted with no result of its own.
+        mutable.writableEnded = true;
+        mutable.destroyed = true;
+        return true;
+      });
+
+      await callInference(response);
+
+      const after = getInferenceStats();
+      expect(after.failed.abandoned).toBe(before.failed.abandoned + 1);
+      const model = after.byModel["test-model"];
+      expect(model.abandoned).toBe(
+        (before.byModel["test-model"]?.abandoned ?? 0) + 1,
+      );
+      expect(model.attempted).toBe(
+        model.streamed + model.failed + model.abandoned,
       );
     });
 
@@ -1137,8 +1186,7 @@ describe("internalApiEndpointServerHook", () => {
 
       expect(stats.requests).toBe(before.requests + 2);
       expect(total).toBe(stats.requests);
-      // Zero unless a path through the handler stopped reporting its outcome.
-      expect(stats.failed.unclassified).toBe(0);
+      expect(stats.averageAttempts).toBeGreaterThanOrEqual(1);
     });
 
     it("keeps no part of the conversation", async () => {

@@ -43,11 +43,13 @@ interface ModelCounts {
   attempted: number;
   streamed: number;
   failed: number;
+  abandoned: number;
 }
 
 const byModel = new Map<string, ModelCounts>();
 
 let totalAttempts = 0;
+let requestsWithAttempts = 0;
 let totalFirstTokenMs = 0;
 let answersWithFirstToken = 0;
 let totalStreamMs = 0;
@@ -58,13 +60,12 @@ let streamsEndedWithoutFinish = 0;
 function countsFor(model: string): ModelCounts {
   const existing = byModel.get(model);
   if (existing) return existing;
-  const created = { attempted: 0, streamed: 0, failed: 0 };
+  const created = { attempted: 0, streamed: 0, failed: 0, abandoned: 0 };
   byModel.set(model, created);
   return created;
 }
 
 export function recordModelAttempt(model: string): void {
-  totalAttempts++;
   countsFor(model).attempted++;
 }
 
@@ -74,6 +75,15 @@ export function recordModelStreamed(model: string): void {
 
 export function recordModelFailure(model: string): void {
   countsFor(model).failed++;
+}
+
+/**
+ * The client left while this model was streaming. Counted so that a model's
+ * `attempted` always equals `streamed` plus `failed` plus this, rather than
+ * quietly losing the attempts nobody stayed to read.
+ */
+export function recordModelAbandoned(model: string): void {
+  countsFor(model).abandoned++;
 }
 
 /** A retry moved to another model, which is the only reason the pool exists. */
@@ -102,13 +112,17 @@ export function recordInference({
   outcome,
   durationMs,
   firstTokenMs,
+  attempts,
 }: {
   outcome: InferenceOutcome;
   durationMs: number;
   firstTokenMs?: number;
+  attempts: number;
 }): void {
   outcomes[outcome]++;
   totalStreamMs += durationMs;
+  totalAttempts += attempts;
+  if (attempts > 0) requestsWithAttempts++;
   if (firstTokenMs !== undefined) {
     totalFirstTokenMs += firstTokenMs;
     answersWithFirstToken++;
@@ -136,7 +150,12 @@ export function getInferenceStats() {
       totalFirstTokenMs / answersWithFirstToken || 0,
     ),
     averageDurationMs: Math.round(totalStreamMs / requests || 0),
-    averageAttempts: Number((totalAttempts / requests || 0).toFixed(2)),
+    // Over the requests that reached the model loop at all: a request that
+    // never had a model to try would otherwise drag the average below 1 and
+    // make a thrashing pool look healthier the more unrelated traffic arrives.
+    averageAttempts: Number(
+      (totalAttempts / requestsWithAttempts || 0).toFixed(2),
+    ),
     modelFallbacks,
     modelsRefetched,
     streamsEndedWithoutFinish,

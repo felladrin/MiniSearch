@@ -12,6 +12,7 @@ import { handleTokenVerification } from "./handleTokenVerification.ts";
 import {
   type InferenceOutcome,
   recordInference,
+  recordModelAbandoned,
   recordModelAttempt,
   recordModelFailure,
   recordModelFallback,
@@ -169,6 +170,7 @@ export function internalApiEndpointServerHook<
 
       const startedAt = performance.now();
       let firstTokenMs: number | undefined;
+      let attempts = 0;
       // Set on the way out of every path below. The default is the bucket that
       // means "a path stopped reporting", so a missed one is visible on
       // `/status` instead of landing in a bucket that means something else.
@@ -296,6 +298,7 @@ export function internalApiEndpointServerHook<
           }
 
           recordModelAttempt(model);
+          attempts++;
 
           try {
             const result = streamText({
@@ -310,6 +313,7 @@ export function internalApiEndpointServerHook<
             for await (const part of result.stream) {
               if (!isResponseWritable(response)) {
                 outcome = "abandoned";
+                recordModelAbandoned(model);
                 return;
               }
 
@@ -413,6 +417,7 @@ export function internalApiEndpointServerHook<
           outcome,
           durationMs: performance.now() - startedAt,
           firstTokenMs,
+          attempts,
         });
       }
     },
