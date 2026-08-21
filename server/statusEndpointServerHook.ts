@@ -1,6 +1,7 @@
 import prettyMilliseconds from "pretty-ms";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { getAuthorizationStats } from "./authorizationSinceLastRestart.ts";
+import { getInferenceStats } from "./inferencesSinceLastRestart.ts";
 import { getPageReadStats } from "./pageReadsSinceLastRestart.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
 import {
@@ -68,6 +69,7 @@ export function statusEndpointServerHook<
       webSearchServiceStatus,
       pageReads: getPageReadStats(),
       authorization: getAuthorizationStats(),
+      inference: getInferenceStats(),
       build: {
         timestamp: new Date(
           server.config.define?.VITE_BUILD_DATE_TIME || "",

@@ -34,6 +34,7 @@ import {
 } from "../shared/openaiModels";
 import { getModelConfig } from "./config/modelConfig";
 import { handleTokenVerification } from "./handleTokenVerification";
+import { getInferenceStats } from "./inferencesSinceLastRestart";
 import { internalApiEndpointServerHook } from "./internalApiEndpointServerHook";
 
 function createRequest(
@@ -900,6 +901,267 @@ describe("internalApiEndpointServerHook", () => {
           errorSpy.mockRestore();
         }
       });
+    });
+  });
+  describe("inference counters", () => {
+    const setupStreaming = () => {
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL", "http://test-api");
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_KEY", "test-key");
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "test-model");
+      vi.mocked(getModelConfig).mockReturnValue({
+        maxRetries: 5,
+        baseBackoffMs: 100,
+        maxBackoffMs: 5000,
+        requestTimeoutMs: 30000,
+        maxConcurrentRequests: 10,
+        defaultMaxTokens: 2048,
+        temperature: 0.7,
+        topP: 0.9,
+      });
+      vi.mocked(createOpenAICompatible).mockReturnValue({
+        chatModel: vi.fn().mockReturnValue("mock-chat-model"),
+      } as never);
+    };
+
+    async function callInference(response = createResponse()) {
+      const handler = getRegisteredHandler();
+      await handler(
+        createRequest({ messages: [{ role: "user", content: "hi" }] }),
+        response,
+        vi.fn(),
+      );
+      return response;
+    }
+
+    beforeEach(setupStreaming);
+
+    it("counts a finished answer under its model", async () => {
+      const before = getInferenceStats();
+      vi.mocked(streamText).mockImplementation(
+        () =>
+          streamOf([
+            { type: "text-delta", text: "Hello" },
+            { type: "finish" },
+          ]) as never,
+      );
+
+      await callInference();
+
+      const after = getInferenceStats();
+      expect(after.streamed).toBe(before.streamed + 1);
+      expect(after.requests).toBe(before.requests + 1);
+      expect(after.averageAttempts).toBeGreaterThan(0);
+      expect(after.byModel["test-model"].attempted).toBe(
+        (before.byModel["test-model"]?.attempted ?? 0) + 1,
+      );
+      expect(after.byModel["test-model"].streamed).toBe(
+        (before.byModel["test-model"]?.streamed ?? 0) + 1,
+      );
+    });
+
+    it("counts a request the client walked away from", async () => {
+      const before = getInferenceStats();
+      vi.mocked(streamText).mockImplementation(
+        () => streamOf([{ type: "text-delta", text: "Hello" }]) as never,
+      );
+      const response = createResponse();
+      const mutable = response as {
+        writableEnded: boolean;
+        destroyed: boolean;
+      };
+      mutable.writableEnded = true;
+      mutable.destroyed = true;
+
+      await callInference(response);
+
+      // The only outcome with no response to observe it by, which is the
+      // reason it is worth counting at all.
+      expect(getInferenceStats().failed.abandoned).toBe(
+        before.failed.abandoned + 1,
+      );
+    });
+
+    it("counts an exhausted ladder as a failure before the first token", async () => {
+      const before = getInferenceStats();
+      vi.mocked(streamText).mockImplementation(() => streamOf([]) as never);
+
+      const response = await callInference();
+
+      expect(response.statusCode).toBe(503);
+      const after = getInferenceStats();
+      expect(after.failed.failedBeforeFirstToken).toBe(
+        before.failed.failedBeforeFirstToken + 1,
+      );
+      expect(after.streamsEndedWithoutFinish).toBe(
+        before.streamsEndedWithoutFinish + 1,
+      );
+      expect(after.byModel["test-model"].failed).toBe(
+        (before.byModel["test-model"]?.failed ?? 0) + 1,
+      );
+    });
+
+    it("counts a failure after content as a mid-stream failure", async () => {
+      const before = getInferenceStats();
+      vi.mocked(streamText).mockImplementation(
+        () =>
+          streamOf([
+            { type: "text-delta", text: "Half an answer" },
+            { type: "error", error: new Error("upstream died") },
+          ]) as never,
+      );
+
+      await callInference();
+
+      expect(getInferenceStats().failed.failedMidStream).toBe(
+        before.failed.failedMidStream + 1,
+      );
+    });
+
+    it("counts a fallback to another model", async () => {
+      const before = getInferenceStats();
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
+      vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
+        { id: "model-a" },
+        { id: "model-b" },
+      ]);
+      vi.mocked(selectRandomModel)
+        .mockReturnValueOnce("model-a")
+        .mockReturnValueOnce("model-b");
+      let calls = 0;
+      vi.mocked(streamText).mockImplementation(() => {
+        calls += 1;
+        return (
+          calls === 1
+            ? streamOf([])
+            : streamOf([
+                { type: "text-delta", text: "Recovered" },
+                { type: "finish" },
+              ])
+        ) as never;
+      });
+
+      vi.useFakeTimers();
+      try {
+        const handler = getRegisteredHandler();
+        const pending = handler(
+          createRequest({ messages: [{ role: "user", content: "hi" }] }),
+          createResponse(),
+          vi.fn(),
+        );
+        await vi.runAllTimersAsync();
+        await pending;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      const after = getInferenceStats();
+      expect(after.modelFallbacks).toBe(before.modelFallbacks + 1);
+      expect(after.byModel["model-a"].failed).toBe(
+        (before.byModel["model-a"]?.failed ?? 0) + 1,
+      );
+      expect(after.byModel["model-b"].streamed).toBe(
+        (before.byModel["model-b"]?.streamed ?? 0) + 1,
+      );
+      expect(after.streamed).toBe(before.streamed + 1);
+    });
+
+    it.each([
+      [
+        "badRequest",
+        async () => {
+          const handler = getRegisteredHandler();
+          const request = Readable.from(["{invalid"]) as IncomingMessage;
+          request.url = "/inference?token=abc";
+          request.method = "POST";
+          request.headers = {
+            host: "localhost:3000",
+            "content-type": "application/json",
+          };
+          await handler(request, createResponse(), vi.fn());
+        },
+      ],
+      [
+        "notConfigured",
+        async () => {
+          vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL", undefined);
+          await callInference();
+        },
+      ],
+      [
+        "modelListUnavailable",
+        async () => {
+          vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
+          vi.mocked(listOpenAiCompatibleModels).mockRejectedValue(
+            new Error("registry timeout"),
+          );
+          const errorSpy = vi
+            .spyOn(console, "error")
+            .mockImplementation(() => {});
+          try {
+            await callInference();
+          } finally {
+            errorSpy.mockRestore();
+          }
+        },
+      ],
+    ] as const)(
+      "counts a %s answer under its own outcome",
+      async (outcome, run) => {
+        const before = getInferenceStats();
+
+        await run();
+
+        expect(getInferenceStats().failed[outcome]).toBe(
+          before.failed[outcome] + 1,
+        );
+      },
+    );
+
+    it("counts every request exactly once and classifies all of them", async () => {
+      const before = getInferenceStats();
+      vi.mocked(streamText).mockImplementation(
+        () =>
+          streamOf([
+            { type: "text-delta", text: "Hello" },
+            { type: "finish" },
+          ]) as never,
+      );
+
+      await callInference();
+      await callInference();
+
+      const stats = getInferenceStats();
+      const total =
+        stats.streamed +
+        Object.values(stats.failed).reduce((sum, count) => sum + count, 0);
+
+      expect(stats.requests).toBe(before.requests + 2);
+      expect(total).toBe(stats.requests);
+      // Zero unless a path through the handler stopped reporting its outcome.
+      expect(stats.failed.unclassified).toBe(0);
+    });
+
+    it("keeps no part of the conversation", async () => {
+      vi.mocked(streamText).mockImplementation(
+        () =>
+          streamOf([
+            { type: "text-delta", text: "borogoves" },
+            { type: "finish" },
+          ]) as never,
+      );
+      const handler = getRegisteredHandler();
+      await handler(
+        createRequest({
+          messages: [{ role: "user", content: "outgrabe mimsy-42" }],
+        }),
+        createResponse(),
+        vi.fn(),
+      );
+
+      const serialized = JSON.stringify(getInferenceStats());
+      expect(serialized).not.toContain("outgrabe");
+      expect(serialized).not.toContain("borogoves");
+      expect(serialized).not.toContain("abc");
     });
   });
 });

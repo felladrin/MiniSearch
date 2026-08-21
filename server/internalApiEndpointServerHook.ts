@@ -10,6 +10,16 @@ import {
 import { getModelConfig } from "./config/modelConfig.ts";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
 import {
+  type InferenceOutcome,
+  recordInference,
+  recordModelAttempt,
+  recordModelFailure,
+  recordModelFallback,
+  recordModelStreamed,
+  recordModelsRefetched,
+  recordStreamEndedWithoutFinish,
+} from "./inferencesSinceLastRestart.ts";
+import {
   calculateBackoffTime,
   isResponseWritable,
   safeEndResponse,
@@ -157,6 +167,13 @@ export function internalApiEndpointServerHook<
       );
       if (!shouldContinue) return;
 
+      const startedAt = performance.now();
+      let firstTokenMs: number | undefined;
+      // Set on the way out of every path below. The default is the bucket that
+      // means "a path stopped reporting", so a missed one is visible on
+      // `/status` instead of landing in a bucket that means something else.
+      let outcome: InferenceOutcome = "unclassified";
+
       try {
         let rawRequestBody: unknown;
         try {
@@ -170,6 +187,7 @@ export function internalApiEndpointServerHook<
             } else if (chunk instanceof Uint8Array) {
               buf = Buffer.from(chunk);
             } else {
+              outcome = "badRequest";
               sendJsonError(response, 400, {
                 error: "Invalid request body stream",
               });
@@ -177,6 +195,7 @@ export function internalApiEndpointServerHook<
             }
             totalBytes += buf.length;
             if (totalBytes > maxBodyBytes) {
+              outcome = "badRequest";
               sendJsonError(response, 413, { error: "Request body too large" });
               return;
             }
@@ -184,6 +203,7 @@ export function internalApiEndpointServerHook<
           }
           rawRequestBody = JSON.parse(Buffer.concat(chunks).toString());
         } catch (_error) {
+          outcome = "badRequest";
           sendJsonError(response, 400, { error: "Invalid request body" });
           return;
         }
@@ -192,6 +212,7 @@ export function internalApiEndpointServerHook<
           chatCompletionRequestSchema.safeParse(rawRequestBody);
         if (!parsedRequestBody.success) {
           const issue = parsedRequestBody.error.issues[0];
+          outcome = "badRequest";
           sendJsonError(response, 400, {
             error: `Invalid request body: ${issue.path.join(".") || "body"} ${issue.message}`,
           });
@@ -203,6 +224,7 @@ export function internalApiEndpointServerHook<
           !process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL ||
           !process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY
         ) {
+          outcome = "notConfigured";
           sendJsonError(response, 500, {
             error: "OpenAI API configuration is missing",
           });
@@ -232,6 +254,7 @@ export function internalApiEndpointServerHook<
               "Error fetching models:",
               error instanceof Error ? error.message : error,
             );
+            outcome = "modelListUnavailable";
             sendJsonError(response, 500, {
               error: "Failed to fetch available models",
             });
@@ -240,6 +263,7 @@ export function internalApiEndpointServerHook<
         }
 
         if (!model) {
+          outcome = "noModelAvailable";
           sendJsonError(response, 500, { error: "No model available" });
           return;
         }
@@ -267,8 +291,11 @@ export function internalApiEndpointServerHook<
           attemptedModels.add(model);
 
           if (!isResponseWritable(response)) {
+            outcome = "abandoned";
             return;
           }
+
+          recordModelAttempt(model);
 
           try {
             const result = streamText({
@@ -281,9 +308,14 @@ export function internalApiEndpointServerHook<
             });
 
             for await (const part of result.stream) {
-              if (!isResponseWritable(response)) return;
+              if (!isResponseWritable(response)) {
+                outcome = "abandoned";
+                return;
+              }
 
               if (part.type === "text-delta") {
+                if (!hasEmittedContent)
+                  firstTokenMs = performance.now() - startedAt;
                 hasEmittedContent = true;
                 sendSseData(response, createChunkPayload(model, part.text));
               } else if (part.type === "error") {
@@ -294,13 +326,17 @@ export function internalApiEndpointServerHook<
                   createChunkPayload(model, undefined, "stop"),
                 );
                 sendSseDone(response);
+                outcome = "streamed";
+                recordModelStreamed(model);
                 return;
               }
             }
 
+            recordStreamEndedWithoutFinish();
             throw new Error("Stream ended unexpectedly");
           } catch (error) {
             lastError = error;
+            recordModelFailure(model);
             console.error(
               "Error during streaming:",
               error instanceof Error ? error.message : error,
@@ -318,6 +354,7 @@ export function internalApiEndpointServerHook<
                   process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
                   process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
                 );
+                recordModelsRefetched();
               } catch (refetchError) {
                 console.warn(
                   "Failed to refetch models:",
@@ -334,6 +371,7 @@ export function internalApiEndpointServerHook<
             );
             if (!nextModel) break;
             model = nextModel;
+            recordModelFallback();
 
             const backoffMs = calculateBackoffTime(attempt);
             await new Promise((resolve) => setTimeout(resolve, backoffMs));
@@ -344,6 +382,7 @@ export function internalApiEndpointServerHook<
           lastError instanceof Error ? lastError.message : "Unknown error";
 
         if (!response.headersSent) {
+          outcome = "failedBeforeFirstToken";
           sendJsonError(response, 503, {
             error: "Service unavailable - all models failed",
             lastError: lastErrorMessage,
@@ -351,6 +390,9 @@ export function internalApiEndpointServerHook<
           return;
         }
 
+        outcome = hasEmittedContent
+          ? "failedMidStream"
+          : "failedBeforeFirstToken";
         sendSseError(
           response,
           `Service unavailable - all models failed: ${lastErrorMessage}`,
@@ -361,9 +403,16 @@ export function internalApiEndpointServerHook<
           "Error in internal API endpoint:",
           error instanceof Error ? error.message : error,
         );
+        outcome = "internalError";
         sendJsonError(response, 500, {
           error: "Internal server error",
           message: error instanceof Error ? error.message : "Unknown error",
+        });
+      } finally {
+        recordInference({
+          outcome,
+          durationMs: performance.now() - startedAt,
+          firstTokenMs,
         });
       }
     },
