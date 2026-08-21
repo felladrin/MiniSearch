@@ -33,7 +33,11 @@ import {
   runFollowUpSearch,
 } from "./chatHelpers";
 import { saveChatMessageForQuery } from "./history";
-import { updateImageSearchResults, updateTextSearchResults } from "./pubSub";
+import {
+  updateImageSearchResults,
+  updateLlmTextSearchResults,
+  updateTextSearchResults,
+} from "./pubSub";
 import { searchImages, searchText } from "./search";
 import type { ImageSearchResults, TextSearchResults } from "./types";
 
@@ -42,6 +46,7 @@ const mockSearchImages = vi.mocked(searchImages);
 const mockSaveChat = vi.mocked(saveChatMessageForQuery);
 const mockUpdateText = vi.mocked(updateTextSearchResults);
 const mockUpdateImage = vi.mocked(updateImageSearchResults);
+const mockUpdateLlmText = vi.mocked(updateLlmTextSearchResults);
 
 describe("refreshTextSearchResults", () => {
   it("deduplicates by URL and appends fresh results", async () => {
@@ -82,6 +87,8 @@ describe("refreshTextSearchResults", () => {
     await refreshTextSearchResults("query", 10, []);
 
     expect(mockUpdateText).not.toHaveBeenCalled();
+    // An empty refresh must not blank what the model was given either.
+    expect(mockUpdateLlmText).not.toHaveBeenCalled();
   });
 });
 

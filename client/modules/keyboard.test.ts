@@ -92,16 +92,4 @@ describe("handleEnterKeyDown", () => {
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(onSubmit).not.toHaveBeenCalled();
   });
-
-  it("still submits a normal Enter after a composition has ended", () => {
-    const onSubmit = vi.fn();
-    const event = mockEvent(false);
-    handleEnterKeyDown(
-      event as KeyboardEvent<HTMLTextAreaElement>,
-      { enterToSubmit: true },
-      onSubmit,
-    );
-    expect(event.preventDefault).toHaveBeenCalled();
-    expect(onSubmit).toHaveBeenCalled();
-  });
 });

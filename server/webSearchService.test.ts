@@ -201,8 +201,11 @@ describe("graceful degradation", () => {
   const RETRY_BACKOFF_TOTAL_MS = 7000;
 
   const breakerOptions = {
+    // Far enough out that the reset timer cannot fire while a test is still
+    // driving retry cycles: the margin would otherwise depend on MAX_RETRIES.
+    // The recovery test advances by `resetTimeout + 1` rather than a literal.
     failureThreshold: 5,
-    resetTimeout: 60_000,
+    resetTimeout: 600_000,
     successThreshold: 1,
   };
 
@@ -216,6 +219,9 @@ describe("graceful degradation", () => {
    */
   async function searchThroughRetries(breaker: CircuitBreaker) {
     const promise = fetchSearXNG("failure injection", "text", 30, breaker);
+    // Deliberately not pinned to a message: callers drive this through phases
+    // that fail differently, an exhausted retry cycle and a refusal by the
+    // open circuit, and the fetch counts are what carry each claim.
     const outcome = expect(promise).rejects.toThrow();
     await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_TOTAL_MS);
     await outcome;

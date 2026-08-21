@@ -12,7 +12,8 @@ describe("stringFormatters", () => {
     it.each([
       ["https://example.com/page", "example.com"],
       ["https://www.example.com/page", "example.com"],
-      // Only the leading www goes; the rest of the name is not a prefix.
+      // A subdomain survives. Note the strip is unanchored today, so
+      // `my.www.example.com` still loses its middle label: see #2427.
       ["https://docs.example.com/page", "docs.example.com"],
       // The hostname, so the port stays out of it.
       ["https://localhost:3000", "localhost"],
@@ -94,14 +95,23 @@ describe("stringFormatters", () => {
       expect(results).toHaveLength(0);
     });
 
-    it("should score earlier matches above later ones", () => {
-      const results = searchWithFuzzy(items, "app", (item) => item.name);
-
-      expect(results.length).toBeGreaterThan(1);
-      expect(results[0].score).toBeGreaterThan(
-        results[results.length - 1].score,
+    it("should rank the matches and score them by rank", () => {
+      // Listed with the weaker match first, so document order cannot produce
+      // the expected result: uFuzzy's ranking has to be what orders these.
+      const results = searchWithFuzzy(
+        [
+          { id: 2, name: "application" },
+          { id: 1, name: "apple" },
+          { id: 3, name: "banana" },
+        ],
+        "app",
+        (item) => item.name,
       );
-      expect(results[0].score).toBeLessThanOrEqual(1);
+
+      expect(results.map(({ item, score }) => [item.name, score])).toEqual([
+        ["apple", 1],
+        ["application", 0.5],
+      ]);
     });
   });
 

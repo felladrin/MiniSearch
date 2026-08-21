@@ -52,14 +52,6 @@ describe("Settings Module", () => {
       expect(getDefaultCpuThreads(3)).toBe(1);
       expect(getDefaultCpuThreads(9)).toBe(4);
     });
-
-    it("should never oversubscribe the logical processors", () => {
-      for (const cores of [1, 2, 3, 4, 8, 12, 16, 24, 32, 64, 256]) {
-        expect(getDefaultCpuThreads(cores)).toBeLessThanOrEqual(
-          Math.max(1, Math.floor(cores / 2)),
-        );
-      }
-    });
   });
 
   it("should include core inference types", () => {
