@@ -4,8 +4,16 @@ import { handleTokenVerification } from "./handleTokenVerification.ts";
 import { rankSearchResults } from "./rankSearchResults.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
 import {
+  recordRerankFailed,
+  recordRerankSkipped,
+} from "./rerankingSinceLastRestart.ts";
+import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
+  recordSearchDuration,
+  recordThumbnailBlocked,
+  recordThumbnailDropped,
+  recordThumbnailRequested,
 } from "./searchesSinceLastRestart.ts";
 import { resolvePublicUrl } from "./utils/publicUrl.ts";
 import { readCappedBytes } from "./utils/streamUtils.ts";
@@ -44,6 +52,7 @@ type ImageResult = [
 ];
 
 async function fetchThumbnailAsDataUrl(thumbnailSource: string) {
+  recordThumbnailRequested();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), THUMBNAIL_TIMEOUT_MS);
   try {
@@ -57,6 +66,7 @@ async function fetchThumbnailAsDataUrl(thumbnailSource: string) {
         // Malformed, non-HTTP, or a private/link-local/reserved address:
         // do not fetch it on the server's behalf. Throwing lets the caller's
         // catch drop the whole image result, matching the other failure paths.
+        recordThumbnailBlocked();
         throw new Error(
           "Refusing to fetch thumbnail from a non-public address",
         );
@@ -106,6 +116,7 @@ async function handleRanking(
 ): Promise<[title: string, content: string, url: string][]> {
   const isRerankerHealthy = await getRerankerStatus();
   if (!isRerankerHealthy) {
+    recordRerankSkipped();
     console.warn("Reranker service is not healthy, using unranked results");
   }
 
@@ -115,6 +126,7 @@ async function handleRanking(
     }
     return results;
   } catch (error) {
+    recordRerankFailed();
     console.error(
       "Error ranking search results:",
       error instanceof Error ? error.message : error,
@@ -168,8 +180,10 @@ export function searchEndpointServerHook<
       const searchType = isTextSearch ? "text" : "images";
 
       let searxngResults: TextResult[] | ImageResult[];
+      const searchStartedAt = performance.now();
       try {
         searxngResults = await fetchSearXNG(query, searchType, limit);
+        recordSearchDuration(searchType, performance.now() - searchStartedAt);
       } catch {
         // SearXNG is unreachable: answer non-200 so the client can tell an
         // outage apart from a search that genuinely has no results.
@@ -208,6 +222,7 @@ export function searchEndpointServerHook<
 
                 return [title, url, thumbnail, sourceUrl] as ImageResult;
               } catch {
+                recordThumbnailDropped();
                 return null;
               }
             }),

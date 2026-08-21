@@ -220,7 +220,8 @@ The `/status` endpoint returns a JSON object:
 | Field | Type | Description |
 |---|---|---|
 | `uptime` | string | Human-readable server uptime |
-| `sessions` | number | Active verified token sessions |
+| `sessions` | number | Distinct verified sessions since last restart, which is what the averages below divide by |
+| `activeSessions` | number | Sessions still in the cache, dropped after 30 idle minutes |
 | `textualSearches` | number | Text search count since last restart |
 | `graphicalSearches` | number | Image search count since last restart |
 | `averageTextualSearchesPerSession` | number | Text searches / sessions ratio |
@@ -233,6 +234,9 @@ The `/status` endpoint returns a JSON object:
 | `pageReads` | object | Page-reading counters since last restart, see below |
 | `authorization` | object | Token and rate-limit outcomes since last restart, see below |
 | `inference` | object | AI answer counters since last restart, see below |
+| `searches` | object | Search timing, circuit state and grounding, see below |
+| `reranker` | object | Reranking cost and effect, see below |
+| `thumbnails` | object | Image thumbnail fetches, see below |
 | `build.timestamp` | string | ISO 8601 build time |
 | `build.gitCommit` | string | Short Git commit hash |
 
@@ -340,6 +344,31 @@ the loop stops after the first failure: `averageAttempts` cannot exceed 1 and
 Model ids are configuration rather than user data, and `/inference` already
 sends the id to the browser in every chunk, so naming them here publishes
 nothing new.
+
+`searches`, `reranker` and `thumbnails` are the numbers behind the constants
+in the search path. Each row names the constant it is there to move, the same
+way `pageReads` does:
+
+| Field | Type | Tunes |
+|---|---|---|
+| `searches.averageTextualMs` | number | The 30 s client timeout in `client/modules/search.ts`, and SearXNG's own engine timeouts |
+| `searches.averageGraphicalMs` | number | The same, for image searches |
+| `searches.circuitState` | string | Nothing; whether searches are being short-circuited right now |
+| `searches.circuitOpens` | number | `failureThreshold` and `resetTimeout` on the SearXNG breaker: each opening is a minute of serving no searches at all |
+| `searches.withGrounding` | number | Nothing; how often an answer had page excerpts to stand on |
+| `searches.withoutGrounding` | number | The page-reading budget and timeouts in `docs/page-content.md`, counted per search rather than per page |
+| `reranker.reranks` | number | Nothing; the denominator for the rest |
+| `reranker.averageMs` | number | Whether reranking or SearXNG is what users wait for, and so whether to rerank a shortlist instead of all 30 results |
+| `reranker.keptRate` | number | `kStandardDeviationFactor`: near 100% means the filter is not filtering |
+| `reranker.fallbackApplied` | number | `minPercentageFallback`: a large share means the deviation threshold is emptying batches the fallback then has to rescue |
+| `reranker.skippedUnhealthy` | number | Nothing; searches served in SearXNG's own order because the model was not loaded |
+| `reranker.failed` | number | Nothing; the same, because reranking threw |
+| `thumbnails.requested` | number | Nothing; the denominator for the two below |
+| `thumbnails.dropped` | number | `THUMBNAIL_TIMEOUT_MS` and `MAX_THUMBNAIL_BYTES`: every one of these is an image result the user never saw |
+| `thumbnails.blocked` | number | The SSRF guard, as the share of thumbnails pointing outside public space |
+
+`thumbnails.dropped` includes the blocked ones, so `requested` minus `dropped`
+is what reached the client.
 
 ## Data Persistence Architecture
 

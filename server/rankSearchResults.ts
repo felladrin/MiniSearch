@@ -1,4 +1,5 @@
 import { rerank } from "./rerankerService.ts";
+import { recordRerank } from "./rerankingSinceLastRestart.ts";
 
 export async function rankSearchResults(
   query: string,
@@ -9,6 +10,21 @@ export async function rankSearchResults(
     ([title, snippet]) => `${title}\n${snippet}`,
   );
 
+  const startedAt = performance.now();
+  let usedPercentageFallback = false;
+  const filterResults = (items: ScoredResultItem[]) => {
+    const filtered = filterResultsByScore(items);
+    if (filtered.fellBackToPercentage) usedPercentageFallback = true;
+    return filtered.items;
+  };
+  const report = (kept: number) =>
+    recordRerank({
+      considered: searchResults.length,
+      kept,
+      durationMs: performance.now() - startedAt,
+      usedPercentageFallback,
+    });
+
   const results = await rerank(query, documents);
 
   const scoredResults = results.map(({ index, relevance_score }) => ({
@@ -17,18 +33,21 @@ export async function rankSearchResults(
   }));
 
   if (scoredResults.length === 0) {
+    report(0);
     return [];
   }
 
   if (!preserveTopResults) {
-    return filterResultsByScore(scoredResults)
+    const ranked = filterResults(scoredResults)
       .sort((a, b) => b.score - a.score)
       .map(({ result }) => result);
+    report(ranked.length);
+    return ranked;
   }
 
   const [firstResult, ...nextResults] = scoredResults;
 
-  const filteredNextResults = filterResultsByScore(nextResults);
+  const filteredNextResults = filterResults(nextResults);
 
   const nextTopResultsCount = 9;
 
@@ -40,9 +59,11 @@ export async function rankSearchResults(
     .slice(nextTopResultsCount)
     .sort((a, b) => b.score - a.score);
 
-  return [firstResult, ...nextTopResults, ...remainingResults].map(
+  const ranked = [firstResult, ...nextTopResults, ...remainingResults].map(
     ({ result }) => result,
   );
+  report(ranked.length);
+  return ranked;
 }
 
 type SearchResultTuple = [title: string, content: string, url: string];
@@ -51,12 +72,21 @@ type ScoredResultItemWithNormalizedScore = ScoredResultItem & {
   normalizedScore: number;
 };
 
+/**
+ * Returns the surviving results and whether the percentage fallback had to
+ * rescue them, which is the signal that `kStandardDeviationFactor` emptied a
+ * batch it should not have.
+ */
 function filterResultsByScore(
   inputResults: ScoredResultItem[],
   kStandardDeviationFactor = 0.3,
   minPercentageFallback = 0.4,
-): ScoredResultItemWithNormalizedScore[] {
-  if (inputResults.length === 0) return [];
+): {
+  items: ScoredResultItemWithNormalizedScore[];
+  fellBackToPercentage: boolean;
+} {
+  if (inputResults.length === 0)
+    return { items: [], fellBackToPercentage: false };
 
   const originalScores = inputResults.map(({ score }) => score);
   const minScore = Math.min(...originalScores);
@@ -87,6 +117,8 @@ function filterResultsByScore(
     ({ normalizedScore }) => normalizedScore >= threshold,
   );
 
+  let fellBackToPercentage = false;
+
   if (
     filteredItems.length <
       Math.ceil(itemsWithNormalizedScore.length * minPercentageFallback) &&
@@ -97,7 +129,8 @@ function filterResultsByScore(
       ({ normalizedScore }) =>
         normalizedScore >= highestNormalizedScore * minPercentageFallback,
     );
+    fellBackToPercentage = true;
   }
 
-  return filteredItems;
+  return { items: filteredItems, fellBackToPercentage };
 }

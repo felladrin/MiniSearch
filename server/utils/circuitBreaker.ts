@@ -11,6 +11,8 @@ interface CircuitMetrics {
   successes: number;
   lastFailure?: number;
   state: CircuitState;
+  /** Times this circuit has opened, which `resetMetrics` deliberately keeps. */
+  opens: number;
 }
 
 const defaultOptions: CircuitBreakerOptions = {
@@ -53,12 +55,22 @@ export class CircuitBreaker {
     return this.metrics.get(key)?.state || "CLOSED";
   }
 
+  /**
+   * How often this circuit has opened. A closed circuit says nothing about
+   * whether the instance spent the last hour serving no searches at all, which
+   * is what this answers.
+   */
+  getOpens(key: string): number {
+    return this.metrics.get(key)?.opens ?? 0;
+  }
+
   private getOrCreateMetrics(key: string): CircuitMetrics {
     if (!this.metrics.has(key)) {
       this.metrics.set(key, {
         failures: 0,
         successes: 0,
         state: "CLOSED",
+        opens: 0,
       });
     }
 
@@ -98,6 +110,7 @@ export class CircuitBreaker {
       metrics.state !== "OPEN"
     ) {
       metrics.state = "OPEN";
+      metrics.opens++;
       setTimeout(() => {
         if (metrics.state === "OPEN") {
           metrics.state = "HALF_OPEN";

@@ -205,4 +205,26 @@ describe("pageContentEndpointServerHook", () => {
     expect(response.statusCode).toBe(500);
     expect(parseBody(response)).toEqual({ error: "Internal server error" });
   });
+  it("records whether the search got anything to ground on", async () => {
+    const { getSearchStats } = await import("./searchesSinceLastRestart");
+    const before = getSearchStats();
+    vi.mocked(handleTokenVerification).mockResolvedValue({
+      shouldContinue: true,
+    });
+
+    const url = "/page-content?q=cats&url=https%3A%2F%2Fa.example%2F&token=abc";
+
+    vi.mocked(fetchPageContents).mockResolvedValue([
+      { url: "https://a.example/", content: "text worth quoting" },
+    ]);
+    await callEndpoint(url).handled;
+
+    expect(getSearchStats().withGrounding).toBe(before.withGrounding + 1);
+    expect(getSearchStats().withoutGrounding).toBe(before.withoutGrounding);
+
+    vi.mocked(fetchPageContents).mockResolvedValue([]);
+    await callEndpoint(url).handled;
+
+    expect(getSearchStats().withoutGrounding).toBe(before.withoutGrounding + 1);
+  });
 });

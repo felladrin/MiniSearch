@@ -77,6 +77,18 @@ export async function startWebSearchService() {
   }
 }
 
+/**
+ * The state of the circuit in front of SearXNG, and how often it has opened. An
+ * open circuit answers every search with a failure without calling SearXNG at
+ * all, which no other counter distinguishes from SearXNG being down.
+ */
+export function getSearchCircuitStats() {
+  return {
+    circuitState: searxngCircuitBreaker.getState("searxng"),
+    circuitOpens: searxngCircuitBreaker.getOpens("searxng"),
+  };
+}
+
 export async function getWebSearchStatus() {
   try {
     const response = await fetch(`${SERVICE_BASE_URL}/healthz`, {

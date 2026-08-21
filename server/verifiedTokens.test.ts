@@ -63,4 +63,21 @@ describe("verifiedTokens", () => {
 
     expect(isVerifiedToken("active")).toBe(true);
   });
+  it("reports the sessions still in the cache apart from the cumulative count", async () => {
+    const {
+      addVerifiedToken,
+      getActiveSessionsAmount,
+      getVerifiedTokensAmount,
+    } = await import("./verifiedTokens");
+
+    const cumulativeBefore = getVerifiedTokensAmount();
+    const activeBefore = getActiveSessionsAmount();
+
+    addVerifiedToken("active-token-a");
+    addVerifiedToken("active-token-b");
+    addVerifiedToken("active-token-a");
+
+    expect(getVerifiedTokensAmount()).toBe(cumulativeBefore + 2);
+    expect(getActiveSessionsAmount()).toBe(activeBefore + 2);
+  });
 });

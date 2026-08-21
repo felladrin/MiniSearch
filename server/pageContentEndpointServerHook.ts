@@ -2,6 +2,7 @@ import type { PreviewServer, ViteDevServer } from "vite";
 import { z } from "zod";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
 import { fetchPageContents } from "./pageContentService.ts";
+import { recordGroundingOutcome } from "./searchesSinceLastRestart.ts";
 
 const MAX_QUERY_LENGTH = 2000;
 const MAX_URL_LENGTH = 2048;
@@ -78,6 +79,7 @@ export function pageContentEndpointServerHook<
     try {
       const { query, urls } = parsedParams.data;
       const contents = await fetchPageContents(query, urls);
+      recordGroundingOutcome(contents.length > 0);
 
       response.setHeader("Content-Type", "application/json");
       response.end(

@@ -4,15 +4,24 @@ import { getAuthorizationStats } from "./authorizationSinceLastRestart.ts";
 import { getInferenceStats } from "./inferencesSinceLastRestart.ts";
 import { getPageReadStats } from "./pageReadsSinceLastRestart.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
+import { getRerankingStats } from "./rerankingSinceLastRestart.ts";
 import {
   getGraphicalSearchesSinceLastRestart,
   getSearchesWithAllResultsDiscardedSinceLastRestart,
   getSearchesWithoutResultsSinceLastRestart,
   getSearchesWithUnresponsiveEnginesSinceLastRestart,
+  getSearchStats,
   getTextualSearchesSinceLastRestart,
+  getThumbnailStats,
 } from "./searchesSinceLastRestart.ts";
-import { getVerifiedTokensAmount } from "./verifiedTokens.ts";
-import { getWebSearchStatus } from "./webSearchService.ts";
+import {
+  getActiveSessionsAmount,
+  getVerifiedTokensAmount,
+} from "./verifiedTokens.ts";
+import {
+  getSearchCircuitStats,
+  getWebSearchStatus,
+} from "./webSearchService.ts";
 
 const serverStartTime = Date.now();
 
@@ -70,6 +79,10 @@ export function statusEndpointServerHook<
       pageReads: getPageReadStats(),
       authorization: getAuthorizationStats(),
       inference: getInferenceStats(),
+      activeSessions: getActiveSessionsAmount(),
+      searches: { ...getSearchStats(), ...getSearchCircuitStats() },
+      reranker: getRerankingStats(),
+      thumbnails: getThumbnailStats(),
       build: {
         timestamp: new Date(
           server.config.define?.VITE_BUILD_DATE_TIME || "",
