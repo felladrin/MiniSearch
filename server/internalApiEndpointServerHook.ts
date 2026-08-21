@@ -134,12 +134,7 @@ export function internalApiEndpointServerHook<
       response: ServerResponse,
       next: () => void,
     ) => {
-      if (!request.url) {
-        sendJsonError(response, 400, { error: "Bad Request: URL is required" });
-        return;
-      }
-
-      if (!request.url.startsWith("/inference")) {
+      if (!request.url?.startsWith("/inference")) {
         return next();
       }
 

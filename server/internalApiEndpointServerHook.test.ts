@@ -178,15 +178,15 @@ describe("internalApiEndpointServerHook", () => {
       expect(response.end).not.toHaveBeenCalled();
     });
 
-    it("responds 400 when request.url is missing", async () => {
+    it("passes on a request without a URL instead of answering for it", async () => {
       const handler = getRegisteredHandler();
+      const next = vi.fn();
       const response = createResponse();
       const request = createRequest({});
       request.url = undefined;
-      await handler(request, response, vi.fn());
-      expect(response.statusCode).toBe(400);
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
-      expect(payload.error).toContain("URL is required");
+      await handler(request, response, next);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(response.end).not.toHaveBeenCalled();
     });
   });
 
