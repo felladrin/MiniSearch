@@ -112,6 +112,22 @@ describe("searchEndpointServerHook", () => {
     expect(fetchSearXNG).not.toHaveBeenCalled();
   });
 
+  it("verifies the token before reading the query parameters", async () => {
+    vi.mocked(handleTokenVerification).mockResolvedValue({
+      shouldContinue: false,
+    });
+    const handler = getRegisteredHandler();
+    const response = createResponse();
+
+    await handler(createRequest("/search/text"), response, vi.fn());
+
+    // The malformed-query 400 would otherwise answer first, and a caller could
+    // loop it without a token and without spending a rate-limit point.
+    expect(handleTokenVerification).toHaveBeenCalled();
+    expect(response.end).not.toHaveBeenCalled();
+    expect(fetchSearXNG).not.toHaveBeenCalled();
+  });
+
   it("responds 400 when the query parameter exceeds the maximum length", async () => {
     const handler = getRegisteredHandler();
     const response = createResponse();

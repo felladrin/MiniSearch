@@ -283,18 +283,19 @@ verification, the funnel `/search/text`, `/search/images`, `/page-content` and
 | `reasons.rateLimited` | number | Refused by the limiter before anything else ran |
 | `reasons.missingToken` | number | No token on the request, which is what an outdated client looks like |
 | `reasons.invalidToken` | number | A token that failed verification, which is what probing looks like |
-| `bySurface` | object | Which endpoint family the rejections were aimed at: `search`, `pageContent`, `inference`, `other` |
+| `bySurface` | object | `authorized` and `rejected` per endpoint family: `search`, `pageContent`, `inference`, `other` |
 | `limiter` | object | The limiter's `points` and `durationSeconds`, without which a rejection count says nothing |
 
-`authorized` plus every entry of `reasons` sums to `requests`, and `bySurface`
-sums to the rejections, on the same principle as `pageReads`.
+`authorized` plus every entry of `reasons` sums to `requests`, and each half of
+`bySurface` sums to its side of that, on the same principle as `pageReads`.
 
 The limiter keys on the client IP and none of that reaches these counters: no
 address, no token, no query, no per-request timestamp. The cut is by reason and
 by surface, both properties of the request rather than of whoever sent it.
-`bySurface` is the one worth watching, because all four endpoints share the
-same budget and one user action fans out into a text search, an image search
-and a page-content read.
+`bySurface` is the one worth watching: all four endpoints share one budget and
+a single user action fans out into a text search, an image search and a
+page-content read, so its `authorized` side says where the budget goes and its
+`rejected` side says who pays for it running out.
 
 ## Data Persistence Architecture
 

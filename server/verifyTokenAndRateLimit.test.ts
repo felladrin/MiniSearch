@@ -52,7 +52,7 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const result = await verifyTokenAndRateLimit(null);
-    expect(result).toMatchObject({
+    expect(result).toEqual({
       isAuthorized: false,
       statusCode: 400,
       error: "Missing token.",
@@ -67,7 +67,7 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const result = await verifyTokenAndRateLimit("invalid-token");
-    expect(result).toMatchObject({
+    expect(result).toEqual({
       isAuthorized: false,
       statusCode: 401,
       error: "Invalid token.",
@@ -106,7 +106,7 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const result = await verifyTokenAndRateLimit("rate-limit-token");
-    expect(result).toMatchObject({
+    expect(result).toEqual({
       isAuthorized: false,
       statusCode: 429,
       error: "Too many requests.",
@@ -122,7 +122,8 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const result = await verifyTokenAndRateLimit("invalid-token");
-    expect(result).toMatchObject({
+    expect(result).toEqual({
+      isAuthorized: false,
       statusCode: 429,
       error: "Too many requests.",
       reason: "rateLimited",
@@ -137,7 +138,12 @@ describe("verifyTokenAndRateLimit", () => {
     );
     const hashWasm = await import("hash-wasm");
     const result = await verifyTokenAndRateLimit("some-token");
-    expect(result).toMatchObject({ statusCode: 429 });
+    expect(result).toEqual({
+      isAuthorized: false,
+      statusCode: 429,
+      error: "Too many requests.",
+      reason: "rateLimited",
+    });
     expect(hashWasm.argon2Verify).not.toHaveBeenCalled();
   });
 
@@ -148,7 +154,8 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const result = await verifyTokenAndRateLimit(null);
-    expect(result).toMatchObject({
+    expect(result).toEqual({
+      isAuthorized: false,
       statusCode: 429,
       error: "Too many requests.",
       reason: "rateLimited",

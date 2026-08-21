@@ -1,10 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getAuthorizationStats } from "./authorizationSinceLastRestart";
 import { handleTokenVerification } from "./handleTokenVerification";
-import { getRequestAuthorizationStats } from "./rejectionsSinceLastRestart";
 import {
-  RATE_LIMIT_DURATION_SECONDS,
-  RATE_LIMIT_POINTS,
   type TokenVerificationResult,
   verifyTokenAndRateLimit,
 } from "./verifyTokenAndRateLimit";
@@ -46,30 +44,28 @@ function makeResponse() {
   } as unknown as ServerResponse & { end: ReturnType<typeof vi.fn> };
 }
 
-function makeRequest(url: string) {
-  return { url } as IncomingMessage;
-}
-
-/** Every count the assertions below compare against, flattened for readability. */
-function counts() {
-  const stats = getRequestAuthorizationStats();
-  return {
-    requests: stats.requests,
-    authorized: stats.authorized,
-    ...stats.reasons,
-    surfaces: stats.bySurface,
-  };
-}
-
 async function verify(url: string, result: TokenVerificationResult) {
   verifyMock.mockResolvedValue(result);
   const response = makeResponse();
-  const outcome = await handleTokenVerification(
-    "token",
-    response,
-    makeRequest(url),
-  );
+  const outcome = await handleTokenVerification("token", response, {
+    url,
+  } as IncomingMessage);
   return { response, ...outcome };
+}
+
+/**
+ * The payload is integers all the way down. A per-client dimension would have
+ * to arrive either as a new key or as a leaf that stopped being a number, so
+ * checking both is what keeps one from being added by accident.
+ */
+function expectNumbersAllTheWayDown(value: unknown, path: string): void {
+  if (typeof value === "number") return;
+  expect(value, `${path} is neither a number nor an object`).toBeTypeOf(
+    "object",
+  );
+  for (const [key, child] of Object.entries(value as object)) {
+    expectNumbersAllTheWayDown(child, `${path}.${key}`);
+  }
 }
 
 describe("handleTokenVerification", () => {
@@ -77,17 +73,21 @@ describe("handleTokenVerification", () => {
     vi.clearAllMocks();
   });
 
-  it("counts an authorized request and lets it through", async () => {
-    const before = counts();
+  it("counts an authorized request under its surface and lets it through", async () => {
+    const before = getAuthorizationStats();
 
-    const { shouldContinue, response } = await verify("/search/text", {
+    const { shouldContinue, response } = await verify("/inference", {
       isAuthorized: true,
     });
 
     expect(shouldContinue).toBe(true);
     expect(response.end).not.toHaveBeenCalled();
-    expect(counts().authorized).toBe(before.authorized + 1);
-    expect(counts().requests).toBe(before.requests + 1);
+
+    const after = getAuthorizationStats();
+    expect(after.authorized).toBe(before.authorized + 1);
+    expect(after.bySurface.inference.authorized).toBe(
+      before.bySurface.inference.authorized + 1,
+    );
   });
 
   it.each([
@@ -99,7 +99,7 @@ describe("handleTokenVerification", () => {
   ] as const)(
     "counts a rejected %s request under the %s surface",
     async (url, surface) => {
-      const before = counts();
+      const before = getAuthorizationStats();
 
       const { shouldContinue, response } = await verify(
         url,
@@ -111,58 +111,66 @@ describe("handleTokenVerification", () => {
       expect(response.end).toHaveBeenCalledWith(
         JSON.stringify({ error: "Invalid token." }),
       );
-      expect(counts().surfaces[surface]).toBe(before.surfaces[surface] + 1);
-      expect(counts().authorized).toBe(before.authorized);
+
+      const after = getAuthorizationStats();
+      expect(after.bySurface[surface].rejected).toBe(
+        before.bySurface[surface].rejected + 1,
+      );
+      expect(after.authorized).toBe(before.authorized);
     },
   );
 
   it.each(["rateLimited", "missingToken", "invalidToken"] as const)(
     "counts a %s rejection under its own reason",
     async (reason) => {
-      const before = counts();
+      const before = getAuthorizationStats();
 
       await verify("/search/text", REJECTIONS[reason]);
 
-      expect(counts()[reason]).toBe(before[reason] + 1);
+      expect(getAuthorizationStats().reasons[reason]).toBe(
+        before.reasons[reason] + 1,
+      );
     },
   );
 
   it("keeps the totals closed across a mixed run", async () => {
+    const before = getAuthorizationStats();
+
     await verify("/search/text", { isAuthorized: true });
     await verify("/page-content", REJECTIONS.rateLimited);
     await verify("/inference", REJECTIONS.missingToken);
     await verify("/whatever", REJECTIONS.invalidToken);
 
-    const stats = getRequestAuthorizationStats();
-    const rejected = Object.values(stats.reasons).reduce(
-      (total, count) => total + count,
-      0,
-    );
-    const perSurface = Object.values(stats.bySurface).reduce(
-      (total, count) => total + count,
-      0,
-    );
+    const stats = getAuthorizationStats();
+    const total = (values: number[]) =>
+      values.reduce((sum, value) => sum + value, 0);
+    const perSurface = Object.values(stats.bySurface);
+    const rejected = total(Object.values(stats.reasons));
 
+    expect(stats.requests).toBe(before.requests + 4);
     expect(stats.authorized + rejected).toBe(stats.requests);
-    expect(perSurface).toBe(rejected);
+    expect(total(perSurface.map((counts) => counts.rejected))).toBe(rejected);
+    expect(total(perSurface.map((counts) => counts.authorized))).toBe(
+      stats.authorized,
+    );
   });
 
   it("reports the limiter's settings alongside the counts", async () => {
     await verify("/search/text", REJECTIONS.rateLimited);
 
-    expect(getRequestAuthorizationStats().limiter).toEqual({
-      points: RATE_LIMIT_POINTS,
-      durationSeconds: RATE_LIMIT_DURATION_SECONDS,
+    // The literals rather than the imported constants: a moved limit has to
+    // fail here, so that whoever moves it also revisits `docs/overview.md`.
+    expect(getAuthorizationStats().limiter).toEqual({
+      points: 10,
+      durationSeconds: 10,
     });
   });
 
   it("exposes nothing that could identify a client", async () => {
     await verify("/search/text?q=borogoves+outgrabe", REJECTIONS.invalidToken);
 
-    const stats = getRequestAuthorizationStats();
+    const stats = getAuthorizationStats();
 
-    // A per-client or per-query dimension would have to arrive as a new key,
-    // so pinning the shape is what keeps one from being added by accident.
     expect(Object.keys(stats).sort()).toEqual([
       "authorized",
       "bySurface",
@@ -182,17 +190,24 @@ describe("handleTokenVerification", () => {
       "pageContent",
       "search",
     ]);
+    expect(Object.keys(stats.limiter).sort()).toEqual([
+      "durationSeconds",
+      "points",
+    ]);
+    expectNumbersAllTheWayDown(stats, "authorization");
     expect(JSON.stringify(stats)).not.toContain("borogoves");
   });
 
   it("answers with a snapshot that later requests do not mutate", async () => {
-    const snapshot = getRequestAuthorizationStats();
+    const snapshot = getAuthorizationStats();
     const rateLimitedBefore = snapshot.reasons.rateLimited;
+    const searchRejectedBefore = snapshot.bySurface.search.rejected;
 
     await verify("/search/text", REJECTIONS.rateLimited);
 
     expect(snapshot.reasons.rateLimited).toBe(rateLimitedBefore);
-    expect(getRequestAuthorizationStats().reasons.rateLimited).toBe(
+    expect(snapshot.bySurface.search.rejected).toBe(searchRejectedBefore);
+    expect(getAuthorizationStats().reasons.rateLimited).toBe(
       rateLimitedBefore + 1,
     );
   });

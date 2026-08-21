@@ -3,7 +3,7 @@ import {
   type AuthorizationSurface,
   recordAuthorizedRequest,
   recordRejectedRequest,
-} from "./rejectionsSinceLastRestart.ts";
+} from "./authorizationSinceLastRestart.ts";
 import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit.ts";
 
 const SURFACES: [pathPrefix: string, surface: AuthorizationSurface][] = [
@@ -13,8 +13,9 @@ const SURFACES: [pathPrefix: string, surface: AuthorizationSurface][] = [
 ];
 
 /**
- * The endpoint family a request was aimed at, taken from the path alone. The
- * query string is never read, so nothing here can reach the search terms.
+ * The endpoint family a request was aimed at. `request.url` carries the query
+ * string too, but the match is anchored at the start of it and only the label
+ * is kept, so no part of a query can reach a counter or change one.
  */
 function resolveSurface(request?: IncomingMessage): AuthorizationSurface {
   const path = request?.url ?? "";
@@ -28,15 +29,16 @@ export async function handleTokenVerification(
   request?: IncomingMessage,
 ): Promise<{ shouldContinue: boolean }> {
   const result = await verifyTokenAndRateLimit(token, request);
+  const surface = resolveSurface(request);
 
   if (!result.isAuthorized) {
-    recordRejectedRequest(resolveSurface(request), result.reason);
+    recordRejectedRequest(surface, result.reason);
     response.statusCode = result.statusCode;
     response.setHeader("Content-Type", "application/json");
     response.end(JSON.stringify({ error: result.error }));
     return { shouldContinue: false };
   }
 
-  recordAuthorizedRequest();
+  recordAuthorizedRequest(surface);
   return { shouldContinue: true };
 }
