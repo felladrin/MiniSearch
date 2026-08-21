@@ -205,9 +205,9 @@ describe("pageContentEndpointServerHook", () => {
     expect(response.statusCode).toBe(500);
     expect(parseBody(response)).toEqual({ error: "Internal server error" });
   });
-  it("records whether the search got anything to ground on", async () => {
-    const { getSearchStats } = await import("./searchesSinceLastRestart");
-    const before = getSearchStats();
+  it("records whether a page-content request got anything to ground on", async () => {
+    const { getPageReadStats } = await import("./pageReadsSinceLastRestart");
+    const before = getPageReadStats().grounding;
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: true,
     });
@@ -219,12 +219,19 @@ describe("pageContentEndpointServerHook", () => {
     ]);
     await callEndpoint(url).handled;
 
-    expect(getSearchStats().withGrounding).toBe(before.withGrounding + 1);
-    expect(getSearchStats().withoutGrounding).toBe(before.withoutGrounding);
+    expect(getPageReadStats().grounding.withContent).toBe(
+      before.withContent + 1,
+    );
+    expect(getPageReadStats().grounding.withoutContent).toBe(
+      before.withoutContent,
+    );
 
     vi.mocked(fetchPageContents).mockResolvedValue([]);
     await callEndpoint(url).handled;
 
-    expect(getSearchStats().withoutGrounding).toBe(before.withoutGrounding + 1);
+    expect(getPageReadStats().grounding.withoutContent).toBe(
+      before.withoutContent + 1,
+    );
+    expect(getPageReadStats().grounding.requests).toBe(before.requests + 2);
   });
 });

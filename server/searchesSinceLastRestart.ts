@@ -57,8 +57,6 @@ export function incrementSearchesWithAllResultsDiscardedSinceLastRestart() {
 
 let textualSearchMs = 0;
 let graphicalSearchMs = 0;
-let searchesWithGroundingSinceLastRestart = 0;
-let searchesWithoutGroundingSinceLastRestart = 0;
 let thumbnailsRequested = 0;
 let thumbnailsDropped = 0;
 let thumbnailsBlocked = 0;
@@ -72,16 +70,6 @@ export function recordSearchDuration(
   else graphicalSearchMs += durationMs;
 }
 
-/**
- * Whether one search got any page content to ground its answer on.
- * `pageReads` counts pages; this counts searches, and a 50% read rate means
- * something different depending on which of the two it came from.
- */
-export function recordGroundingOutcome(hadContent: boolean): void {
-  if (hadContent) searchesWithGroundingSinceLastRestart++;
-  else searchesWithoutGroundingSinceLastRestart++;
-}
-
 export function recordThumbnailRequested(): void {
   thumbnailsRequested++;
 }
@@ -91,7 +79,11 @@ export function recordThumbnailDropped(): void {
   thumbnailsDropped++;
 }
 
-/** Refused because the host resolved outside public space: a security signal, not a tuning one. */
+/**
+ * Refused before any request was made: malformed, non-HTTP, unresolvable, or
+ * resolving outside public space. The SSRF guard does not distinguish them, so
+ * a dead thumbnail host lands here next to a genuine private-address attempt.
+ */
 export function recordThumbnailBlocked(): void {
   thumbnailsBlocked++;
 }
@@ -104,8 +96,6 @@ export function getSearchStats() {
     averageGraphicalMs: Math.round(
       graphicalSearchMs / graphicalSearchesSinceLastRestart || 0,
     ),
-    withGrounding: searchesWithGroundingSinceLastRestart,
-    withoutGrounding: searchesWithoutGroundingSinceLastRestart,
   };
 }
 

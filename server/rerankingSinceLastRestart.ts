@@ -52,6 +52,8 @@ export function getRerankingStats() {
   return {
     reranks,
     averageMs: Math.round(totalMs / reranks || 0),
+    considered: totalConsidered,
+    kept: totalKept,
     keptRate: Number(((totalKept / totalConsidered) * 100 || 0).toFixed(1)),
     fallbackApplied,
     skippedUnhealthy,

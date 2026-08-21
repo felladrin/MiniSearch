@@ -17,13 +17,18 @@ export async function rankSearchResults(
     if (filtered.fellBackToPercentage) usedPercentageFallback = true;
     return filtered.items;
   };
-  const report = (kept: number) =>
+  // A search with no results still reaches here, and reranking nothing is not
+  // a rerank: counting it would drag the average toward zero on exactly the
+  // instances where searches are coming back empty.
+  const report = (considered: number, kept: number) => {
+    if (considered === 0) return;
     recordRerank({
-      considered: searchResults.length,
+      considered,
       kept,
       durationMs: performance.now() - startedAt,
       usedPercentageFallback,
     });
+  };
 
   const results = await rerank(query, documents);
 
@@ -33,7 +38,6 @@ export async function rankSearchResults(
   }));
 
   if (scoredResults.length === 0) {
-    report(0);
     return [];
   }
 
@@ -41,7 +45,7 @@ export async function rankSearchResults(
     const ranked = filterResults(scoredResults)
       .sort((a, b) => b.score - a.score)
       .map(({ result }) => result);
-    report(ranked.length);
+    report(scoredResults.length, ranked.length);
     return ranked;
   }
 
@@ -62,7 +66,7 @@ export async function rankSearchResults(
   const ranked = [firstResult, ...nextTopResults, ...remainingResults].map(
     ({ result }) => result,
   );
-  report(ranked.length);
+  report(scoredResults.length, ranked.length);
   return ranked;
 }
 
