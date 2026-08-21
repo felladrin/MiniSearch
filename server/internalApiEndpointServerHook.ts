@@ -299,6 +299,19 @@ export function internalApiEndpointServerHook<
           recordModelAttempt(model);
           attempts++;
 
+          // An idle timeout bounds how long the upstream may stay silent.
+          // A long answer is allowed to proceed; only a stall is cut.
+          const abortController = new AbortController();
+          let idleTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
+          function resetIdleTimeout(): void {
+            if (idleTimeoutId !== undefined) clearTimeout(idleTimeoutId);
+            idleTimeoutId = setTimeout(
+              () => abortController.abort(),
+              config.requestTimeoutMs,
+            );
+          }
+
           try {
             const result = streamText({
               model: openaiProvider.chatModel(model),
@@ -307,14 +320,23 @@ export function internalApiEndpointServerHook<
               topP: clampedTopP,
               maxOutputTokens: clampedMaxTokens,
               maxRetries: 0,
+              abortSignal: abortController.signal,
             });
 
+            // Arm the timer before the first part so a stall before the first
+            // token is also bounded — not just the gap between parts.
+            resetIdleTimeout();
             for await (const part of result.stream) {
               if (!isResponseWritable(response)) {
                 outcome = "abandoned";
                 recordModelAbandoned(model);
+                clearTimeout(idleTimeoutId);
                 return;
               }
+
+              // Any part counts as liveness: a reasoning model may spend more
+              // than requestTimeoutMs in reasoning-delta before emitting text.
+              resetIdleTimeout();
 
               if (part.type === "text-delta") {
                 if (!hasEmittedContent)
@@ -322,8 +344,18 @@ export function internalApiEndpointServerHook<
                 hasEmittedContent = true;
                 sendSseData(response, createChunkPayload(model, part.text));
               } else if (part.type === "error") {
+                clearTimeout(idleTimeoutId);
                 throw part.error;
+              } else if (part.type === "abort") {
+                // The AI SDK v7 enqueues an abort part and closes the stream
+                // cleanly rather than throwing; re-throw so the catch block
+                // records the failure and walks the retry ladder.
+                clearTimeout(idleTimeoutId);
+                throw new Error(
+                  `Upstream stalled for ${config.requestTimeoutMs}ms`,
+                );
               } else if (part.type === "finish") {
+                clearTimeout(idleTimeoutId);
                 sendSseData(
                   response,
                   createChunkPayload(model, undefined, "stop"),
@@ -335,9 +367,11 @@ export function internalApiEndpointServerHook<
               }
             }
 
+            clearTimeout(idleTimeoutId);
             recordStreamEndedWithoutFinish();
             throw new Error("Stream ended unexpectedly");
           } catch (error) {
+            clearTimeout(idleTimeoutId);
             lastError = error;
             recordModelFailure(model);
             console.error(
