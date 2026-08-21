@@ -34,7 +34,7 @@ can reach the instance, so keep secrets out of that interface.
 Every HTTP request from client to backend carries a `token` query parameter for CSRF protection:
 
 1. **Token Generation**: On build/startup, `regenerateSearchToken()` writes a random token to `{os.tempdir()}/minisearch-token`, readable only by the user running the build (`0600`)
-2. **Client Injection**: The token is injected as `VITE_SEARCH_TOKEN` compile-time constant via Vite's `define` option
+2. **Client Distribution**: The server reads the file once, holds that token for the life of the process, and serves it as `searchToken` in `/api/config`
 3. **Per-Request Auth**: Client includes token as `?token=` parameter on all `/search/text`, `/search/images` and `/page-content` requests
 4. **Server Verification**: `handleTokenVerification()` in `searchEndpointServerHook.ts` validates the token before proxying to SearXNG
 5. **Session Tracking**: Validated tokens are stored in an in-memory `Set<string>` (`verifiedTokens.ts`) for session counting

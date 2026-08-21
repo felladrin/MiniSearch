@@ -5,6 +5,7 @@ import {
   DEFAULT_WLLAMA_MODEL_ID,
   type ServerConfig,
 } from "../shared/serverConfig.ts";
+import { getSearchToken } from "./searchToken.ts";
 
 /**
  * Vite server hook that serves runtime server config at /api/config.
@@ -32,6 +33,10 @@ export function configEndpointServerHook<
         DEFAULT_INTERNAL_API_NAME,
       defaultInferenceType:
         process.env.DEFAULT_INFERENCE_TYPE || DEFAULT_INFERENCE_TYPE,
+      // Served here rather than compiled into the bundle so a client always
+      // gets the token of the server answering it, and a reload is enough to
+      // pick up a new one.
+      searchToken: getSearchToken(),
     };
 
     res.setHeader("Content-Type", "application/json");

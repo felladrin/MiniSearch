@@ -8,7 +8,7 @@ Codebase-specific terms, jargon, and domain concepts used in MiniSearch.
 
 A security mechanism used to authorize communication between the client and the internal search/AI endpoints.
 
-- **Search Token**: A string generated at build time (`VITE_SEARCH_TOKEN`). Used to verify that requests to the server originate from a trusted build.
+- **Search Token**: A random string held by the running server, served to the client at runtime through `/api/config`. Used to verify that requests to the server come from a client that server handed the token to.
 - **Search Token Hash**: To avoid exposing the raw token in all requests, the client generates a hash of the token. Managed via the `lastSearchTokenHashPubSub` channel.
 - **Verification**: The server verifies these tokens to prevent unauthorized access to the search API. Stored in `server/verifiedTokens.ts` as an in-memory `Set<string>`.
 

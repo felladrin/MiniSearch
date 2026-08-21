@@ -243,7 +243,6 @@ Client-facing configuration (access keys, inference type, internal API settings)
 
 | Value | Resolved At | Notes |
 |-------|-------------|-------|
-| `VITE_SEARCH_TOKEN` | Build time | CSRF protection token, regenerated on each build |
 | `VITE_BUILD_DATE_TIME` | Build time | Epoch milliseconds when the build occurred |
 | `VITE_COMMIT_SHORT_HASH` | Build time | Git commit hash at build time (if available) |
 | `ACCESS_KEYS` | Runtime | Read from `/api/config` |
@@ -251,10 +250,12 @@ Client-facing configuration (access keys, inference type, internal API settings)
 | `WLLAMA_DEFAULT_MODEL_ID` | Runtime | Read from `/api/config` |
 | `INTERNAL_OPENAI_COMPATIBLE_API_*` | Runtime | Read from `/api/config` (except `API_KEY` which is server-only) |
 | `DEFAULT_INFERENCE_TYPE` | Runtime | Read from `/api/config` |
+| Search token | Runtime | Read from `/api/config`, so a reload picks up the token of whichever server answers |
 
 ### Security Considerations
 
-- `VITE_SEARCH_TOKEN`, `VITE_BUILD_DATE_TIME`, and `VITE_COMMIT_SHORT_HASH` are bundled into the client JavaScript as build-time constants (CSRF token and build metadata)
+- `VITE_BUILD_DATE_TIME` and `VITE_COMMIT_SHORT_HASH` are bundled into the client JavaScript as build-time constants (build metadata only)
+- The CSRF token is served at runtime like the rest of the config. It reaches any caller that can reach `/api/config`, which is the same exposure it had while it was compiled into the bundle
 - All other configuration is fetched at runtime from `/api/config` and never appears in the bundled JavaScript
 - Server-only variables like `INTERNAL_OPENAI_COMPATIBLE_API_KEY` are never exposed to the client
 

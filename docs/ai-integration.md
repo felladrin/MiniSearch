@@ -163,7 +163,7 @@ Content-Type: application/json
 }
 ```
 
-The token is passed as a URL query parameter (`?token=`), verified server-side with Argon2 against the build-time `VITE_SEARCH_TOKEN`, not as an `Authorization: Bearer` header. The model field is optional; if `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` is unset, the server fetches and randomly selects from the upstream's available models.
+The token is passed as a URL query parameter (`?token=`), verified server-side with Argon2 against the token the server is holding, not as an `Authorization: Bearer` header. The model field is optional; if `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` is unset, the server fetches and randomly selects from the upstream's available models.
 
 **Observability:** what happens to these requests is counted on `/status`
 under `inference`: how many answers finished, how many failed before or after

@@ -1,9 +1,10 @@
 import { argon2id, argon2Verify } from "hash-wasm";
+import { getConfig } from "./config";
 import { addLogEntry } from "./logEntries";
 import { getLastSearchTokenHash, updateLastSearchTokenHash } from "./pubSub";
 
 export async function getSearchTokenHash() {
-  const password = VITE_SEARCH_TOKEN;
+  const { searchToken: password } = await getConfig();
   const lastSearchTokenHash = getLastSearchTokenHash();
 
   try {

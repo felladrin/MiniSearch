@@ -14,7 +14,9 @@ vi.mock("./pubSub", () => ({
 
 const searchToken = "a".repeat(64);
 
-vi.stubGlobal("VITE_SEARCH_TOKEN", searchToken);
+vi.mock("./config", () => ({
+  getConfig: () => Promise.resolve({ searchToken }),
+}));
 
 /** Digest length in bytes, read from the trailing field of the encoded hash. */
 function getDigestLength(encodedHash: string) {
