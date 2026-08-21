@@ -114,4 +114,107 @@ describe("rankSearchResults", () => {
     // Double quotes in the snippet are preserved (no Markdown wrapper to escape for)
     expect(docs[0]).toBe('Title\nContent with "quotes"');
   });
+  it("counts one rerank per ranked batch, and none for an empty one", async () => {
+    const { getRerankingStats } = await import("./rerankingSinceLastRestart");
+    const { rankSearchResults } = await import("./rankSearchResults");
+    const results: [string, string, string][] = [
+      ["A", "a", "https://a.com"],
+      ["B", "b", "https://b.com"],
+    ];
+    mockRerank.mockResolvedValue([
+      { index: 0, relevance_score: 9 },
+      { index: 1, relevance_score: 8 },
+    ] as { index: number; relevance_score: number }[]);
+
+    const before = getRerankingStats();
+    await rankSearchResults("test", results);
+    await rankSearchResults("test", results, true);
+
+    expect(getRerankingStats().reranks).toBe(before.reranks + 2);
+
+    // Reranking nothing is not a rerank: a search with no results still
+    // reaches here, and counting it would pull the average toward zero.
+    mockRerank.mockResolvedValue(
+      [] as { index: number; relevance_score: number }[],
+    );
+    await rankSearchResults("test", []);
+
+    expect(getRerankingStats().reranks).toBe(before.reranks + 2);
+  });
+
+  it("counts the results the score filter considered and kept", async () => {
+    const { getRerankingStats } = await import("./rerankingSinceLastRestart");
+    const { rankSearchResults } = await import("./rankSearchResults");
+    mockRerank.mockResolvedValue([
+      { index: 0, relevance_score: 9 },
+      { index: 1, relevance_score: 8.9 },
+      { index: 2, relevance_score: 8.8 },
+    ] as { index: number; relevance_score: number }[]);
+
+    const before = getRerankingStats();
+    const ranked = await rankSearchResults("test", [
+      ["A", "a", "https://a.com"],
+      ["B", "b", "https://b.com"],
+      ["C", "c", "https://c.com"],
+    ]);
+    const after = getRerankingStats();
+
+    // Counts, not just the ratio: the ratio alone passes for any
+    // implementation that returns a percentage.
+    expect(after.considered).toBe(before.considered + 3);
+    expect(after.kept).toBe(before.kept + ranked.length);
+  });
+
+  it("reports how many results survived the score filter", async () => {
+    const { getRerankingStats } = await import("./rerankingSinceLastRestart");
+    const before = getRerankingStats();
+    mockRerank.mockResolvedValue([
+      { index: 0, relevance_score: 9 },
+      { index: 1, relevance_score: 8.5 },
+      { index: 2, relevance_score: 8.4 },
+    ] as { index: number; relevance_score: number }[]);
+    const { rankSearchResults } = await import("./rankSearchResults");
+
+    const ranked = await rankSearchResults("test", [
+      ["A", "a", "https://a.com"],
+      ["B", "b", "https://b.com"],
+      ["C", "c", "https://c.com"],
+    ]);
+
+    const after = getRerankingStats();
+    expect(after.reranks).toBe(before.reranks + 1);
+    expect(ranked.length).toBeGreaterThan(0);
+    // keptRate is a share of everything considered so far, so the only safe
+    // assertion across a shared counter is that it stayed a percentage.
+    expect(after.keptRate).toBeGreaterThan(0);
+    expect(after.keptRate).toBeLessThanOrEqual(100);
+  });
+
+  it("reports the percentage fallback when the deviation filter empties a batch", async () => {
+    const { getRerankingStats } = await import("./rerankingSinceLastRestart");
+    const before = getRerankingStats();
+    // One result far above a long tail: the standard-deviation threshold keeps
+    // too few, so the percentage fallback has to rescue the batch.
+    mockRerank.mockResolvedValue([
+      { index: 0, relevance_score: 100 },
+      ...Array.from({ length: 9 }, (_unused, index) => ({
+        index: index + 1,
+        relevance_score: 0,
+      })),
+    ] as { index: number; relevance_score: number }[]);
+    const { rankSearchResults } = await import("./rankSearchResults");
+
+    await rankSearchResults(
+      "test",
+      Array.from({ length: 10 }, (_unused, index) => [
+        `T${index}`,
+        `C${index}`,
+        `https://${index}.com`,
+      ]) as [string, string, string][],
+    );
+
+    expect(getRerankingStats().fallbackApplied).toBe(
+      before.fallbackApplied + 1,
+    );
+  });
 });

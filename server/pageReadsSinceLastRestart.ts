@@ -33,6 +33,14 @@ const outcomes: Record<PageReadOutcome, number> = {
   failed: 0,
 };
 
+// Counted per request rather than per page: six pages at a 50% read rate can
+// be three fully grounded answers or six half-grounded ones, and those want
+// different fixes. A request only happens when the browser has AI responses and
+// page reading on and the search returned results, so these do not count
+// searches.
+let groundingRequests = 0;
+let groundingRequestsWithContent = 0;
+
 let totalReadMs = 0;
 let bodiesTruncated = 0;
 let totalPassagesKept = 0;
@@ -62,6 +70,12 @@ export function recordPageRead({
   totalPassagesAvailable += passagesAvailable;
 }
 
+/** One `/page-content` request, and whether any of its pages yielded text. */
+export function recordGroundingOutcome(hadContent: boolean): void {
+  groundingRequests++;
+  if (hadContent) groundingRequestsWithContent++;
+}
+
 /**
  * `read` plus every `skipped` entry sums to `requested`, so a page that goes
  * uncounted shows up as a gap rather than being lost silently.
@@ -87,5 +101,10 @@ export function getPageReadStats() {
       ((totalPassagesKept / totalPassagesAvailable) * 100 || 0).toFixed(1),
     ),
     skipped,
+    grounding: {
+      requests: groundingRequests,
+      withContent: groundingRequestsWithContent,
+      withoutContent: groundingRequests - groundingRequestsWithContent,
+    },
   };
 }

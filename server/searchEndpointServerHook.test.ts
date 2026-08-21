@@ -23,6 +23,10 @@ vi.mock("./rerankerService", () => ({
 vi.mock("./searchesSinceLastRestart", () => ({
   incrementTextualSearchesSinceLastRestart: vi.fn(),
   incrementGraphicalSearchesSinceLastRestart: vi.fn(),
+  recordSearchDuration: vi.fn(),
+  recordThumbnailRequested: vi.fn(),
+  recordThumbnailDropped: vi.fn(),
+  recordThumbnailBlocked: vi.fn(),
 }));
 
 vi.mock("./webSearchService", () => ({
@@ -36,6 +40,10 @@ import { searchEndpointServerHook } from "./searchEndpointServerHook";
 import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
+  recordSearchDuration,
+  recordThumbnailBlocked,
+  recordThumbnailDropped,
+  recordThumbnailRequested,
 } from "./searchesSinceLastRestart";
 import { fetchSearXNG } from "./webSearchService";
 
@@ -625,5 +633,132 @@ describe("searchEndpointServerHook", () => {
     expect(response.end).toHaveBeenCalledWith(
       JSON.stringify({ error: "Internal server error" }),
     );
+  });
+  describe("search path counters", () => {
+    it("records how long SearXNG took on a text search", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([
+        ["Title", "Snippet", "https://example.com"],
+      ]);
+      const handler = getRegisteredHandler();
+
+      await handler(
+        createRequest("/search/text?q=test&token=abc"),
+        createResponse(),
+        vi.fn(),
+      );
+
+      expect(recordSearchDuration).toHaveBeenCalledWith(
+        "text",
+        expect.any(Number),
+      );
+    });
+
+    it("does not record a duration when SearXNG fails", async () => {
+      vi.mocked(fetchSearXNG).mockRejectedValue(new Error("down"));
+      const handler = getRegisteredHandler();
+
+      await handler(
+        createRequest("/search/text?q=test&token=abc"),
+        createResponse(),
+        vi.fn(),
+      );
+
+      expect(recordSearchDuration).not.toHaveBeenCalled();
+    });
+
+    it("counts a thumbnail that was fetched and one that was dropped", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([
+        [
+          "picture",
+          "https://example.com/page",
+          "https://example.com/thumb.jpg",
+          "https://example.com/full.jpg",
+        ],
+      ]);
+      mockFetch.mockRejectedValue(new Error("thumbnail host down"));
+      const handler = getRegisteredHandler();
+
+      await handler(
+        createRequest("/search/images?q=test&token=abc"),
+        createResponse(),
+        vi.fn(),
+      );
+
+      expect(recordThumbnailRequested).toHaveBeenCalledTimes(1);
+      expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+      expect(recordThumbnailBlocked).not.toHaveBeenCalled();
+    });
+
+    it("counts a thumbnail refused for resolving outside public space", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([
+        [
+          "picture",
+          "https://example.com/page",
+          "https://169.254.169.254/thumb.jpg",
+          "https://example.com/full.jpg",
+        ],
+      ]);
+      lookupMock.mockResolvedValue([{ address: "169.254.169.254", family: 4 }]);
+      const handler = getRegisteredHandler();
+
+      await handler(
+        createRequest("/search/images?q=test&token=abc"),
+        createResponse(),
+        vi.fn(),
+      );
+
+      expect(recordThumbnailBlocked).toHaveBeenCalledTimes(1);
+      // Blocked thumbnails are dropped too, so the requested total stays closed.
+      expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+    });
+
+    it("counts the searches served without the reranker", async () => {
+      const { getRerankingStats } = await import("./rerankingSinceLastRestart");
+      const before = getRerankingStats();
+      vi.mocked(getRerankerStatus).mockResolvedValue(false);
+      vi.mocked(fetchSearXNG).mockResolvedValue([
+        ["Title", "Snippet", "https://example.com"],
+      ]);
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const handler = getRegisteredHandler();
+
+      try {
+        await handler(
+          createRequest("/search/text?q=test&token=abc"),
+          createResponse(),
+          vi.fn(),
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+
+      expect(getRerankingStats().skippedUnhealthy).toBe(
+        before.skippedUnhealthy + 1,
+      );
+    });
+
+    it("counts a rerank that threw mid-request", async () => {
+      const { getRerankingStats } = await import("./rerankingSinceLastRestart");
+      const before = getRerankingStats();
+      vi.mocked(getRerankerStatus).mockResolvedValue(true);
+      vi.mocked(rankSearchResults).mockRejectedValue(new Error("model gone"));
+      vi.mocked(fetchSearXNG).mockResolvedValue([
+        ["Title", "Snippet", "https://example.com"],
+      ]);
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const handler = getRegisteredHandler();
+
+      try {
+        await handler(
+          createRequest("/search/text?q=test&token=abc"),
+          createResponse(),
+          vi.fn(),
+        );
+      } finally {
+        errorSpy.mockRestore();
+      }
+
+      expect(getRerankingStats().failed).toBe(before.failed + 1);
+    });
   });
 });

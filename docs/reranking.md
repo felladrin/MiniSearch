@@ -159,6 +159,15 @@ npx vitest run --config vitest.integration.config.ts
 | Empty documents array | Returns empty array without running inference |
 | Unicode sanitization needed | Logs warning, continues with sanitized input |
 
+## Observability
+
+`/status` reports what reranking costs and what it changes, under `reranker`:
+how long a rerank takes, the share of results that survive the score filter,
+how often the percentage fallback has to rescue a batch, and how often a search
+was served in SearXNG's own order because the model was not loaded or threw.
+The two thresholds in `filterResultsByScore` have no other evidence behind
+them; see the `/status` section of `docs/overview.md` for the field reference.
+
 ## Related Topics
 
 - **Search System**: `docs/overview.md` - Search pipeline overview

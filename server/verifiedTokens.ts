@@ -35,6 +35,15 @@ export function getVerifiedTokensAmount() {
   return sessionCount;
 }
 
+/**
+ * Sessions still in the cache, which is the number of people the instance is
+ * serving right now. `getVerifiedTokensAmount` is the cumulative one, and the
+ * two together say whether a busy day was many short visits or a few long ones.
+ */
+export function getActiveSessionsAmount() {
+  return verifiedTokens.size;
+}
+
 export function isVerifiedToken(token: string) {
   return verifiedTokens.has(token);
 }

@@ -121,7 +121,7 @@ CSRF protection uses a build-time generated token:
 2. **Storage**: Server stores token file at `{os.tempdir()}/minisearch-token`
 3. **Client Hashing**: Client hashes token before sending in requests (never sends raw token)
 4. **Verification**: Server compares request hash against stored token
-5. **Caching**: Verified tokens stored in `server/verifiedTokens.ts` (in-memory `Set<string>`) to avoid redundant cryptographic operations
+5. **Caching**: Verified tokens stored in `server/verifiedTokens.ts` (in-memory `Map` of token to last-seen time) to avoid redundant cryptographic operations
 
 ## Data Flow and Communication
 
@@ -200,7 +200,7 @@ Key server-side modules:
 - **`server/webSearchService.ts`**: Integrates with SearXNG at `http://127.0.0.1:8888`. Implements a circuit breaker (opens after 5 failures, resets after 60s) and retry logic (up to 3 retries with exponential backoff for 500 errors).
 - **`server/pageContentService.ts`**: Reads result pages for answer grounding: SSRF-guarded fetches with a byte cap, readable-text extraction, and query-relevant passage selection.
 - **`server/searchToken.ts`**: Manages a token at `{os.tempdir()}/minisearch-token` used for CSRF protection on search requests.
-- **`server/verifiedTokens.ts`**: In-memory `Set<string>` of verified session tokens.
+- **`server/verifiedTokens.ts`**: In-memory `Map` of verified session token to last-seen time, evicted after 30 idle minutes, plus a cumulative count of the distinct sessions seen since the last restart.
 - **`server/searchesSinceLastRestart.ts`**: In-memory counters for search analytics.
 
 ### Cache Control
@@ -220,7 +220,8 @@ The `/status` endpoint returns a JSON object:
 | Field | Type | Description |
 |---|---|---|
 | `uptime` | string | Human-readable server uptime |
-| `sessions` | number | Active verified token sessions |
+| `sessions` | number | Distinct verified sessions since last restart, which the two per-session averages below divide by |
+| `activeSessions` | number | Sessions still in the cache, dropped after 30 idle minutes |
 | `textualSearches` | number | Text search count since last restart |
 | `graphicalSearches` | number | Image search count since last restart |
 | `averageTextualSearchesPerSession` | number | Text searches / sessions ratio |
@@ -233,6 +234,9 @@ The `/status` endpoint returns a JSON object:
 | `pageReads` | object | Page-reading counters since last restart, see below |
 | `authorization` | object | Token and rate-limit outcomes since last restart, see below |
 | `inference` | object | AI answer counters since last restart, see below |
+| `searches` | object | Search timing, circuit state and grounding, see below |
+| `reranker` | object | Reranking cost and effect, see below |
+| `thumbnails` | object | Image thumbnail fetches, see below |
 | `build.timestamp` | string | ISO 8601 build time |
 | `build.gitCommit` | string | Short Git commit hash |
 
@@ -268,9 +272,18 @@ is counted at all (see `docs/page-content.md`):
 | `skipped.timedOut` | number | `REQUEST_TIMEOUT_MS` |
 | `skipped.tooLittleText` | number | `MIN_USEFUL_CHARS`, and the extractor's selectors |
 | `skipped.failed` | number | Nothing; the residue worth watching for a pattern |
+| `grounding.requests` | number | Nothing; the denominator for the two below |
+| `grounding.withContent` | number | Nothing; requests where at least one page yielded text |
+| `grounding.withoutContent` | number | The budgets and timeouts above, read per request instead of per page: six pages at a 50% read rate can be three fully grounded answers or six half-grounded ones |
 
 `read` plus every `skipped` entry sums to `requested`, so a page that goes
 uncounted shows up as a gap rather than being lost silently.
+
+`grounding` counts `/page-content` requests and not searches. A search only
+reaches that endpoint when the browser has AI responses on, page reading on,
+and the search returned results, and AI responses are off by default, so
+`grounding.requests` sitting at zero while `textualSearches` climbs means
+nobody asked for an answer, not that nothing could be read.
 
 `authorization` reports what happened to the requests that reached token
 verification, the funnel `/search/text`, `/search/images`, `/page-content` and
@@ -340,6 +353,31 @@ the loop stops after the first failure: `averageAttempts` cannot exceed 1 and
 Model ids are configuration rather than user data, and `/inference` already
 sends the id to the browser in every chunk, so naming them here publishes
 nothing new.
+
+`searches`, `reranker` and `thumbnails` are the numbers behind the constants
+in the search path. Each row names the constant it is there to move, the same
+way `pageReads` does:
+
+| Field | Type | Tunes |
+|---|---|---|
+| `searches.averageTextualMs` | number | The 30 s client timeout in `client/modules/search.ts`. Over the text searches SearXNG answered, so a failed or short-circuited one is not in it, and up to 7 s of retry backoff is |
+| `searches.averageGraphicalMs` | number | The same, for image searches |
+| `reranker.considered` | number | Nothing; results handed to the score filter, the denominator for `keptRate` |
+| `reranker.kept` | number | Nothing; results that survived it |
+| `searches.circuitState` | string | Nothing; whether searches are being short-circuited right now |
+| `searches.circuitOpens` | number | `failureThreshold` and `resetTimeout` on the SearXNG breaker: each opening is a minute of serving no searches at all |
+| `reranker.reranks` | number | Nothing; the denominator for the rest |
+| `reranker.averageMs` | number | Whether reranking or SearXNG is what users wait for, and so whether to rerank a shortlist instead of all 30 results. Over `reranks`, covering the filtering and sorting as well as the model |
+| `reranker.keptRate` | number | `kStandardDeviationFactor`: near 100% means the filter is not filtering. Text and image reranks are pooled, and the two run through different paths, so this moves with the traffic mix as well as with the threshold |
+| `reranker.fallbackApplied` | number | `minPercentageFallback`: a large share means the deviation threshold is emptying batches the fallback then has to rescue |
+| `reranker.skippedUnhealthy` | number | Nothing; searches served in SearXNG's own order because the model was not loaded |
+| `reranker.failed` | number | Nothing; the same, because reranking threw |
+| `thumbnails.requested` | number | Nothing; the denominator for the two below |
+| `thumbnails.dropped` | number | `THUMBNAIL_TIMEOUT_MS` and `MAX_THUMBNAIL_BYTES`: every one of these is an image result the user never saw |
+| `thumbnails.blocked` | number | The SSRF guard, as the share of thumbnails pointing outside public space |
+
+`thumbnails.dropped` includes the blocked ones, so `requested` minus `dropped`
+is what reached the client.
 
 ## Data Persistence Architecture
 

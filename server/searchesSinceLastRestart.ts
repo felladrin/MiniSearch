@@ -49,3 +49,60 @@ export function getSearchesWithAllResultsDiscardedSinceLastRestart() {
 export function incrementSearchesWithAllResultsDiscardedSinceLastRestart() {
   searchesWithAllResultsDiscardedSinceLastRestart++;
 }
+
+// The counters below are the numbers behind the constants in the search path:
+// the client's request timeout, the thumbnail timeout and byte cap, and whether
+// the pages behind the results contribute anything. Same basis as the rest of
+// this file: totals and running sums, never a query and never a URL.
+
+let textualSearchMs = 0;
+let graphicalSearchMs = 0;
+let thumbnailsRequested = 0;
+let thumbnailsDropped = 0;
+let thumbnailsBlocked = 0;
+
+/** One SearXNG round trip, retries and backoff included, so it stays comparable with the timeouts it is there to tune. */
+export function recordSearchDuration(
+  searchType: "text" | "images",
+  durationMs: number,
+): void {
+  if (searchType === "text") textualSearchMs += durationMs;
+  else graphicalSearchMs += durationMs;
+}
+
+export function recordThumbnailRequested(): void {
+  thumbnailsRequested++;
+}
+
+/** Counts every thumbnail that never reached the client, `blocked` ones included. */
+export function recordThumbnailDropped(): void {
+  thumbnailsDropped++;
+}
+
+/**
+ * Refused before any request was made: malformed, non-HTTP, unresolvable, or
+ * resolving outside public space. The SSRF guard does not distinguish them, so
+ * a dead thumbnail host lands here next to a genuine private-address attempt.
+ */
+export function recordThumbnailBlocked(): void {
+  thumbnailsBlocked++;
+}
+
+export function getSearchStats() {
+  return {
+    averageTextualMs: Math.round(
+      textualSearchMs / textualSearchesSinceLastRestart || 0,
+    ),
+    averageGraphicalMs: Math.round(
+      graphicalSearchMs / graphicalSearchesSinceLastRestart || 0,
+    ),
+  };
+}
+
+export function getThumbnailStats() {
+  return {
+    requested: thumbnailsRequested,
+    dropped: thumbnailsDropped,
+    blocked: thumbnailsBlocked,
+  };
+}
