@@ -77,37 +77,37 @@ async function encode(
   loadedTokenizer: Tokenizer,
   text: string,
 ): Promise<Float32Array> {
-  const { ids } = loadedTokenizer.encode(text);
-  const truncated =
-    ids.length > MAX_SEQUENCE_LENGTH ? ids.slice(0, MAX_SEQUENCE_LENGTH) : ids;
+  const { ids, attention_mask } = loadedTokenizer.encode(text);
+  const truncatedIds = ids.slice(0, MAX_SEQUENCE_LENGTH);
+  const truncatedMask = attention_mask.slice(0, MAX_SEQUENCE_LENGTH);
 
-  const length = truncated.length;
+  const length = truncatedIds.length;
   const dimensions = [1, length];
 
-  const { output } = await activeSession.run({
+  const { last_hidden_state } = await activeSession.run({
     input_ids: new Tensor(
       "int64",
-      BigInt64Array.from(truncated as unknown as bigint[], BigInt),
+      BigInt64Array.from(truncatedIds, BigInt),
       dimensions,
     ),
     attention_mask: new Tensor(
       "int64",
-      BigInt64Array.from(
-        (truncated as unknown as bigint[]).map((id) => (id !== 0n ? 1n : 0n)),
-        BigInt,
-      ),
+      BigInt64Array.from(truncatedMask, BigInt),
       dimensions,
     ),
+    // The export declares `token_type_ids` and ONNX Runtime refuses to run with
+    // a declared input missing. A single text is one segment, so it is zeros.
+    token_type_ids: new Tensor("int64", new BigInt64Array(length), dimensions),
   });
 
   // Mean pooling: average the hidden states across non-padded tokens.
-  const embedding = output.data as Float32Array;
-  const dim = output.dims[2];
+  const embedding = last_hidden_state.data as Float32Array;
+  const dim = last_hidden_state.dims[2];
   const pooled = new Float32Array(dim);
   let count = 0;
 
   for (let t = 0; t < length; t++) {
-    if ((truncated as unknown as bigint[])[t] === 0n) continue;
+    if (truncatedMask[t] === 0) continue;
     const offset = t * dim;
     for (let d = 0; d < dim; d++) {
       pooled[d] += embedding[offset + d];
