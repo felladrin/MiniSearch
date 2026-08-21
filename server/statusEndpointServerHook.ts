@@ -1,6 +1,7 @@
 import prettyMilliseconds from "pretty-ms";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { getAuthorizationStats } from "./authorizationSinceLastRestart.ts";
+import { getBiEncoderStatus } from "./biEncoderService.ts";
 import { getInferenceStats } from "./inferencesSinceLastRestart.ts";
 import { getPageReadStats } from "./pageReadsSinceLastRestart.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
@@ -41,6 +42,9 @@ export function statusEndpointServerHook<
     const averageGraphicalSearchesPerSession = Number(
       (graphicalSearches / sessions || 0).toFixed(1),
     );
+    const biEncoderServiceStatus = (await getBiEncoderStatus())
+      ? "healthy"
+      : "unhealthy";
     const rerankerServiceStatus = (await getRerankerStatus())
       ? "healthy"
       : "unhealthy";
@@ -74,6 +78,7 @@ export function statusEndpointServerHook<
         getSearchesWithUnresponsiveEnginesSinceLastRestart(),
       searchesWithAllResultsDiscarded:
         getSearchesWithAllResultsDiscardedSinceLastRestart(),
+      biEncoderServiceStatus,
       rerankerServiceStatus,
       webSearchServiceStatus,
       pageReads: getPageReadStats(),

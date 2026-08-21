@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import getGitCommitHash from "helper-git-hash";
 import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
+import { biEncoderServiceHook } from "./server/biEncoderServiceHook.ts";
 import { cacheServerHook } from "./server/cacheServerHook.ts";
 import { compressionServerHook } from "./server/compressionServerHook.ts";
 import { configEndpointServerHook } from "./server/configEndpointServerHook.ts";
@@ -115,6 +116,11 @@ export default defineConfig(({ command }) => {
         name: "configure-server-internal-api-endpoint",
         configureServer: internalApiEndpointServerHook,
         configurePreviewServer: internalApiEndpointServerHook,
+      },
+      {
+        name: "configure-server-bi-encoder-service",
+        configureServer: biEncoderServiceHook,
+        configurePreviewServer: biEncoderServiceHook,
       },
       {
         name: "configure-server-reranker-service",

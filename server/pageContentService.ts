@@ -1,6 +1,7 @@
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import pdfParse from "pdf-parse";
 import { repository, version } from "../package.json" with { type: "json" };
+import { scorePassages } from "./biEncoderService.ts";
 import {
   type PageReadOutcome,
   recordPageRead,
@@ -580,14 +581,17 @@ function selectPassagesAcrossPages(
  * article is its navigation and its infobox, so the ranking below decided only
  * what was transferred and never what the model read.
  *
+ * Lexical and dense (bi-encoder) scores are fused with reciprocal rank fusion;
+ * when the model is unavailable the lexical score alone is used.
+ *
  * @param passages - Candidate passages from a single page; the wrapper feeds
  * them through the production selector so tests exercise the real code path.
  */
-export function selectPassages(
+export async function selectPassages(
   query: string,
   passages: string[],
   maxChars: number,
-): string[] {
+): Promise<string[]> {
   // Single-page wrapper over the production selector so tests exercise the
   // real code path.
   const input = passages.map((text, index) => ({
@@ -596,8 +600,31 @@ export function selectPassages(
     positionInPage: index,
   }));
 
-  const ranked = rankPassages(query, input);
-  return selectPassagesAcrossPages(ranked, maxChars, maxChars).get("") ?? [];
+  const lexicalRanked = rankPassages(query, input);
+
+  // Dense scores from the bi-encoder; empty array when the model is not loaded.
+  const denseScores = await scorePassages(query, passages);
+
+  // Reciprocal rank fusion: combine lexical and dense ranks.
+  const RRF_K = 60;
+  const fused = lexicalRanked.map((p, i) => {
+    const lexicalRank = i + 1;
+    const denseRank =
+      denseScores.length > 0
+        ? [...denseScores]
+            .map((s, idx) => ({ s, idx }))
+            .sort((a, b) => b.s - a.s)
+            .findIndex((r) => r.idx === i) + 1
+        : lexicalRank;
+    return {
+      ...p,
+      score:
+        1 / (RRF_K + lexicalRank) +
+        (denseScores.length > 0 ? 1 / (RRF_K + denseRank) : 0),
+    };
+  });
+
+  return selectPassagesAcrossPages(fused, maxChars, maxChars).get("") ?? [];
 }
 
 async function fetchPageContent(url: string): Promise<{
