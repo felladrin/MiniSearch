@@ -25,7 +25,9 @@ and no page is read either way until AI responses are on.
 2. The top `searchResultsToConsider` (6) URLs go to `/page-content`, together
    with the query, via `client/modules/pageContent.ts`.
 3. `server/pageContentService.ts` reads each page, extracts its readable text,
-   splits it into passages, and returns the passages that best cover the query.
+   splits it into passages, ranks all passages from all pages together, and
+   selects from the pooled ranking with a per-URL cap and near-duplicate
+   suppression, so syndicated paragraphs reach the prompt once.
 4. The response is published to the `pageContents` PubSub channel, keyed by URL.
 5. `getFormattedSearchResults` (`client/modules/textGenerationUtilities.ts`)
    appends each excerpt under its result before the prompt is built.
@@ -89,7 +91,7 @@ anything written for one language:
 | --- | --- | --- |
 | Word boundaries | `Intl.Segmenter`, word granularity | `[^\p{L}\p{N}]+` cut Brahmic scripts and Thai at every combining vowel mark and dropped the marks, and it finds no boundary at all in Chinese, Japanese or Thai, which write none: a whole sentence arrived as one token that matched nothing, scoring fell through to document order, and the page's own navigation won |
 | Sentence boundaries | `Intl.Segmenter`, sentence granularity | `[.!?]` never matches `。`, `！`, `？` or `।`, so long CJK and Indic blocks were cut at an arbitrary character mid-sentence |
-| Uninformative words | Inverse document frequency over the passages of the page being read | A stop-word list only covers the language it was written in. A term found in most passages of a page cannot say which passage to quote, in any language, and this needs no word list and no language detection |
+| Uninformative words | Inverse document frequency over the pooled passages of all pages read for the search | A stop-word list only covers the language it was written in. A term found in most passages of a pool cannot say which passage to quote, in any language, and this needs no word list and no language detection |
 | Inflection | A query term and a page word match when one is a prefix of the other, from 3 characters and within 3 | Stripping `-ing`, `-es`, `-s` is English morphology applied to every language: it turned the Portuguese `mães` into `mã` and never matched `mãe` |
 
 Both segmenters are script-driven, so the locale is left unset and the result
@@ -134,7 +136,9 @@ anything.
 | Per-page deadline, redirects included | 6 s | `REQUEST_TIMEOUT_MS` |
 | Redirects followed | 3, each re-validated | `MAX_REDIRECTS` |
 | Body read per page | 1.5 MB | `MAX_RESPONSE_BYTES` |
-| Extracted text per page | 6,000 characters | `MAX_PAGE_CHARS` |
+| Excerpt cap per URL | 6,000 characters | `MAX_PAGE_CHARS`, `selectPassagesAcrossPages` |
+| Global excerpt budget | `MAX_PAGE_CHARS × pages` | `fetchPageContents` |
+| Near-duplicate threshold | 0.9 Jaccard | `JACCARD_THRESHOLD` |
 | Minimum usable text | 200 characters | `MIN_USEFUL_CHARS` |
 | Passage size | 180-1,200 characters | `MIN_PASSAGE_CHARS`, `MAX_PASSAGE_CHARS` |
 | Excerpt share of the context | 35% | `pageContentTokenBudgetRatio` |
@@ -228,7 +232,7 @@ this limit set where it should be", not "who read what":
 | `skipped.notADocument` | Are useful content types being turned away |
 | `skipped.blocked` | Are callers aiming at private space, deliberately or otherwise |
 | `bodiesTruncated` | Is the 1.5 MB body cap biting |
-| `excerptKeptRate` | How much of a page the 6,000-character budget keeps |
+| `excerptKeptRate` | How much of a page the per-URL cap and dedup keep |
 
 A counter can only be read in aggregate, so a single search cannot be recovered
 from it. The weakest point is an instance nobody else is using, where one search
@@ -248,6 +252,8 @@ grounded on before:
 | `/page-content` fails or times out | Answer falls back to snippets |
 | Setting turned off, or AI responses off | No page is ever read |
 | A newer search starts while pages are still being read | The late result is dropped instead of grounding the new answer |
+| Every passage on a page duplicates passages that ranked higher in the pooled order | That page keeps its snippet-only line; no empty excerpt block is emitted |
+| | The pooled ranking uses a per-passage position prior, so a later result can keep a paragraph the higher-ranked one carries further down its page. |
 
 ## Related Topics
 

@@ -184,7 +184,7 @@ describe("splitIntoPassages", () => {
       p.startsWith("Second block"),
     );
     expect(secondBlockPassage).toBeDefined();
-    expect(secondBlockPassage!.startsWith("First block")).toBe(false);
+    expect(secondBlockPassage?.startsWith("First block")).toBe(false);
   });
 });
 
@@ -364,6 +364,72 @@ describe("selectPassages across scripts", () => {
       expect(selected).toEqual([onTopic]);
     });
   }
+});
+
+describe("selectPassagesAcrossPages", () => {
+  // Helper to call the internal selector indirectly through fetchPageContents.
+  async function selectFrom(urls: string[], htmls: string[]) {
+    fetchMock.mockReset();
+    for (const html of htmls) {
+      fetchMock.mockResolvedValueOnce(
+        new Response(html, {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        }),
+      );
+    }
+    return fetchPageContents("test query", urls);
+  }
+
+  it("suppresses a syndicated paragraph that appears on multiple pages", async () => {
+    const syndicated =
+      "This paragraph is syndicated across many sites. ".repeat(10);
+    const uniqueA = "Unique content on page A. ".repeat(10);
+    const uniqueB = "Unique content on page B. ".repeat(10);
+
+    const contents = await selectFrom(
+      ["https://example.com/a", "https://example.com/b"],
+      [
+        `<article><p>${uniqueA}</p><p>${syndicated}</p></article>`,
+        `<article><p>${syndicated}</p><p>${uniqueB}</p></article>`,
+      ],
+    );
+
+    // The syndicated paragraph should appear in only one of the two responses.
+    // Text extraction trims trailing whitespace, so match a trimmed marker
+    // rather than the exact paragraph text.
+    const marker = syndicated.trimEnd();
+    const aText = contents.find((c) => c.url.includes("/a"))?.content ?? "";
+    const bText = contents.find((c) => c.url.includes("/b"))?.content ?? "";
+    const count = (aText + bText).split(marker).length - 1;
+    expect(count).toBe(1);
+  });
+
+  it("drops a page whose passages are all near-duplicates of an earlier page", async () => {
+    // Page A has one passage. Page B has one near-duplicate passage
+    // (Jaccard >= 0.9). The new global dedup should suppress B's copy,
+    // leaving B with no selected passages so it vanishes from the response.
+    // The old per-page code would have returned both pages.
+    // Note: with a query that matches no terms, A wins purely on flatten
+    // order (lower global index), not on relevance. The test guards the
+    // dedup drop path, not the ranking order.
+    const base =
+      "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 ";
+    const passageA = base.repeat(15);
+    const passageB = `${base}word11 `.repeat(15);
+
+    const contents = await selectFrom(
+      ["https://example.com/a", "https://example.com/b"],
+      [
+        `<article><p>${passageA}</p></article>`,
+        `<article><p>${passageB}</p></article>`,
+      ],
+    );
+
+    // Only page A should survive; page B's sole passage is a near-duplicate.
+    expect(contents).toHaveLength(1);
+    expect(contents[0].url).toContain("/a");
+  });
 });
 
 describe("page read counters", () => {

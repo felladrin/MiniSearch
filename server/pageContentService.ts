@@ -98,6 +98,21 @@ export interface PageContent {
   content: string;
 }
 
+interface RankedPassage {
+  url: string;
+  text: string;
+  score: number;
+  index: number;
+  tokens: Set<string>;
+}
+
+interface FetchedPage {
+  url: string;
+  passages: string[];
+  durationMs: number;
+  bodyTruncated: boolean;
+}
+
 function isRedirect(status: number): boolean {
   return (
     status === 301 ||
@@ -408,13 +423,13 @@ function matchingPassages(
 
 /**
  * Weighs each query term by inverse document frequency across the passages of
- * this one page, and returns how much weight each passage matched along with
- * the total available.
+ * the current pool, and returns how much weight each passage matched along
+ * with the total available.
  *
  * This is what replaced a stop-word list, which could only ever cover the one
- * language it was written in: a term found in most passages of a page cannot
+ * language it was written in: a term found in most passages of a pool cannot
  * say which passage to quote, and a term confined to a few of them can, and
- * that holds whatever language the page is in.
+ * that holds whatever language the pool is in.
  */
 function weighTerms(
   queryTerms: string[],
@@ -441,9 +456,9 @@ function scorePassage(
   matchedWeight: number,
   totalWeight: number,
   termCount: number,
-  index: number,
+  positionInPage: number,
 ): number {
-  const position = 1 / (1 + index);
+  const position = 1 / (1 + positionInPage);
   if (termCount === 0) return position;
 
   // Lead passages carry the definition or summary on most pages, so they get a
@@ -451,6 +466,109 @@ function scorePassage(
   // intro of a page whose body never repeats the query, never enough to
   // outrank a passage that covers more of it.
   return matchedWeight / totalWeight + (0.5 * position) / termCount;
+}
+
+/**
+ * Ranks passages by how well they cover the query, using IDF weighting over
+ * the whole pool.
+ *
+ * @param passages - Candidate passages with their source URLs. The ranking is
+ * relative to this global pool, so term statistics are computed across all
+ * pages, not per page.
+ */
+function rankPassages(
+  query: string,
+  passages: { url: string; text: string; positionInPage: number }[],
+): RankedPassage[] {
+  const passageWords = passages.map((p) => new Set(tokenize(p.text)));
+  const queryTerms = [...new Set(tokenize(query))];
+  const { matchedWeights, totalWeight } = weighTerms(queryTerms, passageWords);
+
+  return passages
+    .map((p, index) => ({
+      url: p.url,
+      text: p.text,
+      score: scorePassage(
+        matchedWeights[index],
+        totalWeight,
+        queryTerms.length,
+        p.positionInPage,
+      ),
+      index,
+      tokens: passageWords[index],
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+}
+
+const JACCARD_THRESHOLD = 0.9;
+
+/**
+ * Selects passages from a globally ranked pool, applying a per-URL character
+ * cap and suppressing near-duplicates via token-set Jaccard similarity.
+ *
+ * The same paragraph that appears on several pages reaches the prompt once.
+ * Passages that are near-duplicates of already-selected ones from a *different*
+ * URL are skipped, so a page whose passages all overlap with earlier picks
+ * keeps its snippet-only line with no empty excerpt block.
+ */
+function selectPassagesAcrossPages(
+  ranked: RankedPassage[],
+  maxChars: number,
+  maxCharsPerUrl: number,
+): Map<string, string[]> {
+  const selectedByUrl = new Map<string, string[]>();
+  // Track every selected passage's tokens for cross-URL dedup.
+  // Passages from the same page are allowed to coexist; dedup is only for
+  // syndicated paragraphs that appear on different pages.
+  const selectedTokens: { url: string; tokens: Set<string> }[] = [];
+  let usedChars = 0;
+  const usedPerUrl = new Map<string, number>();
+
+  for (const passage of ranked) {
+    if (usedChars + passage.text.length > maxChars) continue;
+    if (
+      (usedPerUrl.get(passage.url) ?? 0) + passage.text.length >
+      maxCharsPerUrl
+    )
+      continue;
+
+    // Check against all selected passages from other URLs.
+    // Size prefilter: Jaccard ≥ 0.9 requires sizes within 10×, so skip
+    // comparisons where the ratio is too small.
+    let isDuplicate = false;
+    for (const { url: otherUrl, tokens: otherTokens } of selectedTokens) {
+      if (otherUrl === passage.url) continue;
+      const minSize = Math.min(passage.tokens.size, otherTokens.size);
+      const maxSize = Math.max(passage.tokens.size, otherTokens.size);
+      if (minSize * 10 < maxSize * 9) continue;
+      const intersection = [...passage.tokens].filter((t) =>
+        otherTokens.has(t),
+      ).length;
+      // union = a.size + b.size - intersection; avoids allocating a Set.
+      const union = passage.tokens.size + otherTokens.size - intersection;
+      if (union > 0 && intersection / union >= JACCARD_THRESHOLD) {
+        isDuplicate = true;
+        break;
+      }
+    }
+
+    if (isDuplicate) continue;
+
+    const existing = selectedByUrl.get(passage.url);
+    if (existing === undefined) {
+      selectedByUrl.set(passage.url, [passage.text]);
+    } else {
+      existing.push(passage.text);
+    }
+    selectedTokens.push({ url: passage.url, tokens: passage.tokens });
+    usedChars += passage.text.length + 1;
+    usedPerUrl.set(
+      passage.url,
+      (usedPerUrl.get(passage.url) ?? 0) + passage.text.length + 1,
+    );
+  }
+
+  return selectedByUrl;
 }
 
 /**
@@ -462,49 +580,32 @@ function scorePassage(
  * article is its navigation and its infobox, so the ranking below decided only
  * what was transferred and never what the model read.
  *
- * @param passages - Candidate passages from a single page, which is the scope
- * the weighting below is relative to
+ * @param passages - Candidate passages from a single page; the wrapper feeds
+ * them through the production selector so tests exercise the real code path.
  */
 export function selectPassages(
   query: string,
   passages: string[],
   maxChars: number,
 ): string[] {
-  const passageWords = passages.map((text) => new Set(tokenize(text)));
-  const queryTerms = [...new Set(tokenize(query))];
-  const { matchedWeights, totalWeight } = weighTerms(queryTerms, passageWords);
+  // Single-page wrapper over the production selector so tests exercise the
+  // real code path.
+  const input = passages.map((text, index) => ({
+    url: "",
+    text,
+    positionInPage: index,
+  }));
 
-  const ranked = passages
-    .map((text, index) => ({
-      index,
-      text,
-      score: scorePassage(
-        matchedWeights[index],
-        totalWeight,
-        queryTerms.length,
-        index,
-      ),
-    }))
-    .sort((a, b) => b.score - a.score || a.index - b.index);
-
-  const selected: string[] = [];
-  let usedChars = 0;
-
-  for (const passage of ranked) {
-    // Skipping rather than stopping lets a shorter passage further down the
-    // ranking still fill what is left of the budget.
-    if (usedChars + passage.text.length > maxChars) continue;
-    selected.push(passage.text);
-    usedChars += passage.text.length + 1;
-  }
-
-  return selected;
+  const ranked = rankPassages(query, input);
+  return selectPassagesAcrossPages(ranked, maxChars, maxChars).get("") ?? [];
 }
 
-async function fetchPageContent(
-  query: string,
-  url: string,
-): Promise<PageContent | null> {
+async function fetchPageContent(url: string): Promise<{
+  url: string;
+  passages: string[];
+  durationMs: number;
+  bodyTruncated: boolean;
+} | null> {
   const startedAt = performance.now();
   const since = () => performance.now() - startedAt;
 
@@ -518,13 +619,9 @@ async function fetchPageContent(
   const { bodyTruncated } = download;
 
   try {
-    const passages = splitIntoPassages(
-      download.text !== undefined
-        ? download.text
-        : extractReadableText(download.html!),
-    );
-    const selected = selectPassages(query, passages, MAX_PAGE_CHARS);
-    const content = selected.join("\n");
+    const html = download.text ?? extractReadableText(download.html ?? "");
+    const passages = splitIntoPassages(html);
+    const content = passages.join("\n");
 
     if (content.length < MIN_USEFUL_CHARS) {
       recordPageRead({
@@ -535,19 +632,14 @@ async function fetchPageContent(
       return null;
     }
 
-    recordPageRead({
-      outcome: "read",
-      durationMs: since(),
-      bodyTruncated,
-      passagesKept: selected.length,
-      passagesAvailable: passages.length,
-    });
-
-    return { url, content };
+    // Don't record passage stats here — selection happens globally in
+    // fetchPageContents, and we need to report how many passages actually
+    // survived the global budget, not how many the page yielded.
+    return { url, passages, durationMs: since(), bodyTruncated };
   } catch {
     recordPageRead({
       outcome: "failed",
-      durationMs: since(),
+      durationMs: performance.now() - startedAt,
       bodyTruncated,
     });
     return null;
@@ -558,6 +650,10 @@ async function fetchPageContent(
  * Reads the given pages and returns the passages most relevant to the query.
  * Pages that fail, time out, or carry no readable text are left out instead of
  * failing the batch: a partial set of excerpts still grounds the answer.
+ *
+ * Passages from all pages are ranked together, then selected with a per-URL
+ * character cap and near-duplicate suppression, so syndicated paragraphs that
+ * appear on several pages reach the prompt once.
  *
  * Nothing here is logged. Every read is counted instead, by outcome, in
  * `pageReadsSinceLastRestart`, since a line naming the query or the URL would
@@ -570,9 +666,43 @@ export async function fetchPageContents(
   query: string,
   urls: string[],
 ): Promise<PageContent[]> {
-  const contents = await Promise.all(
-    urls.map((url) => fetchPageContent(query, url)),
+  const results = await Promise.all(urls.map((url) => fetchPageContent(url)));
+
+  const pages = results.filter((r): r is FetchedPage => r !== null);
+
+  if (pages.length === 0) return [];
+
+  const allPassages = pages.flatMap((p) =>
+    p.passages.map((text, passageIndex) => ({
+      url: p.url,
+      text,
+      positionInPage: passageIndex,
+    })),
   );
 
-  return contents.filter((content): content is PageContent => content !== null);
+  const ranked = rankPassages(query, allPassages);
+  const selectedByUrl = selectPassagesAcrossPages(
+    ranked,
+    MAX_PAGE_CHARS * pages.length,
+    MAX_PAGE_CHARS,
+  );
+
+  // Record page-read stats now that we know how many passages were kept.
+  for (const page of pages) {
+    const selected = selectedByUrl.get(page.url) ?? [];
+    recordPageRead({
+      outcome: "read",
+      durationMs: page.durationMs,
+      bodyTruncated: page.bodyTruncated,
+      passagesKept: selected.length,
+      passagesAvailable: page.passages.length,
+    });
+  }
+
+  return pages
+    .map((p) => {
+      const selected = selectedByUrl.get(p.url) ?? [];
+      return { url: p.url, content: selected.join("\n") };
+    })
+    .filter((c) => c.content.length > 0);
 }

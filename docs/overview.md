@@ -11,6 +11,7 @@ The architecture follows a layered design where search, AI inference, and presen
 MiniSearch integrates multiple technology stacks within a unified deployment container:
 
 ### Frontend
+
 - **React** - UI framework
 - **React DOM** - DOM rendering
 - **Mantine UI** - Component library (`@mantine/core`, `@mantine/hooks`, `@mantine/carousel`)
@@ -18,11 +19,13 @@ MiniSearch integrates multiple technology stacks within a unified deployment con
 - **TypeScript** - Type safety
 
 ### AI & Search
+
 - **@wllama/wllama** - Client-side AI inference (WebGPU-accelerated or CPU via WebAssembly)
 - **AI SDK** - AI integration layer
 - **@ai-sdk/openai-compatible** - Unified AI interface
 
 ### Data & State
+
 - **Dexie** - IndexedDB management
 - **create-pubsub** - State management (avoid React Context)
 - **usePubSub** - Component subscriptions
@@ -40,6 +43,7 @@ The application has three primary entry points:
 ## Multi-Service Container Architecture
 
 The Docker container runs three services concurrently:
+
 - **SearXNG** - Privacy-focused metasearch engine
 - **ONNX Runtime** - In-process inference for result reranking
 - **Node.js application** - Main application server
@@ -55,6 +59,7 @@ PubSub channels are created using the create-pubsub package and provide type-saf
 ## Data Persistence Strategy
 
 MiniSearch employs a dual-layer persistence approach:
+
 - **IndexedDB** - Local storage for search history, settings, cached results, and saved AI transcripts
 - **TTL-based caching** - 15-minute cache for search results to minimize API calls
 
@@ -67,11 +72,13 @@ Long-running chat sessions use an in-memory conversation summary that rolls exce
 The system supports two operational modes:
 
 ### Development Mode
+
 - Hot module replacement (HMR) on port 7861
 - Volume mount for live code updates
 - Vite dev server with source maps
 
 ### Production Mode
+
 - Pre-built static assets in /dist
 - Vite preview server (no HMR)
 - Optimized bundle with minification
@@ -130,6 +137,7 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 ### State Machine Transitions
 
 **Text Generation States:**
+
 - `idle` - No active generation
 - `awaitingModelDownloadAllowance` - Waiting for user consent to download a browser model
 - `loadingModel` - Downloading or initializing the browser (Wllama) model
@@ -141,6 +149,7 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 - `failed` - Error occurred
 
 **Search States:**
+
 - `idle` - No active search
 - `running` - Search in progress
 - `completed` - Results received
@@ -170,7 +179,7 @@ Callers write tokens directly to `updateResponse` or `updateReasoningContent` wi
 Three channels register built-in side-effect subscribers at module load time for automatic logging:
 
 | Channel | Side Effect |
-|---------|-------------|
+| --------- | ------------- |
 | `textGenerationStatePubSub` | Logs state transitions via `addLogEntry` |
 | `textSearchStatePubSub` | Logs state transitions via `addLogEntry` |
 | `imageSearchStatePubSub` | Logs state transitions via `addLogEntry` |
@@ -184,7 +193,7 @@ The build pipeline uses Biome for linting and formatting, TypeScript for type ch
 MiniSearch implements all server-side logic as Vite plugin hooks. Each hook registers middleware on Vite's HTTP server, working identically in both dev (`vite`) and production preview (`vite preview`) modes. Hooks are declared in `vite.config.ts` and registered via `configureServer`/`configurePreviewServer` callbacks.
 
 | Hook | File | Purpose |
-|------|------|---------|
+| ------ | ------ | --------- |
 | `compressionServerHook` | `server/compressionServerHook.ts` | gzip/brotli compression for all responses |
 | `crossOriginServerHook` | `server/crossOriginServerHook.ts` | COOP/COEP headers for SharedArrayBuffer |
 | `searchEndpointServerHook` | `server/searchEndpointServerHook.ts` | `/search/text` and `/search/images` endpoints proxied to SearXNG |
@@ -208,7 +217,7 @@ Key server-side modules:
 The `cacheServerHook` sets Cache-Control headers on every response:
 
 | Path Pattern | Cache-Control Header | Rationale |
-|---|---|---|
+| --- | --- | --- |
 | `/assets/*` | `public, max-age=31536000, immutable` | Content-hashed filenames never change |
 | `/` or `*.html` | `no-cache` | HTML must always check for updates |
 | Everything else | `public, max-age=86400, must-revalidate` | 24-hour cache with revalidation |
@@ -218,7 +227,7 @@ The `cacheServerHook` sets Cache-Control headers on every response:
 The `/status` endpoint returns a JSON object:
 
 | Field | Type | Description |
-|---|---|---|
+| --- | --- | --- |
 | `uptime` | string | Human-readable server uptime |
 | `sessions` | number | Distinct verified sessions since last restart, which the two per-session averages below divide by |
 | `activeSessions` | number | Sessions still in the cache, dropped after 30 idle minutes |
@@ -258,13 +267,13 @@ is attached to a constant that someone will want to move, which is the reason it
 is counted at all (see `docs/page-content.md`):
 
 | Field | Type | Tunes |
-|---|---|---|
+| --- | --- | --- |
 | `requested` | number | Nothing; the denominator for the rest |
 | `read` | number | Nothing; how often the feature contributed anything |
 | `readRate` | number | Nothing; `read` as a percentage of `requested` |
 | `averageReadMs` | number | `REQUEST_TIMEOUT_MS`, including the reads that hit it |
 | `bodiesTruncated` | number | `MAX_RESPONSE_BYTES` |
-| `excerptKeptRate` | number | `MAX_PAGE_CHARS`, as the share of a page's passages that fit it |
+| `excerptKeptRate` | number | `MAX_PAGE_CHARS` and the 0.9 dedup threshold, as the share of pooled passages that survive |
 | `skipped.blocked` | number | The SSRF guard, and how often callers aim at private space |
 | `skipped.notADocument` | number | `READABLE_CONTENT_TYPES` |
 | `skipped.httpError` | number | Nothing; how often sites refuse the instance |
@@ -290,7 +299,7 @@ verification, the funnel `/search/text`, `/search/images`, `/page-content` and
 `/inference` all pass through:
 
 | Field | Type | Says |
-|---|---|---|
+| --- | --- | --- |
 | `requests` | number | Requests that reached verification; the denominator for the rest |
 | `authorized` | number | Requests that passed it |
 | `rejectedRate` | number | Rejections as a percentage of `requests` |
@@ -316,7 +325,7 @@ page-content read, so its `authorized` side says where the budget goes and its
 answer are about the upstream and about the wait, not about what was asked:
 
 | Field | Type | Says |
-|---|---|---|
+| --- | --- | --- |
 | `requests` | number | Requests that passed token verification; the denominator for the rest |
 | `streamed` | number | Answers that finished normally |
 | `streamedRate` | number | `streamed` as a percentage of `requests` |
@@ -360,7 +369,7 @@ in the search path. Each row names the constant it is there to move, the same
 way `pageReads` does:
 
 | Field | Type | Tunes |
-|---|---|---|
+| --- | --- | --- |
 | `searches.averageTextualMs` | number | The 30 s client timeout in `client/modules/search.ts`. Over the text searches SearXNG answered, so a failed or short-circuited one is not in it, and up to 7 s of retry backoff is |
 | `searches.averageGraphicalMs` | number | The same, for image searches |
 | `reranker.considered` | number | Nothing; results handed to the score filter, the denominator for `keptRate` |
@@ -394,7 +403,7 @@ Two separate Dexie databases handle different persistence needs:
    - Cache config:
 
 | Constant | Value | Description |
-|----------|-------|-------------|
+| ---------- | ------- | ------------- |
 | TTL | 15 minutes | Cache entry lifetime |
 | MAX_ENTRIES | 100 | Maximum cached queries per store |
 | ENABLED | true | Global cache toggle |
@@ -402,11 +411,11 @@ Two separate Dexie databases handle different persistence needs:
 | METRICS_LOG_INTERVAL | 10 | Operations between hit-rate log entries |
 | REQUEST_TIMEOUT | 30,000 ms | Fetch timeout |
 
-   - Query hashing: djb2 XOR Murmur algorithm for cache key generation
-   - Management operations: `cleanExpiredCache`, `pruneCache`, `ensureIntegrity`
-   - Performance monitoring: `cacheMetrics` tracks hit/miss rates for text and image searches
+- Query hashing: djb2 XOR Murmur algorithm for cache key generation
+- Management operations: `cleanExpiredCache`, `pruneCache`, `ensureIntegrity`
+- Performance monitoring: `cacheMetrics` tracks hit/miss rates for text and image searches
 
-2. **HistoryDatabase** (`client/modules/history.ts`): Long-term persistence of user interactions. Three coordinated tables:
+1. **HistoryDatabase** (`client/modules/history.ts`): Long-term persistence of user interactions. Three coordinated tables:
    - `searches`: Canonical log of each query with hydrated results payloads
    - `llmResponses`: AI answers tied to their originating search run
    - `chatHistory`: Chronological chat turns scoped by `conversationId` (which equals `searchRunId`)
@@ -415,6 +424,7 @@ Two separate Dexie databases handle different persistence needs:
 ### localStorage Persistence
 
 Lightweight state persisted across sessions via `createLocalStoragePubSub` pattern:
+
 - `settings`: Application preferences (inference type, model, UI options)
 - `querySuggestions`: Shuffled search suggestion pool
 - `lastSearchTokenHash`: Cached security token hash
@@ -424,18 +434,21 @@ Lightweight state persisted across sessions via `createLocalStoragePubSub` patte
 ## Application Bootstrap Flow
 
 ### Server-Side Bootstrap (vite.config.ts)
+
 1. Loads environment variables via `dotenv.config`
 2. Generates/retrieves search token for CSRF protection
 3. Injects environment-based constants as compile-time replacements (`VITE_SEARCH_TOKEN`, `VITE_ACCESS_KEYS_ENABLED`, etc.)
 4. Registers all middleware hooks (see Server Hook System above)
 
 ### Client-Side Bootstrap (client/index.tsx)
+
 1. Retrieves current settings via `getSettings()`
 2. Registers ready/close listeners on `historyDatabase`, opens DB if history enabled
 3. Sets up reactive listener to open/close DB when user toggles history in settings
 4. Creates React root and renders `<App />`
 
 ### App Component Initialization (client/components/App/App.tsx)
+
 1. `useInitializeSettings`: Merges default settings with stored values into `settingsPubSub`
 2. `useAccessKeyValidation`: Checks `VITE_ACCESS_KEYS_ENABLED`; if enabled, verifies stored key; shows loading state during check; renders `<AccessPage />` or `<MainPage />` accordingly
 
