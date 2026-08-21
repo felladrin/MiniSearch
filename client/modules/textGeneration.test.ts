@@ -76,52 +76,20 @@ describe("textGenerationFunctions", () => {
   });
 
   describe("getCurrentModelName", () => {
-    it("should return openai model name when inferenceType is openai", () => {
-      const { getCurrentModelName } = textGenerationFunctions;
-      mockGetSettings.mockReturnValue({
-        inferenceType: "openai",
-        openAiApiModel: "gpt-4",
-        enableWebGpu: false,
-      });
-      const result = getCurrentModelName();
-      expect(result).toBe("gpt-4");
-    });
+    it.each([
+      ["openai", { inferenceType: "openai", openAiApiModel: "gpt-4" }, "gpt-4"],
+      ["horde", { inferenceType: "horde" }, "AI Horde"],
+      ["internal", { inferenceType: "internal" }, "Internal API"],
+      [
+        "browser",
+        { inferenceType: "browser", wllamaModelId: "wllama-model" },
+        "wllama-model",
+      ],
+      ["an unknown backend", { inferenceType: "unknown" }, "Unknown"],
+    ])("should name the model for %s", (_, settings, expected) => {
+      mockGetSettings.mockReturnValue(settings as never);
 
-    it("should return AI Horde when inferenceType is horde", () => {
-      const { getCurrentModelName } = textGenerationFunctions;
-      mockGetSettings.mockReturnValue({
-        inferenceType: "horde",
-      });
-      const result = getCurrentModelName();
-      expect(result).toBe("AI Horde");
-    });
-
-    it("should return Internal API when inferenceType is internal", () => {
-      const { getCurrentModelName } = textGenerationFunctions;
-      mockGetSettings.mockReturnValue({
-        inferenceType: "internal",
-      });
-      const result = getCurrentModelName();
-      expect(result).toBe("Internal API");
-    });
-
-    it("should return wllama model id when inferenceType is browser", () => {
-      const { getCurrentModelName } = textGenerationFunctions;
-      mockGetSettings.mockReturnValue({
-        inferenceType: "browser",
-        wllamaModelId: "wllama-model",
-      });
-      const result = getCurrentModelName();
-      expect(result).toBe("wllama-model");
-    });
-
-    it("should return Unknown for unknown inferenceType", () => {
-      const { getCurrentModelName } = textGenerationFunctions;
-      mockGetSettings.mockReturnValue({
-        inferenceType: "unknown" as unknown,
-      });
-      const result = getCurrentModelName();
-      expect(result).toBe("Unknown");
+      expect(textGenerationFunctions.getCurrentModelName()).toBe(expected);
     });
   });
 
@@ -136,19 +104,13 @@ describe("textGenerationFunctions", () => {
       expect(result).toBe("Hello world");
     });
 
-    it("should return empty string when no user message", () => {
+    it("should return empty string when there is no user message", () => {
       const { getConversationId } = textGenerationFunctions;
-      const messages: ChatMessage[] = [
-        { role: "assistant", content: "Hi there!" },
-      ];
-      const result = getConversationId(messages);
-      expect(result).toBe("");
-    });
 
-    it("should return empty string for empty messages array", () => {
-      const { getConversationId } = textGenerationFunctions;
-      const result = getConversationId([]);
-      expect(result).toBe("");
+      expect(getConversationId([{ role: "assistant", content: "Hi!" }])).toBe(
+        "",
+      );
+      expect(getConversationId([])).toBe("");
     });
 
     it("should return first user message when multiple user messages exist", () => {

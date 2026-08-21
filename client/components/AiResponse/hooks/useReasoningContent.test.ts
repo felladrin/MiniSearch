@@ -24,8 +24,12 @@ describe("useReasoningContent hook", () => {
       expect(result.current.isGenerating).toBe(false);
     });
 
-    it("should handle empty text", () => {
-      const { result } = renderHook(() => useReasoningContent(""));
+    it.each([
+      ["empty text", ""],
+      ["whitespace-only text", "   "],
+      ["no text at all", null as unknown as string],
+    ])("should report nothing to show for %s", (_, content) => {
+      const { result } = renderHook(() => useReasoningContent(content));
       expectEmptyState(result);
     });
 
@@ -47,50 +51,6 @@ describe("useReasoningContent hook", () => {
       expect(result.current.reasoningContent).toBe("I'm still thinking");
       expect(result.current.mainContent).toBe("");
       expect(result.current.isGenerating).toBe(true);
-    });
-
-    it("should handle whitespace-only content", () => {
-      const { result } = renderHook(() => useReasoningContent("   "));
-      expectEmptyState(result);
-    });
-
-    it("should handle null/undefined content gracefully", () => {
-      const { result } = renderHook(() =>
-        useReasoningContent(null as unknown as string),
-      );
-      expectEmptyState(result);
-    });
-  });
-
-  describe("UI state management for reasoning section", () => {
-    it("should provide correct isGenerating state for accordion title", () => {
-      const streamingState = renderHook(() =>
-        useReasoningContent("<think>Currently thinking..."),
-      );
-
-      expect(streamingState.result.current.isGenerating).toBe(true);
-
-      const completedState = renderHook(() =>
-        useReasoningContent(
-          "<think>Thought process completed</think>\nHere is the answer.",
-        ),
-      );
-
-      expect(completedState.result.current.isGenerating).toBe(false);
-    });
-
-    it("should handle transition from streaming to completed state", () => {
-      const initial = renderHook(() =>
-        useReasoningContent("<think>Building response..."),
-      );
-      expect(initial.result.current.isGenerating).toBe(true);
-
-      const transitioned = renderHook(() =>
-        useReasoningContent(
-          "<think>Response built.</think>\nFinal answer here.",
-        ),
-      );
-      expect(transitioned.result.current.isGenerating).toBe(false);
     });
   });
 });

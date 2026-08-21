@@ -56,43 +56,17 @@ import { textGenerationFunctions } from "./textGeneration";
 const mockGetSettings = vi.mocked(getSettings);
 
 describe("needsModelDownloadGate", () => {
-  it("returns true for 'browser' inference type", () => {
-    mockGetSettings.mockReturnValueOnce({
-      inferenceType: "browser",
-    } as never);
+  // Only the in-browser backend downloads a model, and an unknown backend from
+  // an older stored profile falls back to it.
+  it.each([
+    ["browser", true],
+    ["openai", false],
+    ["horde", false],
+    ["internal", false],
+    ["unknown-legacy-type", true],
+  ])("gates the %s inference type: %s", (inferenceType, expected) => {
+    mockGetSettings.mockReturnValueOnce({ inferenceType } as never);
 
-    expect(textGenerationFunctions.needsModelDownloadGate()).toBe(true);
-  });
-
-  it("returns false for 'openai' inference type", () => {
-    mockGetSettings.mockReturnValueOnce({
-      inferenceType: "openai",
-    } as never);
-
-    expect(textGenerationFunctions.needsModelDownloadGate()).toBe(false);
-  });
-
-  it("returns false for 'horde' inference type", () => {
-    mockGetSettings.mockReturnValueOnce({
-      inferenceType: "horde",
-    } as never);
-
-    expect(textGenerationFunctions.needsModelDownloadGate()).toBe(false);
-  });
-
-  it("returns false for 'internal' inference type", () => {
-    mockGetSettings.mockReturnValueOnce({
-      inferenceType: "internal",
-    } as never);
-
-    expect(textGenerationFunctions.needsModelDownloadGate()).toBe(false);
-  });
-
-  it("returns true for unknown inference type (falls back to browser)", () => {
-    mockGetSettings.mockReturnValueOnce({
-      inferenceType: "unknown-legacy-type",
-    } as never);
-
-    expect(textGenerationFunctions.needsModelDownloadGate()).toBe(true);
+    expect(textGenerationFunctions.needsModelDownloadGate()).toBe(expected);
   });
 });

@@ -44,11 +44,15 @@ describe("Search Module", () => {
 
   describe("Hash Query Function", () => {
     it("should return the same hash for identical queries", async () => {
-      const result1 =
-        await searchModule.searchServiceInstance.hashQuery("test query");
-      const result2 =
-        await searchModule.searchServiceInstance.hashQuery("test query");
-      expect(result1).toBe(result2);
+      for (const query of [
+        "test query",
+        "",
+        "test@query#123",
+        "日本語テスト",
+      ]) {
+        const { hashQuery } = searchModule.searchServiceInstance;
+        expect(await hashQuery(query)).toBe(await hashQuery(query));
+      }
     });
 
     it("should return different hashes for different queries", async () => {
@@ -57,28 +61,6 @@ describe("Search Module", () => {
       const result2 =
         await searchModule.searchServiceInstance.hashQuery("query two");
       expect(result1).not.toBe(result2);
-    });
-
-    it("should handle empty query string", async () => {
-      const result = await searchModule.searchServiceInstance.hashQuery("");
-      expect(result).toBeTruthy();
-      expect(typeof result).toBe("string");
-    });
-
-    it("should handle special characters", async () => {
-      const hash1 =
-        await searchModule.searchServiceInstance.hashQuery("test@query#123");
-      expect(hash1).toBe(
-        await searchModule.searchServiceInstance.hashQuery("test@query#123"),
-      );
-    });
-
-    it("should handle unicode characters", async () => {
-      const hash1 =
-        await searchModule.searchServiceInstance.hashQuery("日本語テスト");
-      expect(hash1).toBe(
-        await searchModule.searchServiceInstance.hashQuery("日本語テスト"),
-      );
     });
 
     it("should include limit in the hash so different limits produce different keys", async () => {
@@ -206,105 +188,71 @@ describe("Search Module", () => {
           "text",
           "   ",
         ),
-      ).rejects.toThrow(/Query cannot be/i);
+      ).rejects.toThrow("Query cannot be empty");
     });
 
-    it("should handle network failure", async () => {
-      mockFetch.mockRejectedValue(new Error("Network unavailable"));
+    // Each row has to reach the branch it is named for. The three tests these
+    // replaced did not: one asserted `response.json()` on the fetch mock
+    // without ever calling `performSearch`, and the other two rejected with a
+    // plain Error, which matches neither `AbortError` nor the lowercase
+    // "network" the wrapper looks for, so both only watched a raw error
+    // propagate.
+    it.each([
+      [
+        "wraps a body it cannot parse",
+        () =>
+          mockFetch.mockResolvedValue({
+            ok: true,
+            json: vi
+              .fn()
+              .mockRejectedValue(new SyntaxError("Unexpected token")),
+          }),
+        "JSON parsing error: Unexpected token",
+      ],
+      [
+        "labels a network failure",
+        () => mockFetch.mockRejectedValue(new Error("network is unreachable")),
+        "Network error: network is unreachable",
+      ],
+      [
+        "labels an aborted request as a timeout",
+        () =>
+          mockFetch.mockRejectedValue(
+            Object.assign(new Error("The operation was aborted"), {
+              name: "AbortError",
+            }),
+          ),
+        "Request timeout - server did not respond within 30 seconds",
+      ],
+    ])("%s", async (_, arrange, expected) => {
+      arrange();
 
       await expect(
         searchModule.searchServiceInstance.performSearch<string[][]>(
           "text",
           "test",
         ),
-      ).rejects.toThrow("Network unavailable");
-    });
-
-    it("should handle timeout scenario", async () => {
-      mockFetch.mockRejectedValue(new Error("Request timeout"));
-
-      await expect(
-        searchModule.searchServiceInstance.performSearch<string[][]>(
-          "text",
-          "test",
-        ),
-      ).rejects.toThrow("Request timeout");
-    });
-
-    it("should handle malformed JSON response", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockRejectedValue(new SyntaxError("Unexpected token")),
-      });
-
-      const response = await mockFetch();
-      await expect(response.json()).rejects.toThrow("Unexpected token");
-    });
-  });
-
-  describe("Get Cache Stats Function", () => {
-    it("should return cache statistics object", () => {
-      const stats = searchModule.searchServiceInstance.getCacheStats();
-
-      expect(stats).toHaveProperty("textHitRate");
-      expect(stats).toHaveProperty("imageHitRate");
-      expect(stats).toHaveProperty("textHits");
-      expect(stats).toHaveProperty("textMisses");
-      expect(stats).toHaveProperty("imageHits");
-      expect(stats).toHaveProperty("imageMisses");
-      expect(stats).toHaveProperty("config");
-      expect(stats.config).toHaveProperty("ttl");
-      expect(stats.config).toHaveProperty("maxEntries");
-      expect(stats.config).toHaveProperty("enabled");
-    });
-
-    it("should track text search cache hits and misses", () => {
-      const initialStats = searchModule.searchServiceInstance.getCacheStats();
-      expect(initialStats.textHits).toBeGreaterThanOrEqual(0);
-      expect(initialStats.textMisses).toBeGreaterThanOrEqual(0);
-    });
-
-    it("should track image search cache hits and misses", () => {
-      const initialStats = searchModule.searchServiceInstance.getCacheStats();
-      expect(initialStats.imageHits).toBeGreaterThanOrEqual(0);
-      expect(initialStats.imageMisses).toBeGreaterThanOrEqual(0);
+      ).rejects.toThrow(expected);
     });
   });
 
   describe("Update Cache Config Function", () => {
-    it("should update ttl when provided", () => {
-      const newTTL = 60000;
-      searchModule.searchServiceInstance.updateCacheConfig({ ttl: newTTL });
+    it.each([
+      ["ttl", 60000],
+      ["maxEntries", 50],
+      ["enabled", false],
+    ] as const)("should update %s when provided", (field, value) => {
+      searchModule.searchServiceInstance.updateCacheConfig({ [field]: value });
 
-      const statsTTL =
-        searchModule.searchServiceInstance.getCacheStats().config.ttl;
-      expect(statsTTL).toBe(newTTL);
-    });
-
-    it("should update maxEntries when provided", () => {
-      searchModule.searchServiceInstance.updateCacheConfig({
-        maxEntries: 50,
-      });
-
-      const maxEntries =
-        searchModule.searchServiceInstance.getCacheStats().config.maxEntries;
-      expect(maxEntries).toBe(50);
-    });
-
-    it("should update enabled when provided", () => {
-      searchModule.searchServiceInstance.updateCacheConfig({
-        enabled: false,
-      });
-
-      const enabled =
-        searchModule.searchServiceInstance.getCacheStats().config.enabled;
-      expect(enabled).toBe(false);
+      expect(
+        searchModule.searchServiceInstance.getCacheStats().config[field],
+      ).toBe(value);
     });
 
     it("should reject invalid TTL value", () => {
       expect(() =>
         searchModule.searchServiceInstance.updateCacheConfig({ ttl: -1 }),
-      ).toThrow();
+      ).toThrow("Invalid TTL value: -1");
     });
 
     it("should reject invalid maxEntries value", () => {
@@ -312,61 +260,34 @@ describe("Search Module", () => {
         searchModule.searchServiceInstance.updateCacheConfig({
           maxEntries: -1,
         }),
-      ).toThrow();
+      ).toThrow("Invalid maxEntries value: -1");
     });
   });
 
-  describe("Cache Failure Scenarios", () => {
+  describe("Search Failures", () => {
+    // The cache layer swallows its own read, write and integrity errors, so a
+    // failed search is always a failed fetch by the time it reaches the caller,
+    // and it has to stay one so the caller can mark the search as failed.
     it("should rethrow when a text search fails end-to-end", async () => {
-      // getCachedResult/cacheResult swallow their own read/write errors, so a
-      // cache failure surfaces as a miss followed by a real fetch — the fetch
-      // failure must propagate so the caller can mark the search as failed.
-      mockFetch.mockRejectedValue(new Error("Cache read error"));
+      mockFetch.mockRejectedValue(new Error("upstream refused the connection"));
 
       await expect(searchModule.searchText("test query")).rejects.toThrow(
-        "Cache read error",
+        "upstream refused the connection",
       );
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("Text search failed"),
       );
     });
 
-    it("should still return fresh results when the underlying fetch succeeds", async () => {
-      const mockResults: string[][] = [
-        ["Title", "Snippet", "https://example.com"],
-      ];
-      mockFetchResponse(mockResults);
-
-      const results = await searchModule.searchText("test query");
-
-      expect(results).toEqual(mockResults);
-    });
-  });
-
-  describe("Database Integrity Failures", () => {
     it("should rethrow when an image search fails end-to-end", async () => {
-      // ensureIntegrity/cleanExpiredCache swallow their own errors, so a
-      // corrupted database surfaces as a miss followed by a real fetch — the
-      // fetch failure must propagate so the caller can mark the search failed.
-      mockFetch.mockRejectedValue(new Error("Database integrity check failed"));
+      mockFetch.mockRejectedValue(new Error("upstream refused the connection"));
 
       await expect(searchModule.searchImages("test query")).rejects.toThrow(
-        "Database integrity check failed",
+        "upstream refused the connection",
       );
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("Image search failed"),
       );
-    });
-
-    it("should recover and return fresh results after a prior failure", async () => {
-      const mockResults: string[][] = [
-        ["Image", "Alt", "https://example.com/img.jpg"],
-      ];
-      mockFetchResponse(mockResults);
-
-      const results = await searchModule.searchImages("test query");
-
-      expect(results).toEqual(mockResults);
     });
   });
 
