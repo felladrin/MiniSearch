@@ -1,13 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockArgon2Verify = vi.fn();
+const mockConsumeRateLimitPoint = vi.fn();
 
 vi.mock("hash-wasm", () => ({
   argon2Verify: (...args: unknown[]) => mockArgon2Verify(...args),
 }));
 
+vi.mock("./verifyTokenAndRateLimit", () => ({
+  consumeRateLimitPoint: (...args: unknown[]) =>
+    mockConsumeRateLimitPoint(...args),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // Within budget by default; the rate-limited case opts out.
+  mockConsumeRateLimitPoint.mockResolvedValue(true);
 });
 
 function makeMockRequest(
@@ -108,16 +116,64 @@ describe("validateAccessKeyServerHook", () => {
     );
 
     await new Promise<void>((resolve) => {
-      handler(req as never, res as never, () => {});
-      // Trigger the end callback that the handler registered
-      for (const cb of req.endCallbacks) {
-        cb();
-      }
-      // argon2Verify is async, so we need to wait for it.
-      setTimeout(resolve, 50);
+      void handler(req as never, res as never, () => {});
+      // The handler consumes a rate-limit point (async) before it registers its
+      // end listener, so trigger it on a later macrotask.
+      setImmediate(() => {
+        for (const cb of req.endCallbacks) {
+          cb();
+        }
+        setTimeout(resolve, 50);
+      });
     });
 
     expect(res.end).toHaveBeenCalledWith(JSON.stringify({ valid: true }));
+    // The request was within budget, so the limiter let it through.
+    expect(mockConsumeRateLimitPoint).toHaveBeenCalledTimes(1);
+  });
+
+  it("responds 429 and skips the argon2 loop when the limiter refuses", async () => {
+    process.env.ACCESS_KEYS = "test-key";
+    mockConsumeRateLimitPoint.mockResolvedValue(false);
+    const { validateAccessKeyServerHook } = await import(
+      "./validateAccessKeyServerHook"
+    );
+    const use = vi.fn();
+    validateAccessKeyServerHook({
+      middlewares: { use },
+    } as never);
+    const handler = use.mock.calls[0][0] as (
+      req: {
+        url: string;
+        method: string;
+        on: (event: string, cb: (chunk: string) => void) => void;
+      },
+      res: {
+        setHeader: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+        statusCode: number;
+      },
+      next: () => void,
+    ) => void;
+
+    const res = makeMockResponse();
+    const req = makeMockRequest(
+      "/api/validate-access-key",
+      "POST",
+      JSON.stringify({ accessKeyHash: "some-hash" }),
+    );
+
+    await new Promise<void>((resolve) => {
+      handler(req as never, res as never, () => {});
+      setTimeout(resolve, 50);
+    });
+
+    expect(res.statusCode).toBe(429);
+    expect(res.end).toHaveBeenCalledWith(
+      JSON.stringify({ error: "Too many requests." }),
+    );
+    // The limiter refused before the argon2 loop ran, so no key was verified.
+    expect(mockArgon2Verify).not.toHaveBeenCalled();
   });
 
   it("should return valid: false when no access keys match", async () => {
@@ -151,11 +207,13 @@ describe("validateAccessKeyServerHook", () => {
     );
 
     await new Promise<void>((resolve) => {
-      handler(req as never, res as never, () => {});
-      for (const cb of req.endCallbacks) {
-        cb();
-      }
-      setTimeout(resolve, 50);
+      void handler(req as never, res as never, () => {});
+      setImmediate(() => {
+        for (const cb of req.endCallbacks) {
+          cb();
+        }
+        setTimeout(resolve, 50);
+      });
     });
 
     expect(res.end).toHaveBeenCalledWith(JSON.stringify({ valid: false }));
@@ -188,11 +246,13 @@ describe("validateAccessKeyServerHook", () => {
     const req = makeMockRequest("/api/validate-access-key", "POST", "not-json");
 
     await new Promise<void>((resolve) => {
-      handler(req as never, res as never, () => {});
-      for (const cb of req.endCallbacks) {
-        cb();
-      }
-      setTimeout(resolve, 50);
+      void handler(req as never, res as never, () => {});
+      setImmediate(() => {
+        for (const cb of req.endCallbacks) {
+          cb();
+        }
+        setTimeout(resolve, 50);
+      });
     });
 
     expect(res.statusCode).toBe(400);

@@ -30,7 +30,11 @@ async function hashAccessKey(accessKey: string): Promise<string> {
  * Validates the key against the server; on success the hash is stored locally
  * so later loads can go through `verifyStoredAccessKey`.
  */
-export async function validateAccessKey(accessKey: string): Promise<boolean> {
+export type AccessKeyResult = "valid" | "invalid" | "rateLimited";
+
+export async function validateAccessKey(
+  accessKey: string,
+): Promise<AccessKeyResult> {
   try {
     const hash = await hashAccessKey(accessKey);
     const response = await fetch("/api/validate-access-key", {
@@ -38,6 +42,20 @@ export async function validateAccessKey(accessKey: string): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ accessKeyHash: hash }),
     });
+
+    // A 429 is "try again in a moment", not "wrong key": keep the two apart so
+    // the caller can show a refusal message instead of a wrong-key error.
+    if (response.status === 429) {
+      addLogEntry("Access key validation rate-limited");
+      notifications.show({
+        title: "Too many attempts",
+        message: "Please wait a few seconds and try again",
+        color: "yellow",
+        position: "top-right",
+      });
+      return "rateLimited";
+    }
+
     const data = await response.json();
 
     if (data.valid) {
@@ -47,9 +65,10 @@ export async function validateAccessKey(accessKey: string): Promise<boolean> {
       };
       localStorage.setItem(ACCESS_KEY_STORAGE_KEY, JSON.stringify(storedData));
       addLogEntry("Access key hash stored");
+      return "valid";
     }
 
-    return data.valid;
+    return "invalid";
   } catch (error) {
     addLogEntry(`Error validating access key: ${error}`);
     notifications.show({
@@ -58,7 +77,7 @@ export async function validateAccessKey(accessKey: string): Promise<boolean> {
       color: "red",
       position: "top-right",
     });
-    return false;
+    return "invalid";
   }
 }
 
@@ -89,6 +108,14 @@ export async function verifyStoredAccessKey(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ accessKeyHash: hash }),
     });
+
+    // A 429 must not be read as "wrong key": the stored hash may be fine and
+    // the caller simply hit the rate limiter. Keep the hash on disk so a
+    // later load can still validate it.
+    if (response.status === 429) {
+      addLogEntry("Stored access key validation rate-limited");
+      return false;
+    }
 
     const data = await response.json();
     if (!data.valid) {

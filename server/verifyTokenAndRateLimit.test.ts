@@ -6,6 +6,8 @@ let mockIsVerifiedToken = false;
 let mockRateLimiterShouldFail = false;
 const mockAddVerifiedToken = vi.fn();
 const mockConsume = vi.fn();
+// Every limiter instance that a consume touches; one module should mean one.
+const consumeInstances = new Set<unknown>();
 
 vi.mock("hash-wasm", () => ({
   argon2Verify: vi.fn(() => Promise.resolve(mockArgon2VerifyResult)),
@@ -14,6 +16,7 @@ vi.mock("hash-wasm", () => ({
 vi.mock("rate-limiter-flexible", () => ({
   RateLimiterMemory: class {
     consume = vi.fn((key: string) => {
+      consumeInstances.add(this);
       mockConsume(key);
       if (mockRateLimiterShouldFail) {
         return Promise.reject(new Error("Rate limit exceeded"));
@@ -199,6 +202,43 @@ describe("verifyTokenAndRateLimit", () => {
     const result = await verifyTokenAndRateLimit("fallback-token");
     expect(result.isAuthorized).toBe(true);
     expect(mockConsume).toHaveBeenCalledWith("fallback-token");
+  });
+});
+
+describe("consumeRateLimitPoint", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    consumeInstances.clear();
+    mockRateLimiterShouldFail = false;
+  });
+
+  it("consumes from the limiter keyed on socket.remoteAddress when not behind a trusted proxy", async () => {
+    const { consumeRateLimitPoint } = await import("./verifyTokenAndRateLimit");
+    const mockReq = makeMockRequest("192.168.1.100");
+    expect(await consumeRateLimitPoint(mockReq)).toBe(true);
+    expect(mockConsume).toHaveBeenCalledWith("127.0.0.1");
+  });
+
+  it("reports out of budget when the limiter refuses", async () => {
+    mockRateLimiterShouldFail = true;
+    const { consumeRateLimitPoint } = await import("./verifyTokenAndRateLimit");
+    expect(await consumeRateLimitPoint(makeMockRequest("192.168.1.100"))).toBe(
+      false,
+    );
+  });
+
+  it("draws from the same limiter instance and key as the search path", async () => {
+    const { verifyTokenAndRateLimit, consumeRateLimitPoint } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const mockReq = makeMockRequest("192.168.1.100");
+    await verifyTokenAndRateLimit("valid-token", mockReq);
+    await consumeRateLimitPoint(mockReq);
+    // Both went through the one shared limiter, keyed on the same address.
+    expect(consumeInstances.size).toBe(1);
+    expect(mockConsume).toHaveBeenCalledTimes(2);
+    expect(mockConsume).toHaveBeenNthCalledWith(1, "127.0.0.1");
+    expect(mockConsume).toHaveBeenNthCalledWith(2, "127.0.0.1");
   });
 });
 
