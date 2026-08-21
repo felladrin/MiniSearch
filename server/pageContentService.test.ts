@@ -195,40 +195,44 @@ describe("selectPassages", () => {
     "An unrelated aside about the weather.",
   ];
 
-  it("prefers the passage that covers the query", () => {
-    expect(selectPassages("onnx runtime reranker", passages, 80)).toEqual([
-      passages[1],
-    ]);
+  it("prefers the passage that covers the query", async () => {
+    expect(await selectPassages("onnx runtime reranker", passages, 80)).toEqual(
+      [passages[1]],
+    );
   });
 
-  it("returns the selected passages best match first", () => {
+  it("returns the selected passages best match first", async () => {
     // Document order would put the lead passage first, and the client trims
     // this excerpt again against the model's context by keeping a prefix, so
     // the covering passage has to be the one that survives that cut.
-    const selected = selectPassages("onnx runtime reranker", passages, 120);
+    const selected = await selectPassages(
+      "onnx runtime reranker",
+      passages,
+      120,
+    );
 
     expect(selected).toEqual([passages[1], passages[0]]);
   });
 
-  it("stays within the character budget", () => {
-    const selected = selectPassages("weather", passages, 60);
+  it("stays within the character budget", async () => {
+    const selected = await selectPassages("weather", passages, 60);
 
     expect(selected.join("\n").length).toBeLessThanOrEqual(60);
   });
 
-  it("falls back to document order when the query has no usable terms", () => {
-    expect(selectPassages("", passages, 500)).toEqual(passages);
+  it("falls back to document order when the query has no usable terms", async () => {
+    expect(await selectPassages("", passages, 500)).toEqual(passages);
   });
 
-  it("matches a query term against the inflected form on the page", () => {
+  it("matches a query term against the inflected form on the page", async () => {
     const inflected = [
       "An introduction that mentions nothing in particular.",
       "Cats spend most of the day sleeping in warm places.",
     ];
 
-    expect(selectPassages("how long does a cat sleep", inflected, 60)).toEqual([
-      inflected[1],
-    ]);
+    expect(
+      await selectPassages("how long does a cat sleep", inflected, 60),
+    ).toEqual([inflected[1]]);
   });
 
   // The bound sits between two measured costs on this exact input: 176ms
@@ -237,7 +241,7 @@ describe("selectPassages", () => {
   // that restoring the scan does.
   it("ranks a large page against a large query in bounded time", {
     timeout: 20_000,
-  }, () => {
+  }, async () => {
     // Comparing every term against every word is quadratic in a product the
     // page controls, and a page of Han has one word per character. This is the
     // worst case the endpoint accepts: 1.5 MB of Han reaches ranking as
@@ -252,14 +256,14 @@ describe("selectPassages", () => {
     const query = han(0x3400, 1500, 2000);
 
     const startedAt = performance.now();
-    selectPassages(query, passages, 6000);
+    await selectPassages(query, passages, 6000);
     const elapsed = performance.now() - startedAt;
 
     expect(passages.length).toBeGreaterThan(100);
     expect(elapsed).toBeLessThan(3000);
   });
 
-  it("does not match a query term against a merely similar word", () => {
+  it("does not match a query term against a merely similar word", async () => {
     const similar = [
       "The catalogue lists every accessory the shop has ever carried.",
       "A short note about the weather, which has nothing to do with pets.",
@@ -267,8 +271,10 @@ describe("selectPassages", () => {
 
     // "cat" is a prefix of "catalogue", but too far from it to be the same word,
     // so nothing matches and the lead passage wins on position alone.
-    expect(selectPassages("cat", similar, 70)).toEqual([similar[0]]);
-    expect(selectPassages("catalogue", similar, 70)).toEqual([similar[0]]);
+    expect(await selectPassages("cat", similar, 70)).toEqual([similar[0]]);
+    expect(await selectPassages("catalogue", similar, 70)).toEqual([
+      similar[0],
+    ]);
   });
 });
 
@@ -357,9 +363,9 @@ describe("selectPassages across scripts", () => {
   ];
 
   for (const { script, query, offTopic, onTopic } of cases) {
-    it(`picks the relevant passage over the lead one in ${script}`, () => {
+    it(`picks the relevant passage over the lead one in ${script}`, async () => {
       const budget = Math.max(offTopic.length, onTopic.length);
-      const selected = selectPassages(query, [offTopic, onTopic], budget);
+      const selected = await selectPassages(query, [offTopic, onTopic], budget);
 
       expect(selected).toEqual([onTopic]);
     });
