@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CircuitBreaker } from "./circuitBreaker";
 
 describe("CircuitBreaker", () => {
@@ -76,15 +76,24 @@ describe("CircuitBreaker", () => {
     });
   });
   describe("getOpens", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it("returns zero for a circuit that never opened", () => {
       const cb = new CircuitBreaker();
       expect(cb.getOpens("unknown")).toBe(0);
     });
 
     it("counts one opening per trip and keeps the count after a reset", async () => {
+      // Fake timers, because the refusal below only holds while the reset timer
+      // has not fired: on real timers the window is whatever the machine takes
+      // to reach the next line, which is not a window at all.
+      vi.useFakeTimers();
+      const resetTimeout = 1000;
       const cb = new CircuitBreaker({
         failureThreshold: 2,
-        resetTimeout: 0,
+        resetTimeout,
         successThreshold: 1,
       });
 
@@ -106,9 +115,7 @@ describe("CircuitBreaker", () => {
       ).rejects.toThrow("Circuit breaker is open");
       expect(cb.getOpens("upstream")).toBe(1);
 
-      // The reset timer is a macrotask, so the half-open transition needs one
-      // turn of the loop before a recovery can go through.
-      await new Promise((resolve) => setTimeout(resolve, 1));
+      await vi.advanceTimersByTimeAsync(resetTimeout + 1);
       await cb.execute("upstream", async () => "back");
       expect(cb.getState("upstream")).toBe("CLOSED");
       // The count is since-restart, so closing the circuit does not clear it.
