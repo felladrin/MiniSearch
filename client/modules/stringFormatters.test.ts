@@ -12,9 +12,14 @@ describe("stringFormatters", () => {
     it.each([
       ["https://example.com/page", "example.com"],
       ["https://www.example.com/page", "example.com"],
-      // A subdomain survives. Note the strip is unanchored today, so
-      // `my.www.example.com` still loses its middle label: see #2427.
+      // A subdomain survives.
       ["https://docs.example.com/page", "docs.example.com"],
+      // Anchored, so `www.` deeper in the host stays.
+      ["https://my.www.example.com/page", "my.www.example.com"],
+      // Anchored, so an overlapping `www.` at offset 1 is not a prefix.
+      ["https://wwww.example.com/page", "wwww.example.com"],
+      // The strip runs once, not per occurrence.
+      ["https://www.www.example.com/page", "www.example.com"],
       // The hostname, so the port stays out of it.
       ["https://localhost:3000", "localhost"],
       // Not a URL at all: hand back what came in, for display.
