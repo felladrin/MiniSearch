@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { repository, version } from "../package.json" with { type: "json" };
 
 const lookupMock = vi.hoisted(() => vi.fn());
+const pdfGetTextMock = vi.hoisted(() => vi.fn());
+const pdfDestroyMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:dns/promises", () => ({
   default: { lookup: lookupMock },
@@ -9,7 +11,10 @@ vi.mock("node:dns/promises", () => ({
 }));
 
 vi.mock("pdf-parse", () => ({
-  default: vi.fn().mockResolvedValue({ text: "" }),
+  PDFParse: class {
+    getText = pdfGetTextMock;
+    destroy = pdfDestroyMock;
+  },
 }));
 
 import {
@@ -52,6 +57,10 @@ beforeEach(() => {
   fetchMock.mockReset();
   lookupMock.mockReset();
   lookupMock.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+  pdfGetTextMock.mockReset();
+  pdfGetTextMock.mockResolvedValue({ text: "" });
+  pdfDestroyMock.mockReset();
+  pdfDestroyMock.mockResolvedValue(undefined);
 });
 
 describe("extractReadableText", () => {
@@ -484,11 +493,9 @@ describe("page read counters", () => {
 
     // A PDF is no longer dropped as notADocument; it goes through the passage
     // pipeline and is counted as read (or tooLittleText if the text is short).
-    const { default: pdfParse } = await import("pdf-parse");
-    vi.mocked(pdfParse).mockResolvedValue({
+    pdfGetTextMock.mockResolvedValue({
       text: "CAT SLEEPS 16 HOURS A DAY. ".repeat(20),
-      info: {},
-    } as never);
+    });
     fetchMock.mockResolvedValue(
       new Response("%PDF-1.7\n%%EOF", {
         status: 200,
@@ -709,11 +716,9 @@ describe("fetchPageContents", () => {
   });
 
   it("reads a PDF and returns its text as passages", async () => {
-    const { default: pdfParse } = await import("pdf-parse");
-    vi.mocked(pdfParse).mockResolvedValue({
+    pdfGetTextMock.mockResolvedValue({
       text: "CAT SLEEPS 16 HOURS A DAY. ".repeat(20),
-      info: {},
-    } as never);
+    });
     fetchMock.mockResolvedValue(
       new Response("%PDF-1.7\nCAT SLEEPS 16 HOURS A DAY.\n%%EOF", {
         status: 200,

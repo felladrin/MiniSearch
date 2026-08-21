@@ -1,5 +1,5 @@
 import { convert as convertHtmlToPlainText } from "html-to-text";
-import pdfParse from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import { repository, version } from "../package.json" with { type: "json" };
 import { scorePassages } from "./biEncoderService.ts";
 import {
@@ -225,8 +225,11 @@ async function downloadDocument(rawUrl: string): Promise<DownloadResult> {
         MAX_RESPONSE_BYTES,
       );
       if (contentType.trim().toLowerCase().startsWith("application/pdf")) {
-        const { text } = await pdfParse(bytes);
-        return { outcome: "ok", text, bodyTruncated: truncated };
+        return {
+          outcome: "ok",
+          text: await extractPdfText(bytes),
+          bodyTruncated: truncated,
+        };
       }
       return {
         outcome: "ok",
@@ -239,6 +242,23 @@ async function downloadDocument(rawUrl: string): Promise<DownloadResult> {
   }
 
   return { outcome: "redirectLimit" };
+}
+
+/**
+ * A parser holds an open pdf.js document behind it, so it has to be destroyed
+ * even when reading throws, or its worker outlives the request. `bytes` is
+ * transferred to that worker rather than copied, so it comes back empty and
+ * must not be read after this.
+ */
+async function extractPdfText(bytes: Uint8Array): Promise<string> {
+  const parser = new PDFParse({ data: bytes });
+
+  try {
+    const { text } = await parser.getText();
+    return text;
+  } finally {
+    await parser.destroy();
+  }
 }
 
 /**
