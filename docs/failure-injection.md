@@ -12,12 +12,13 @@ needed.
 | --- | --- | --- |
 | SearXNG answers 500 once, then recovers | Retried with exponential backoff, results returned | `server/webSearchService.test.ts` › retry logic |
 | SearXNG answers 500 on every attempt | Retry cycle exhausts (4 requests) and costs a single circuit-breaker failure | `server/webSearchService.test.ts` › graceful degradation |
+| SearXNG answers 200 with no results and unresponsive engines once, then recovers | Retried with the same backoff, results returned, not counted as a failure | `server/webSearchService.test.ts` › retry logic |
+| SearXNG answers 200 with no results and unresponsive engines on every attempt | Retry cycle exhausts (4 requests), counts one failure, and `fetchSearXNG` throws with the engine reasons rather than an empty set, so the case takes the provider-down path below | `server/webSearchService.test.ts` › retry logic, graceful degradation |
 | SearXNG fails five cycles in a row | Circuit opens; further searches short-circuit without calling the upstream | `server/webSearchService.test.ts` › graceful degradation |
 | SearXNG recovers after the reset timeout | One healthy response closes the circuit again | `server/webSearchService.test.ts` › graceful degradation |
 | SearXNG answers 200 with a non-JSON body | `fetchSearXNG` throws and the endpoint answers HTTP 502 | `server/webSearchService.test.ts` › graceful degradation |
 | SearXNG returns results that are all unusable | Empty result set, no throw | `server/webSearchService.test.ts` › graceful degradation |
 | Provider down vs. genuinely zero results | Provider down: `fetchSearXNG` throws, the endpoint answers HTTP 502, and the client search state becomes `failed`; genuinely zero results: HTTP 200 with `[]`, state stays `completed` and the no-results alert renders | `server/webSearchService.test.ts` and `server/searchEndpointServerHook.test.ts` › graceful degradation |
-| SearXNG answers 200 with no results and unresponsive engines | `fetchSearXNG` throws instead of returning an empty result set, so the case takes the outage path above rather than the zero-results one | `server/webSearchService.test.ts` › graceful degradation |
 | SearXNG is down | `/search/text` and `/search/images` answer HTTP 502 with a JSON error | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranker is not ready | Results served in SearXNG order, HTTP 200 | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranking throws mid-request | Results served in SearXNG order, HTTP 200 | `server/searchEndpointServerHook.test.ts` › graceful degradation |
