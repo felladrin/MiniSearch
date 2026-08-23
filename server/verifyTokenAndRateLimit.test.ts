@@ -99,6 +99,24 @@ describe("verifyTokenAndRateLimit", () => {
     expect(hashWasm.argon2Verify).not.toHaveBeenCalled();
   });
 
+  it("should verify a token hash with the client parameters normally", async () => {
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const hashWasm = await import("hash-wasm");
+    const token =
+      "$argon2id$v=19$m=512,t=16,p=1$c29tZXNhbHRzb21lc2FsdA$0000000000000000000000000000000000000000000";
+
+    const result = await verifyTokenAndRateLimit(token);
+
+    expect(result).toEqual({ isAuthorized: true });
+    expect(hashWasm.argon2Verify).toHaveBeenCalledWith({
+      password: "dummy-token",
+      hash: token,
+    });
+  });
+
   it("refuses an already rejected token without a second argon2 verification", async () => {
     mockArgon2VerifyResult = false;
     vi.resetModules();
