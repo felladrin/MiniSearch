@@ -192,6 +192,90 @@ describe("retry logic", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
+
+  it("retries an empty response with unresponsive engines and returns results on eventual success", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        createMockResponse(
+          JSON.stringify({
+            results: [],
+            unresponsive_engines: [["google", "CAPTCHA"]],
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(successResponse());
+
+    const searchesWithUnresponsiveEngines =
+      getSearchesWithUnresponsiveEnginesSinceLastRestart();
+    const promise = fetchSearXNG("test", "text");
+    await vi.runAllTimersAsync();
+    const results = await promise;
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(results).toHaveLength(1);
+    // A search that recovers on a retry is a search, not a failure.
+    expect(getSearchesWithUnresponsiveEnginesSinceLastRestart()).toBe(
+      searchesWithUnresponsiveEngines,
+    );
+  });
+
+  it("throws when the empty response with unresponsive engines persists across all retries", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [],
+          unresponsive_engines: [["google", "Timeout"]],
+        }),
+      ),
+    );
+    const searchesWithUnresponsiveEngines =
+      getSearchesWithUnresponsiveEnginesSinceLastRestart();
+
+    const promise = fetchSearXNG("test", "text");
+    const outcome = expect(promise).rejects.toThrow(
+      "Unresponsive engines: google (Timeout)",
+    );
+    await vi.runAllTimersAsync();
+    await outcome;
+
+    // One user-visible failure, not one per attempt.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(getSearchesWithUnresponsiveEnginesSinceLastRestart()).toBe(
+      searchesWithUnresponsiveEngines + 1,
+    );
+  });
+
+  it("classifies a retry that comes back empty without engine errors as a search without results", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        createMockResponse(
+          JSON.stringify({
+            results: [],
+            unresponsive_engines: [["google", "Timeout"]],
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        createMockResponse(JSON.stringify({ results: [] })),
+      );
+
+    const searchesWithoutResults = getSearchesWithoutResultsSinceLastRestart();
+    const searchesWithUnresponsiveEngines =
+      getSearchesWithUnresponsiveEnginesSinceLastRestart();
+    const promise = fetchSearXNG("test", "text");
+    await vi.runAllTimersAsync();
+    const results = await promise;
+
+    // The classification follows the response the search ends on, so a retry
+    // that recovers to a clean zero is a no-results search, not a failure.
+    expect(results).toEqual([]);
+    expect(getSearchesWithoutResultsSinceLastRestart()).toBe(
+      searchesWithoutResults + 1,
+    );
+    expect(getSearchesWithUnresponsiveEnginesSinceLastRestart()).toBe(
+      searchesWithUnresponsiveEngines,
+    );
+  });
 });
 
 describe("graceful degradation", () => {
@@ -339,9 +423,10 @@ describe("graceful degradation", () => {
     await outcome;
 
     expect(breaker.getState("searxng")).toBe("OPEN");
-    // Rate limits and CAPTCHA do not clear inside the backoff, and a retry
-    // would push another request into the engine that just refused.
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Some of the reported cases (timeouts, rate-limit windows) clear inside
+    // the backoff, so the case gets the full retry budget before the search
+    // fails, and the counter lands when the attempts run out.
+    expect(fetchMock).toHaveBeenCalledTimes(ATTEMPTS_PER_CALL);
     expect(getSearchesWithoutResultsSinceLastRestart()).toBe(
       searchesWithoutResults,
     );
@@ -401,6 +486,9 @@ describe("query privacy", () => {
    * makes directly, so a new logging line is caught whichever it uses.
    */
   beforeEach(() => {
+    // The unresponsive-engine path retries, so the backoff timers must be
+    // fake or those calls wait seven seconds of real time each.
+    vi.useFakeTimers();
     logLines = [];
     originalLog = debug.log;
     debug.log = (...args: unknown[]) => {
@@ -414,6 +502,7 @@ describe("query privacy", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     debug.log = originalLog;
     vi.restoreAllMocks();
   });
@@ -459,9 +548,17 @@ describe("query privacy", () => {
     // make fetchSearXNG throw; the point here is that no path ever logs the
     // query.
     fetchMock.mockResolvedValue(emptyResponse());
-    await expect(
-      fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker()),
-    ).rejects.toThrow("Unresponsive engines");
+    const unresponsiveSearch = fetchSearXNG(
+      DISTINCTIVE_QUERY,
+      "text",
+      30,
+      new CircuitBreaker(),
+    );
+    const unresponsiveOutcome = expect(unresponsiveSearch).rejects.toThrow(
+      "Unresponsive engines",
+    );
+    await vi.runAllTimersAsync();
+    await unresponsiveOutcome;
 
     fetchMock.mockResolvedValue(createMockResponse("<html>gateway</html>"));
     await expect(
@@ -491,12 +588,23 @@ describe("query privacy", () => {
   it("still names the unresponsive engines behind a failed empty response", async () => {
     fetchMock.mockResolvedValue(emptyResponse());
 
-    await expect(
-      fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker()),
-    ).rejects.toThrow();
+    const search = fetchSearXNG(
+      DISTINCTIVE_QUERY,
+      "text",
+      30,
+      new CircuitBreaker(),
+    );
+    const outcome = expect(search).rejects.toThrow();
+    await vi.runAllTimersAsync();
+    await outcome;
 
     expect(logLines.join("\n")).toContain(
       "Unresponsive engines: google (Timeout)",
+    );
+    // The retry line carries the cause, so a recovered retry stays readable
+    // in the log: engine names, never the query.
+    expect(logLines.join("\n")).toContain(
+      "returned no results (google (Timeout))",
     );
   });
 

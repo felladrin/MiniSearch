@@ -210,7 +210,7 @@ MiniSearch implements all server-side logic as Vite plugin hooks. Each hook regi
 
 Key server-side modules:
 
-- **`server/webSearchService.ts`**: Integrates with SearXNG at `http://127.0.0.1:8888`. Implements a circuit breaker (opens after 5 failures, resets after 60s) and retry logic (up to 3 retries with exponential backoff for 500 errors).
+- **`server/webSearchService.ts`**: Integrates with SearXNG at `http://127.0.0.1:8888`. Implements a circuit breaker (opens after 5 failures, resets after 60s) and retry logic (up to 3 retries with exponential backoff, for 500s and for empty responses naming unresponsive engines).
 - **`server/pageContentService.ts`**: Reads result pages for answer grounding: SSRF-guarded fetches with a byte cap, readable-text extraction, and query-relevant passage selection.
 - **`server/searchToken.ts`**: Manages a token at `{os.tempdir()}/minisearch-token` used for CSRF protection on search requests.
 - **`server/verifiedTokens.ts`**: In-memory `Map` of verified session token to last-seen time, evicted after 30 idle minutes, plus a cumulative count of the distinct sessions seen since the last restart.
@@ -241,7 +241,7 @@ The `/status` endpoint returns a JSON object:
 | `averageTextualSearchesPerSession` | number | Text searches / sessions ratio |
 | `averageGraphicalSearchesPerSession` | number | Image searches / sessions ratio |
 | `searchesWithoutResults` | number | Searches, text and image together, that SearXNG answered with zero results and no unresponsive engines |
-| `searchesWithUnresponsiveEngines` | number | Searches, text and image together, that SearXNG answered with zero results while naming unresponsive engines |
+| `searchesWithUnresponsiveEngines` | number | Searches, text and image together, that still came back with zero results and unresponsive engines after the retries were spent; one per search, not per attempt |
 | `searchesWithAllResultsDiscarded` | number | Text searches whose results were all dropped during processing |
 | `rerankerServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `webSearchServiceStatus` | string | `"healthy"` or `"unhealthy"` |
@@ -259,11 +259,13 @@ used to carry the query text. The log still names the unresponsive engines
 behind an empty response and the size and type of a discarded batch; how often
 each happens is read from here instead. `searchesWithoutResults` counts only
 the searches that genuinely matched nothing, since an empty response naming
-unresponsive engines fails the search rather than returning zero results (see
-`docs/failure-injection.md`); `searchesWithUnresponsiveEngines` counts those,
-which is the way to tell whether the case is being over-classified. It
-undercounts a sustained outage, where the circuit breaker short-circuits before
-`performSearch` is reached. The discarded count covers text searches only,
+unresponsive engines fails the search rather than returning zero results once
+the retries are spent (see `docs/failure-injection.md`);
+`searchesWithUnresponsiveEngines` counts those, which is the way to tell
+whether the case is being over-classified. It undercounts a sustained
+outage, where the circuit breaker short-circuits before `performSearch` is
+reached, and it does not count a search that recovered on a retry at all,
+which is the point of the retry. The discarded count covers text searches only,
 because an image result is never dropped at this stage: an unusable
 thumbnail is dropped later, when `searchEndpointServerHook` fetches it.
 

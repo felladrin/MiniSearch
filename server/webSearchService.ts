@@ -141,11 +141,13 @@ async function performSearch(
 ): Promise<SearxngSearchResult[]> {
   const searchUrl = buildSearchUrl(query, searchType);
 
+  let retryReason = "";
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     if (attempt > 0) {
       const delay = BASE_RETRY_DELAY * 2 ** (attempt - 1);
       printMessage(
-        `SearXNG returned 500, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})`,
+        `SearXNG ${retryReason}, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})`,
       );
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
@@ -156,6 +158,7 @@ async function performSearch(
 
     if (!response.ok) {
       if (response.status === 500 && attempt < MAX_RETRIES) {
+        retryReason = "returned 500";
         continue;
       }
       throw new Error(`SearXNG request failed with status ${response.status}`);
@@ -171,9 +174,15 @@ async function performSearch(
       // rate-limited, suspended or CAPTCHA-challenged, so the only sign that
       // the search layer is down arrives in `unresponsive_engines`. Returned as
       // an empty array it is indistinguishable from a query that genuinely
-      // matches nothing, and the user is told there are no results for a query
-      // that works again once the engines recover.
+      // matches nothing. Some of the reported cases (timeouts, rate-limit
+      // windows) clear inside the backoff, so the case takes the same retry
+      // budget as a 500.
       if (reason) {
+        if (attempt < MAX_RETRIES) {
+          retryReason = `returned no results (${reason})`;
+          continue;
+        }
+
         incrementSearchesWithUnresponsiveEnginesSinceLastRestart();
         throw new Error(
           `No results returned from SearXNG. Unresponsive engines: ${reason}`,
