@@ -130,6 +130,7 @@ CSRF protection uses a token the server owns for its lifetime:
 4. **Client Hashing**: Client hashes token before sending in requests (never sends raw token)
 5. **Verification**: Server compares request hash against the token it is holding
 6. **Caching**: Verified tokens stored in `server/verifiedTokens.ts` (in-memory `Map` of token to last-seen time) to avoid redundant cryptographic operations
+7. **Rejection Caching**: Tokens that fail a completed verification are kept in a bounded set (`server/rejectedTokens.ts`) until it evicts them at the cap, so a replay of a dead token is refused without a second argon2 verification; a verification that never produced a result, because the hash could not be parsed or the token file could not be read, leaves nothing behind
 
 Rewriting the token file under a running server does not re-key it: the server keeps the token it is already handing out, and logs once that the file diverged if a request is rejected while it has.
 
@@ -213,6 +214,7 @@ Key server-side modules:
 - **`server/pageContentService.ts`**: Reads result pages for answer grounding: SSRF-guarded fetches with a byte cap, readable-text extraction, and query-relevant passage selection.
 - **`server/searchToken.ts`**: Manages a token at `{os.tempdir()}/minisearch-token` used for CSRF protection on search requests.
 - **`server/verifiedTokens.ts`**: In-memory `Map` of verified session token to last-seen time, evicted after 30 idle minutes, plus a cumulative count of the distinct sessions seen since the last restart.
+- **`server/rejectedTokens.ts`**: Bounded in-memory set of tokens that already failed a completed verification, so a replay is refused without a second argon2 check until the set evicts it at the cap; a token refused once cannot become valid in the same process, so the set is exact, and a token that never got a verification result never occupies a slot.
 - **`server/searchesSinceLastRestart.ts`**: In-memory counters for search analytics.
 
 ### Cache Control
@@ -310,10 +312,13 @@ verification, the funnel `/search/text`, `/search/images`, `/page-content` and
 | `reasons.missingToken` | number | No token on the request, which is what an outdated client looks like |
 | `reasons.invalidToken` | number | A token that failed verification, which is what probing looks like |
 | `bySurface` | object | `authorized` and `rejected` per endpoint family: `search`, `pageContent`, `inference`, `other` |
+| `rejectedTokenCacheHits` | number | Rejections served from the rejected-token cache without a second argon2 verification |
 | `limiter` | object | The limiter's `points` and `durationSeconds`, without which a rejection count says nothing |
 
 `authorized` plus every entry of `reasons` sums to `requests`, and each half of
 `bySurface` sums to its side of that, on the same principle as `pageReads`.
+`rejectedTokenCacheHits` counts a subset of `reasons.invalidToken` rather
+than adding to that sum.
 
 The limiter keys on the client IP and none of that reaches these counters: no
 address, no token, no query, no per-request timestamp. The cut is by reason and

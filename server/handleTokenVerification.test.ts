@@ -177,6 +177,7 @@ describe("handleTokenVerification", () => {
       "limiter",
       "reasons",
       "rejectedRate",
+      "rejectedTokenCacheHits",
       "requests",
     ]);
     expect(Object.keys(stats.reasons).sort()).toEqual([

@@ -79,6 +79,105 @@ describe("verifyTokenAndRateLimit", () => {
     });
   });
 
+  it("refuses an already rejected token without a second argon2 verification", async () => {
+    mockArgon2VerifyResult = false;
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const hashWasm = await import("hash-wasm");
+    const { getAuthorizationStats } = await import(
+      "./authorizationSinceLastRestart"
+    );
+
+    const invalid = {
+      isAuthorized: false,
+      statusCode: 401,
+      error: "Invalid token.",
+      reason: "invalidToken",
+    };
+    const cacheHitsBefore = getAuthorizationStats().rejectedTokenCacheHits;
+
+    expect(await verifyTokenAndRateLimit("dead-token")).toEqual(invalid);
+    expect(await verifyTokenAndRateLimit("dead-token")).toEqual(invalid);
+
+    // The first refusal pays for the verification; the repeat is a cache hit.
+    expect(hashWasm.argon2Verify).toHaveBeenCalledTimes(1);
+    expect(getAuthorizationStats().rejectedTokenCacheHits).toBe(
+      cacheHitsBefore + 1,
+    );
+  });
+
+  it("does not record a token that verifies", async () => {
+    mockArgon2VerifyResult = true;
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const { isRejectedToken } = await import("./rejectedTokens");
+
+    const result = await verifyTokenAndRateLimit("live-token");
+    expect(result.isAuthorized).toBe(true);
+    expect(isRejectedToken("live-token")).toBe(false);
+  });
+
+  it("does not cache a token whose verification threw, so the same token verifies on the next attempt", async () => {
+    mockArgon2VerifyResult = true;
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const hashWasm = await import("hash-wasm");
+    const searchToken = await import("./searchToken");
+    const { isRejectedToken } = await import("./rejectedTokens");
+    // The transient throw: the token file could not be read, not the token
+    // being dead.
+    vi.mocked(searchToken.getSearchToken).mockImplementationOnce(() => {
+      throw new Error("ENOENT");
+    });
+
+    const invalid = {
+      isAuthorized: false,
+      statusCode: 401,
+      error: "Invalid token.",
+      reason: "invalidToken",
+    };
+    expect(await verifyTokenAndRateLimit("flaky-token")).toEqual(invalid);
+
+    // Nothing was cached, so once the read succeeds the same token verifies.
+    expect((await verifyTokenAndRateLimit("flaky-token")).isAuthorized).toBe(
+      true,
+    );
+    expect(hashWasm.argon2Verify).toHaveBeenCalledTimes(1);
+    expect(isRejectedToken("flaky-token")).toBe(false);
+  });
+
+  it("does not cache a token when argon2 itself throws, as it does on an unparseable hash", async () => {
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const hashWasm = await import("hash-wasm");
+    const { isRejectedToken } = await import("./rejectedTokens");
+    vi.mocked(hashWasm.argon2Verify)
+      .mockRejectedValueOnce(new Error("Invalid hash"))
+      .mockRejectedValueOnce(new Error("Invalid hash"));
+
+    const invalid = {
+      isAuthorized: false,
+      statusCode: 401,
+      error: "Invalid token.",
+      reason: "invalidToken",
+    };
+    expect(await verifyTokenAndRateLimit("not-a-hash")).toEqual(invalid);
+    expect(await verifyTokenAndRateLimit("not-a-hash")).toEqual(invalid);
+
+    // Junk costs a regex reject, not a verification, so caching it would only
+    // spend a slot: it is refused again from scratch.
+    expect(hashWasm.argon2Verify).toHaveBeenCalledTimes(2);
+    expect(isRejectedToken("not-a-hash")).toBe(false);
+  });
+
   it("should accept valid token and add to verified tokens", async () => {
     mockArgon2VerifyResult = true;
     vi.resetModules();
