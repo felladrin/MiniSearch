@@ -10,8 +10,8 @@
 ### Access Key Validation Flow
 
 1. User enters access key on the **AccessPage** UI
-2. Client hashes the key client-side using argon2id
-3. Server validates the hash against configured `ACCESS_KEYS` via `validateAccessKeyServerHook`
+2. Client hashes the key client-side using argon2id with fixed parameters (`m=512, t=16, p=1`)
+3. Server validates the hash against configured `ACCESS_KEYS` via `validateAccessKeyServerHook`. The hash's prefix (`$argon2id$v=19$m=512,t=16,p=1$`) is checked before `argon2Verify` runs, so a caller cannot embed inflated parameters to force allocations per configured key.
 4. On success: key hash is stored in localStorage with timestamp
 5. On subsequent loads, `useAccessKeyValidation` in `App.tsx` calls `verifyStoredAccessKey()` to check if the cached key is still valid
 6. If expired (based on `ACCESS_KEY_TIMEOUT_HOURS`), user is prompted to re-enter
@@ -36,7 +36,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 1. **Token Generation**: On build/startup, `regenerateSearchToken()` writes a random token to `{os.tempdir()}/minisearch-token`, readable only by the user running the build (`0600`)
 2. **Client Distribution**: The server reads the file once, holds that token for the life of the process, and serves it as `searchToken` in `/api/config`
 3. **Per-Request Auth**: Client includes token as `?token=` parameter on all `/search/text`, `/search/images` and `/page-content` requests
-4. **Server Verification**: `handleTokenVerification()` in `searchEndpointServerHook.ts` validates the token before proxying to SearXNG
+4. **Server Verification**: `handleTokenVerification()` in `searchEndpointServerHook.ts` validates the token before proxying to SearXNG. The token hash's prefix (`$argon2id$v=19$m=512,t=16,p=1$`) is checked before `argon2Verify` runs, so a caller cannot embed inflated parameters to force multi-gigabyte allocations or excessive CPU work.
 5. **Session Tracking**: Validated tokens are stored in an in-memory `Set<string>` (`verifiedTokens.ts`) for session counting
 6. **Rejection Caching**: Tokens that fail a completed verification are kept in a bounded in-memory set (`rejectedTokens.ts`) until it evicts them at the cap, so a replay is refused without paying for a second argon2 verification; a token whose verification threw instead of returning a result, whether from an unparseable hash or an unreadable token file, is refused without taking a slot; how many rejections were served that way is reported on `/status` (`authorization.rejectedTokenCacheHits`)
 

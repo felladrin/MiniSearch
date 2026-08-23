@@ -4,6 +4,7 @@ import path from "node:path";
 import debug from "debug";
 import { argon2Verify } from "hash-wasm";
 import { RateLimiterMemory } from "rate-limiter-flexible";
+import { ARGON2_HASH_PREFIX } from "../shared/argon2Parameters.ts";
 import {
   addRejectedToken,
   isRejectedToken,
@@ -167,6 +168,20 @@ export async function verifyTokenAndRateLimit(
       };
     }
 
+    // The client hashes with the shared parameters, so a hash carrying any
+    // other block cannot be valid against this server. Checking before
+    // argon2Verify refuses a mismatch for free, before any allocation or work
+    // starts. Without it a caller could embed m=4194304,t=1000,p=1 and force a
+    // multi-gigabyte allocation and 1000 rounds per request.
+    if (!token.startsWith(ARGON2_HASH_PREFIX)) {
+      return {
+        isAuthorized: false,
+        statusCode: 401,
+        error: "Invalid token.",
+        reason: "invalidToken",
+      };
+    }
+
     let isValidToken = false;
     let didComparisonRun = false;
 
@@ -185,7 +200,8 @@ export async function verifyTokenAndRateLimit(
       // throw means either the token file could not be read, and caching that
       // would refuse a valid token for the rest of the process, or the hash
       // is malformed, and caching junk would only spend a slot on a refusal
-      // that costs a regex check, not a verification.
+      // that costs a prefix check plus a decode-time throw, not a full
+      // verification.
       if (didComparisonRun) addRejectedToken(token);
       reportTokenFileChangeOnce();
 

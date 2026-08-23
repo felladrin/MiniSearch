@@ -1,5 +1,6 @@
 import { argon2Verify } from "hash-wasm";
 import type { PreviewServer, ViteDevServer } from "vite";
+import { ARGON2_HASH_PREFIX } from "../shared/argon2Parameters.ts";
 import { consumeRateLimitPoint } from "./verifyTokenAndRateLimit.ts";
 
 /** POST /api/validate-access-key: checks an argon2id hash against the configured `ACCESS_KEYS`. */
@@ -35,6 +36,21 @@ export function validateAccessKeyServerHook<
     req.on("end", async () => {
       try {
         const { accessKeyHash } = JSON.parse(body);
+
+        // The client hashes with the shared parameters, so a hash carrying any
+        // other block cannot be valid against this server. Checking before
+        // argon2Verify refuses a mismatch for free, before any allocation or
+        // work starts. Without it a caller could embed m=4194304,t=1000,p=1 and
+        // force a multi-gigabyte allocation per configured key.
+        if (
+          typeof accessKeyHash !== "string" ||
+          !accessKeyHash.startsWith(ARGON2_HASH_PREFIX)
+        ) {
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ valid: false }));
+          return;
+        }
+
         let isValid = false;
 
         for (const key of accessKeys) {

@@ -1,4 +1,5 @@
 import { notifications } from "@mantine/notifications";
+import { ARGON2_PARAMETERS } from "@shared/argon2Parameters";
 import { argon2id } from "hash-wasm";
 import { addLogEntry } from "./logEntries";
 
@@ -16,12 +17,7 @@ async function hashAccessKey(accessKey: string): Promise<string> {
   return argon2id({
     password: accessKey,
     salt,
-    parallelism: 1,
-    iterations: 16,
-    memorySize: 512,
-    // The digest is what a caller without the key would have to guess to pass
-    // validation, so it sets the ceiling on forgery resistance.
-    hashLength: 32,
+    ...ARGON2_PARAMETERS,
     outputType: "encoded",
   });
 }
