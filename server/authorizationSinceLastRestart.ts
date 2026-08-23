@@ -8,6 +8,7 @@
  * share it, none of which needs to know who asked.
  */
 
+import { getRejectedTokenCacheHits } from "./rejectedTokens.ts";
 import {
   RATE_LIMIT_DURATION_SECONDS,
   RATE_LIMIT_POINTS,
@@ -78,6 +79,7 @@ export function getAuthorizationStats() {
     requests,
     authorized,
     rejectedRate: Number(((rejected / requests) * 100 || 0).toFixed(1)),
+    rejectedTokenCacheHits: getRejectedTokenCacheHits(),
     reasons: { ...reasons },
     // Deep copy, so a caller holding a snapshot for comparison does not watch
     // it change under them as later requests arrive.

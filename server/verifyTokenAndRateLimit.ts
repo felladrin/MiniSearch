@@ -4,6 +4,11 @@ import path from "node:path";
 import debug from "debug";
 import { argon2Verify } from "hash-wasm";
 import { RateLimiterMemory } from "rate-limiter-flexible";
+import {
+  addRejectedToken,
+  isRejectedToken,
+  recordRejectedTokenCacheHit,
+} from "./rejectedTokens.ts";
 import { getSearchToken, hasSearchTokenFileChanged } from "./searchToken.ts";
 import { addVerifiedToken, isVerifiedToken } from "./verifiedTokens.ts";
 
@@ -146,18 +151,42 @@ export async function verifyTokenAndRateLimit(
   }
 
   if (!isVerifiedToken(token)) {
+    if (isRejectedToken(token)) {
+      // This process will never accept this token, so the refusal is final
+      // without paying for the verification again. The file-divergence check
+      // is skipped on purpose: this path has not paid for a verification, so
+      // its file read would dominate, and first rejections always run it,
+      // which is the case it was written for.
+      recordRejectedTokenCacheHit();
+
+      return {
+        isAuthorized: false,
+        statusCode: 401,
+        error: "Invalid token.",
+        reason: "invalidToken",
+      };
+    }
+
     let isValidToken = false;
+    let didComparisonRun = false;
 
     try {
       isValidToken = await argon2Verify({
         password: getSearchToken(),
         hash: token,
       });
+      didComparisonRun = true;
     } catch (error) {
       void error;
     }
 
     if (!isValidToken) {
+      // Only a comparison that ran to a result proves the token is dead. A
+      // throw means either the token file could not be read, and caching that
+      // would refuse a valid token for the rest of the process, or the hash
+      // is malformed, and caching junk would only spend a slot on a refusal
+      // that costs a regex check, not a verification.
+      if (didComparisonRun) addRejectedToken(token);
       reportTokenFileChangeOnce();
 
       return {

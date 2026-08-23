@@ -38,6 +38,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 3. **Per-Request Auth**: Client includes token as `?token=` parameter on all `/search/text`, `/search/images` and `/page-content` requests
 4. **Server Verification**: `handleTokenVerification()` in `searchEndpointServerHook.ts` validates the token before proxying to SearXNG
 5. **Session Tracking**: Validated tokens are stored in an in-memory `Set<string>` (`verifiedTokens.ts`) for session counting
+6. **Rejection Caching**: Tokens that fail a completed verification are kept in a bounded in-memory set (`rejectedTokens.ts`) until it evicts them at the cap, so a replay is refused without paying for a second argon2 verification; a token whose verification threw instead of returning a result, whether from an unparseable hash or an unreadable token file, is refused without taking a slot; how many rejections were served that way is reported on `/status` (`authorization.rejectedTokenCacheHits`)
 
 ## Privacy
 
@@ -74,6 +75,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 |--------|---------|
 | `server/searchToken.ts` | Reads/writes the CSRF token from `{tempdir}/minisearch-token` |
 | `server/verifiedTokens.ts` | In-memory `Set<string>` of verified session tokens |
+| `server/rejectedTokens.ts` | Bounded in-memory set of tokens that already failed a completed verification, so a replay skips the second argon2 check |
 | `server/searchesSinceLastRestart.ts` | In-memory counters for aggregate search outcomes (text/image search totals, and how often searches came back empty or were fully discarded), reported on `/status` |
 | `server/pageReadsSinceLastRestart.ts` | In-memory aggregate counters for pages read for grounding (outcomes, durations, passage ratios), reported on `/status`; records no query, URL, host, or per-read timestamp |
 | `server/searchEndpointServerHook.ts` | Proxies text/image search to SearXNG after token verification (via `handleTokenVerification`) |
