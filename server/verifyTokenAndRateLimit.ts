@@ -19,6 +19,13 @@ printMessage.enabled = true;
 export const RATE_LIMIT_POINTS = 10;
 export const RATE_LIMIT_DURATION_SECONDS = 10;
 
+const CLIENT_ARGON2_PARAMETERS = "m=512,t=16,p=1";
+
+function hasUnsupportedArgon2Parameters(token: string): boolean {
+  const parameters = /^\$argon2id\$v=19\$([^$]+)\$/.exec(token)?.[1];
+  return parameters !== undefined && parameters !== CLIENT_ARGON2_PARAMETERS;
+}
+
 const rateLimiter = new RateLimiterMemory({
   points: RATE_LIMIT_POINTS,
   duration: RATE_LIMIT_DURATION_SECONDS,
@@ -159,6 +166,15 @@ export async function verifyTokenAndRateLimit(
       // which is the case it was written for.
       recordRejectedTokenCacheHit();
 
+      return {
+        isAuthorized: false,
+        statusCode: 401,
+        error: "Invalid token.",
+        reason: "invalidToken",
+      };
+    }
+
+    if (hasUnsupportedArgon2Parameters(token)) {
       return {
         isAuthorized: false,
         statusCode: 401,

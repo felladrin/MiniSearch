@@ -79,6 +79,26 @@ describe("verifyTokenAndRateLimit", () => {
     });
   });
 
+  it("should reject a token hash with parameters different from the client defaults before verification", async () => {
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const hashWasm = await import("hash-wasm");
+    const token =
+      "$argon2id$v=19$m=4194304,t=1000,p=1$c29tZXNhbHRzb21lc2FsdA$0000000000000000000000000000000000000000000";
+
+    const result = await verifyTokenAndRateLimit(token);
+
+    expect(result).toEqual({
+      isAuthorized: false,
+      statusCode: 401,
+      error: "Invalid token.",
+      reason: "invalidToken",
+    });
+    expect(hashWasm.argon2Verify).not.toHaveBeenCalled();
+  });
+
   it("refuses an already rejected token without a second argon2 verification", async () => {
     mockArgon2VerifyResult = false;
     vi.resetModules();
