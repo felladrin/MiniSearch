@@ -1,3 +1,4 @@
+import { ARGON2_PARAMETERS } from "@shared/argon2Parameters";
 import { argon2id, argon2Verify } from "hash-wasm";
 import { getConfig } from "./config";
 import { addLogEntry } from "./logEntries";
@@ -27,12 +28,7 @@ export async function getSearchTokenHash() {
   const newSearchTokenHash = await argon2id({
     password,
     salt,
-    parallelism: 1,
-    iterations: 16,
-    memorySize: 512,
-    // The digest is what a caller without the token would have to guess to
-    // forge a `?token=`, so it sets the ceiling on forgery resistance.
-    hashLength: 32,
+    ...ARGON2_PARAMETERS,
     outputType: "encoded",
   });
 

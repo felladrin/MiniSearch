@@ -43,6 +43,17 @@ function makeMockRequest(ip: string): IncomingMessage {
   } as unknown as IncomingMessage;
 }
 
+/**
+ * Builds a well-formed argon2id hash string with the client's fixed parameters
+ * (m=512, t=16, p=1). The suffix makes each call unique so the same suffix is
+ * treated as the same token by the rejection cache.
+ */
+function makeValidHash(suffix: string): string {
+  const salt = Buffer.from(`${suffix}salt`).toString("base64url");
+  const digest = Buffer.from(`${suffix}digest`).toString("base64url");
+  return `$argon2id$v=19$m=512,t=16,p=1$${salt}$${digest}`;
+}
+
 describe("verifyTokenAndRateLimit", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,7 +81,7 @@ describe("verifyTokenAndRateLimit", () => {
     const { verifyTokenAndRateLimit } = await import(
       "./verifyTokenAndRateLimit"
     );
-    const result = await verifyTokenAndRateLimit("invalid-token");
+    const result = await verifyTokenAndRateLimit(makeValidHash("invalid"));
     expect(result).toEqual({
       isAuthorized: false,
       statusCode: 401,
@@ -98,8 +109,12 @@ describe("verifyTokenAndRateLimit", () => {
     };
     const cacheHitsBefore = getAuthorizationStats().rejectedTokenCacheHits;
 
-    expect(await verifyTokenAndRateLimit("dead-token")).toEqual(invalid);
-    expect(await verifyTokenAndRateLimit("dead-token")).toEqual(invalid);
+    expect(await verifyTokenAndRateLimit(makeValidHash("dead"))).toEqual(
+      invalid,
+    );
+    expect(await verifyTokenAndRateLimit(makeValidHash("dead"))).toEqual(
+      invalid,
+    );
 
     // The first refusal pays for the verification; the repeat is a cache hit.
     expect(hashWasm.argon2Verify).toHaveBeenCalledTimes(1);
@@ -116,9 +131,10 @@ describe("verifyTokenAndRateLimit", () => {
     );
     const { isRejectedToken } = await import("./rejectedTokens");
 
-    const result = await verifyTokenAndRateLimit("live-token");
+    const live = makeValidHash("live");
+    const result = await verifyTokenAndRateLimit(live);
     expect(result.isAuthorized).toBe(true);
-    expect(isRejectedToken("live-token")).toBe(false);
+    expect(isRejectedToken(live)).toBe(false);
   });
 
   it("does not cache a token whose verification threw, so the same token verifies on the next attempt", async () => {
@@ -142,14 +158,13 @@ describe("verifyTokenAndRateLimit", () => {
       error: "Invalid token.",
       reason: "invalidToken",
     };
-    expect(await verifyTokenAndRateLimit("flaky-token")).toEqual(invalid);
+    const flaky = makeValidHash("flaky");
+    expect(await verifyTokenAndRateLimit(flaky)).toEqual(invalid);
 
     // Nothing was cached, so once the read succeeds the same token verifies.
-    expect((await verifyTokenAndRateLimit("flaky-token")).isAuthorized).toBe(
-      true,
-    );
+    expect((await verifyTokenAndRateLimit(flaky)).isAuthorized).toBe(true);
     expect(hashWasm.argon2Verify).toHaveBeenCalledTimes(1);
-    expect(isRejectedToken("flaky-token")).toBe(false);
+    expect(isRejectedToken(flaky)).toBe(false);
   });
 
   it("does not cache a token when argon2 itself throws, as it does on an unparseable hash", async () => {
@@ -169,13 +184,74 @@ describe("verifyTokenAndRateLimit", () => {
       error: "Invalid token.",
       reason: "invalidToken",
     };
-    expect(await verifyTokenAndRateLimit("not-a-hash")).toEqual(invalid);
-    expect(await verifyTokenAndRateLimit("not-a-hash")).toEqual(invalid);
+    // A well-formed hash whose salt is invalid base64; the parameter block
+    // passes our check, but argon2Verify itself rejects the encoding.
+    const notAHash =
+      "$argon2id$v=19$m=512,t=16,p=1$!!!invalid!!!$!!!invalid!!!";
+    expect(await verifyTokenAndRateLimit(notAHash)).toEqual(invalid);
+    expect(await verifyTokenAndRateLimit(notAHash)).toEqual(invalid);
 
-    // Junk costs a regex reject, not a verification, so caching it would only
-    // spend a slot: it is refused again from scratch.
+    // Junk costs a prefix reject plus a decode-time throw, not a full
+    // verification, so caching it would only spend a slot: it is refused again
+    // from scratch.
     expect(hashWasm.argon2Verify).toHaveBeenCalledTimes(2);
-    expect(isRejectedToken("not-a-hash")).toBe(false);
+    expect(isRejectedToken(notAHash)).toBe(false);
+  });
+
+  it("refuses a token whose parameter block differs from the client's before argon2Verify runs", async () => {
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const hashWasm = await import("hash-wasm");
+    // A hash with inflated parameters: m=4194304 would force a multi-gigabyte
+    // allocation if argon2Verify ever saw it.
+    const malicious =
+      "$argon2id$v=19$m=4194304,t=1000,p=1$xJaao6+z/VEA4+CU/+LAKg$JCE6vg7EHYLNv+EfNk1R6oJsEoDOsv2zNAXzQrrvI0E";
+    const result = await verifyTokenAndRateLimit(malicious);
+    expect(result).toEqual({
+      isAuthorized: false,
+      statusCode: 401,
+      error: "Invalid token.",
+      reason: "invalidToken",
+    });
+    expect(hashWasm.argon2Verify).not.toHaveBeenCalled();
+  });
+
+  it("accepts a well-formed token with the client's parameters", async () => {
+    mockArgon2VerifyResult = true;
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const hashWasm = await import("hash-wasm");
+    const valid = makeValidHash("wellformed");
+    const result = await verifyTokenAndRateLimit(valid);
+    expect(result.isAuthorized).toBe(true);
+    expect(hashWasm.argon2Verify).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts a hash produced by hash-wasm with the shared argon2 parameters", async () => {
+    vi.resetModules();
+    const { verifyTokenAndRateLimit } = await import(
+      "./verifyTokenAndRateLimit"
+    );
+    const hashWasm = await import("hash-wasm");
+    const { ARGON2_PARAMETERS } = await import("../shared/argon2Parameters.ts");
+    const { argon2id } =
+      await vi.importActual<typeof import("hash-wasm")>("hash-wasm");
+    const realHash = await argon2id({
+      password: "dummy-token",
+      salt: new Uint8Array(16),
+      ...ARGON2_PARAMETERS,
+      outputType: "encoded",
+    });
+    const result = await verifyTokenAndRateLimit(realHash);
+    expect(result.isAuthorized).toBe(true);
+    expect(hashWasm.argon2Verify).toHaveBeenCalledWith({
+      password: "dummy-token",
+      hash: realHash,
+    });
   });
 
   it("should accept valid token and add to verified tokens", async () => {
@@ -184,10 +260,11 @@ describe("verifyTokenAndRateLimit", () => {
     const { verifyTokenAndRateLimit } = await import(
       "./verifyTokenAndRateLimit"
     );
-    const result = await verifyTokenAndRateLimit("valid-token");
+    const valid = makeValidHash("valid");
+    const result = await verifyTokenAndRateLimit(valid);
     expect(result.isAuthorized).toBe(true);
     expect(result).not.toHaveProperty("statusCode");
-    expect(mockAddVerifiedToken).toHaveBeenCalledWith("valid-token");
+    expect(mockAddVerifiedToken).toHaveBeenCalledWith(valid);
   });
 
   it("should skip verification for already verified tokens", async () => {
@@ -197,7 +274,8 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const hashWasm = await import("hash-wasm");
-    const result = await verifyTokenAndRateLimit("already-verified-token");
+    const alreadyVerified = makeValidHash("alreadyverified");
+    const result = await verifyTokenAndRateLimit(alreadyVerified);
     expect(result.isAuthorized).toBe(true);
     expect(hashWasm.argon2Verify).not.toHaveBeenCalled();
   });
@@ -208,7 +286,7 @@ describe("verifyTokenAndRateLimit", () => {
     const { verifyTokenAndRateLimit } = await import(
       "./verifyTokenAndRateLimit"
     );
-    const result = await verifyTokenAndRateLimit("rate-limit-token");
+    const result = await verifyTokenAndRateLimit(makeValidHash("ratelimit"));
     expect(result).toEqual({
       isAuthorized: false,
       statusCode: 429,
@@ -224,7 +302,7 @@ describe("verifyTokenAndRateLimit", () => {
     const { verifyTokenAndRateLimit } = await import(
       "./verifyTokenAndRateLimit"
     );
-    const result = await verifyTokenAndRateLimit("invalid-token");
+    const result = await verifyTokenAndRateLimit(makeValidHash("invalidrl"));
     expect(result).toEqual({
       isAuthorized: false,
       statusCode: 429,
@@ -240,7 +318,7 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const hashWasm = await import("hash-wasm");
-    const result = await verifyTokenAndRateLimit("some-token");
+    const result = await verifyTokenAndRateLimit(makeValidHash("somelimit"));
     expect(result).toEqual({
       isAuthorized: false,
       statusCode: 429,
@@ -274,7 +352,10 @@ describe("verifyTokenAndRateLimit", () => {
     // makeMockRequest sets a spoofable X-Forwarded-For, but with TRUST_PROXY
     // off the real TCP peer (socket.remoteAddress) must be used instead.
     const mockReq = makeMockRequest("192.168.1.100");
-    const result = await verifyTokenAndRateLimit("valid-token", mockReq);
+    const result = await verifyTokenAndRateLimit(
+      makeValidHash("valid"),
+      mockReq,
+    );
     expect(result.isAuthorized).toBe(true);
     expect(mockConsume).toHaveBeenCalledWith("127.0.0.1");
   });
@@ -287,7 +368,10 @@ describe("verifyTokenAndRateLimit", () => {
       "./verifyTokenAndRateLimit"
     );
     const mockReq = makeMockRequest("192.168.1.100");
-    const result = await verifyTokenAndRateLimit("valid-token", mockReq);
+    const result = await verifyTokenAndRateLimit(
+      makeValidHash("valid"),
+      mockReq,
+    );
     expect(result.isAuthorized).toBe(true);
     expect(mockConsume).toHaveBeenCalledWith("192.168.1.100");
     vi.unstubAllEnvs();
@@ -299,9 +383,11 @@ describe("verifyTokenAndRateLimit", () => {
     const { verifyTokenAndRateLimit } = await import(
       "./verifyTokenAndRateLimit"
     );
-    const result = await verifyTokenAndRateLimit("fallback-token");
+    const result = await verifyTokenAndRateLimit(makeValidHash("fallback"));
     expect(result.isAuthorized).toBe(true);
-    expect(mockConsume).toHaveBeenCalledWith("fallback-token");
+    expect(mockConsume).toHaveBeenCalledWith(
+      expect.stringContaining("$argon2id"),
+    );
   });
 });
 
@@ -332,7 +418,7 @@ describe("consumeRateLimitPoint", () => {
       "./verifyTokenAndRateLimit"
     );
     const mockReq = makeMockRequest("192.168.1.100");
-    await verifyTokenAndRateLimit("valid-token", mockReq);
+    await verifyTokenAndRateLimit(makeValidHash("valid"), mockReq);
     await consumeRateLimitPoint(mockReq);
     // Both went through the one shared limiter, keyed on the same address.
     expect(consumeInstances.size).toBe(1);

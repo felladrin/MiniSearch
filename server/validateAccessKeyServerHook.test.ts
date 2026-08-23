@@ -48,6 +48,13 @@ function makeMockResponse() {
   return { setHeader, end, statusCode };
 }
 
+/** Builds a well-formed argon2id hash string with the client's fixed parameters. */
+function makeValidAccessKeyHash(suffix: string): string {
+  const salt = Buffer.from(`${suffix}salt`).toString("base64url");
+  const digest = Buffer.from(`${suffix}digest`).toString("base64url");
+  return `$argon2id$v=19$m=512,t=16,p=1$${salt}$${digest}`;
+}
+
 describe("validateAccessKeyServerHook", () => {
   it("should skip non-matching URLs", async () => {
     const { validateAccessKeyServerHook } = await import(
@@ -112,7 +119,7 @@ describe("validateAccessKeyServerHook", () => {
     const req = makeMockRequest(
       "/api/validate-access-key",
       "POST",
-      JSON.stringify({ accessKeyHash: "some-hash" }),
+      JSON.stringify({ accessKeyHash: makeValidAccessKeyHash("valid") }),
     );
 
     await new Promise<void>((resolve) => {
@@ -160,7 +167,7 @@ describe("validateAccessKeyServerHook", () => {
     const req = makeMockRequest(
       "/api/validate-access-key",
       "POST",
-      JSON.stringify({ accessKeyHash: "some-hash" }),
+      JSON.stringify({ accessKeyHash: makeValidAccessKeyHash("valid") }),
     );
 
     await new Promise<void>((resolve) => {
@@ -203,7 +210,7 @@ describe("validateAccessKeyServerHook", () => {
     const req = makeMockRequest(
       "/api/validate-access-key",
       "POST",
-      JSON.stringify({ accessKeyHash: "wrong-hash" }),
+      JSON.stringify({ accessKeyHash: makeValidAccessKeyHash("wrong") }),
     );
 
     await new Promise<void>((resolve) => {
@@ -217,6 +224,54 @@ describe("validateAccessKeyServerHook", () => {
     });
 
     expect(res.end).toHaveBeenCalledWith(JSON.stringify({ valid: false }));
+  });
+
+  it("refuses a hash whose parameter block differs from the client's before argon2Verify runs", async () => {
+    process.env.ACCESS_KEYS = "test-key";
+    const { validateAccessKeyServerHook } = await import(
+      "./validateAccessKeyServerHook"
+    );
+    const use = vi.fn();
+    validateAccessKeyServerHook({
+      middlewares: { use },
+    } as never);
+    const handler = use.mock.calls[0][0] as (
+      req: {
+        url: string;
+        method: string;
+        on: (event: string, cb: (chunk: string) => void) => void;
+      },
+      res: {
+        setHeader: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+        statusCode: number;
+      },
+      next: () => void,
+    ) => void;
+
+    const res = makeMockResponse();
+    // A hash with inflated parameters: m=4194304 would force a multi-gigabyte
+    // allocation if argon2Verify ever saw it.
+    const malicious =
+      "$argon2id$v=19$m=4194304,t=1000,p=1$xJaao6+z/VEA4+CU/+LAKg$JCE6vg7EHYLNv+EfNk1R6oJsEoDOsv2zNAXzQrrvI0E";
+    const req = makeMockRequest(
+      "/api/validate-access-key",
+      "POST",
+      JSON.stringify({ accessKeyHash: malicious }),
+    );
+
+    await new Promise<void>((resolve) => {
+      void handler(req as never, res as never, () => {});
+      setImmediate(() => {
+        for (const cb of req.endCallbacks) {
+          cb();
+        }
+        setTimeout(resolve, 50);
+      });
+    });
+
+    expect(res.end).toHaveBeenCalledWith(JSON.stringify({ valid: false }));
+    expect(mockArgon2Verify).not.toHaveBeenCalled();
   });
 
   it("should return 400 for invalid JSON body", async () => {
