@@ -22,6 +22,10 @@ import type { ChatMessage } from "@/modules/types";
 
 let currentAbortController: AbortController | null = null;
 
+function describeError(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 interface StreamOptions {
   messages: ChatMessage[];
   onUpdate: (text: string, reasoningContent?: string) => void;
@@ -81,7 +85,6 @@ async function createOpenAiStream({
     currentAttempt++;
 
     currentAbortController = new AbortController();
-    let shouldRetry = false;
 
     try {
       const result = streamText({
@@ -92,36 +95,12 @@ async function createOpenAiStream({
         topP: params.top_p,
         abortSignal: currentAbortController.signal,
         maxRetries: 0,
-        onError: async (error: unknown) => {
-          if (
-            getTextGenerationState() === "interrupted" ||
-            (error instanceof DOMException && error.name === "AbortError")
-          ) {
-            throw new Error("Chat generation interrupted");
-          }
-
-          if (availableModels.length > 0 && currentAttempt < maxRetries) {
-            const nextModel = selectRandomModel(
-              availableModels,
-              attemptedModels,
-            );
-            if (nextModel) {
-              addLogEntry(
-                `Model "${effectiveModel}" failed, retrying with "${nextModel}" (Attempt ${currentAttempt}/${maxRetries})`,
-              );
-              effectiveModel = nextModel;
-              shouldRetry = true;
-              await sleep(100 * currentAttempt);
-              throw error;
-            }
-          }
-
-          throw error;
-        },
       });
 
       let text = "";
       let reasoning = "";
+      let streamError: unknown;
+
       for await (const part of result.stream) {
         if (getTextGenerationState() === "interrupted") {
           currentAbortController.abort();
@@ -134,6 +113,33 @@ async function createOpenAiStream({
         } else if (part.type === "text-delta") {
           text += part.text;
           onUpdate(text, reasoning);
+        } else if (part.type === "error") {
+          streamError = part.error;
+        }
+      }
+
+      // A failing stream reports the problem as a part instead of rejecting,
+      // and the SDK swallows whatever `onError` throws, so the retry decision
+      // belongs here, once the stream is drained.
+      if (streamError !== undefined) {
+        if (text.length > 0 || reasoning.length > 0) {
+          addLogEntry(
+            `Model "${effectiveModel}" errored after streaming some content, keeping what arrived: ${describeError(streamError)}`,
+          );
+        } else {
+          const nextModel =
+            availableModels.length > 0 && currentAttempt < maxRetries
+              ? selectRandomModel(availableModels, attemptedModels)
+              : undefined;
+
+          if (!nextModel) throw streamError;
+
+          addLogEntry(
+            `Model "${effectiveModel}" failed, retrying with "${nextModel}" (Attempt ${currentAttempt}/${maxRetries})`,
+          );
+          effectiveModel = nextModel;
+          await sleep(100 * currentAttempt);
+          return tryNextModel();
         }
       }
 
@@ -144,10 +150,6 @@ async function createOpenAiStream({
         (error instanceof DOMException && error.name === "AbortError")
       ) {
         throw new Error("Chat generation interrupted");
-      }
-
-      if (shouldRetry) {
-        return tryNextModel();
       }
 
       throw error;
