@@ -52,8 +52,16 @@ vi.mock("@shared/openaiModels", () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-function sseResponse(lines: unknown[]) {
-  const body = `${lines.map((line) => `data: ${JSON.stringify(line)}\n\n`).join("")}data: [DONE]\n\n`;
+/**
+ * A stream without a `finish_reason` counts as truncated, and the provider
+ * turns that into an error part, so the closing chunk is part of a well-formed
+ * response and only the truncation test leaves it out.
+ */
+function sseResponse(lines: unknown[], { truncated = false } = {}) {
+  const chunks = truncated
+    ? lines
+    : [...lines, { choices: [{ delta: {}, finish_reason: "stop" }] }];
+  const body = `${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("")}data: [DONE]\n\n`;
   return new Response(body, {
     status: 200,
     headers: { "content-type": "text/event-stream" },
@@ -189,6 +197,48 @@ describe("textGenerationWithOpenAi", () => {
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining('retrying with "model-b"'),
       );
+    });
+
+    it("keeps the content already streamed when the stream is truncated", async () => {
+      const { generateChatWithOpenAi } = await import(
+        "./textGenerationWithOpenAi"
+      );
+
+      mockFetch.mockResolvedValueOnce(
+        sseResponse([{ choices: [{ delta: { content: "partial" } }] }], {
+          truncated: true,
+        }),
+      );
+
+      const result = await generateChatWithOpenAi(
+        [{ role: "user", content: "Hi" }],
+        vi.fn(),
+      );
+
+      expect(result).toBe("partial");
+      expect(addLogEntry).toHaveBeenCalledWith(
+        expect.stringContaining("keeping what arrived"),
+      );
+    });
+
+    it("gives up once no untried model is left", async () => {
+      mockSettings({ openAiApiModel: "" });
+      vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
+        { id: "model-a" },
+      ]);
+      vi.mocked(selectRandomModel).mockReturnValueOnce("model-a");
+
+      mockFetch.mockResolvedValue(
+        sseResponse([{ error: { message: "model overloaded" } }]),
+      );
+
+      const { generateChatWithOpenAi } = await import(
+        "./textGenerationWithOpenAi"
+      );
+
+      await expect(
+        generateChatWithOpenAi([{ role: "user", content: "Hi" }], vi.fn()),
+      ).rejects.toThrow();
     });
   });
 });
