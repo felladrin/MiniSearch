@@ -175,12 +175,13 @@ describe("getFormattedSearchResults", () => {
   });
 
   it("adds no tag or relevance note when the results carry no score", () => {
-    // History-restored and eval results have no score; the prompt must stay
-    // exactly what it was before the score existed.
+    // History-restored and eval results have no score; their prompt must stay
+    // exactly what it was before the score existed, disclaimer aside.
     const formatted = getFormattedSearchResults(true);
 
     expect(formatted).toBe(
-      "• [First](https://a.example/) | first snippet\n" +
+      `${disclaimer}\n\n` +
+        "• [First](https://a.example/) | first snippet\n" +
         "• [Second](https://b.example/) | second snippet",
     );
     expect(formatted).not.toContain("relevance:");
