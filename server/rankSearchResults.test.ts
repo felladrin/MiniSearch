@@ -54,6 +54,52 @@ describe("rankSearchResults", () => {
     expect(result[0][0]).toBe("A");
   });
 
+  it("carries the reranker score through as a fourth tuple element", async () => {
+    mockRerank.mockResolvedValue([
+      { index: 0, relevance_score: 9 },
+      { index: 1, relevance_score: 8.9 },
+      { index: 2, relevance_score: 8.8 },
+    ] as { index: number; relevance_score: number }[]);
+    const { rankSearchResults } = await import("./rankSearchResults");
+    const result = await rankSearchResults("query", [
+      ["A", "a", "https://a.com"],
+      ["B", "b", "https://b.com"],
+      ["C", "c", "https://c.com"],
+    ]);
+    // C is dropped by the score filter; the survivors keep their scores.
+    expect(result).toEqual([
+      ["A", "a", "https://a.com", 9],
+      ["B", "b", "https://b.com", 8.9],
+    ]);
+  });
+
+  it("carries the score through when preserving the top result", async () => {
+    mockRerank.mockResolvedValue([
+      { index: 0, relevance_score: 1 },
+      { index: 1, relevance_score: 9 },
+      { index: 2, relevance_score: 8.9 },
+      { index: 3, relevance_score: 8.8 },
+    ] as { index: number; relevance_score: number }[]);
+    const { rankSearchResults } = await import("./rankSearchResults");
+    const result = await rankSearchResults(
+      "query",
+      [
+        ["Top", "top", "https://top.com"],
+        ["A", "a", "https://a.com"],
+        ["B", "b", "https://b.com"],
+        ["C", "c", "https://c.com"],
+      ],
+      true,
+    );
+    // The pinned top result keeps its own (lowest) score, and every survivor
+    // carries its score as the fourth element.
+    expect(result).toEqual([
+      ["Top", "top", "https://top.com", 1],
+      ["A", "a", "https://a.com", 9],
+      ["B", "b", "https://b.com", 8.9],
+    ]);
+  });
+
   it("should preserve top result when preserveTopResults is true", async () => {
     // Index 0 has the LOWER score, so a plain descending sort would put
     // "Other" first; only the pin keeps "Top" first. (A vacuous version gives

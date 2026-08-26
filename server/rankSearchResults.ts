@@ -5,7 +5,7 @@ export async function rankSearchResults(
   query: string,
   searchResults: [title: string, content: string, url: string][],
   preserveTopResults = false,
-) {
+): Promise<[title: string, content: string, url: string, score: number][]> {
   const documents = searchResults.map(
     ([title, snippet]) => `${title}\n${snippet}`,
   );
@@ -44,7 +44,7 @@ export async function rankSearchResults(
   if (!preserveTopResults) {
     const ranked = filterResults(scoredResults)
       .sort((a, b) => b.score - a.score)
-      .map(({ result }) => result);
+      .map(({ result, score }) => [...result, score]);
     report(scoredResults.length, ranked.length);
     return ranked;
   }
@@ -64,7 +64,7 @@ export async function rankSearchResults(
     .sort((a, b) => b.score - a.score);
 
   const ranked = [firstResult, ...nextTopResults, ...remainingResults].map(
-    ({ result }) => result,
+    ({ result, score }) => [...result, score],
   );
   report(scoredResults.length, ranked.length);
   return ranked;

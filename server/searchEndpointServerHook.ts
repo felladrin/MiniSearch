@@ -113,7 +113,7 @@ async function handleRanking(
   query: string,
   results: [title: string, content: string, url: string][],
   isTextSearch?: boolean,
-): Promise<[title: string, content: string, url: string][]> {
+): Promise<[title: string, content: string, url: string, score?: number][]> {
   const isRerankerHealthy = await getRerankerStatus();
   if (!isRerankerHealthy) {
     recordRerankSkipped();

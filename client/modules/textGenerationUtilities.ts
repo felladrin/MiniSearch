@@ -8,7 +8,7 @@ import {
   updateTextGenerationState,
 } from "./pubSub";
 import { getSystemPrompt } from "./systemPrompt";
-import type { ChatMessage } from "./types";
+import type { ChatMessage, TextSearchResult } from "./types";
 
 export const defaultContextSize = 4096;
 
@@ -105,8 +105,46 @@ function formatExcerpt(excerpt: string) {
 }
 
 /**
+ * Explains the per-result relevance tags. The tags are relative to the batch,
+ * not absolute: the reranker's raw score range depends on the model, so only
+ * a result's position within the batch is a stable signal for the model.
+ */
+const relevanceDisclaimer =
+  "Each result is tagged with how well it matched the query relative to the others in this batch: high, medium, or low. Weigh the low ones less, and treat a batch of low results as a sign the results may not cover the question.";
+
+// Z-score cutoffs against the batch's own mean and standard deviation, the
+// same statistics the server's score filter is calibrated on.
+const RELEVANCE_HIGH_Z = 0.5;
+const RELEVANCE_LOW_Z = -0.5;
+
+function getRelevanceTags(
+  searchResults: TextSearchResult[],
+): (string | undefined)[] {
+  const scores = searchResults
+    .map(([, , , score]) => score)
+    .filter((score): score is number => score !== undefined);
+
+  if (scores.length === 0) return searchResults.map(() => undefined);
+
+  const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  const standardDeviation = Math.sqrt(
+    scores.reduce((sum, score) => sum + (score - mean) ** 2, 0) / scores.length,
+  );
+
+  return searchResults.map(([, , , score]) => {
+    if (score === undefined) return undefined;
+    if (standardDeviation === 0) return "medium";
+    const z = (score - mean) / standardDeviation;
+    if (z >= RELEVANCE_HIGH_Z) return "high";
+    if (z <= RELEVANCE_LOW_Z) return "low";
+    return "medium";
+  });
+}
+
+/**
  * Formats the results for the prompt, appending the excerpt read from each
- * page when one is available for it.
+ * page when one is available for it, and a relative relevance tag when the
+ * results carry a reranker score.
  */
 export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
   const searchResults = getLlmTextSearchResults();
@@ -119,17 +157,28 @@ export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
     getPageContentTokenBudget(),
   );
 
+  const relevanceTags = getRelevanceTags(searchResults);
+
   const formattedResults = searchResults
     .map(([title, snippet, url], index) => {
       const heading = shouldIncludeUrl
         ? `• [${title}](${url}) | ${snippet}`
         : `• ${title} | ${snippet}`;
+      const tag = relevanceTags[index];
+      const taggedHeading = tag ? `${heading} (relevance: ${tag})` : heading;
       const excerpt = excerpts[index];
-      return excerpt ? `${heading}\n${formatExcerpt(excerpt)}` : heading;
+      return excerpt
+        ? `${taggedHeading}\n${formatExcerpt(excerpt)}`
+        : taggedHeading;
     })
     .join("\n");
 
-  return `${untrustedTextDisclaimer}\n\n${formattedResults}`;
+  const disclaimers = [
+    untrustedTextDisclaimer,
+    relevanceTags.some(Boolean) ? relevanceDisclaimer : undefined,
+  ].filter((disclaimer): disclaimer is string => disclaimer !== undefined);
+
+  return `${disclaimers.join("\n\n")}\n\n${formattedResults}`;
 }
 
 export async function canStartResponding() {
