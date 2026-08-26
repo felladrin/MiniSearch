@@ -5,7 +5,7 @@ export async function rankSearchResults(
   query: string,
   searchResults: [title: string, content: string, url: string][],
   preserveTopResults = false,
-) {
+): Promise<ScoredSearchResultTuple[]> {
   const documents = searchResults.map(
     ([title, snippet]) => `${title}\n${snippet}`,
   );
@@ -44,7 +44,7 @@ export async function rankSearchResults(
   if (!preserveTopResults) {
     const ranked = filterResults(scoredResults)
       .sort((a, b) => b.score - a.score)
-      .map(({ result }) => result);
+      .map(({ result, score }): ScoredSearchResultTuple => [...result, score]);
     report(scoredResults.length, ranked.length);
     return ranked;
   }
@@ -64,13 +64,14 @@ export async function rankSearchResults(
     .sort((a, b) => b.score - a.score);
 
   const ranked = [firstResult, ...nextTopResults, ...remainingResults].map(
-    ({ result }) => result,
+    ({ result, score }): ScoredSearchResultTuple => [...result, score],
   );
   report(scoredResults.length, ranked.length);
   return ranked;
 }
 
 type SearchResultTuple = [title: string, content: string, url: string];
+type ScoredSearchResultTuple = [...SearchResultTuple, score: number];
 type ScoredResultItem = { result: SearchResultTuple; score: number };
 type ScoredResultItemWithNormalizedScore = ScoredResultItem & {
   normalizedScore: number;

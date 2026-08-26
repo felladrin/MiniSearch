@@ -92,8 +92,8 @@ describe("searchEndpointServerHook", () => {
       shouldContinue: true,
     });
     vi.mocked(getRerankerStatus).mockResolvedValue(false);
-    vi.mocked(rankSearchResults).mockImplementation(
-      async (_query, results) => results,
+    vi.mocked(rankSearchResults).mockImplementation(async (_query, results) =>
+      results.map(([title, content, url]) => [title, content, url, 0]),
     );
   });
 
@@ -215,8 +215,8 @@ describe("searchEndpointServerHook", () => {
     ]);
     vi.mocked(getRerankerStatus).mockResolvedValue(true);
     vi.mocked(rankSearchResults).mockResolvedValue([
-      ["B", "snippet b", "https://b.com"],
-      ["A", "snippet a", "https://a.com"],
+      ["B", "snippet b", "https://b.com", 0.9],
+      ["A", "snippet a", "https://a.com", 0.5],
     ]);
 
     const handler = getRegisteredHandler();
@@ -239,8 +239,8 @@ describe("searchEndpointServerHook", () => {
     );
     expect(response.end).toHaveBeenCalledWith(
       JSON.stringify([
-        ["B", "snippet b", "https://b.com"],
-        ["A", "snippet a", "https://a.com"],
+        ["B", "snippet b", "https://b.com", 0.9],
+        ["A", "snippet a", "https://a.com", 0.5],
       ]),
     );
   });
@@ -426,7 +426,12 @@ describe("searchEndpointServerHook", () => {
       vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
       vi.mocked(getRerankerStatus).mockResolvedValue(true);
       vi.mocked(rankSearchResults).mockResolvedValue([
-        ["Cat picture", "", "https://example.com/not-in-the-result-set.jpg"],
+        [
+          "Cat picture",
+          "",
+          "https://example.com/not-in-the-result-set.jpg",
+          0.5,
+        ],
       ]);
 
       const handler = getRegisteredHandler();

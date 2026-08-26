@@ -3,7 +3,12 @@ export type ChatMessage = {
   content: string;
 };
 
-export type TextSearchResult = [title: string, snippet: string, url: string];
+export type TextSearchResult = [
+  title: string,
+  snippet: string,
+  url: string,
+  score?: number,
+];
 
 export type ImageSearchResult = [
   title: string,

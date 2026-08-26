@@ -154,6 +154,72 @@ describe("getFormattedSearchResults", () => {
     // not, so an untrimmed excerpt is what pins that the setting was read.
     expect(getFormattedSearchResults(true)).not.toContain("…");
   });
+
+  it("tags each result with its relative relevance when scores are present", () => {
+    state.searchResults = [
+      ["First", "first snippet", "https://a.example/", 5.0],
+      ["Second", "second snippet", "https://b.example/", 1.0],
+    ];
+
+    const formatted = getFormattedSearchResults(true);
+
+    expect(formatted).toContain(
+      "• [First](https://a.example/) | first snippet (relevance: high)",
+    );
+    expect(formatted).toContain(
+      "• [Second](https://b.example/) | second snippet (relevance: low)",
+    );
+    expect(formatted).toContain(
+      "Each result is tagged with how well it matched the query relative to the others in this batch",
+    );
+  });
+
+  it("adds no tag or relevance note when the results carry no score", () => {
+    // History-restored and eval results have no score; their prompt must stay
+    // exactly what it was before the score existed, disclaimer aside.
+    const formatted = getFormattedSearchResults(true);
+
+    expect(formatted).toBe(
+      `${disclaimer}\n\n` +
+        "• [First](https://a.example/) | first snippet\n" +
+        "• [Second](https://b.example/) | second snippet",
+    );
+    expect(formatted).not.toContain("relevance:");
+    expect(formatted).not.toContain("tagged with how well it matched");
+  });
+
+  it("tags every result medium when all scores are equal", () => {
+    state.searchResults = [
+      ["First", "first snippet", "https://a.example/", 3.0],
+      ["Second", "second snippet", "https://b.example/", 3.0],
+    ];
+
+    const formatted = getFormattedSearchResults(true);
+
+    expect(formatted).toContain("(relevance: medium)");
+    expect(formatted).not.toContain("(relevance: high)");
+    expect(formatted).not.toContain("(relevance: low)");
+  });
+
+  it("spreads high, medium and low across a batch with a clear spread", () => {
+    state.searchResults = [
+      ["A", "a", "https://a.example/", 10.0],
+      ["B", "b", "https://b.example/", 9.0],
+      ["C", "c", "https://c.example/", 8.0],
+    ];
+
+    const formatted = getFormattedSearchResults(true);
+
+    expect(formatted).toContain(
+      "• [A](https://a.example/) | a (relevance: high)",
+    );
+    expect(formatted).toContain(
+      "• [B](https://b.example/) | b (relevance: medium)",
+    );
+    expect(formatted).toContain(
+      "• [C](https://c.example/) | c (relevance: low)",
+    );
+  });
 });
 
 describe("allocatePageExcerpts", () => {
