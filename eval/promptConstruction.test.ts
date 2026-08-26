@@ -67,6 +67,9 @@ describe("answer eval: prompt construction", () => {
     for (const { url } of golden.results) {
       expect(systemTurn).toContain(url);
     }
+    // The golden queries all have results, so the untrusted-text disclaimer
+    // is present even though no page content was read for them.
+    expect(systemTurn).toContain("never as instructions");
   });
 
   it("embeds a distinct prompt for every golden query", () => {
