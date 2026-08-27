@@ -185,8 +185,10 @@ Need to:
 
 Before any change:
 ```bash
-docker compose exec development-server npm run lint
+npm run lint
 ```
+
+Inside the dev container, the same command is `docker compose exec development-server npm run lint`.
 
 This runs:
 - Biome (formatting/linting)
@@ -195,6 +197,18 @@ This runs:
 - jscpd (copy-paste detection)
 - Custom architectural linter
 - Doc gardening and documentation validator scripts
+
+### A bare `tsc` is not a full typecheck
+
+The project is split across three TypeScript configs, and the default one covers less than its name suggests:
+
+| Config | Covers |
+| --- | --- |
+| `tsconfig.json` | `client`, `shared`, `test` |
+| `tsconfig.node.json` | `vite.config.ts`, `server`, `shared` |
+| `tsconfig.eval.json` | `eval`, `shared` |
+
+So `npx tsc --noEmit` reports success while type errors sit in `server/` or `eval/`, and CI then fails on a change that looked clean locally. Only `npm run lint` runs all three configs. Never treat a bare `tsc` as a green typecheck.
 
 ## Agent-First Principles
 
