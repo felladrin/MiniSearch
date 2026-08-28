@@ -10,6 +10,7 @@ import {
   updateImageSearchResults,
   updateLlmTextSearchResults,
   updateTextSearchResults,
+  updateTextSearchStale,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
 import type { defaultSettings } from "./settings";
@@ -31,9 +32,14 @@ export async function refreshTextSearchResults(
   resultsLimit: number,
   existingResults: TextSearchResults,
 ): Promise<void> {
-  const freshResults = await searchText(searchQuery, resultsLimit);
+  const { results: freshResults, stale } = await searchText(
+    searchQuery,
+    resultsLimit,
+  );
 
   if (freshResults.length === 0) return;
+
+  updateTextSearchStale(stale);
 
   updateLlmTextSearchResults(freshResults.slice(0, searchResultsToConsider));
 
@@ -69,7 +75,10 @@ export async function refreshImageSearchResults(
   resultsLimit: number,
   existingResults: ImageSearchResults,
 ): Promise<void> {
-  const imageResults = await searchImages(searchQuery, resultsLimit);
+  const { results: imageResults } = await searchImages(
+    searchQuery,
+    resultsLimit,
+  );
 
   if (imageResults.length === 0) return;
 

@@ -54,7 +54,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 ## Data Protection
 
 - **Access Key Hashing**: Access keys hashed using argon2id before storage (via hash-wasm)
-- **TTL-based Cleanup**: Automatic cleanup of cached data
+- **Bounded Local Result Retention**: Results are kept at most 24 hours from cache write, of which the first 15 minutes count as fresh; past that they are served only as a clearly-flagged stale fallback when the live search fails,
 - **No PII Collection**: No personally identifiable information stored
 - **User Control**: Users can export and delete all their data
 

@@ -328,12 +328,12 @@ describe("Search Module", () => {
 
       // First call — cache miss, fetches from network.
       const firstResults = await searchModule.searchText("cached query");
-      expect(firstResults).toEqual(mockResults);
+      expect(firstResults).toEqual({ results: mockResults, stale: false });
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       // Second call with the same query — should be a cache hit.
       const secondResults = await searchModule.searchText("cached query");
-      expect(secondResults).toEqual(mockResults);
+      expect(secondResults).toEqual({ results: mockResults, stale: false });
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("Text search: Reused 1 results from the cache"),
@@ -353,11 +353,11 @@ describe("Search Module", () => {
       });
 
       const firstResults = await searchModule.searchImages("cached images");
-      expect(firstResults).toEqual(mockResults);
+      expect(firstResults).toEqual({ results: mockResults, stale: false });
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       const secondResults = await searchModule.searchImages("cached images");
-      expect(secondResults).toEqual(mockResults);
+      expect(secondResults).toEqual({ results: mockResults, stale: false });
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -413,7 +413,7 @@ describe("Search Module", () => {
       searchModule.searchServiceInstance.updateCacheConfig({ ttl: 0 });
 
       const secondResults = await searchModule.searchText("ttl query");
-      expect(secondResults).toEqual(mockResults);
+      expect(secondResults).toEqual({ results: mockResults, stale: false });
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
@@ -452,6 +452,75 @@ describe("Search Module", () => {
       await searchModule.searchImages("cross-store query");
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
+  });
+
+  describe("Stale Result Fallback", () => {
+    it("should serve stale cached results when a repeated query's live search fails", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockResults),
+      });
+
+      // First call: cache miss, fetches and caches.
+      const first = await searchModule.searchText("stale query");
+      expect(first).toEqual({ results: mockResults, stale: false });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Expire the entry and make the live search fail.
+      searchModule.searchServiceInstance.updateCacheConfig({ ttl: 0 });
+      mockFetch.mockRejectedValue(new Error("upstream refused the connection"));
+
+      const second = await searchModule.searchText("stale query");
+      expect(second.results).toEqual(mockResults);
+      expect(second.stale).toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(addLogEntry).toHaveBeenCalledWith(
+        expect.stringContaining("from a previous search"),
+      );
+    });
+
+    it("should still fail when the live search fails and nothing is cached to serve", async () => {
+      // No prior successful search for this query, so a failure has no stale
+      // result to fall back on and must surface as a failed search.
+      mockFetch.mockRejectedValue(new Error("upstream refused the connection"));
+
+      await expect(
+        searchModule.searchText("never cached query"),
+      ).rejects.toThrow("upstream refused the connection");
+    });
+
+    it("should not serve a cached entry past the stale retention even when the live search fails", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockResults),
+      });
+
+      try {
+        // Cache an entry, then move past the 24-hour stale retention.
+        await searchModule.searchText("aging query");
+        vi.setSystemTime(Date.now() + 25 * 60 * 60 * 1000);
+        mockFetch.mockRejectedValue(
+          new Error("upstream refused the connection"),
+        );
+
+        await expect(searchModule.searchText("aging query")).rejects.toThrow(
+          "upstream refused the connection",
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // The read-side recheck is the backup for a cleanup pass that failed;
+    // pinning it alone would require reaching the internal database, which is
+    // not exported, so this test pins the pair (cleanup plus recheck).
   });
 
   describe("URL Construction", () => {

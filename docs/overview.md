@@ -61,9 +61,9 @@ PubSub channels are created using the create-pubsub package and provide type-saf
 MiniSearch employs a dual-layer persistence approach:
 
 - **IndexedDB** - Local storage for search history, settings, cached results, and saved AI transcripts
-- **TTL-based caching** - 15-minute cache for search results to minimize API calls
+- **TTL-based caching** - 15-minute freshness cache for search results to minimize API calls, with a 24-hour stale retention as a fallback when the live search fails
 
-Search history is backed by a Dexie database that keeps three coordinated tables (search runs, LLM responses, chat turns) along with automatic retention/max-entry cleanup. See `docs/search-history.md` for the complete schema and invariants. The caching layer minimizes redundant API calls to SearXNG while maintaining fresh results. Search results cached in IndexedDB have a 15-minute TTL, after which new searches bypass the cache.
+Search history is backed by a Dexie database that keeps three coordinated tables (search runs, LLM responses, chat turns) along with automatic retention/max-entry cleanup. See `docs/search-history.md` for the complete schema and invariants. The caching layer minimizes redundant API calls to SearXNG while maintaining fresh results. Search results cached in IndexedDB have a 15-minute freshness TTL, after which new searches bypass the cache; an expired entry is kept for 24 hours so a failed live search can serve it, flagged stale, instead of failing.
 
 Long-running chat sessions use an in-memory conversation summary that rolls excess turns into a structured digest before continuing generation. Details about the token budgeting and summary refresh flow live in `docs/conversation-memory.md`.
 
@@ -98,7 +98,7 @@ The system executes two parallel flows when a user submits a query:
 5. `webSearchService.ts` forwards query to SearXNG at `http://127.0.0.1:8888`
 6. Raw results are deduplicated, cleaned, and optionally reranked
 7. Thumbnails are proxied and converted to base64 Data URLs to avoid CORS issues
-8. Results returned as structured JSON and cached in IndexedDB (15-minute TTL)
+8. Results returned as structured JSON and cached in IndexedDB (15-minute freshness TTL)
 
 ### AI Generation Flow
 
@@ -117,6 +117,7 @@ The `textGeneration` module orchestrates the entire search-to-response flow, man
 
 - **Circuit Breaker**: Opens after 5 consecutive failures, blocking requests for 60 seconds before attempting reset
 - **Retry Logic**: Exponential backoff for HTTP 500 errors, up to 3 retries
+- **Fail-Fast on Suspending Engines**: An empty response in which every unresponsive engine is under a long suspension (CAPTCHA, rate limit, access denied; SearXNG suspends them for an hour to a day) throws on the first attempt instead of spending the retry budget, which it could not possibly outlast. Transient engine errors (timeouts, server API errors) keep the full retry budget.
 - **Content Processing**: Converts HTML results to plain text, strips emojis for cleaner output
 - **Thumbnail Proxying**: Server fetches external thumbnails and converts to base64 Data URLs, avoiding CORS issues and improving loading stability
 
@@ -210,7 +211,7 @@ MiniSearch implements all server-side logic as Vite plugin hooks. Each hook regi
 
 Key server-side modules:
 
-- **`server/webSearchService.ts`**: Integrates with SearXNG at `http://127.0.0.1:8888`. Implements a circuit breaker (opens after 5 failures, resets after 60s) and retry logic (up to 3 retries with exponential backoff, for 500s and for empty responses naming unresponsive engines).
+- **`server/webSearchService.ts`**: Integrates with SearXNG at `http://127.0.0.1:8888`. Implements a circuit breaker (opens after 5 failures, resets after 60s) and retry logic (up to 3 retries with exponential backoff, for 500s and for empty responses naming transiently unresponsive engines; an all-suspended set fails fast on the first attempt, since SearXNG suspensions last an hour to a day).
 - **`server/pageContentService.ts`**: Reads result pages for answer grounding: SSRF-guarded fetches with a byte cap, readable-text extraction, and query-relevant passage selection.
 - **`server/searchToken.ts`**: Manages a token at `{os.tempdir()}/minisearch-token` used for CSRF protection on search requests.
 - **`server/verifiedTokens.ts`**: In-memory `Map` of verified session token to last-seen time, evicted after 30 idle minutes, plus a cumulative count of the distinct sessions seen since the last restart.
@@ -241,7 +242,7 @@ The `/status` endpoint returns a JSON object:
 | `averageTextualSearchesPerSession` | number | Text searches / sessions ratio |
 | `averageGraphicalSearchesPerSession` | number | Image searches / sessions ratio |
 | `searchesWithoutResults` | number | Searches, text and image together, that SearXNG answered with zero results and no unresponsive engines |
-| `searchesWithUnresponsiveEngines` | number | Searches, text and image together, that still came back with zero results and unresponsive engines after the retries were spent; one per search, not per attempt |
+| `searchesWithUnresponsiveEngines` | number | Searches, text and image together, that came back with zero results and unresponsive engines, whether the retries were spent or an all-suspended set failed fast; one per search, not per attempt |
 | `searchesWithAllResultsDiscarded` | number | Text searches whose results were all dropped during processing |
 | `rerankerServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `webSearchServiceStatus` | string | `"healthy"` or `"unhealthy"` |
@@ -259,8 +260,9 @@ used to carry the query text. The log still names the unresponsive engines
 behind an empty response and the size and type of a discarded batch; how often
 each happens is read from here instead. `searchesWithoutResults` counts only
 the searches that genuinely matched nothing, since an empty response naming
-unresponsive engines fails the search rather than returning zero results once
-the retries are spent (see `docs/failure-injection.md`);
+unresponsive engines fails the search rather than returning zero results,
+after the retries are spent or immediately for an all-suspended set
+(see `docs/failure-injection.md`);
 `searchesWithUnresponsiveEngines` counts those, which is the way to tell
 whether the case is being over-classified. It undercounts a sustained
 outage, where the circuit breaker short-circuits before `performSearch` is
@@ -414,7 +416,8 @@ Two separate Dexie databases handle different persistence needs:
 
 | Constant | Value | Description |
 | ---------- | ------- | ------------- |
-| TTL | 15 minutes | Cache entry lifetime |
+| TTL | 15 minutes | Freshness window: a hit inside it skips the network |
+| MAX_STALE_RETENTION | 24 hours | How long an expired entry is kept, so a failed live search can still serve it flagged stale |
 | MAX_ENTRIES | 100 | Maximum cached queries per store |
 | ENABLED | true | Global cache toggle |
 | PRUNE_INTERVAL | 10 | Cache writes between LRU prune passes |

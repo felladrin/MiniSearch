@@ -5,6 +5,7 @@ import {
   getQuery,
   getSearchPromise,
   getSettings,
+  getTextSearchStale,
   updateTextGenerationState,
 } from "./pubSub";
 import { getSystemPrompt } from "./systemPrompt";
@@ -13,6 +14,8 @@ import type { ChatMessage, TextSearchResult } from "./types";
 export const defaultContextSize = 4096;
 
 export const searchResultsToConsider = 6;
+
+export const imageResultTag = "(image) ";
 
 export class ChatGenerationError extends Error {
   constructor(message: string) {
@@ -112,6 +115,11 @@ function formatExcerpt(excerpt: string) {
 const relevanceDisclaimer =
   "Each result is tagged with how well it matched the query relative to the others in this batch: high, medium, or low. Weigh the low ones less, and treat a batch of low results as a sign the results may not cover the question.";
 
+const imageResultsDisclaimer = `Results tagged ${imageResultTag.trim()} come from the image search fallback: they carry only titles and page links, no snippets, and may not cover the question.`;
+
+const staleResultsDisclaimer =
+  "These search results were cached from an earlier search because the live search failed; they may be outdated. If the answer depends on current information, say so.";
+
 // Z-score cutoffs against the batch's own mean and standard deviation, the
 // same statistics the server's score filter is calibrated on.
 const RELEVANCE_HIGH_Z = 0.5;
@@ -173,9 +181,15 @@ export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
     })
     .join("\n");
 
+  const hasTaggedImageResults = searchResults.some(([title]) =>
+    title.startsWith(imageResultTag),
+  );
+
   const disclaimers = [
     untrustedTextDisclaimer,
     relevanceTags.some(Boolean) ? relevanceDisclaimer : undefined,
+    hasTaggedImageResults ? imageResultsDisclaimer : undefined,
+    getTextSearchStale() ? staleResultsDisclaimer : undefined,
   ].filter((disclaimer): disclaimer is string => disclaimer !== undefined);
 
   return `${disclaimers.join("\n\n")}\n\n${formattedResults}`;

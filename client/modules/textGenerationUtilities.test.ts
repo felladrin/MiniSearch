@@ -16,6 +16,7 @@ vi.mock("./pubSub", () => ({
   getQuery: () => "the query",
   getSearchPromise: vi.fn(),
   getSettings: () => state.settings,
+  getTextSearchStale: () => false,
   updateTextGenerationState: vi.fn(),
 }));
 

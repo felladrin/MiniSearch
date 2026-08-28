@@ -149,6 +149,11 @@ export const [updateLlmTextSearchResults, , getLlmTextSearchResults] =
 
 export const [updateImageSearchResults] = imageSearchResultsPubSub;
 
+export const textSearchStalePubSub = createPubSub<boolean>(false);
+
+export const [updateTextSearchStale, , getTextSearchStale] =
+  textSearchStalePubSub;
+
 const pageContentsPubSub = createPubSub<PageContents>({});
 
 export const [updatePageContents, , getPageContents] = pageContentsPubSub;

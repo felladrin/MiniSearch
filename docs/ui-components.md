@@ -76,6 +76,7 @@ All state channels are defined in `client/modules/pubSub.ts`:
 | `llmTextSearchResultsPubSub` | `TextSearchResults` | LLM-reranked text results | Internal use |
 | `imageSearchResultsPubSub` | `ImageSearchResults` | Image search results | ImageResultsSection |
 | `textSearchStatePubSub` | `SearchState` | Text search state: `"idle" \| "running" \| "failed" \| "completed"` | SearchResultsSection, LoadingIndicators |
+| `textSearchStalePubSub` | `boolean` | Whether the text results on screen came from the cache because the live search failed | TextSearchResults |
 | `imageSearchStatePubSub` | `SearchState` | Image search state: `"idle" \| "running" \| "failed" \| "completed"` | ImageResultsSection |
 | `textGenerationStatePubSub` | `TextGenerationState` | AI generation state | AiResponseSection, StatusIndicators |
 | `modelLoadingProgressPubSub` | `number` | Model download progress (0-100) | AiResponseSection |
