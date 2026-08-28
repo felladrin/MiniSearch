@@ -193,13 +193,16 @@ describe("retry logic", () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
-  it("retries an empty response with unresponsive engines and returns results on eventual success", async () => {
+  it("retries an empty response with a transiently unresponsive engine and returns results on eventual success", async () => {
     fetchMock
       .mockResolvedValueOnce(
         createMockResponse(
           JSON.stringify({
             results: [],
-            unresponsive_engines: [["google", "CAPTCHA"]],
+            // A timeout is transient: it can clear inside the backoff, so the
+            // search keeps the retry budget (unlike a suspension, which fails
+            // fast). See the fail-fast test below for the suspended case.
+            unresponsive_engines: [["google", "Timeout"]],
           }),
         ),
       )
@@ -216,6 +219,59 @@ describe("retry logic", () => {
     // A search that recovers on a retry is a search, not a failure.
     expect(getSearchesWithUnresponsiveEnginesSinceLastRestart()).toBe(
       searchesWithUnresponsiveEngines,
+    );
+  });
+
+  it("keeps the retry budget when the unresponsive engine reports a non-suspending error", async () => {
+    // "server API error" is not a suspension in SearXNG's exception
+    // vocabulary, so the search must not fail fast and has to spend the
+    // backoff like any transient failure.
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [],
+          unresponsive_engines: [["google", "server API error"]],
+        }),
+      ),
+    );
+
+    const promise = fetchSearXNG("test", "text");
+    const outcome = expect(promise).rejects.toThrow(
+      "Unresponsive engines: google (server API error)",
+    );
+    await vi.runAllTimersAsync();
+    await outcome;
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("fails fast without retrying when every unresponsive engine is under a long suspension", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [],
+          unresponsive_engines: [
+            ["brave", "Suspended: too many requests"],
+            ["duckduckgo", "CAPTCHA"],
+          ],
+        }),
+      ),
+    );
+    const searchesWithUnresponsiveEngines =
+      getSearchesWithUnresponsiveEnginesSinceLastRestart();
+
+    const promise = fetchSearXNG("test", "text");
+    const outcome = expect(promise).rejects.toThrow(
+      "Unresponsive engines: brave (Suspended: too many requests), duckduckgo (CAPTCHA)",
+    );
+    // No backoff to drain: the all-suspended set throws on the first attempt
+    // rather than spending the retry budget it could not possibly outlast.
+    await vi.runAllTimersAsync();
+    await outcome;
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(getSearchesWithUnresponsiveEnginesSinceLastRestart()).toBe(
+      searchesWithUnresponsiveEngines + 1,
     );
   });
 
@@ -409,7 +465,7 @@ describe("graceful degradation", () => {
       createMockResponse(
         JSON.stringify({
           results: [],
-          unresponsive_engines: [["google", "CAPTCHA"]],
+          unresponsive_engines: [["google", "Timeout"]],
         }),
       ),
     );
@@ -418,14 +474,15 @@ describe("graceful degradation", () => {
       getSearchesWithUnresponsiveEnginesSinceLastRestart();
 
     const search = fetchSearXNG("failure injection", "text", 30, breaker);
-    const outcome = expect(search).rejects.toThrow("google (CAPTCHA)");
+    const outcome = expect(search).rejects.toThrow("google (Timeout)");
     await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_TOTAL_MS);
     await outcome;
 
     expect(breaker.getState("searxng")).toBe("OPEN");
-    // Some of the reported cases (timeouts, rate-limit windows) clear inside
-    // the backoff, so the case gets the full retry budget before the search
-    // fails, and the counter lands when the attempts run out.
+    // A transient reason (a timeout) can clear inside the backoff, so this
+    // case keeps the full retry budget before the search fails, and the
+    // counter lands when the attempts run out. A suspended set would fail
+    // fast instead; that is covered separately in the retry logic tests.
     expect(fetchMock).toHaveBeenCalledTimes(ATTEMPTS_PER_CALL);
     expect(getSearchesWithoutResultsSinceLastRestart()).toBe(
       searchesWithoutResults,

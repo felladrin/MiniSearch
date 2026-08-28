@@ -55,7 +55,8 @@ Alongside the history database, MiniSearch uses a separate `SearchCacheDatabase`
 **Configuration:**
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| TTL | 15 minutes | Cache entry lifetime |
+| TTL | 15 minutes | Freshness window: a hit inside it skips the network |
+| MAX_STALE_RETENTION | 24 hours | How long an expired entry is kept, so a failed live search can serve it flagged stale |
 | MAX_ENTRIES | 100 | Maximum cached queries per store |
 | PRUNE_INTERVAL | 10 writes | Cache writes between LRU prune passes |
 | REQUEST_TIMEOUT | 30,000 ms | Search request timeout |

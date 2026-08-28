@@ -15,6 +15,7 @@ vi.mock("./pubSub", () => ({
   updateImageSearchResults: vi.fn(),
   updateLlmTextSearchResults: vi.fn(),
   updateTextSearchResults: vi.fn(),
+  updateTextSearchStale: vi.fn(),
 }));
 vi.mock("./relatedSearchQuery", () => ({
   generateRelatedSearchQuery: vi.fn(() => Promise.resolve("")),
@@ -37,6 +38,7 @@ import {
   updateImageSearchResults,
   updateLlmTextSearchResults,
   updateTextSearchResults,
+  updateTextSearchStale,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
 import type { ImageSearchResults, TextSearchResults } from "./types";
@@ -47,6 +49,7 @@ const mockSaveChat = vi.mocked(saveChatMessageForQuery);
 const mockUpdateText = vi.mocked(updateTextSearchResults);
 const mockUpdateImage = vi.mocked(updateImageSearchResults);
 const mockUpdateLlmText = vi.mocked(updateLlmTextSearchResults);
+const mockUpdateTextStale = vi.mocked(updateTextSearchStale);
 
 describe("refreshTextSearchResults", () => {
   it("deduplicates by URL and appends fresh results", async () => {
@@ -58,7 +61,7 @@ describe("refreshTextSearchResults", () => {
       ["Duplicate", "snippet", "https://existing.com"],
     ];
 
-    mockSearchText.mockResolvedValueOnce(fresh);
+    mockSearchText.mockResolvedValueOnce({ results: fresh, stale: false });
 
     await refreshTextSearchResults("query", 10, existing);
 
@@ -66,6 +69,7 @@ describe("refreshTextSearchResults", () => {
       ["Existing", "snippet", "https://existing.com"],
       ["New", "snippet", "https://new.com"],
     ]);
+    expect(mockUpdateTextStale).toHaveBeenCalledWith(false);
   });
 
   it("skips updates when all fresh results are duplicates", async () => {
@@ -74,7 +78,7 @@ describe("refreshTextSearchResults", () => {
     ];
     const fresh: TextSearchResults = [["Title", "snippet", "https://dup.com"]];
 
-    mockSearchText.mockResolvedValueOnce(fresh);
+    mockSearchText.mockResolvedValueOnce({ results: fresh, stale: false });
 
     await refreshTextSearchResults("query", 10, existing);
 
@@ -82,13 +86,24 @@ describe("refreshTextSearchResults", () => {
   });
 
   it("skips updates when there are no fresh results", async () => {
-    mockSearchText.mockResolvedValueOnce([]);
+    mockSearchText.mockResolvedValueOnce({ results: [], stale: false });
 
     await refreshTextSearchResults("query", 10, []);
 
     expect(mockUpdateText).not.toHaveBeenCalled();
-    // An empty refresh must not blank what the model was given either.
     expect(mockUpdateLlmText).not.toHaveBeenCalled();
+    expect(mockUpdateTextStale).not.toHaveBeenCalled();
+  });
+
+  it("raises the stale banner when the fresh batch was served from the cache", async () => {
+    mockSearchText.mockResolvedValueOnce({
+      results: [["New", "snippet", "https://new.com"]],
+      stale: true,
+    });
+
+    await refreshTextSearchResults("query", 10, []);
+
+    expect(mockUpdateTextStale).toHaveBeenCalledWith(true);
   });
 });
 
@@ -102,7 +117,7 @@ describe("refreshImageSearchResults", () => {
       ["Duplicate", "https://existing.com", "thumb", "source"],
     ];
 
-    mockSearchImages.mockResolvedValueOnce(fresh);
+    mockSearchImages.mockResolvedValueOnce({ results: fresh, stale: false });
 
     await refreshImageSearchResults("query", 10, existing);
 
@@ -113,7 +128,7 @@ describe("refreshImageSearchResults", () => {
   });
 
   it("skips updates when there are no fresh results", async () => {
-    mockSearchImages.mockResolvedValueOnce([]);
+    mockSearchImages.mockResolvedValueOnce({ results: [], stale: false });
 
     await refreshImageSearchResults("query", 10, []);
 
@@ -144,9 +159,10 @@ describe("runFollowUpSearch", () => {
     }) as unknown as Parameters<typeof runFollowUpSearch>[2];
 
   it("refreshes text results when enabled", async () => {
-    mockSearchText.mockResolvedValueOnce([
-      ["Title", "snippet", "https://new.com"],
-    ]);
+    mockSearchText.mockResolvedValueOnce({
+      results: [["Title", "snippet", "https://new.com"]],
+      stale: false,
+    });
 
     await runFollowUpSearch(
       [{ role: "user", content: "hello" }],

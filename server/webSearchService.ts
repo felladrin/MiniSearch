@@ -135,6 +135,34 @@ export function describeUnresponsiveEngines(
     .join(", ");
 }
 
+const SUSPENSION_REASON = /captcha|too many request|access denied/i;
+
+/**
+ * Whether every unresponsive engine is under a long suspension rather than a
+ * transient error, so the whole set cannot recover within the retry backoff.
+ */
+function allEnginesSuspended(unresponsiveEngines: unknown): boolean {
+  if (!Array.isArray(unresponsiveEngines) || unresponsiveEngines.length === 0) {
+    return false;
+  }
+  return unresponsiveEngines.every((entry) => {
+    const reason = Array.isArray(entry) ? entry[1] : undefined;
+    return typeof reason === "string" && SUSPENSION_REASON.test(reason);
+  });
+}
+
+/**
+ * Counts the search as an unresponsive-engine failure and throws the error the
+ * endpoint turns into a non-200. The fail-fast and the retry-exhausted paths
+ * both end here, so a search costs one user-visible failure either way.
+ */
+function failWithUnresponsiveEngines(reason: string): never {
+  incrementSearchesWithUnresponsiveEnginesSinceLastRestart();
+  throw new Error(
+    `No results returned from SearXNG. Unresponsive engines: ${reason}`,
+  );
+}
+
 async function performSearch(
   query: string,
   searchType: SearchType,
@@ -174,19 +202,18 @@ async function performSearch(
       // rate-limited, suspended or CAPTCHA-challenged, so the only sign that
       // the search layer is down arrives in `unresponsive_engines`. Returned as
       // an empty array it is indistinguishable from a query that genuinely
-      // matches nothing. Some of the reported cases (timeouts, rate-limit
-      // windows) clear inside the backoff, so the case takes the same retry
-      // budget as a 500.
+      // matches nothing.
       if (reason) {
+        if (allEnginesSuspended(data.unresponsive_engines)) {
+          failWithUnresponsiveEngines(reason);
+        }
+
         if (attempt < MAX_RETRIES) {
           retryReason = `returned no results (${reason})`;
           continue;
         }
 
-        incrementSearchesWithUnresponsiveEnginesSinceLastRestart();
-        throw new Error(
-          `No results returned from SearXNG. Unresponsive engines: ${reason}`,
-        );
+        failWithUnresponsiveEngines(reason);
       }
 
       incrementSearchesWithoutResultsSinceLastRestart();

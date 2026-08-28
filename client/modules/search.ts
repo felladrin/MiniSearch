@@ -12,6 +12,7 @@ const CACHE_CONFIG = {
   METRICS_LOG_INTERVAL: 10,
   REQUEST_TIMEOUT: 30000,
   MAX_QUERY_LENGTH: 2000,
+  MAX_STALE_RETENTION: 24 * 60 * 60 * 1000,
 } as const;
 
 const cacheConfig: {
@@ -123,12 +124,17 @@ interface SearchOperations<T extends SearchResults> {
   ) => Promise<T>;
 }
 
+interface CachedSearchOutcome<T> {
+  results: T;
+  stale: boolean;
+}
+
 async function executeCachedSearch<T extends SearchResults>(
   query: string,
   limit: number | undefined,
   context: SearchExecutionConfig,
   operations: SearchOperations<T>,
-): Promise<T> {
+): Promise<CachedSearchOutcome<T>> {
   await db.cleanExpiredCache(context.storeName);
 
   const key = await operations.hashQuery(query, limit);
@@ -143,26 +149,43 @@ async function executeCachedSearch<T extends SearchResults>(
     );
 
     logAndMaybeResetMetrics();
-    return cachedData.results;
+    return { results: cachedData.results, stale: false };
   }
 
   incrementCacheMetric(context.missMetric);
   cacheMetrics.incrementTotalOperations();
 
-  const results = await operations.performSearch(
-    context.endpoint,
-    query,
-    limit,
-  );
+  try {
+    const results = await operations.performSearch(
+      context.endpoint,
+      query,
+      limit,
+    );
 
-  await db.cacheResult(context.storeName, key, results);
-  logAndMaybeResetMetrics();
+    await db.cacheResult(context.storeName, key, results);
+    logAndMaybeResetMetrics();
 
-  addLogEntry(
-    `${context.logLabel}: Fetched ${results.length} results from the API`,
-  );
+    addLogEntry(
+      `${context.logLabel}: Fetched ${results.length} results from the API`,
+    );
 
-  return results;
+    return { results, stale: false };
+  } catch (error) {
+    if (
+      cachedData &&
+      cachedData.results.length > 0 &&
+      Date.now() - cachedData.timestamp < CACHE_CONFIG.MAX_STALE_RETENTION
+    ) {
+      logAndMaybeResetMetrics();
+      addLogEntry(
+        `${context.logLabel}: Live search failed (${
+          error instanceof Error ? error.message : String(error)
+        }); serving ${cachedData.results.length} result(s) from a previous search`,
+      );
+      return { results: cachedData.results, stale: true };
+    }
+    throw error;
+  }
 }
 
 interface SearchCacheEntry {
@@ -216,7 +239,10 @@ class SearchCacheDatabase extends Dexie {
 
   async cleanExpiredCache(
     storeName: "textSearchHistory" | "imageSearchHistory",
-    timeToLive: number = cacheConfig.ttl,
+    retention: number = Math.max(
+      cacheConfig.ttl,
+      CACHE_CONFIG.MAX_STALE_RETENTION,
+    ),
   ): Promise<void> {
     const currentTime = Date.now();
     const store = this[storeName];
@@ -224,7 +250,7 @@ class SearchCacheDatabase extends Dexie {
     try {
       const expiredItems = await store
         .where("timestamp")
-        .below(currentTime - timeToLive)
+        .below(currentTime - retention)
         .toArray();
 
       if (expiredItems.length > 0) {
@@ -272,7 +298,7 @@ class SearchCacheDatabase extends Dexie {
   async getCachedResult<T extends TextSearchResults | ImageSearchResults>(
     storeName: "textSearchHistory" | "imageSearchHistory",
     key: string,
-  ): Promise<{ results: T; fresh: boolean } | null> {
+  ): Promise<{ results: T; fresh: boolean; timestamp: number } | null> {
     if (!cacheConfig.enabled) return null;
 
     try {
@@ -285,7 +311,11 @@ class SearchCacheDatabase extends Dexie {
       if (!cachedItem) return null;
 
       const fresh = Date.now() - cachedItem.timestamp < cacheConfig.ttl;
-      return { results: cachedItem.results, fresh };
+      return {
+        results: cachedItem.results,
+        fresh,
+        timestamp: cachedItem.timestamp,
+      };
     } catch (error) {
       addLogEntry(
         `Error retrieving from cache: ${error instanceof Error ? error.message : String(error)}`,
@@ -416,7 +446,10 @@ const searchService = {
     }
   },
 
-  async searchText(query: string, limit?: number): Promise<TextSearchResults> {
+  async searchText(
+    query: string,
+    limit?: number,
+  ): Promise<CachedSearchOutcome<TextSearchResults>> {
     try {
       return await executeCachedSearch<TextSearchResults>(
         query,
@@ -446,7 +479,7 @@ const searchService = {
   async searchImages(
     query: string,
     limit?: number,
-  ): Promise<ImageSearchResults> {
+  ): Promise<CachedSearchOutcome<ImageSearchResults>> {
     try {
       return await executeCachedSearch<ImageSearchResults>(
         query,

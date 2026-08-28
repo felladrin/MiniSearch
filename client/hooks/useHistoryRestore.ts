@@ -23,6 +23,7 @@ import {
   updateSuppressNextFollowUp,
   updateTextGenerationState,
   updateTextSearchResults,
+  updateTextSearchStale,
   updateTextSearchState,
 } from "../modules/pubSub";
 import type { ImageSearchResults, TextSearchResults } from "../modules/types";
@@ -49,6 +50,7 @@ export function useHistoryRestore(
       updatePageContents({});
       updateFollowUpQuestion("");
       updateChatInput("");
+      updateTextSearchStale(false);
 
       const queryString = `q=${encodeURIComponent(selectedQuery)}`;
       postMessageToParentWindow({ queryString, hash: "" });

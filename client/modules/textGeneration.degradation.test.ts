@@ -10,6 +10,7 @@ const harness = vi.hoisted(() => {
     llmTextSearchResults: [] as unknown[],
     pageContents: {} as Record<string, string>,
     searchRunId: "run-1",
+    staleFlag: false,
     searchPromise: Promise.resolve({}) as Promise<unknown>,
     settings: {
       inferenceType: "internal",
@@ -33,6 +34,8 @@ const harness = vi.hoisted(() => {
 
 vi.mock("./pubSub", () => ({
   getConversationSummary: () => ({ conversationId: "", summary: "" }),
+  getLlmTextSearchResults: () => harness.state.llmTextSearchResults,
+  getPageContents: () => harness.state.pageContents,
   getQuery: () => harness.state.query,
   getResponse: () => harness.state.response,
   getSettings: () => harness.state.settings,
@@ -65,6 +68,10 @@ vi.mock("./pubSub", () => ({
   updateTextSearchState: (value: string) => {
     harness.state.textSearchState = value;
   },
+  updateTextSearchStale: vi.fn((value: boolean) => {
+    harness.state.staleFlag = value;
+  }),
+  getTextSearchStale: () => harness.state.staleFlag,
 }));
 
 vi.mock("./config", () => ({
@@ -87,8 +94,8 @@ vi.mock("./pageContent", () => ({
 }));
 
 vi.mock("./search", () => ({
-  searchImages: vi.fn(() => Promise.resolve([])),
-  searchText: vi.fn(() => Promise.resolve([])),
+  searchImages: vi.fn(() => Promise.resolve({ results: [], stale: false })),
+  searchText: vi.fn(() => Promise.resolve({ results: [], stale: false })),
 }));
 
 vi.mock("./searchTokenHash", () => ({
@@ -112,6 +119,7 @@ vi.mock("./textGenerationUtilities", () => ({
     max_tokens: 1000,
   })),
   getFormattedSearchResults: vi.fn(() => "None."),
+  imageResultTag: "(image) ",
   searchResultsToConsider: 6,
 }));
 
@@ -121,9 +129,10 @@ vi.mock("gpt-tokenizer", () => ({
 
 import { saveLlmResponseForQuery } from "./history";
 import { fetchPageContents } from "./pageContent";
+import { updateTextSearchStale } from "./pubSub";
 import { searchImages, searchText } from "./search";
 import { searchAndRespond } from "./textGeneration";
-import type { TextSearchResults } from "./types";
+import type { ImageSearchResults, TextSearchResults } from "./types";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -154,8 +163,10 @@ describe("search degradation", () => {
     harness.state.textSearchState = "idle";
     harness.state.textSearchResults = [];
     harness.state.llmTextSearchResults = [];
+    harness.state.staleFlag = false;
     harness.state.settings.enableAiResponse = false;
     harness.state.settings.enableTextSearch = true;
+    harness.state.settings.enableImageSearch = false;
     harness.stateTransitions.length = 0;
     harness.onResponseUpdate.current = () => {};
   });
@@ -165,8 +176,8 @@ describe("search degradation", () => {
       ["Beginner languages", "A snippet", "https://example.com"],
     ];
     vi.mocked(searchText)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce(fallbackResults);
+      .mockResolvedValueOnce({ results: [], stale: false })
+      .mockResolvedValueOnce({ results: fallbackResults, stale: false });
 
     await searchAndRespond();
     await harness.state.searchPromise;
@@ -184,7 +195,7 @@ describe("search degradation", () => {
   });
 
   it("keeps the text search completed when the keyword fallback is also empty", async () => {
-    vi.mocked(searchText).mockResolvedValue([]);
+    vi.mocked(searchText).mockResolvedValue({ results: [], stale: false });
 
     await searchAndRespond();
     await harness.state.searchPromise;
@@ -194,10 +205,178 @@ describe("search degradation", () => {
     expect(harness.state.textSearchState).toBe("completed");
   });
 
+  it("grounds the LLM on image results when the text search fails", async () => {
+    vi.mocked(searchText).mockRejectedValue(
+      new Error("HTTP error! status: 502"),
+    );
+    // The grounding only happens for the answer path.
+    harness.state.settings.enableAiResponse = true;
+    vi.mocked(searchImages).mockResolvedValue({
+      results: [
+        [
+          "Image A",
+          "https://img.example.com/a",
+          "thumb",
+          "https://img.example.com/a",
+        ],
+        [
+          "Image B",
+          "https://img.example.com/b",
+          "thumb",
+          "https://img.example.com/b",
+        ],
+      ],
+      stale: false,
+    });
+    harness.state.settings.enableImageSearch = true;
+
+    const responded = searchAndRespond();
+    // The grounding has to wait for the awaited image search, so the channel
+    // is only populated once the search promise settles.
+    await responded;
+    await harness.state.searchPromise;
+
+    expect(harness.state.textSearchState).toBe("failed");
+    expect(harness.state.llmTextSearchResults).toEqual([
+      ["(image) Image A", "", "https://img.example.com/a"],
+      ["(image) Image B", "", "https://img.example.com/b"],
+    ]);
+
+    // The tagged line as the prompt actually renders it, through the real
+    // formatter.
+    const { getFormattedSearchResults } = await vi.importActual<
+      typeof import("./textGenerationUtilities")
+    >("./textGenerationUtilities");
+    const promptResults = getFormattedSearchResults(true);
+    expect(promptResults).toContain(
+      "\u2022 [(image) Image A](https://img.example.com/a) | ",
+    );
+    expect(promptResults).toContain("image search fallback");
+  });
+
+  it("marks completed results as stale when the live search degraded to the cache", async () => {
+    vi.mocked(searchText).mockResolvedValue({
+      results: [["T", "S", "https://example.com"]],
+      stale: true,
+    });
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(harness.state.textSearchState).toBe("completed");
+    // The banner is about the final state: the reset publishes false first,
+    // so only the last call says anything about what is on screen.
+    expect(vi.mocked(updateTextSearchStale)).toHaveBeenLastCalledWith(true);
+
+    // The UI saying the results are stale is not enough: the prompt the LLM
+    // is built from has to carry the same caveat, through the real formatter.
+    const { getFormattedSearchResults } = await vi.importActual<
+      typeof import("./textGenerationUtilities")
+    >("./textGenerationUtilities");
+    expect(getFormattedSearchResults(true)).toContain(
+      "cached from an earlier search",
+    );
+  });
+
+  it("lets a newer search keep the grounding channel when an older image fallback resolves last", async () => {
+    // Run 1: text fails, image in flight.
+    vi.mocked(searchText).mockRejectedValueOnce(
+      new Error("HTTP error! status: 502"),
+    );
+    let releaseImages: (value: {
+      results: ImageSearchResults;
+      stale: boolean;
+    }) => void = () => {};
+    vi.mocked(searchImages).mockReturnValueOnce(
+      new Promise<{ results: ImageSearchResults; stale: boolean }>(
+        (resolve) => {
+          releaseImages = resolve;
+        },
+      ),
+    );
+    harness.state.settings.enableAiResponse = true;
+    harness.state.settings.enableImageSearch = true;
+
+    const first = searchAndRespond();
+    await vi.waitFor(() => expect(searchImages).toHaveBeenCalled());
+
+    // Run 2 (a retry): text succeeds and repopulates the channel.
+    harness.state.query = "retry query";
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: [["Fresh", "snippet", "https://fresh.example.com"]],
+      stale: false,
+    });
+    const second = searchAndRespond();
+    await second;
+    await harness.state.searchPromise;
+
+    // Run 1's image search now lands, after run 2 already owns the channel.
+    releaseImages({
+      results: [
+        ["Late", "https://late.example.com", "t", "https://late.example.com"],
+      ],
+      stale: false,
+    });
+    // Let run 1's in-flight continuation fully drain: without the guard its
+    // publish lands on later microtasks, after the test's own `await` has
+    // resumed, so asserting without draining would race the very write the
+    // guard blocks.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await first;
+
+    expect(harness.state.llmTextSearchResults).toEqual([
+      ["Fresh", "snippet", "https://fresh.example.com"],
+    ]);
+  });
+
+  it("keeps restored grounding when an older image fallback resolves after a restore", async () => {
+    vi.mocked(searchText).mockRejectedValueOnce(
+      new Error("HTTP error! status: 502"),
+    );
+    let releaseImages:
+      | ((value: { results: ImageSearchResults; stale: boolean }) => void)
+      | undefined;
+    vi.mocked(searchImages).mockReturnValueOnce(
+      new Promise<{ results: ImageSearchResults; stale: boolean }>(
+        (resolve) => {
+          releaseImages = resolve;
+        },
+      ),
+    );
+    harness.state.settings.enableAiResponse = true;
+    harness.state.settings.enableImageSearch = true;
+
+    const first = searchAndRespond();
+    await vi.waitFor(() => expect(searchImages).toHaveBeenCalled());
+
+    // A history restore changes the run id without starting a new search, so
+    // the invocation counter alone cannot invalidate the in-flight fallback.
+    harness.state.searchRunId = "run-2";
+    harness.state.llmTextSearchResults = [
+      ["Restored", "snippet", "https://restored.example.com"],
+    ];
+
+    releaseImages?.({
+      results: [
+        ["Late", "https://late.example.com", "t", "https://late.example.com"],
+      ],
+      stale: false,
+    });
+    // The publish sits behind the awaited image search; drain the
+    // continuation before asserting, as in the cross-run test above.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await first;
+
+    expect(harness.state.llmTextSearchResults).toEqual([
+      ["Restored", "snippet", "https://restored.example.com"],
+    ]);
+  });
+
   it("marks the text search as failed when the search request errors", async () => {
     vi.mocked(searchText).mockRejectedValue(
       new Error("HTTP error! status: 502"),
     );
+    harness.state.settings.enableImageSearch = true;
 
     // A previous search left the LLM grounding channel populated; the failed
     // search must clear it so the AI can't ground on stale results.
@@ -234,7 +413,10 @@ describe("page content grounding", () => {
     harness.state.settings.enableImageSearch = false;
     harness.state.settings.enableTextSearch = true;
     harness.state.settings.enablePageContentFetch = true;
-    vi.mocked(searchText).mockResolvedValue(textResults);
+    vi.mocked(searchText).mockResolvedValue({
+      results: textResults,
+      stale: false,
+    });
   });
 
   /** Holds the page read open so a test can observe what happens meanwhile. */

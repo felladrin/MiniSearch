@@ -25,6 +25,7 @@ import {
   updateSearchPromise,
   updateTextGenerationState,
   updateTextSearchResults,
+  updateTextSearchStale,
   updateTextSearchState,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
@@ -33,6 +34,7 @@ import {
   ChatGenerationError,
   defaultContextSize,
   getFormattedSearchResults,
+  imageResultTag,
   searchResultsToConsider,
 } from "./textGenerationUtilities";
 import type {
@@ -214,12 +216,16 @@ function summarizeDroppedMessages(
   return summary;
 }
 
+let searchInvocation = 0;
+
 /**
  * Runs the search for the current query and, when AI responses are enabled,
  * generates an answer with the configured backend after it completes.
  */
 export async function searchAndRespond() {
   if (getQuery() === "") return;
+
+  const invocation = ++searchInvocation;
 
   document.title = getQuery();
 
@@ -229,6 +235,8 @@ export async function searchAndRespond() {
 
   updateTextSearchResults([]);
 
+  updateTextSearchStale(false);
+
   updateLlmTextSearchResults([]);
 
   updateImageSearchResults([]);
@@ -237,7 +245,7 @@ export async function searchAndRespond() {
 
   updatePageContents({});
 
-  updateSearchPromise(startTextSearch(getQuery()));
+  updateSearchPromise(startTextSearch(getQuery(), invocation));
 
   if (!getSettings().enableAiResponse) return;
 
@@ -414,12 +422,14 @@ async function readPageContents(query: string, results: TextSearchResults) {
   updatePageContents(contents);
 }
 
-async function startTextSearch(query: string) {
+async function startTextSearch(query: string, invocation: number) {
+  const searchRunId = getCurrentSearchRunId();
   const results = {
     textResults: [] as TextSearchResults,
     imageResults: [] as ImageSearchResults,
   };
   let pageContentsRead = Promise.resolve();
+  let textSearchFailed = false;
 
   const searchQuery =
     query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query;
@@ -432,22 +442,24 @@ async function startTextSearch(query: string) {
     updateTextSearchState("running");
 
     try {
-      let textResults = await searchText(
+      let { results: textResults, stale } = await searchText(
         searchQuery,
         getSettings().searchResultsLimit,
       );
 
       if (textResults.length === 0) {
         const queryKeywords = await getKeywords(query, 10);
-        const keywordResults = await searchText(
+        const keywordOutcome = await searchText(
           queryKeywords.join(" "),
           getSettings().searchResultsLimit,
         );
-        textResults = keywordResults;
+        textResults = keywordOutcome.results;
+        stale = keywordOutcome.stale;
       }
 
       results.textResults = textResults;
 
+      updateTextSearchStale(stale);
       updateTextSearchState("completed");
       updateTextSearchResults(textResults);
 
@@ -467,14 +479,34 @@ async function startTextSearch(query: string) {
       // image search and the history write carry on.
       pageContentsRead = readPageContents(searchQuery, resultsForLlm);
     } catch {
-      // An outage (non-200 from /search/*) is not the same as a query with no
-      // results; only the former leaves the search in the failed state.
+      updateTextSearchStale(false);
       updateTextSearchState("failed");
+      textSearchFailed = true;
     }
   }
 
   if (getSettings().enableImageSearch) {
-    startImageSearch(searchQuery, results);
+    if (textSearchFailed && getSettings().enableAiResponse) {
+      await startImageSearch(searchQuery, results);
+
+      if (
+        results.imageResults.length > 0 &&
+        invocation === searchInvocation &&
+        searchRunId === getCurrentSearchRunId()
+      ) {
+        updateLlmTextSearchResults(
+          results.imageResults
+            .slice(0, searchResultsToConsider)
+            .map(([title, url]) => [
+              `${imageResultTag}${title.slice(0, 100)}`,
+              "",
+              url,
+            ]),
+        );
+      }
+    } else {
+      startImageSearch(searchQuery, results);
+    }
   }
 
   await pageContentsRead;
@@ -487,7 +519,7 @@ async function startImageSearch(
   results: { textResults: TextSearchResults; imageResults: ImageSearchResults },
 ) {
   try {
-    const imageResults = await searchImages(
+    const { results: imageResults } = await searchImages(
       searchQuery,
       getSettings().searchResultsLimit,
     );
