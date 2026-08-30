@@ -234,7 +234,8 @@ The `/status` endpoint returns a JSON object:
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `uptime` | string | Human-readable server uptime |
+| `uptime` | string | Human-readable server uptime, measured from `startedAt` |
+| `startedAt` | string | ISO timestamp of the server start; all the "since last restart" counters below are measured from this moment |
 | `sessions` | number | Distinct verified sessions since last restart, which the two per-session averages below divide by |
 | `activeSessions` | number | Sessions still in the cache, dropped after 30 idle minutes |
 | `textualSearches` | number | Text search count since last restart |
