@@ -2,8 +2,8 @@
 #
 # Built on top of SearXNG's upstream defaults via `use_default_settings`, so this
 # file only declares what MiniSearch overrides:
+#   - a placeholder secret_key
 #   - JSON output format (consumed by server/webSearchService.ts)
-#   - an explicit, resilient set of general-web engines
 #
 # Docs: https://docs.searxng.org/admin/settings/settings_use_default_settings.html
 use_default_settings: true
