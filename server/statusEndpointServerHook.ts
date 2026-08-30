@@ -68,6 +68,10 @@ export function statusEndpointServerHook<
       uptime: prettyMilliseconds(Date.now() - serverStartTime, {
         verbose: true,
       }),
+      // The counters below read "since last restart"; this is that start,
+      // as an absolute timestamp, so a reader can tell which deploys a
+      // window of counters spans.
+      startedAt: new Date(serverStartTime).toISOString(),
       sessions,
       textualSearches,
       graphicalSearches,
