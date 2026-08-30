@@ -94,6 +94,7 @@ describe("handleTokenVerification", () => {
     ["/search/text", "search"],
     ["/search/images", "search"],
     ["/page-content", "pageContent"],
+    ["/thumbnail", "thumbnail"],
     ["/inference", "inference"],
     ["/something-else", "other"],
   ] as const)(
@@ -190,6 +191,7 @@ describe("handleTokenVerification", () => {
       "other",
       "pageContent",
       "search",
+      "thumbnail",
     ]);
     expect(Object.keys(stats.limiter).sort()).toEqual([
       "durationSeconds",

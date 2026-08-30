@@ -1,13 +1,34 @@
 import { MantineProvider } from "@mantine/core";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getThumbnailSrc } from "@/modules/thumbnailUrls";
 import type { ImageSearchResult } from "@/modules/types";
 import { setReducedMotionPreference } from "../testUtils";
 import ImageResultsList from "./ImageResultsList";
 
+vi.mock("@/modules/thumbnailUrls", () => ({
+  getThumbnailSrc: vi.fn(),
+}));
+
+// Mirrors the real module's contract closely enough for the component: an
+// empty thumbnail yields null, everything else comes back as a /thumbnail URL.
+function thumbnailSrcFor(thumbnailUrl: string): string | null {
+  if (!thumbnailUrl) return null;
+  const url = new URL("/thumbnail", "http://localhost:3000");
+  url.searchParams.set("u", thumbnailUrl);
+  return url.toString();
+}
+
+beforeEach(() => {
+  vi.mocked(getThumbnailSrc).mockImplementation(async (thumbnailUrl) =>
+    thumbnailUrl ? thumbnailSrcFor(thumbnailUrl) : null,
+  );
+});
+
 afterEach(() => {
   setReducedMotionPreference(false);
+  vi.clearAllMocks();
 });
 
 const imageResults: ImageSearchResult[] = [
@@ -55,6 +76,50 @@ describe("ImageResultsList", () => {
         name: "Open image preview: First image",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("loads each tile from the /thumbnail endpoint once the src resolves", async () => {
+    renderImageResultsList();
+
+    const img = await screen.findByRole("img");
+    expect(getThumbnailSrc).toHaveBeenCalledWith(
+      "https://example.com/first.jpg",
+    );
+    expect(img.getAttribute("src")).toBe(
+      thumbnailSrcFor("https://example.com/first.jpg"),
+    );
+  });
+
+  it("shows the host name for a result without a thumbnail", async () => {
+    render(
+      <MantineProvider>
+        <ImageResultsList
+          imageResults={[
+            [
+              "No thumbnail",
+              "https://example.com/no-thumbnail",
+              "",
+              "https://source.example.com/no-thumbnail",
+            ],
+          ]}
+        />
+      </MantineProvider>,
+    );
+
+    await screen.findByText("example.com");
+  });
+
+  it("shows the host name when a thumbnail fails to load", async () => {
+    renderImageResultsList();
+
+    const img = await screen.findByRole("img");
+    img.dispatchEvent(new Event("error"));
+
+    // The second tile still loads, so exactly one img survives the failure.
+    await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(1));
+    expect(
+      screen.getByRole("button", { name: "Open image preview: First image" }),
+    ).toHaveTextContent("example.com");
   });
 
   it("opens the focused thumbnail in the lightbox from the keyboard", async () => {

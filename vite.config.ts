@@ -17,6 +17,7 @@ import { rerankerServiceHook } from "./server/rerankerServiceHook.ts";
 import { searchEndpointServerHook } from "./server/searchEndpointServerHook.ts";
 import { regenerateSearchToken } from "./server/searchToken.ts";
 import { statusEndpointServerHook } from "./server/statusEndpointServerHook.ts";
+import { thumbnailEndpointServerHook } from "./server/thumbnailEndpointServerHook.ts";
 import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook.ts";
 
 dotenv.config({ path: [".env", ".env.example"], quiet: true });
@@ -96,6 +97,11 @@ export default defineConfig(({ command }) => {
         name: "configure-server-page-content-endpoint",
         configureServer: pageContentEndpointServerHook,
         configurePreviewServer: pageContentEndpointServerHook,
+      },
+      {
+        name: "configure-server-thumbnail-endpoint",
+        configureServer: thumbnailEndpointServerHook,
+        configurePreviewServer: thumbnailEndpointServerHook,
       },
       {
         name: "configure-server-status-endpoint",

@@ -79,25 +79,28 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 | `server/searchesSinceLastRestart.ts` | In-memory counters for aggregate search outcomes (text/image search totals, and how often searches came back empty or were fully discarded), reported on `/status` |
 | `server/pageReadsSinceLastRestart.ts` | In-memory aggregate counters for pages read for grounding (outcomes, durations, passage ratios), reported on `/status`; records no query, URL, host, or per-read timestamp |
 | `server/searchEndpointServerHook.ts` | Proxies text/image search to SearXNG after token verification (via `handleTokenVerification`) |
-| `server/verifyTokenAndRateLimit.ts` | Verifies the Argon2 token hash and enforces rate limiting (10 requests per 10 seconds) shared by the search, page-content and inference endpoints |
-| `server/handleTokenVerification.ts` | Middleware bridge that calls `verifyTokenAndRateLimit` and writes 400/401/429 error responses for the search, page-content and inference endpoints |
+| `server/verifyTokenAndRateLimit.ts` | Verifies the Argon2 token hash and enforces rate limiting (10 requests per 10 seconds) shared by the search, page-content, thumbnail and inference endpoints |
+| `server/handleTokenVerification.ts` | Middleware bridge that calls `verifyTokenAndRateLimit` and writes 400/401/429 error responses for the search, page-content, thumbnail and inference endpoints |
 | `server/configEndpointServerHook.ts` | Serves the non-secret runtime config at `/api/config`, including whether access keys are enabled |
 | `server/utils/publicUrl.ts` | Rejects non-HTTP schemes and hosts resolving into private, loopback, link-local or reserved ranges before the server fetches a client-supplied URL |
 | `server/pageContentEndpointServerHook.ts` | Reads result pages at `/page-content` after token verification, capped at 6 URLs per request |
+| `server/thumbnailEndpointServerHook.ts` | Serves one search-result thumbnail at a time at `/thumbnail` after token verification, with an in-process LRU in front of the upstream host |
 
 ### Server-Side Fetching of Client-Supplied URLs
 
 `/page-content` is the endpoint that fetches a URL the client chose, so it is
 the main place where SSRF matters. It is always available; the user's
 `enablePageContentFetch` toggle decides whether each browser actually uses it.
-It shares the 10-requests-per-10-seconds bucket with `/search/`, but each
-request can fan out to six pages, so it is the heavier of the two per point.
+It shares the 10-requests-per-10-seconds bucket with `/search/` and
+`/thumbnail`, but each request can fan out to six pages, so it is the
+heaviest of the three per point.
 
-`/search/images` also fetches on the server's behalf: the thumbnail URLs that
-come back from SearXNG are fetched and returned as data URLs. Thumbnails are
-harder for an attacker to steer than a client-chosen page URL, but a
-compromised or hostile engine result could still point the server at an
-internal address, so the same guard applies.
+`/thumbnail` is the second place the server fetches on a client's behalf: the
+client loads each search-result thumbnail from it, one tile at a time. The
+URLs come back from SearXNG rather than from the user, but a compromised or
+hostile engine result could still point the server at an internal address, so
+the same guard applies, and the endpoint is token-gated and rate-limited like
+the rest.
 
 Every hop - the original URL and each redirect - passes `resolvePublicUrl`
 before a request is made, which blocks loopback, link-local (including

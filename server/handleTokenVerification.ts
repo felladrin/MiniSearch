@@ -9,6 +9,7 @@ import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit.ts";
 const SURFACES: [pathPrefix: string, surface: AuthorizationSurface][] = [
   ["/search", "search"],
   ["/page-content", "pageContent"],
+  ["/thumbnail", "thumbnail"],
   ["/inference", "inference"],
 ];
 

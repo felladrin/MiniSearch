@@ -23,6 +23,7 @@ import {
 export type AuthorizationSurface =
   | "search"
   | "pageContent"
+  | "thumbnail"
   | "inference"
   | "other";
 
@@ -42,6 +43,7 @@ const reasons: Record<RejectionReason, number> = {
 const bySurface: Record<AuthorizationSurface, SurfaceCounts> = {
   search: { authorized: 0, rejected: 0 },
   pageContent: { authorized: 0, rejected: 0 },
+  thumbnail: { authorized: 0, rejected: 0 },
   inference: { authorized: 0, rejected: 0 },
   other: { authorized: 0, rejected: 0 },
 };

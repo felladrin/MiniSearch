@@ -303,13 +303,17 @@ export async function fetchSearXNG(
 
 async function processGraphicalResult(result: SearxngSearchResult) {
   const thumbnailSource =
-    result.category === "videos" ? result.thumbnail : result.thumbnail_src;
+    (result.category === "videos" ? result.thumbnail : result.thumbnail_src) ??
+    "";
 
   const sourceUrl =
-    result.category === "videos"
+    (result.category === "videos"
       ? result.iframe_src || result.url
-      : result.img_src;
+      : result.img_src) ?? "";
 
+  // Empty strings, not undefined: the client reads the tuple positionally and
+  // treats an empty thumbnail as "no thumbnail" and an empty source as
+  // "no link to the full image".
   try {
     return [result.title, result.url, thumbnailSource, sourceUrl] as [
       title: string,

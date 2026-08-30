@@ -23,10 +23,15 @@ needed.
 | SearXNG is down | `/search/text` and `/search/images` answer HTTP 502 with a JSON error | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranker is not ready | Results served in SearXNG order, HTTP 200 | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranking throws mid-request | Results served in SearXNG order, HTTP 200 | `server/searchEndpointServerHook.test.ts` › graceful degradation |
-| Reranker is not ready on an image search | Images still served with thumbnails | `server/searchEndpointServerHook.test.ts` › graceful degradation |
-| Reranking throws on an image search | Images still served with thumbnails | `server/searchEndpointServerHook.test.ts` › graceful degradation |
+| Reranker is not ready on an image search | Images still served, with the thumbnail URLs as SearXNG sent them | `server/searchEndpointServerHook.test.ts` › graceful degradation |
+| Reranking throws on an image search | Images still served, with the thumbnail URLs as SearXNG sent them | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranker returns a URL absent from the result set | That image is dropped | `server/searchEndpointServerHook.test.ts` › graceful degradation |
-| Thumbnail host never answers | Request aborted after the timeout, image dropped | `server/searchEndpointServerHook.test.ts` › graceful degradation |
+| Thumbnail host never answers | Request aborted after the timeout, `/thumbnail` answers HTTP 502 and the tile shows the host name | `server/thumbnailEndpointServerHook.test.ts` |
+| Thumbnail URL resolves into a private range | Refused before any request, `/thumbnail` answers HTTP 403 | `server/thumbnailEndpointServerHook.test.ts` |
+| Thumbnail redirects into a private range | Redirect not followed, HTTP 403 | `server/thumbnailEndpointServerHook.test.ts` |
+| Thumbnail upstream answers with a non-image or an empty body | `/thumbnail` answers HTTP 502, the tile shows the host name | `server/thumbnailEndpointServerHook.test.ts` |
+| Thumbnail body exceeds the byte cap | Body truncated at the cap and served | `server/thumbnailEndpointServerHook.test.ts` |
+| A tile's `/thumbnail` request fails in the browser | That tile shows the host name, the rest of the grid is untouched | `client/components/Search/Results/Graphical/ImageResultsList.test.tsx` |
 | Search returns nothing to the endpoint | HTTP 200 with `[]`, not an error | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Text search returns nothing to the client | Keyword-only query retried as a fallback | `client/modules/textGeneration.degradation.test.ts` |
 | Keyword fallback also returns nothing | Text search state stays `completed` with the no-results alert | `client/modules/textGeneration.degradation.test.ts` |
