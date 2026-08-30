@@ -13,6 +13,8 @@ import {
   RATE_LIMIT_DURATION_SECONDS,
   RATE_LIMIT_POINTS,
   type RejectionReason,
+  THUMBNAIL_RATE_LIMIT_DURATION_SECONDS,
+  THUMBNAIL_RATE_LIMIT_POINTS,
 } from "./verifyTokenAndRateLimit.ts";
 
 /**
@@ -94,6 +96,10 @@ export function getAuthorizationStats() {
     limiter: {
       points: RATE_LIMIT_POINTS,
       durationSeconds: RATE_LIMIT_DURATION_SECONDS,
+      thumbnail: {
+        points: THUMBNAIL_RATE_LIMIT_POINTS,
+        durationSeconds: THUMBNAIL_RATE_LIMIT_DURATION_SECONDS,
+      },
     },
   };
 }

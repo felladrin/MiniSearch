@@ -25,6 +25,21 @@ const rateLimiter = new RateLimiterMemory({
   duration: RATE_LIMIT_DURATION_SECONDS,
 });
 
+/**
+ * A single image search fans out into up to 30 tile loads, so `/thumbnail`
+ * draws from its own budget: sharing the search bucket would let one grid
+ * exhaust the user's text-search and page-read budget, and the 429s would
+ * land on tiles the browser's `<img>` cannot retry. The token gate stays
+ * shared, so a hostile caller still pays one verification per tile.
+ */
+export const THUMBNAIL_RATE_LIMIT_POINTS = 60;
+export const THUMBNAIL_RATE_LIMIT_DURATION_SECONDS = 10;
+
+export const thumbnailRateLimiter = new RateLimiterMemory({
+  points: THUMBNAIL_RATE_LIMIT_POINTS,
+  duration: THUMBNAIL_RATE_LIMIT_DURATION_SECONDS,
+});
+
 /** Why a request was turned away, named by the check that turned it away. */
 export type RejectionReason = "rateLimited" | "missingToken" | "invalidToken";
 
@@ -124,6 +139,7 @@ function reportTokenFileChangeOnce() {
 export async function verifyTokenAndRateLimit(
   token: string | null,
   request?: IncomingMessage,
+  limiter: RateLimiterMemory = rateLimiter,
 ): Promise<TokenVerificationResult> {
   // Rate-limit before anything else. An invalid or missing token used to skip
   // the limiter entirely, and every rejected request still pays for a full
@@ -132,7 +148,7 @@ export async function verifyTokenAndRateLimit(
   // bogus tokens and pin the server's CPU without ever hitting the limiter.
   const rateLimitKey = request ? getClientIp(request) : (token ?? "anonymous");
   try {
-    await rateLimiter.consume(rateLimitKey);
+    await limiter.consume(rateLimitKey);
   } catch {
     return {
       isAuthorized: false,

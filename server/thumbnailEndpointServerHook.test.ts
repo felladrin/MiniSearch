@@ -24,7 +24,11 @@ import {
   recordThumbnailDropped,
   recordThumbnailRequested,
 } from "./searchesSinceLastRestart";
-import { thumbnailEndpointServerHook } from "./thumbnailEndpointServerHook";
+import {
+  getThumbnailCacheLimits,
+  resetThumbnailCache,
+  thumbnailEndpointServerHook,
+} from "./thumbnailEndpointServerHook";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -154,6 +158,16 @@ describe("thumbnailEndpointServerHook", () => {
       "Content-Type",
       "image/jpeg",
     );
+    // The response is same-origin, so the browser must be barred from
+    // interpreting the bytes as anything but the declared image type.
+    expect(response.setHeader).toHaveBeenCalledWith(
+      "X-Content-Type-Options",
+      "nosniff",
+    );
+    expect(response.setHeader).toHaveBeenCalledWith(
+      "Content-Security-Policy",
+      "default-src 'none'; sandbox",
+    );
     expect(response.setHeader).toHaveBeenCalledWith(
       "Cache-Control",
       "private, max-age=3600",
@@ -208,6 +222,19 @@ describe("thumbnailEndpointServerHook", () => {
     expect(response.statusCode).toBe(403);
     expect(mockFetch).not.toHaveBeenCalled();
     expect(recordThumbnailBlocked).toHaveBeenCalledTimes(1);
+    expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a URL longer than the cap", async () => {
+    const handler = getRegisteredHandler();
+    const response = createResponse();
+    const longUrl = `https://thumbs.example.com/${"a".repeat(2050)}`;
+
+    await handler(createRequest(requestUrlFor(longUrl)), response, vi.fn());
+
+    expect(response.statusCode).toBe(400);
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(recordThumbnailRequested).not.toHaveBeenCalled();
   });
 
   it("does not follow a redirect into a private address", async () => {
@@ -234,7 +261,7 @@ describe("thumbnailEndpointServerHook", () => {
     expect(recordThumbnailBlocked).toHaveBeenCalledTimes(1);
   });
 
-  it("answers 502 when the upstream returns an error status", async () => {
+  it("answers 502 with no-store when the upstream returns an error status", async () => {
     mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
     const handler = getRegisteredHandler();
     const response = createResponse();
@@ -246,13 +273,17 @@ describe("thumbnailEndpointServerHook", () => {
     );
 
     expect(response.statusCode).toBe(502);
+    expect(response.setHeader).toHaveBeenCalledWith(
+      "Cache-Control",
+      "no-store",
+    );
     expect(response.end).toHaveBeenCalledWith(
       JSON.stringify({ error: "Thumbnail could not be fetched" }),
     );
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
   });
 
-  it("answers 502 when the upstream answer is not an image", async () => {
+  it("answers 502 when the upstream answer is not an accepted image type", async () => {
     mockFetch.mockResolvedValue(
       new Response("<html></html>", {
         status: 200,
@@ -270,6 +301,65 @@ describe("thumbnailEndpointServerHook", () => {
 
     expect(response.statusCode).toBe(502);
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers 502 when the upstream answer is an SVG", async () => {
+    // An SVG is a document: served same-origin it would run its scripts.
+    mockFetch.mockResolvedValue(
+      new Response("<svg><script>alert(1)</script></svg>", {
+        status: 200,
+        headers: { "content-type": "image/svg+xml" },
+      }),
+    );
+    const handler = getRegisteredHandler();
+    const response = createResponse();
+
+    await handler(
+      createRequest(requestUrlFor(publicThumbnailUrl())),
+      response,
+      vi.fn(),
+    );
+
+    expect(response.statusCode).toBe(502);
+    expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not follow a redirect with a malformed Location", async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(null, {
+        status: 302,
+        headers: { location: "http://[" },
+      }),
+    );
+    const handler = getRegisteredHandler();
+    const response = createResponse();
+
+    await handler(
+      createRequest(requestUrlFor(publicThumbnailUrl())),
+      response,
+      vi.fn(),
+    );
+
+    expect(response.statusCode).toBe(502);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cache a failure, so the next load retries the upstream", async () => {
+    const url = publicThumbnailUrl();
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(imageResponse());
+    const handler = getRegisteredHandler();
+
+    const first = createResponse();
+    await handler(createRequest(requestUrlFor(url)), first, vi.fn());
+    expect(first.statusCode).toBe(502);
+
+    const second = createResponse();
+    await handler(createRequest(requestUrlFor(url)), second, vi.fn());
+    expect(second.statusCode).toBe(200);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it("answers 502 when the upstream body is empty", async () => {
@@ -290,6 +380,31 @@ describe("thumbnailEndpointServerHook", () => {
 
     expect(response.statusCode).toBe(502);
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds a hanging DNS lookup with the same deadline", async () => {
+    // A resolver that never settles must not add its own timeout on top of
+    // the documented one. Matches THUMBNAIL_TIMEOUT_MS.
+    const thumbnailTimeoutMs = 3000;
+    lookupMock.mockImplementation(() => new Promise(() => {}));
+    vi.useFakeTimers();
+    try {
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+      const handled = handler(
+        createRequest(requestUrlFor(publicThumbnailUrl())),
+        response,
+        vi.fn(),
+      );
+      await vi.advanceTimersByTimeAsync(thumbnailTimeoutMs);
+      await handled;
+
+      expect(response.statusCode).toBe(502);
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("answers 502 when the host never answers within the timeout", async () => {
@@ -366,14 +481,17 @@ describe("thumbnailEndpointServerHook", () => {
     // A fresh Response per call: a body can only be read once.
     mockFetch.mockImplementation(async () => imageResponse());
     const handler = getRegisteredHandler();
+    // A clean slate, so the eviction side is exactly where this test puts it.
+    resetThumbnailCache();
     const firstUrl = publicThumbnailUrl();
+    const maxEntries = getThumbnailCacheLimits().entries;
 
     await handler(
       createRequest(requestUrlFor(firstUrl)),
       createResponse(),
       vi.fn(),
     );
-    for (let i = 0; i < 100; i += 1) {
+    for (let i = 0; i < maxEntries; i += 1) {
       await handler(
         createRequest(requestUrlFor(publicThumbnailUrl())),
         createResponse(),
@@ -381,13 +499,14 @@ describe("thumbnailEndpointServerHook", () => {
       );
     }
 
-    // 101 entries pushed the cache past its cap, so the first entry is gone.
+    // maxEntries + 1 entries pushed the cache past its cap, so the first
+    // entry is gone and the repeat fetches again.
     await handler(
       createRequest(requestUrlFor(firstUrl)),
       createResponse(),
       vi.fn(),
     );
 
-    expect(mockFetch).toHaveBeenCalledTimes(102);
+    expect(mockFetch).toHaveBeenCalledTimes(maxEntries + 2);
   });
 });

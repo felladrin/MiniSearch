@@ -63,7 +63,7 @@ MiniSearch employs a dual-layer persistence approach:
 - **IndexedDB** - Local storage for search history, settings, cached results, and saved AI transcripts
 - **TTL-based caching** - 15-minute freshness cache for search results to minimize API calls, with a 24-hour stale retention as a fallback when the live search fails
 
-Search history is backed by a Dexie database that keeps three coordinated tables (search runs, LLM responses, chat turns) along with automatic retention/max-entry cleanup. See `docs/search-history.md` for the complete schema and invariants. The caching layer minimizes redundant API calls to SearXNG while maintaining fresh results. Search results cached in IndexedDB have a 15-minute freshness TTL, after which new searches bypass the cache; an expired entry is kept for 24 hours so a failed live search can serve it, flagged stale, instead of failing.
+Search history is backed by a Dexie database that keeps three coordinated tables (search runs, LLM responses, chat turns) along with automatic retention/max-entry cleanup. See `docs/search-history.md` for the complete schema and invariants. The caching layer minimizes redundant API calls to SearXNG while maintaining fresh results. Search results cached in IndexedDB have a 15-minute freshness TTL, after which new searches bypass the cache; an expired entry is kept for 24 hours so a failed live search can serve it, flagged stale, instead of failing. Cached image results store the thumbnail URLs rather than the bytes, so a thumbnail host whose URLs expire or are signed shorter than the retention window shows host-name tiles instead of images on a stale restore.
 
 Long-running chat sessions use an in-memory conversation summary that rolls excess turns into a structured digest before continuing generation. Details about the token budgeting and summary refresh flow live in `docs/conversation-memory.md`.
 
@@ -318,7 +318,7 @@ verification, the funnel `/search/text`, `/search/images`, `/page-content` and
 | `reasons.invalidToken` | number | A token that failed verification, which is what probing looks like |
 | `bySurface` | object | `authorized` and `rejected` per endpoint family: `search`, `pageContent`, `thumbnail`, `inference`, `other` |
 | `rejectedTokenCacheHits` | number | Rejections served from the rejected-token cache without a second argon2 verification |
-| `limiter` | object | The limiter's `points` and `durationSeconds`, without which a rejection count says nothing |
+| `limiter` | object | The shared limiter's `points` and `durationSeconds`, plus the separate `thumbnail` budget behind `/thumbnail`, without which a rejection count says nothing |
 
 `authorized` plus every entry of `reasons` sums to `requests`, and each half of
 `bySurface` sums to its side of that, on the same principle as `pageReads`.
@@ -396,7 +396,7 @@ way `pageReads` does:
 | `reranker.fallbackApplied` | number | `minPercentageFallback`: a large share means the deviation threshold is emptying batches the fallback then has to rescue |
 | `reranker.skippedUnhealthy` | number | Nothing; searches served in SearXNG's own order because the model was not loaded |
 | `reranker.failed` | number | Nothing; the same, because reranking threw |
-| `thumbnails.requested` | number | Nothing; the denominator for the two below; every verified `/thumbnail` request, cache hits included |
+| `thumbnails.requested` | number | Nothing; the denominator for the two below; every verified `/thumbnail` request, cache hits included. Before the endpoint existed this counted image results in a search response, so the served share cannot be trended across that deploy |
 | `thumbnails.dropped` | number | `THUMBNAIL_TIMEOUT_MS` and `MAX_THUMBNAIL_BYTES` in `thumbnailEndpointServerHook.ts`: every one of these is a tile the user saw as a placeholder |
 | `thumbnails.blocked` | number | The SSRF guard, as the share of thumbnails pointing outside public space |
 

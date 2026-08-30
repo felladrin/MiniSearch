@@ -96,11 +96,14 @@ It shares the 10-requests-per-10-seconds bucket with `/search/` and
 heaviest of the three per point.
 
 `/thumbnail` is the second place the server fetches on a client's behalf: the
-client loads each search-result thumbnail from it, one tile at a time. The
-URLs come back from SearXNG rather than from the user, but a compromised or
-hostile engine result could still point the server at an internal address, so
-the same guard applies, and the endpoint is token-gated and rate-limited like
-the rest.
+client loads each search-result thumbnail from it, one tile at a time, and the
+`u` parameter is client-supplied. In practice it carries the URLs SearXNG
+returned, but the endpoint is a general token-gated fetch for any public
+raster image, so the guard must hold for arbitrary input: every hop passes
+`resolvePublicUrl` (the documented DNS-rebinding residual applies per
+request), only raster content types are served, and the response carries
+`nosniff` plus a sandbox CSP because it is same-origin. It draws from its own
+rate-limit budget, since one grid fans out into up to 30 tile loads.
 
 Every hop - the original URL and each redirect - passes `resolvePublicUrl`
 before a request is made, which blocks loopback, link-local (including

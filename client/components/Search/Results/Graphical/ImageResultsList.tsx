@@ -45,6 +45,17 @@ const tileBoxStyle = {
   border: `${rem(2)} solid var(--mantine-color-default-border)`,
 } as const;
 
+/**
+ * A lightbox slide without a loaded thumbnail would render as a blank or
+ * broken image, and the result's source URL is not always an image (video
+ * results point at a page). An inert SVG carrying the host name matches the
+ * grid's fallback tile; a `data:` URL in an `<img>` cannot execute anything.
+ */
+function hostNamePlaceholder(hostName: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><text x="50%" y="50%" fill="#888888" font-family="sans-serif" font-size="24" text-anchor="middle" dominant-baseline="middle">${hostName}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 export default function ImageResultsList({
   imageResults,
 }: {
@@ -191,11 +202,12 @@ export default function ImageResultsList({
         plugins={[Captions]}
         index={state.lightboxIndex}
         slides={imageResults.map(([title, url, , sourceUrl]) => ({
-          // The grid's thumbnail when it loaded; when it did not, the full
-          // image behind the result is the best stand-in the lightbox has.
-          src: failedThumbnails[url]
-            ? sourceUrl
-            : (thumbnailSrcs[url] ?? sourceUrl),
+          // The grid's thumbnail when it loaded; when it did not, the same
+          // host-name placeholder the tile shows.
+          src:
+            thumbnailSrcs[url] && !failedThumbnails[url]
+              ? thumbnailSrcs[url]
+              : hostNamePlaceholder(getHostname(url)),
           alt: title,
           description: (
             <Stack align="center" gap="md">

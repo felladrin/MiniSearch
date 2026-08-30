@@ -81,7 +81,8 @@ describe("ImageResultsList", () => {
   it("loads each tile from the /thumbnail endpoint once the src resolves", async () => {
     renderImageResultsList();
 
-    const img = await screen.findByRole("img");
+    // Both tiles resolve, so the query must allow a match on either.
+    const [img] = await screen.findAllByRole("img");
     expect(getThumbnailSrc).toHaveBeenCalledWith(
       "https://example.com/first.jpg",
     );
@@ -112,7 +113,7 @@ describe("ImageResultsList", () => {
   it("shows the host name when a thumbnail fails to load", async () => {
     renderImageResultsList();
 
-    const img = await screen.findByRole("img");
+    const [img] = await screen.findAllByRole("img");
     img.dispatchEvent(new Event("error"));
 
     // The second tile still loads, so exactly one img survives the failure.
@@ -120,6 +121,25 @@ describe("ImageResultsList", () => {
     expect(
       screen.getByRole("button", { name: "Open image preview: First image" }),
     ).toHaveTextContent("example.com");
+  });
+
+  it("shows the host-name placeholder in the lightbox when the thumbnail failed", async () => {
+    const user = userEvent.setup();
+    renderImageResultsList();
+
+    const [img] = await screen.findAllByRole("img");
+    img.dispatchEvent(new Event("error"));
+    await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(1));
+
+    await user.click(
+      screen.getByRole("button", { name: "Open image preview: First image" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    const slideImage = dialog.querySelector(".yarl__slide_current img");
+    const src = slideImage?.getAttribute("src") ?? "";
+    expect(src).toContain("data:image/svg+xml");
+    expect(src).toContain("example.com");
   });
 
   it("opens the focused thumbnail in the lightbox from the keyboard", async () => {

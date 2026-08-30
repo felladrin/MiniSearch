@@ -164,6 +164,10 @@ describe("handleTokenVerification", () => {
     expect(getAuthorizationStats().limiter).toEqual({
       points: 10,
       durationSeconds: 10,
+      thumbnail: {
+        points: 60,
+        durationSeconds: 10,
+      },
     });
   });
 
@@ -196,6 +200,7 @@ describe("handleTokenVerification", () => {
     expect(Object.keys(stats.limiter).sort()).toEqual([
       "durationSeconds",
       "points",
+      "thumbnail",
     ]);
     expectNumbersAllTheWayDown(stats, "authorization");
     expect(JSON.stringify(stats)).not.toContain("borogoves");
