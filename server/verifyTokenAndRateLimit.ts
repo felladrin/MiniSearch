@@ -102,10 +102,13 @@ export function getClientIp(request: IncomingMessage): string {
  * client IP. Returns `true` when the request is within budget, `false` when the
  * limiter refuses it.
  *
- * It reuses the same limiter instance the search path consumes from, so a
- * caller cannot get a second, independent budget by hitting a different
- * endpoint. Endpoints that pay for expensive work without a token (access-key
- * validation) must consume here before doing that work.
+ * It reuses the same limiter instance the token-verified endpoints consume
+ * from, so a tokenless caller cannot get a second, independent budget by
+ * hitting a different endpoint. (The one deliberate exception is /thumbnail,
+ * which verifies a token like the rest and carries its own budget because a
+ * grid fans out into up to 30 tile loads.) Endpoints that pay for expensive
+ * work without a token (access-key validation) must consume here before doing
+ * that work.
  */
 export async function consumeRateLimitPoint(
   request: IncomingMessage,

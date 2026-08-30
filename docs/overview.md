@@ -397,8 +397,8 @@ way `pageReads` does:
 | `reranker.skippedUnhealthy` | number | Nothing; searches served in SearXNG's own order because the model was not loaded |
 | `reranker.failed` | number | Nothing; the same, because reranking threw |
 | `thumbnails.requested` | number | Nothing; the denominator for the two below; every verified `/thumbnail` request, cache hits included. Before the endpoint existed this counted image results in a search response, so the served share cannot be trended across that deploy |
-| `thumbnails.dropped` | number | `THUMBNAIL_TIMEOUT_MS` and `MAX_THUMBNAIL_BYTES` in `thumbnailEndpointServerHook.ts`: every one of these is a tile the user saw as a placeholder |
-| `thumbnails.blocked` | number | The SSRF guard, as the share of thumbnails pointing outside public space |
+| `thumbnails.dropped` | number | Every request that did not serve a tile: timeout, a non-raster or empty answer, or an address the guard refused (`MAX_THUMBNAIL_BYTES` is not one of these, a capped body is truncated and served): each is a tile the user saw as a placeholder |
+| `thumbnails.blocked` | number | The SSRF guard, as the share of thumbnails whose host is in private space or does not resolve |
 
 `thumbnails.dropped` includes the blocked ones, so `requested` minus `dropped`
 is what reached the client.

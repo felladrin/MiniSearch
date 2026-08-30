@@ -52,7 +52,10 @@ const tileBoxStyle = {
  * grid's fallback tile; a `data:` URL in an `<img>` cannot execute anything.
  */
 function hostNamePlaceholder(hostName: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><text x="50%" y="50%" fill="#888888" font-family="sans-serif" font-size="24" text-anchor="middle" dominant-baseline="middle">${hostName}</text></svg>`;
+  // The host is interpolated into markup; escape the characters that could
+  // close the <text> node.
+  const safe = hostName.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><text x="50%" y="50%" fill="#888888" font-family="sans-serif" font-size="24" text-anchor="middle" dominant-baseline="middle">${safe}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 

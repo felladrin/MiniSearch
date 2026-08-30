@@ -309,10 +309,12 @@ export function thumbnailEndpointServerHook<
         // `dropped` is the total of what never reached the client, blocked
         // included, so `requested` minus `dropped` stays the served count.
         recordThumbnailDropped();
+        // Covers both refusals resolvePublicUrl reports the same way: a host
+        // in private space and a host that does not resolve.
         serveError(
           response,
           403,
-          "Refusing to fetch thumbnail from a non-public address",
+          "Refusing to fetch a thumbnail from a non-public or unresolvable address",
         );
         return;
       }

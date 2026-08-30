@@ -178,6 +178,28 @@ describe("thumbnailEndpointServerHook", () => {
     expect(recordThumbnailBlocked).not.toHaveBeenCalled();
   });
 
+  it("verifies through the thumbnail's own rate-limit budget", async () => {
+    mockFetch.mockResolvedValue(imageResponse());
+    const { thumbnailRateLimiter } = await import("./verifyTokenAndRateLimit");
+    const handler = getRegisteredHandler();
+
+    await handler(
+      createRequest(requestUrlFor(publicThumbnailUrl())),
+      createResponse(),
+      vi.fn(),
+    );
+
+    // The whole separate-budget design rests on this wiring: delete the
+    // options argument and the grid's 30 tile loads draw from the search
+    // budget again.
+    expect(vi.mocked(handleTokenVerification)).toHaveBeenCalledWith(
+      "abc",
+      expect.anything(),
+      expect.anything(),
+      { limiter: thumbnailRateLimiter },
+    );
+  });
+
   it("serves a repeat request from the cache without fetching again", async () => {
     const url = publicThumbnailUrl();
     // A fresh Response per call: a body can only be read once.
@@ -477,36 +499,39 @@ describe("thumbnailEndpointServerHook", () => {
     expect(body.length).toBe(500_000);
   });
 
-  it("evicts the least recently used entry once the cache is full", async () => {
+  it("evicts the least recently used entry, not the least recently loaded one", async () => {
     // A fresh Response per call: a body can only be read once.
     mockFetch.mockImplementation(async () => imageResponse());
     const handler = getRegisteredHandler();
     // A clean slate, so the eviction side is exactly where this test puts it.
     resetThumbnailCache();
     const firstUrl = publicThumbnailUrl();
+    const secondUrl = publicThumbnailUrl();
     const maxEntries = getThumbnailCacheLimits().entries;
+    const load = (url: string) =>
+      handler(createRequest(requestUrlFor(url)), createResponse(), vi.fn());
+    const fetched = (url: string) =>
+      mockFetch.mock.calls.filter((call) => String(call[0]) === url).length;
 
-    await handler(
-      createRequest(requestUrlFor(firstUrl)),
-      createResponse(),
-      vi.fn(),
-    );
-    for (let i = 0; i < maxEntries; i += 1) {
-      await handler(
-        createRequest(requestUrlFor(publicThumbnailUrl())),
-        createResponse(),
-        vi.fn(),
-      );
+    await load(firstUrl);
+    await load(secondUrl);
+
+    // Re-reading firstUrl promotes it, so secondUrl is the eviction candidate.
+    await load(firstUrl);
+
+    for (let i = 0; i < maxEntries - 2; i += 1) {
+      await load(publicThumbnailUrl());
     }
+    // This insert pushes the cache past the cap: exactly one entry is evicted.
+    await load(publicThumbnailUrl());
 
-    // maxEntries + 1 entries pushed the cache past its cap, so the first
-    // entry is gone and the repeat fetches again.
-    await handler(
-      createRequest(requestUrlFor(firstUrl)),
-      createResponse(),
-      vi.fn(),
-    );
-
-    expect(mockFetch).toHaveBeenCalledTimes(maxEntries + 2);
+    // firstUrl (promoted by the re-read) survived and serves from the cache.
+    // A cache without promote-on-hit would have evicted it, being the oldest
+    // load.
+    await load(firstUrl);
+    expect(fetched(firstUrl)).toBe(1);
+    // secondUrl (least recently used) was evicted and fetches again.
+    await load(secondUrl);
+    expect(fetched(secondUrl)).toBe(2);
   });
 });

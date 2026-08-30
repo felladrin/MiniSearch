@@ -34,7 +34,7 @@ needed.
 | Thumbnail upstream answers with a non-raster or an empty body (SVG included) | `/thumbnail` answers HTTP 502, the tile shows the host name | `server/thumbnailEndpointServerHook.test.ts` |
 | Thumbnail body exceeds the byte cap | Body truncated at the cap and served | `server/thumbnailEndpointServerHook.test.ts` |
 | Thumbnail upstream refuses once, then recovers | The failure is not cached; the next tile load fetches again and serves | `server/thumbnailEndpointServerHook.test.ts` |
-| `/thumbnail` budget is spent | HTTP 429 for the tiles only; the search budget is a separate limiter | `server/verifyTokenAndRateLimit.test.ts` |
+| `/thumbnail` budget is spent | HTTP 429 for the tiles only; the search budget is a separate limiter | `server/handleTokenVerification.test.ts`, `server/thumbnailEndpointServerHook.test.ts` |
 | A tile's `/thumbnail` request fails in the browser | That tile shows the host name, the rest of the grid is untouched | `client/components/Search/Results/Graphical/ImageResultsList.test.tsx` |
 | Search returns nothing to the endpoint | HTTP 200 with `[]`, not an error | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Text search returns nothing to the client | Keyword-only query retried as a fallback | `client/modules/textGeneration.degradation.test.ts` |
