@@ -303,31 +303,26 @@ export async function fetchSearXNG(
 
 async function processGraphicalResult(result: SearxngSearchResult) {
   const thumbnailSource =
-    (result.category === "videos" ? result.thumbnail : result.thumbnail_src) ??
-    "";
+    result.category === "videos" ? result.thumbnail : result.thumbnail_src;
 
+  // A grid tile is the thumbnail: without one there is nothing to show but the
+  // host name, and SearXNG leaves the field out often enough (video engines
+  // especially) that keeping these fills the carousel with text placeholders.
+  if (!thumbnailSource) return null;
+
+  // Empty string, not undefined: the client reads the tuple positionally and
+  // treats an empty source as "no link to the full image".
   const sourceUrl =
     (result.category === "videos"
       ? result.iframe_src || result.url
       : result.img_src) ?? "";
 
-  // Empty strings, not undefined: the client reads the tuple positionally and
-  // treats an empty thumbnail as "no thumbnail" and an empty source as
-  // "no link to the full image".
-  try {
-    return [result.title, result.url, thumbnailSource, sourceUrl] as [
-      title: string,
-      url: string,
-      thumbnailSource: string,
-      sourceUrl: string,
-    ];
-  } catch (error) {
-    console.warn(
-      `Failed to process ${result.category} result: ${result.url}`,
-      error instanceof Error ? error.message : error,
-    );
-    return null;
-  }
+  return [result.title, result.url, thumbnailSource, sourceUrl] as [
+    title: string,
+    url: string,
+    thumbnailSource: string,
+    sourceUrl: string,
+  ];
 }
 
 function processSnippet(snippet: string): string {

@@ -526,6 +526,52 @@ describe("graceful degradation", () => {
 
     expect(results).toEqual([]);
   });
+
+  it("drops image results that carry no thumbnail URL", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [
+            {
+              title: "with thumbnail",
+              url: "https://example.com/picture",
+              category: "images",
+              img_src: "https://example.com/picture.jpg",
+              thumbnail_src: "https://example.com/thumbnail.jpg",
+            },
+            {
+              title: "video without thumbnail",
+              url: "https://example.com/watch",
+              category: "videos",
+              iframe_src: "https://example.com/embed",
+            },
+            {
+              title: "image without thumbnail",
+              url: "https://other.com/picture",
+              category: "images",
+              img_src: "https://other.com/picture.jpg",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const results = await fetchSearXNG(
+      "failure injection",
+      "images",
+      30,
+      new CircuitBreaker(breakerOptions),
+    );
+
+    expect(results).toEqual([
+      [
+        "with thumbnail",
+        "https://example.com/picture",
+        "https://example.com/thumbnail.jpg",
+        "https://example.com/picture.jpg",
+      ],
+    ]);
+  });
 });
 
 describe("query privacy", () => {

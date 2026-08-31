@@ -36,6 +36,7 @@ needed.
 | Thumbnail upstream refuses once, then recovers | The failure is not cached; the next tile load fetches again and serves | `server/thumbnailEndpointServerHook.test.ts` |
 | `/thumbnail` budget is spent | HTTP 429 for the tiles only; the search budget is a separate limiter | `server/handleTokenVerification.test.ts`, `server/thumbnailEndpointServerHook.test.ts` |
 | A tile's `/thumbnail` request fails in the browser | That tile shows the host name, the rest of the grid is untouched | `client/components/Search/Results/Graphical/ImageResultsList.test.tsx` |
+| SearXNG returns an image result with no thumbnail URL | The result is dropped, so the grid never shows a host-name tile for it | `server/webSearchService.test.ts` › graceful degradation |
 | Search returns nothing to the endpoint | HTTP 200 with `[]`, not an error | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Text search returns nothing to the client | Keyword-only query retried as a fallback | `client/modules/textGeneration.degradation.test.ts` |
 | Keyword fallback also returns nothing | Text search state stays `completed` with the no-results alert | `client/modules/textGeneration.degradation.test.ts` |
