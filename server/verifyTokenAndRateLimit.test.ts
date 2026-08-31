@@ -360,6 +360,34 @@ describe("verifyTokenAndRateLimit", () => {
     expect(mockConsume).toHaveBeenCalledWith("127.0.0.1");
   });
 
+  it("draws /thumbnail requests from a separate limiter, so one grid cannot exhaust the search budget", async () => {
+    vi.resetModules();
+    const {
+      verifyTokenAndRateLimit,
+      thumbnailRateLimiter,
+      RATE_LIMIT_POINTS,
+      THUMBNAIL_RATE_LIMIT_POINTS,
+    } = await import("./verifyTokenAndRateLimit");
+    consumeInstances.clear();
+    mockIsVerifiedToken = true;
+    const mockReq = makeMockRequest("192.168.1.100");
+
+    await verifyTokenAndRateLimit("token", mockReq);
+    const searchInstances = [...consumeInstances];
+
+    await verifyTokenAndRateLimit("token", mockReq, thumbnailRateLimiter);
+    const thumbnailInstances = [...consumeInstances].filter(
+      (instance) => !searchInstances.includes(instance),
+    );
+
+    // The tile load drew from a different limiter than the search, so the
+    // up-to-30-tile fan-out of one image search cannot eat the user's
+    // text-search and page-read budget.
+    expect(searchInstances).toHaveLength(1);
+    expect(thumbnailInstances).toHaveLength(1);
+    expect(THUMBNAIL_RATE_LIMIT_POINTS).toBeGreaterThan(RATE_LIMIT_POINTS);
+  });
+
   it("should key rate limiter on the forwarded client IP when TRUST_PROXY is enabled", async () => {
     mockRateLimiterShouldFail = false;
     vi.stubEnv("TRUST_PROXY", "true");

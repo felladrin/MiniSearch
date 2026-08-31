@@ -129,6 +129,7 @@ Need to:
 
 ### Server Modules
 - `server/searchEndpointServerHook.ts` - `/search/text` and `/search/images` endpoints
+- `server/thumbnailEndpointServerHook.ts` - `/thumbnail` endpoint: one search-result thumbnail at a time, token-gated, with an in-process LRU in front of the upstream host
 - `server/internalApiEndpointServerHook.ts` - `/inference` proxy to self-hosted API
 - `server/validateAccessKeyServerHook.ts` - Access key validation endpoint
 - `server/statusEndpointServerHook.ts` - `/status` health check endpoint

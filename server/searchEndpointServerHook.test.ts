@@ -1,13 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const lookupMock = vi.hoisted(() => vi.fn());
-
-vi.mock("node:dns/promises", () => ({
-  default: { lookup: lookupMock },
-  lookup: lookupMock,
-}));
-
 vi.mock("./handleTokenVerification", () => ({
   handleTokenVerification: vi.fn(),
 }));
@@ -24,9 +17,6 @@ vi.mock("./searchesSinceLastRestart", () => ({
   incrementTextualSearchesSinceLastRestart: vi.fn(),
   incrementGraphicalSearchesSinceLastRestart: vi.fn(),
   recordSearchDuration: vi.fn(),
-  recordThumbnailRequested: vi.fn(),
-  recordThumbnailDropped: vi.fn(),
-  recordThumbnailBlocked: vi.fn(),
 }));
 
 vi.mock("./webSearchService", () => ({
@@ -41,14 +31,8 @@ import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
   recordSearchDuration,
-  recordThumbnailBlocked,
-  recordThumbnailDropped,
-  recordThumbnailRequested,
 } from "./searchesSinceLastRestart";
 import { fetchSearXNG } from "./webSearchService";
-
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
 
 function createRequest(url: string): IncomingMessage {
   return {
@@ -83,11 +67,6 @@ function getRegisteredHandler() {
 describe("searchEndpointServerHook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // clearAllMocks keeps implementations, and one degradation case installs a
-    // fetch that only settles on abort.
-    mockFetch.mockReset();
-    lookupMock.mockReset();
-    lookupMock.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: true,
     });
@@ -245,7 +224,10 @@ describe("searchEndpointServerHook", () => {
     );
   });
 
-  it("returns image results with thumbnails converted to data URLs and increments the graphical counter", async () => {
+  it("returns image results with the thumbnail URL untouched and increments the graphical counter", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      throw new Error("the search endpoint must not fetch thumbnails");
+    });
     vi.mocked(fetchSearXNG).mockResolvedValue([
       [
         "Cat picture",
@@ -254,12 +236,6 @@ describe("searchEndpointServerHook", () => {
         "https://example.com/cat",
       ],
     ]);
-    mockFetch.mockResolvedValue(
-      new Response(new Uint8Array([1, 2, 3]), {
-        status: 200,
-        headers: { "content-type": "image/jpeg" },
-      }),
-    );
 
     const handler = getRegisteredHandler();
     const response = createResponse();
@@ -271,39 +247,18 @@ describe("searchEndpointServerHook", () => {
     );
 
     expect(incrementGraphicalSearchesSinceLastRestart).toHaveBeenCalled();
-    const [body] = response.end.mock.calls[0];
-    expect(JSON.parse(body)).toEqual([
-      [
-        "Cat picture",
-        "https://example.com/cat.jpg",
-        `data:image/jpeg;base64,${Buffer.from([1, 2, 3]).toString("base64")}`,
-        "https://example.com/cat",
-      ],
-    ]);
-  });
-
-  it("drops image results whose thumbnail fails to download", async () => {
-    vi.mocked(fetchSearXNG).mockResolvedValue([
-      [
-        "Cat picture",
-        "https://example.com/cat.jpg",
-        "https://thumb.example.com/cat.jpg",
-        "https://example.com/cat",
-      ],
-    ]);
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
-
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest("/search/images?q=cats&token=abc"),
-      response,
-      vi.fn(),
+    expect(response.end).toHaveBeenCalledWith(
+      JSON.stringify([
+        [
+          "Cat picture",
+          "https://example.com/cat.jpg",
+          "https://thumb.example.com/cat.jpg",
+          "https://example.com/cat",
+        ],
+      ]),
     );
-
-    const [body] = response.end.mock.calls[0];
-    expect(JSON.parse(body)).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 
   describe("graceful degradation", () => {
@@ -317,16 +272,6 @@ describe("searchEndpointServerHook", () => {
       "https://thumb.example.com/cat.jpg",
       "https://example.com/cat",
     ];
-    const thumbnailDataUrl = `data:image/jpeg;base64,${Buffer.from([1, 2, 3]).toString("base64")}`;
-
-    function respondWithThumbnail() {
-      mockFetch.mockResolvedValue(
-        new Response(new Uint8Array([1, 2, 3]), {
-          status: 200,
-          headers: { "content-type": "image/jpeg" },
-        }),
-      );
-    }
 
     beforeEach(() => {
       // The degradation paths log on purpose; keep the test output readable.
@@ -379,7 +324,6 @@ describe("searchEndpointServerHook", () => {
     it("still serves image results when the reranker is down", async () => {
       vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
       vi.mocked(getRerankerStatus).mockResolvedValue(false);
-      respondWithThumbnail();
 
       const handler = getRegisteredHandler();
       const response = createResponse();
@@ -393,9 +337,7 @@ describe("searchEndpointServerHook", () => {
       expect(rankSearchResults).not.toHaveBeenCalled();
       expect(response.statusCode).toBe(200);
       const [body] = response.end.mock.calls[0];
-      expect(JSON.parse(body)).toEqual([
-        [imageResult[0], imageResult[1], thumbnailDataUrl, imageResult[3]],
-      ]);
+      expect(JSON.parse(body)).toEqual([imageResult]);
     });
 
     it("still serves image results when reranking throws mid-request", async () => {
@@ -404,7 +346,6 @@ describe("searchEndpointServerHook", () => {
       vi.mocked(rankSearchResults).mockRejectedValue(
         new Error("Reranker model is not loaded"),
       );
-      respondWithThumbnail();
 
       const handler = getRegisteredHandler();
       const response = createResponse();
@@ -417,9 +358,7 @@ describe("searchEndpointServerHook", () => {
 
       expect(response.statusCode).toBe(200);
       const [body] = response.end.mock.calls[0];
-      expect(JSON.parse(body)).toEqual([
-        [imageResult[0], imageResult[1], thumbnailDataUrl, imageResult[3]],
-      ]);
+      expect(JSON.parse(body)).toEqual([imageResult]);
     });
 
     it("drops an image the reranker returns under an unknown URL", async () => {
@@ -445,40 +384,6 @@ describe("searchEndpointServerHook", () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.end).toHaveBeenCalledWith("[]");
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
-
-    it("drops an image whose thumbnail host never answers", async () => {
-      // Matches THUMBNAIL_TIMEOUT_MS in searchEndpointServerHook.ts.
-      const thumbnailTimeoutMs = 1000;
-      vi.useFakeTimers();
-      try {
-        vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
-        vi.mocked(getRerankerStatus).mockResolvedValue(false);
-        mockFetch.mockImplementation(
-          (_url: string, init?: RequestInit) =>
-            new Promise((_resolve, reject) => {
-              init?.signal?.addEventListener("abort", () =>
-                reject(new Error("The operation was aborted")),
-              );
-            }),
-        );
-
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        const handled = handler(
-          createRequest("/search/images?q=cats&token=abc"),
-          response,
-          vi.fn(),
-        );
-        await vi.advanceTimersByTimeAsync(thumbnailTimeoutMs);
-        await handled;
-
-        expect(response.statusCode).toBe(200);
-        expect(response.end).toHaveBeenCalledWith("[]");
-      } finally {
-        vi.useRealTimers();
-      }
     });
 
     it("answers 502 when SearXNG is down", async () => {
@@ -518,105 +423,6 @@ describe("searchEndpointServerHook", () => {
         JSON.stringify({ error: "Search service unavailable" }),
       );
     });
-
-    it("drops an image whose thumbnail resolves to a private address", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
-      vi.mocked(getRerankerStatus).mockResolvedValue(false);
-      lookupMock.mockResolvedValue([{ address: "192.168.1.5", family: 4 }]);
-
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-
-      await handler(
-        createRequest("/search/images?q=cats&token=abc"),
-        response,
-        vi.fn(),
-      );
-
-      expect(response.statusCode).toBe(200);
-      expect(response.end).toHaveBeenCalledWith("[]");
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
-
-    it("drops an image whose thumbnail URL uses a non-HTTP scheme", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([
-        [
-          "Cat picture",
-          "https://example.com/cat.jpg",
-          "file:///etc/passwd",
-          "https://example.com/cat",
-        ],
-      ]);
-      vi.mocked(getRerankerStatus).mockResolvedValue(false);
-
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-
-      await handler(
-        createRequest("/search/images?q=cats&token=abc"),
-        response,
-        vi.fn(),
-      );
-
-      expect(response.statusCode).toBe(200);
-      expect(response.end).toHaveBeenCalledWith("[]");
-      expect(mockFetch).not.toHaveBeenCalled();
-    });
-
-    it("does not follow a thumbnail redirect into a private address", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
-      vi.mocked(getRerankerStatus).mockResolvedValue(false);
-      lookupMock
-        .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
-        .mockResolvedValue([{ address: "10.0.0.7", family: 4 }]);
-      mockFetch.mockResolvedValueOnce(
-        new Response(null, {
-          status: 302,
-          headers: { location: "http://10.0.0.7/thumb.jpg" },
-        }),
-      );
-
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-
-      await handler(
-        createRequest("/search/images?q=cats&token=abc"),
-        response,
-        vi.fn(),
-      );
-
-      expect(response.statusCode).toBe(200);
-      expect(response.end).toHaveBeenCalledWith("[]");
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-    });
-
-    it("truncates an oversized thumbnail body", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
-      vi.mocked(getRerankerStatus).mockResolvedValue(false);
-      const bigBody = new Uint8Array(600_000).fill(7);
-      mockFetch.mockResolvedValue(
-        new Response(bigBody, {
-          status: 200,
-          headers: { "content-type": "image/jpeg" },
-        }),
-      );
-
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-
-      await handler(
-        createRequest("/search/images?q=cats&token=abc"),
-        response,
-        vi.fn(),
-      );
-
-      const [body] = response.end.mock.calls[0];
-      const [thumbnailDataUrl] = JSON.parse(body);
-      expect(thumbnailDataUrl[2]).toContain("data:image/jpeg;base64,");
-      // The cap is 500_000 bytes; a 600_000-byte body must be truncated.
-      const decoded = Buffer.from(thumbnailDataUrl[2].split(",")[1], "base64");
-      expect(decoded.length).toBe(500_000);
-    });
   });
 
   it("responds 500 when an unexpected error is thrown", async () => {
@@ -639,6 +445,7 @@ describe("searchEndpointServerHook", () => {
       JSON.stringify({ error: "Internal server error" }),
     );
   });
+
   describe("search path counters", () => {
     it("records how long SearXNG took on a text search", async () => {
       vi.mocked(fetchSearXNG).mockResolvedValue([
@@ -669,52 +476,6 @@ describe("searchEndpointServerHook", () => {
       );
 
       expect(recordSearchDuration).not.toHaveBeenCalled();
-    });
-
-    it("counts a thumbnail that was fetched and one that was dropped", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([
-        [
-          "picture",
-          "https://example.com/page",
-          "https://example.com/thumb.jpg",
-          "https://example.com/full.jpg",
-        ],
-      ]);
-      mockFetch.mockRejectedValue(new Error("thumbnail host down"));
-      const handler = getRegisteredHandler();
-
-      await handler(
-        createRequest("/search/images?q=test&token=abc"),
-        createResponse(),
-        vi.fn(),
-      );
-
-      expect(recordThumbnailRequested).toHaveBeenCalledTimes(1);
-      expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
-      expect(recordThumbnailBlocked).not.toHaveBeenCalled();
-    });
-
-    it("counts a thumbnail refused for resolving outside public space", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([
-        [
-          "picture",
-          "https://example.com/page",
-          "https://169.254.169.254/thumb.jpg",
-          "https://example.com/full.jpg",
-        ],
-      ]);
-      lookupMock.mockResolvedValue([{ address: "169.254.169.254", family: 4 }]);
-      const handler = getRegisteredHandler();
-
-      await handler(
-        createRequest("/search/images?q=test&token=abc"),
-        createResponse(),
-        vi.fn(),
-      );
-
-      expect(recordThumbnailBlocked).toHaveBeenCalledTimes(1);
-      // Blocked thumbnails are dropped too, so the requested total stays closed.
-      expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
     });
 
     it("counts the searches served without the reranker", async () => {

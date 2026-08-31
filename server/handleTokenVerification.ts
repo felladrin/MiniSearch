@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { RateLimiterMemory } from "rate-limiter-flexible";
 import {
   type AuthorizationSurface,
   recordAuthorizedRequest,
@@ -9,6 +10,7 @@ import { verifyTokenAndRateLimit } from "./verifyTokenAndRateLimit.ts";
 const SURFACES: [pathPrefix: string, surface: AuthorizationSurface][] = [
   ["/search", "search"],
   ["/page-content", "pageContent"],
+  ["/thumbnail", "thumbnail"],
   ["/inference", "inference"],
 ];
 
@@ -27,8 +29,13 @@ export async function handleTokenVerification(
   token: string | null,
   response: ServerResponse,
   request?: IncomingMessage,
+  options?: { limiter?: RateLimiterMemory },
 ): Promise<{ shouldContinue: boolean }> {
-  const result = await verifyTokenAndRateLimit(token, request);
+  const result = await verifyTokenAndRateLimit(
+    token,
+    request,
+    options?.limiter,
+  );
   const surface = resolveSurface(request);
 
   if (!result.isAuthorized) {

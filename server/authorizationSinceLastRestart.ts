@@ -13,6 +13,8 @@ import {
   RATE_LIMIT_DURATION_SECONDS,
   RATE_LIMIT_POINTS,
   type RejectionReason,
+  THUMBNAIL_RATE_LIMIT_DURATION_SECONDS,
+  THUMBNAIL_RATE_LIMIT_POINTS,
 } from "./verifyTokenAndRateLimit.ts";
 
 /**
@@ -23,6 +25,7 @@ import {
 export type AuthorizationSurface =
   | "search"
   | "pageContent"
+  | "thumbnail"
   | "inference"
   | "other";
 
@@ -42,6 +45,7 @@ const reasons: Record<RejectionReason, number> = {
 const bySurface: Record<AuthorizationSurface, SurfaceCounts> = {
   search: { authorized: 0, rejected: 0 },
   pageContent: { authorized: 0, rejected: 0 },
+  thumbnail: { authorized: 0, rejected: 0 },
   inference: { authorized: 0, rejected: 0 },
   other: { authorized: 0, rejected: 0 },
 };
@@ -92,6 +96,10 @@ export function getAuthorizationStats() {
     limiter: {
       points: RATE_LIMIT_POINTS,
       durationSeconds: RATE_LIMIT_DURATION_SECONDS,
+      thumbnail: {
+        points: THUMBNAIL_RATE_LIMIT_POINTS,
+        durationSeconds: THUMBNAIL_RATE_LIMIT_DURATION_SECONDS,
+      },
     },
   };
 }

@@ -11,17 +11,9 @@ import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
   recordSearchDuration,
-  recordThumbnailBlocked,
-  recordThumbnailDropped,
-  recordThumbnailRequested,
 } from "./searchesSinceLastRestart.ts";
-import { resolvePublicUrl } from "./utils/publicUrl.ts";
-import { readCappedBytes } from "./utils/streamUtils.ts";
 import { fetchSearXNG } from "./webSearchService.ts";
 
-const THUMBNAIL_TIMEOUT_MS = 1000;
-const MAX_THUMBNAIL_REDIRECTS = 3;
-const MAX_THUMBNAIL_BYTES = 500_000;
 const DEFAULT_SEARCH_LIMIT = 30;
 const MAX_SEARCH_LIMIT = 30;
 const MAX_QUERY_LENGTH = 2000;
@@ -51,64 +43,6 @@ type ImageResult = [
   sourceUrl: string,
 ];
 
-async function fetchThumbnailAsDataUrl(thumbnailSource: string) {
-  recordThumbnailRequested();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), THUMBNAIL_TIMEOUT_MS);
-  try {
-    let target = thumbnailSource;
-
-    for (let hop = 0; hop <= MAX_THUMBNAIL_REDIRECTS; hop++) {
-      let url: URL;
-      try {
-        url = await resolvePublicUrl(target);
-      } catch {
-        // Malformed, non-HTTP, or a private/link-local/reserved address:
-        // do not fetch it on the server's behalf. Throwing lets the caller's
-        // catch drop the whole image result, matching the other failure paths.
-        recordThumbnailBlocked();
-        throw new Error(
-          "Refusing to fetch thumbnail from a non-public address",
-        );
-      }
-
-      const response = await fetch(url, {
-        redirect: "manual",
-        signal: controller.signal,
-      });
-
-      const location = response.headers.get("location");
-      if (isRedirect(response.status) && location) {
-        await response.body?.cancel().catch(() => {});
-        target = new URL(location, url).toString();
-        continue;
-      }
-
-      if (!response.ok) {
-        await response.body?.cancel().catch(() => {});
-        throw new Error(
-          `Thumbnail request failed with status ${response.status}`,
-        );
-      }
-
-      const contentType =
-        response.headers.get("content-type") ?? "application/octet-stream";
-      const { bytes } = await readCappedBytes(response, MAX_THUMBNAIL_BYTES);
-      const base64 = Buffer.from(bytes).toString("base64");
-
-      return `data:${contentType};base64,${base64}`;
-    }
-
-    throw new Error("Thumbnail redirected too many times");
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function isRedirect(status: number): boolean {
-  return status >= 300 && status < 400 && status !== 304;
-}
-
 async function handleRanking(
   query: string,
   results: [title: string, content: string, url: string][],
@@ -137,7 +71,9 @@ async function handleRanking(
 
 /**
  * Serves `/search/text` and `/search/images`: verified requests go through
- * SearXNG, with reranking, score filtering, and thumbnail data-URLs.
+ * SearXNG, with reranking and score filtering. Image results carry the
+ * thumbnail URL as SearXNG returned it; the client loads each one from
+ * `/thumbnail`, so the response does not wait on any thumbnail host.
  */
 export function searchEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
@@ -208,26 +144,16 @@ export function searchEndpointServerHook<
         );
         const rankedResults = await handleRanking(query, resultsText);
 
-        const processedResults = (
-          await Promise.all(
-            rankedResults.map(async ([title, , rankedResultUrl]) => {
-              const result = results.find(
-                ([, resultUrl]) => resultUrl === rankedResultUrl,
-              );
-              if (!result) return null;
-              const [_, url, thumbnailSource, sourceUrl] = result;
-              try {
-                const thumbnail =
-                  await fetchThumbnailAsDataUrl(thumbnailSource);
-
-                return [title, url, thumbnail, sourceUrl] as ImageResult;
-              } catch {
-                recordThumbnailDropped();
-                return null;
-              }
-            }),
-          )
-        ).filter((result): result is ImageResult => result !== null);
+        const processedResults = rankedResults
+          .map(([title, , rankedResultUrl]) => {
+            const result = results.find(
+              ([, resultUrl]) => resultUrl === rankedResultUrl,
+            );
+            if (!result) return null;
+            const [, url, thumbnailSource, sourceUrl] = result;
+            return [title, url, thumbnailSource, sourceUrl] as ImageResult;
+          })
+          .filter((result): result is ImageResult => result !== null);
 
         incrementGraphicalSearchesSinceLastRestart();
 

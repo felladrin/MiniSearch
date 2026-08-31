@@ -94,6 +94,7 @@ describe("handleTokenVerification", () => {
     ["/search/text", "search"],
     ["/search/images", "search"],
     ["/page-content", "pageContent"],
+    ["/thumbnail", "thumbnail"],
     ["/inference", "inference"],
     ["/something-else", "other"],
   ] as const)(
@@ -163,6 +164,10 @@ describe("handleTokenVerification", () => {
     expect(getAuthorizationStats().limiter).toEqual({
       points: 10,
       durationSeconds: 10,
+      thumbnail: {
+        points: 60,
+        durationSeconds: 10,
+      },
     });
   });
 
@@ -190,10 +195,12 @@ describe("handleTokenVerification", () => {
       "other",
       "pageContent",
       "search",
+      "thumbnail",
     ]);
     expect(Object.keys(stats.limiter).sort()).toEqual([
       "durationSeconds",
       "points",
+      "thumbnail",
     ]);
     expectNumbersAllTheWayDown(stats, "authorization");
     expect(JSON.stringify(stats)).not.toContain("borogoves");

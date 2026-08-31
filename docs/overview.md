@@ -63,7 +63,7 @@ MiniSearch employs a dual-layer persistence approach:
 - **IndexedDB** - Local storage for search history, settings, cached results, and saved AI transcripts
 - **TTL-based caching** - 15-minute freshness cache for search results to minimize API calls, with a 24-hour stale retention as a fallback when the live search fails
 
-Search history is backed by a Dexie database that keeps three coordinated tables (search runs, LLM responses, chat turns) along with automatic retention/max-entry cleanup. See `docs/search-history.md` for the complete schema and invariants. The caching layer minimizes redundant API calls to SearXNG while maintaining fresh results. Search results cached in IndexedDB have a 15-minute freshness TTL, after which new searches bypass the cache; an expired entry is kept for 24 hours so a failed live search can serve it, flagged stale, instead of failing.
+Search history is backed by a Dexie database that keeps three coordinated tables (search runs, LLM responses, chat turns) along with automatic retention/max-entry cleanup. See `docs/search-history.md` for the complete schema and invariants. The caching layer minimizes redundant API calls to SearXNG while maintaining fresh results. Search results cached in IndexedDB have a 15-minute freshness TTL, after which new searches bypass the cache; an expired entry is kept for 24 hours so a failed live search can serve it, flagged stale, instead of failing. Cached image results store the thumbnail URLs rather than the bytes, so a thumbnail host whose URLs expire or are signed shorter than the retention window shows host-name tiles instead of images on a stale restore.
 
 Long-running chat sessions use an in-memory conversation summary that rolls excess turns into a structured digest before continuing generation. Details about the token budgeting and summary refresh flow live in `docs/conversation-memory.md`.
 
@@ -97,7 +97,7 @@ The system executes two parallel flows when a user submits a query:
 4. Server verifies request token via `searchToken.ts` (CSRF protection)
 5. `webSearchService.ts` forwards query to SearXNG at `http://127.0.0.1:8888`
 6. Raw results are deduplicated, cleaned, and optionally reranked
-7. Thumbnails are proxied and converted to base64 Data URLs to avoid CORS issues
+7. Image results keep the thumbnail URLs SearXNG returned; the client loads each tile on its own from `/thumbnail`, so the response does not wait on any thumbnail host
 8. Results returned as structured JSON and cached in IndexedDB (15-minute freshness TTL)
 
 ### AI Generation Flow
@@ -119,7 +119,7 @@ The `textGeneration` module orchestrates the entire search-to-response flow, man
 - **Retry Logic**: Exponential backoff for HTTP 500 errors, up to 3 retries
 - **Fail-Fast on Suspending Engines**: An empty response in which every unresponsive engine is under a long suspension (CAPTCHA, rate limit, access denied; SearXNG suspends them for an hour to a day) throws on the first attempt instead of spending the retry budget, which it could not possibly outlast. Transient engine errors (timeouts, server API errors) keep the full retry budget.
 - **Content Processing**: Converts HTML results to plain text, strips emojis for cleaner output
-- **Thumbnail Proxying**: Server fetches external thumbnails and converts to base64 Data URLs, avoiding CORS issues and improving loading stability
+- **Lazy Thumbnail Loading**: The search response returns thumbnail URLs as SearXNG sent them; the client then loads each tile from `/thumbnail`, which applies the SSRF guard and serves from an in-process LRU, so a dead thumbnail host delays one tile instead of the whole grid
 
 ### Search Token Lifecycle
 
@@ -252,7 +252,7 @@ The `/status` endpoint returns a JSON object:
 | `inference` | object | AI answer counters since last restart, see below |
 | `searches` | object | Search timing, circuit state and grounding, see below |
 | `reranker` | object | Reranking cost and effect, see below |
-| `thumbnails` | object | Image thumbnail fetches, see below |
+| `thumbnails` | object | `/thumbnail` request outcomes, see below |
 | `build.timestamp` | string | ISO 8601 build time |
 | `build.gitCommit` | string | Short Git commit hash |
 
@@ -269,8 +269,9 @@ whether the case is being over-classified. It undercounts a sustained
 outage, where the circuit breaker short-circuits before `performSearch` is
 reached, and it does not count a search that recovered on a retry at all,
 which is the point of the retry. The discarded count covers text searches only,
-because an image result is never dropped at this stage: an unusable
-thumbnail is dropped later, when `searchEndpointServerHook` fetches it.
+because an image result is never dropped at this stage: a thumbnail that
+cannot be loaded is dropped later, when the client fetches it from
+`/thumbnail`.
 
 `pageReads` reports what happened to the pages read for AI answers. Each field
 is attached to a constant that someone will want to move, which is the reason it
@@ -316,9 +317,9 @@ verification, the funnel `/search/text`, `/search/images`, `/page-content` and
 | `reasons.rateLimited` | number | Refused by the limiter before anything else ran |
 | `reasons.missingToken` | number | No token on the request, which is what an outdated client looks like |
 | `reasons.invalidToken` | number | A token that failed verification, which is what probing looks like |
-| `bySurface` | object | `authorized` and `rejected` per endpoint family: `search`, `pageContent`, `inference`, `other` |
+| `bySurface` | object | `authorized` and `rejected` per endpoint family: `search`, `pageContent`, `thumbnail`, `inference`, `other` |
 | `rejectedTokenCacheHits` | number | Rejections served from the rejected-token cache without a second argon2 verification |
-| `limiter` | object | The limiter's `points` and `durationSeconds`, without which a rejection count says nothing |
+| `limiter` | object | The shared limiter's `points` and `durationSeconds`, plus the separate `thumbnail` budget behind `/thumbnail`, without which a rejection count says nothing |
 
 `authorized` plus every entry of `reasons` sums to `requests`, and each half of
 `bySurface` sums to its side of that, on the same principle as `pageReads`.
@@ -328,10 +329,11 @@ than adding to that sum.
 The limiter keys on the client IP and none of that reaches these counters: no
 address, no token, no query, no per-request timestamp. The cut is by reason and
 by surface, both properties of the request rather than of whoever sent it.
-`bySurface` is the one worth watching: all four endpoints share one budget and
-a single user action fans out into a text search, an image search and a
-page-content read, so its `authorized` side says where the budget goes and its
-`rejected` side says who pays for it running out.
+`bySurface` is the one worth watching: all five endpoints share one budget and
+a single user action fans out into a text search, an image search, the
+thumbnail loads behind the image grid and a page-content read, so its
+`authorized` side says where the budget goes and its `rejected` side says who
+pays for it running out.
 
 `inference` reports what happened to the AI answers served through
 `/inference`. Nothing about the conversation is kept, so the questions it can
@@ -395,9 +397,9 @@ way `pageReads` does:
 | `reranker.fallbackApplied` | number | `minPercentageFallback`: a large share means the deviation threshold is emptying batches the fallback then has to rescue |
 | `reranker.skippedUnhealthy` | number | Nothing; searches served in SearXNG's own order because the model was not loaded |
 | `reranker.failed` | number | Nothing; the same, because reranking threw |
-| `thumbnails.requested` | number | Nothing; the denominator for the two below |
-| `thumbnails.dropped` | number | `THUMBNAIL_TIMEOUT_MS` and `MAX_THUMBNAIL_BYTES`: every one of these is an image result the user never saw |
-| `thumbnails.blocked` | number | The SSRF guard, as the share of thumbnails pointing outside public space |
+| `thumbnails.requested` | number | Nothing; the denominator for the two below; every verified `/thumbnail` request, cache hits included. Before the endpoint existed this counted image results in a search response, so the served share cannot be trended across that deploy |
+| `thumbnails.dropped` | number | Every request that did not serve a tile: timeout, a non-raster or empty answer, or an address the guard refused (`MAX_THUMBNAIL_BYTES` is not one of these, a capped body is truncated and served): each is a tile the user saw as a placeholder |
+| `thumbnails.blocked` | number | The SSRF guard, as the share of thumbnails whose host is in private space or does not resolve |
 
 `thumbnails.dropped` includes the blocked ones, so `requested` minus `dropped`
 is what reached the client.
