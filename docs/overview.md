@@ -97,7 +97,7 @@ The system executes two parallel flows when a user submits a query:
 4. Server verifies request token via `searchToken.ts` (CSRF protection)
 5. `webSearchService.ts` forwards query to SearXNG at `http://127.0.0.1:8888`
 6. Raw results are deduplicated, cleaned, and optionally reranked
-7. Image results keep the thumbnail URLs SearXNG returned; the client loads each tile on its own from `/thumbnail`, so the response does not wait on any thumbnail host
+7. Image results keep the thumbnail URLs SearXNG returned, and results that came back without one are dropped; the client loads each tile on its own from `/thumbnail`, so the response does not wait on any thumbnail host
 8. Results returned as structured JSON and cached in IndexedDB (15-minute freshness TTL)
 
 ### AI Generation Flow
@@ -268,9 +268,10 @@ after the retries are spent or immediately for an all-suspended set
 whether the case is being over-classified. It undercounts a sustained
 outage, where the circuit breaker short-circuits before `performSearch` is
 reached, and it does not count a search that recovered on a retry at all,
-which is the point of the retry. The discarded count covers text searches only,
-because an image result is never dropped at this stage: a thumbnail that
-cannot be loaded is dropped later, when the client fetches it from
+which is the point of the retry. The discarded count covers image searches too:
+a result SearXNG returned without a thumbnail URL is dropped here, since the
+grid has nothing to show for it. A thumbnail whose URL is there but cannot be
+loaded is a later, per-tile failure, handled when the client fetches it from
 `/thumbnail`.
 
 `pageReads` reports what happened to the pages read for AI answers. Each field
