@@ -153,6 +153,17 @@ describe("stringFormatters", () => {
   });
 
   describe("groupSearchResultsByDate", () => {
+    // The buckets are calendar days, so every fixture below is relative to a
+    // clock. Pinned to local midday: under real time, a run starting seconds
+    // after midnight puts timestamps minutes apart on different days.
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2024, 5, 15, 12, 0, 0));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it("should group items by Yesterday", () => {
       const yesterday = Date.now() - 24 * 60 * 60 * 1000;
       const items = [{ item: { id: 1 }, timestamp: yesterday }];
