@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
-npm install --no-save @biomejs/biome
 if git diff --cached --name-only | grep -qE '\.(ts|tsx|js|jsx|mjs|cjs)$'; then
-  npx @biomejs/biome check --write --staged --no-errors-on-unmatched
+  biome="$(git rev-parse --show-toplevel)/node_modules/.bin/biome"
+  if [ ! -x "$biome" ]; then
+    echo "pre-commit: @biomejs/biome not found in node_modules. Run 'npm ci' and try again." >&2
+    exit 1
+  fi
+  "$biome" check --write --staged --no-errors-on-unmatched
 fi
 git diff --cached --name-only --diff-filter=d | while read -r file; do [ -f "$file" ] && git add "$file"; done
