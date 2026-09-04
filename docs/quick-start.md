@@ -20,7 +20,7 @@ cd MiniSearch
 docker compose up
 ```
 
-Access the application at `http://localhost:7861` (HMR) or `http://localhost:7860` (main)
+Access the application at `http://localhost:7860` (main). During development, HMR is available on `http://localhost:7861` for instant code changes.
 
 The development server includes:
 - Hot Module Replacement (HMR) on port 7861 for instant code changes
