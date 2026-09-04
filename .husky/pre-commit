@@ -1,4 +1,13 @@
 #!/usr/bin/env sh
+
+# Secret scanning - runs on every commit to catch credentials before they land in git
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks detect --source . --redact --exit-code 1 --log-quiet || exit 1
+elif [ -f "$(git rev-parse --show-toplevel)/node_modules/.bin/gitleaks" ]; then
+  "$(git rev-parse --show-toplevel)/node_modules/.bin/gitleaks" detect --source . --redact --exit-code 1 --log-quiet || exit 1
+fi
+
+# Lint and format staged JS/TS files
 if git diff --cached --name-only | grep -qE '\.(ts|tsx|js|jsx|mjs|cjs)$'; then
   biome="$(git rev-parse --show-toplevel)/node_modules/.bin/biome"
   if [ ! -x "$biome" ]; then
