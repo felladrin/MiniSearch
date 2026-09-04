@@ -1,4 +1,15 @@
 #!/usr/bin/env sh
+
+# Secret scanning - runs on every commit to catch credentials before they land in git
+# Requires gitleaks to be installed globally (https://github.com/gitleaks/gitleaks)
+# Skips silently if not installed; CI enforces the check regardless.
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks detect --source . --redact --exit-code 1 --log-quiet || exit 1
+else
+  echo "WARNING: gitleaks not installed. Skipping pre-commit secret scanning." >&2
+fi
+
+# Lint and format staged JS/TS files
 if git diff --cached --name-only | grep -qE '\.(ts|tsx|js|jsx|mjs|cjs)$'; then
   biome="$(git rev-parse --show-toplevel)/node_modules/.bin/biome"
   if [ ! -x "$biome" ]; then
