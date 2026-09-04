@@ -139,7 +139,7 @@ The `O4` (fp16) export loads without complaint but is slower than fp32 on CPU, s
 
 ## Testing
 
-`server/rerankerService.test.ts` runs in the default suite and covers Unicode sanitization, token truncation, and that every document is sent as its own unpadded row, with the ONNX Runtime session, the tokenizer, and the model download all mocked.
+`server/rerankerService.test.ts` runs in the default suite and covers Unicode sanitization, token truncation, and that every document is sent as its own unpadded row, with the ONNX Runtime session, the tokenizer, and the model download all mocked. `server/rerankerServiceHook.test.ts` covers startup error handling and shutdown cleanup with the service dependencies mocked.
 
 `server/rerankerService.integration.test.ts` loads the real model and asserts ranking quality against English and Portuguese fixtures. It downloads ~136MB, the model plus a 17MB sentencepiece tokenizer, so it is excluded from the default suite:
 

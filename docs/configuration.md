@@ -25,6 +25,24 @@ Configure default models for different inference types:
 |----------|---------|-------------|
 | `WLLAMA_DEFAULT_MODEL_ID` | `littlelamb-290m` | Default Wllama model ID (used for both WebGPU-accelerated and CPU inference) |
 
+### Server Model Request Configuration
+
+The server-side model request defaults can be adjusted at runtime with these
+optional environment variables. Integer values are parsed as decimal numbers,
+and temperature and top-p values are parsed as floating-point numbers. An empty
+value uses the corresponding default.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MODEL_MAX_RETRIES` | `5` | Maximum number of retries for a model request |
+| `MODEL_BASE_BACKOFF_MS` | `100` | Initial retry backoff in milliseconds |
+| `MODEL_MAX_BACKOFF_MS` | `5000` | Maximum retry backoff in milliseconds |
+| `MODEL_REQUEST_TIMEOUT_MS` | `30000` | Model request timeout in milliseconds |
+| `MODEL_MAX_CONCURRENT_REQUESTS` | `10` | Maximum number of simultaneous model requests |
+| `MODEL_DEFAULT_MAX_TOKENS` | `2048` | Default maximum number of generated tokens |
+| `MODEL_TEMPERATURE` | `0.7` | Model sampling temperature |
+| `MODEL_TOP_P` | `0.9` | Model nucleus-sampling probability |
+
 ### Internal API Configuration
 
 For self-hosted OpenAI-compatible APIs:
