@@ -22,7 +22,7 @@
       "@shared/*": ["./shared/*"],
       "@root/*": ["./*"]
     },
-    "types": ["vitest/globals", "@testing-library/jest-dom"]
+    "types": ["vitest/globals"]
   },
   "include": ["client", "shared", "test"]
 }
