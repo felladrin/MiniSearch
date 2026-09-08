@@ -4,11 +4,12 @@ MiniSearch optionally reranks search results using a cross-encoder model running
 
 ## Architecture Overview
 
-The reranking subsystem consists of three components:
+The reranking subsystem consists of four components:
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| Service Manager | `server/rerankerService.ts` | Model loading, readiness state, reranking inference |
+| Service Manager | `server/rerankerService.ts` | Readiness state, reranking inference |
+| Model Loading | `server/utils/onnxModelLoader.ts` | Shared model download, tokenizer loading, and session creation (used by both the reranker and the bi-encoder) |
 | Ranking Logic | `server/rankSearchResults.ts` | Score-based filtering and result reordering |
 | Server Hook | `server/rerankerServiceHook.ts` | Startup/shutdown coordination with Vite server |
 
@@ -35,9 +36,9 @@ The size check costs one metadata request per file at startup (roughly 600ms for
 
 ### Execution Providers
 
-The session is created with `["cpu"]`, with no configuration to set, and there is no second attempt to fall back from.
+The session is created with `["cpu"]`, with no configuration to set, and there is no second attempt to fall back from. This decision lives in `server/utils/onnxModelLoader.ts` and governs both the reranker and the bi-encoder.
 
-The model ships as a dynamically quantized graph, and the WebGPU provider has no kernels for its integer matmuls. It registers happily and then hands every one of them back to the CPU, paying a round trip each time: 812ms against 172ms of the same work, with scores drifting by as much as 1.15 and reordering results. GPU acceleration is therefore not on the table for this model, which also removes the reason the two-attempt session logic existed.
+The reranker ships as a dynamically quantized graph, and the WebGPU provider has no kernels for its integer matmuls. It registers happily and then hands every one of them back to the CPU, paying a round trip each time: 812ms against 172ms of the same work, with scores drifting by as much as 1.15 and reordering results. The bi-encoder is fp32 and was not benchmarked on accelerators, but inherits the CPU-only choice.
 
 | Provider | Availability in the Node binding | Notes |
 |----------|----------------------------------|-------|

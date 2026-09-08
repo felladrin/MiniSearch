@@ -12,6 +12,7 @@ import {
   incrementTextualSearchesSinceLastRestart,
   recordSearchDuration,
 } from "./searchesSinceLastRestart.ts";
+import { sendValidationError } from "./utils/httpResponse.ts";
 import { fetchSearXNG } from "./webSearchService.ts";
 
 const DEFAULT_SEARCH_LIMIT = 30;
@@ -101,11 +102,7 @@ export function searchEndpointServerHook<
     });
 
     if (!parsedParams.success) {
-      response.statusCode = 400;
-      response.setHeader("Content-Type", "application/json");
-      response.end(
-        JSON.stringify({ error: parsedParams.error.issues[0].message }),
-      );
+      sendValidationError(response, parsedParams.error);
       return;
     }
 

@@ -20,6 +20,7 @@ import {
   recordModelsRefetched,
   recordStreamEndedWithoutFinish,
 } from "./inferencesSinceLastRestart.ts";
+import { sendJsonError } from "./utils/httpResponse.ts";
 import {
   calculateBackoffTime,
   isResponseWritable,
@@ -71,21 +72,6 @@ function createChunkPayload(
       },
     ],
   };
-}
-
-function sendJsonError(
-  response: ServerResponse,
-  statusCode: number,
-  payload: Record<string, unknown>,
-): void {
-  if (response.headersSent) {
-    safeEndResponse(response);
-    return;
-  }
-
-  response.statusCode = statusCode;
-  response.setHeader("Content-Type", "application/json");
-  safeEndResponse(response, JSON.stringify(payload));
 }
 
 function ensureSseHeaders(response: ServerResponse): void {

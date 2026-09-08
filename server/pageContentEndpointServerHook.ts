@@ -3,6 +3,7 @@ import { z } from "zod";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
 import { fetchPageContents } from "./pageContentService.ts";
 import { recordGroundingOutcome } from "./pageReadsSinceLastRestart.ts";
+import { sendValidationError } from "./utils/httpResponse.ts";
 
 const MAX_QUERY_LENGTH = 2000;
 const MAX_URL_LENGTH = 2048;
@@ -68,11 +69,7 @@ export function pageContentEndpointServerHook<
     });
 
     if (!parsedParams.success) {
-      response.statusCode = 400;
-      response.setHeader("Content-Type", "application/json");
-      response.end(
-        JSON.stringify({ error: parsedParams.error.issues[0].message }),
-      );
+      sendValidationError(response, parsedParams.error);
       return;
     }
 
