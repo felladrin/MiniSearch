@@ -1,14 +1,9 @@
-import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { Tokenizer } from "@huggingface/tokenizers";
-import debug from "debug";
-import { InferenceSession, Tensor } from "onnxruntime-node";
-import { downloadFileFromHuggingFaceRepository } from "./downloadFileFromHuggingFaceRepository.ts";
+import type { Tokenizer } from "@huggingface/tokenizers";
+import { type InferenceSession, Tensor } from "onnxruntime-node";
+import { createModelLogger, loadOnnxModel } from "./utils/onnxModelLoader.ts";
 
-const fileName = path.basename(import.meta.url);
-const printMessage = debug(fileName);
-printMessage.enabled = true;
+const printMessage = createModelLogger(path.basename(import.meta.url));
 
 const MODEL_HF_REPO = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1";
 
@@ -22,9 +17,6 @@ const MODEL_HF_REPO = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1";
  * on 240 MIRACL queries, for a quarter of the download and half the latency.
  */
 const MODEL_HF_FILE = "onnx/model_quint8_avx2.onnx";
-
-const TOKENIZER_HF_FILE = "tokenizer.json";
-const TOKENIZER_CONFIG_HF_FILE = "tokenizer_config.json";
 
 /**
  * Hard ceiling rather than a tuning knob: the model has 514 learned position
@@ -78,62 +70,11 @@ export function sanitizeUnicodeSurrogates(input: string) {
   return output;
 }
 
-function resolveModelPath(hfRepoFile: string) {
-  return path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    "models",
-    MODEL_HF_REPO,
-    hfRepoFile,
-  );
-}
-
-async function ensureFileExists(hfRepoFile: string) {
-  const localPath = resolveModelPath(hfRepoFile);
-  await downloadFileFromHuggingFaceRepository(
-    MODEL_HF_REPO,
-    hfRepoFile,
-    localPath,
-  );
-  return localPath;
-}
-
-/**
- * Runs on the CPU, with nothing to configure. A dynamically quantized graph is
- * the wrong shape for the WebGPU provider, which has no kernels for the integer
- * matmuls and shuttles every one of them back to the CPU: 812ms against 172ms
- * for the same work, with scores drifting by up to 1.15 and reordering results.
- * `coreml` is out for the same reason it was before, being slower than CPU on
- * dynamic shapes. The architecture is logged because it selects the quantized
- * kernel, which is the part that varies between hosts.
- */
-function createSession(modelPath: string) {
-  printMessage(
-    `Loading model on CPU (arch: ${process.arch}, platform: ${process.platform})...`,
-  );
-
-  return InferenceSession.create(modelPath, {
-    executionProviders: ["cpu"],
-    // Errors only. ONNX Runtime otherwise warns on every startup that it
-    // assigned shape operators to CPU, which is expected and not actionable.
-    logSeverityLevel: 3,
-  });
-}
-
 export async function startRerankerService() {
   printMessage("Preparing model...");
-
-  const [modelPath, tokenizerPath, tokenizerConfigPath] = await Promise.all([
-    ensureFileExists(MODEL_HF_FILE),
-    ensureFileExists(TOKENIZER_HF_FILE),
-    ensureFileExists(TOKENIZER_CONFIG_HF_FILE),
-  ]);
-
-  tokenizer = new Tokenizer(
-    JSON.parse(fs.readFileSync(tokenizerPath, "utf8")),
-    JSON.parse(fs.readFileSync(tokenizerConfigPath, "utf8")),
-  );
-
-  session = await createSession(modelPath);
+  const loaded = await loadOnnxModel(MODEL_HF_REPO, MODEL_HF_FILE);
+  session = loaded.session;
+  tokenizer = loaded.tokenizer;
 
   await score("test", ["test document"]);
 

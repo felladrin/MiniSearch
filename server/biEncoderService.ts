@@ -1,14 +1,9 @@
-import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { Tokenizer } from "@huggingface/tokenizers";
-import debug from "debug";
-import { InferenceSession, Tensor } from "onnxruntime-node";
-import { downloadFileFromHuggingFaceRepository } from "./downloadFileFromHuggingFaceRepository.ts";
+import type { Tokenizer } from "@huggingface/tokenizers";
+import { type InferenceSession, Tensor } from "onnxruntime-node";
+import { createModelLogger, loadOnnxModel } from "./utils/onnxModelLoader.ts";
 
-const fileName = path.basename(import.meta.url);
-const printMessage = debug(fileName);
-printMessage.enabled = true;
+const printMessage = createModelLogger(path.basename(import.meta.url));
 
 const MODEL_HF_REPO =
   "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
@@ -20,9 +15,6 @@ const MODEL_HF_REPO =
  * with hundreds of passages each.
  */
 const MODEL_HF_FILE = "onnx/model.onnx";
-
-const TOKENIZER_HF_FILE = "tokenizer.json";
-const TOKENIZER_CONFIG_HF_FILE = "tokenizer_config.json";
 
 /**
  * Maximum tokens per encoding. The model was trained with a 256-token limit;
@@ -38,36 +30,6 @@ const BATCH_SIZE = 64;
 let isReady = false;
 let session: InferenceSession | null = null;
 let tokenizer: Tokenizer | null = null;
-
-function resolveModelPath(hfRepoFile: string) {
-  return path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    "models",
-    MODEL_HF_REPO,
-    hfRepoFile,
-  );
-}
-
-async function ensureFileExists(hfRepoFile: string) {
-  const localPath = resolveModelPath(hfRepoFile);
-  await downloadFileFromHuggingFaceRepository(
-    MODEL_HF_REPO,
-    hfRepoFile,
-    localPath,
-  );
-  return localPath;
-}
-
-function createSession(modelPath: string) {
-  printMessage(
-    `Loading bi-encoder on CPU (arch: ${process.arch}, platform: ${process.platform})...`,
-  );
-
-  return InferenceSession.create(modelPath, {
-    executionProviders: ["cpu"],
-    logSeverityLevel: 3,
-  });
-}
 
 /**
  * Encodes a single text into a normalized embedding vector.
@@ -176,19 +138,9 @@ function cosineSimilarities(
 
 export async function startBiEncoderService() {
   printMessage("Preparing bi-encoder model...");
-
-  const [modelPath, tokenizerPath, tokenizerConfigPath] = await Promise.all([
-    ensureFileExists(MODEL_HF_FILE),
-    ensureFileExists(TOKENIZER_HF_FILE),
-    ensureFileExists(TOKENIZER_CONFIG_HF_FILE),
-  ]);
-
-  tokenizer = new Tokenizer(
-    JSON.parse(fs.readFileSync(tokenizerPath, "utf8")),
-    JSON.parse(fs.readFileSync(tokenizerConfigPath, "utf8")),
-  );
-
-  session = await createSession(modelPath);
+  const loaded = await loadOnnxModel(MODEL_HF_REPO, MODEL_HF_FILE);
+  session = loaded.session;
+  tokenizer = loaded.tokenizer;
 
   // Warm up with a test encoding.
   await encode(session, tokenizer, "test query");

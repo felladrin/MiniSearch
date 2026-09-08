@@ -135,6 +135,14 @@ describe("startRerankerService", () => {
 
     expect(requestedExecutionProviders).toEqual([["cpu"]]);
     expect(await getRerankerStatus()).toBe(true);
+
+    const downloadMock = vi.mocked(
+      (await import("./downloadFileFromHuggingFaceRepository"))
+        .downloadFileFromHuggingFaceRepository,
+    );
+    const downloadedFiles = downloadMock.mock.calls.map((call) => call[1]);
+    expect(downloadedFiles).toContain("tokenizer.json");
+    expect(downloadedFiles).toContain("tokenizer_config.json");
   });
 
   it("stays unready when the session cannot be created", async () => {
