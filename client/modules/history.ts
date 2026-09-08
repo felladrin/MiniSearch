@@ -118,12 +118,15 @@ class HistoryDatabase extends Dexie {
       chatHistory:
         "++id, conversationId, timestamp, [conversationId+timestamp]",
     });
+  }
 
-    this.searches.hook("creating", () => {
-      this.performCleanup().catch((error) => {
-        addLogEntry(`Cleanup hook error: ${error}`);
-      });
+  private cleanupInFlight: Promise<void> | null = null;
+
+  runCleanup(): Promise<void> {
+    this.cleanupInFlight ??= this.performCleanup().finally(() => {
+      this.cleanupInFlight = null;
     });
+    return this.cleanupInFlight;
   }
 
   async performCleanup(): Promise<void> {
@@ -237,22 +240,26 @@ export async function addSearchToHistory(
   results: TextResults | ImageResults,
   source: "user" | "followup" | "suggestion" = "user",
 ): Promise<number | undefined> {
-  return measurePerformance("Add search to history", async () => {
-    return await historyDatabase.searches.add({
-      searchRunId: getCurrentSearchRunId(),
-      query,
-      results,
-      ...(results.type === "text"
-        ? { textResults: results }
-        : { imageResults: results }),
-      timestamp: Date.now(),
-      source,
-      pinned: false,
+  try {
+    const id = await measurePerformance("Add search to history", async () => {
+      return await historyDatabase.searches.add({
+        searchRunId: getCurrentSearchRunId(),
+        query,
+        results,
+        ...(results.type === "text"
+          ? { textResults: results }
+          : { imageResults: results }),
+        timestamp: Date.now(),
+        source,
+        pinned: false,
+      });
     });
-  }).catch((error) => {
+    historyDatabase.runCleanup();
+    return id;
+  } catch (error) {
     addLogEntry(`Error adding search to history: ${error}`);
     return undefined;
-  });
+  }
 }
 
 export async function getRecentSearches(

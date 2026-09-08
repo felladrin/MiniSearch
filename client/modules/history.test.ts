@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Pin auto-cleanup off and avoid pubSub's module-level localStorage reads.
 vi.mock("./pubSub", () => ({
-  getSettings: () => ({
+  getSettings: vi.fn(() => ({
     historyAutoCleanup: false,
     historyRetentionDays: 30,
     historyMaxEntries: 500,
-  }),
+  })),
 }));
 
 const createTestEntry = (overrides: Record<string, unknown> = {}) => ({
@@ -461,6 +461,62 @@ describe("History Module - Dexie CRUD", () => {
       const { getChatMessagesForQuery } = await import("./history");
       const messages = await getChatMessagesForQuery("nonexistent-run-id");
       expect(messages).toEqual([]);
+    });
+  });
+
+  describe("cleanup after add", () => {
+    it("should not throw TransactionInactiveError when auto-cleanup is enabled", async () => {
+      const { getSettings } = await import("./pubSub");
+      const { defaultSettings } = await import("./settings");
+      vi.mocked(getSettings).mockReturnValue({
+        ...defaultSettings,
+        historyAutoCleanup: true,
+        historyRetentionDays: 0,
+        historyMaxEntries: 5,
+      });
+
+      const { addSearchToHistory, historyDatabase } = await import("./history");
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+
+      // Add entries; each triggers cleanup after the transaction completes.
+      // Before the fix, the creating hook ran cleanup inside the add transaction,
+      // and the async import caused a TransactionInactiveError.
+      for (let i = 0; i < 8; i++) {
+        const id = await addSearchToHistory(`query ${i}`, results);
+        expect(id).toBeDefined();
+      }
+
+      // Settle any in-flight cleanup, then run one final cleanup to ensure
+      // the count reflects the steady state.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await historyDatabase.runCleanup();
+
+      // Cleanup should have trimmed to maxEntries (pinned entries exempt, none here)
+      const count = await historyDatabase.searches.count();
+      expect(count).toBeLessThanOrEqual(5);
+    });
+
+    it("should deduplicate concurrent cleanup calls", async () => {
+      const { getSettings } = await import("./pubSub");
+      const { defaultSettings } = await import("./settings");
+      vi.mocked(getSettings).mockReturnValue({
+        ...defaultSettings,
+        historyAutoCleanup: true,
+        historyRetentionDays: 0,
+        historyMaxEntries: 1000,
+      });
+
+      const { historyDatabase } = await import("./history");
+
+      // Two overlapping calls should share the same in-flight promise
+      const p1 = historyDatabase.runCleanup();
+      const p2 = historyDatabase.runCleanup();
+      expect(p1).toBe(p2);
+
+      await p1;
     });
   });
 
