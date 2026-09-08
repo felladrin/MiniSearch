@@ -29,8 +29,10 @@ export default defineConfig({
       include: ["client/**/*.{tsx,ts,jsx,js}", "server/**/*.{ts,js}"],
       exclude: ["client/dist/**", "server/**/*.test.ts"],
       thresholds: {
-        lines: 31,
-        functions: 24,
+        lines: 60,
+        functions: 50,
+        statements: 60,
+        branches: 50,
       },
     },
   },
