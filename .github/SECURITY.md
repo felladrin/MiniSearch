@@ -13,14 +13,11 @@ Only the latest version of MiniSearch receives security updates.
 
 ### Private Vulnerability Reporting
 
-We strongly encourage using GitHub's [Private Vulnerability Reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability) feature to report security vulnerabilities.
+Report security vulnerabilities through GitHub's [Private Vulnerability Reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability) feature. It is the only reporting channel, so every report stays private and tracked in one place.
 
 **Do not report security vulnerabilities through public issues.**
 
-### How to Report
-
-1. **Preferred**: Use GitHub's Private Vulnerability Reporting
-2. **Alternative**: Email the maintainer privately at: (contact can be provided upon request)
+### What to Include
 
 When reporting a vulnerability, please include:
 - A clear description of the vulnerability
