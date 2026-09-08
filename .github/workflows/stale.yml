@@ -1,0 +1,38 @@
+name: Stale
+
+on:
+  schedule:
+    - cron: "30 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  stale:
+    name: Mark and Close Stale Items
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Mark and close stale issues and pull requests
+        uses: actions/stale@v11
+        with:
+          days-before-stale: 60
+          # Counted from the moment an item is marked stale, so an issue is
+          # closed once it reaches 90 days of inactivity.
+          days-before-close: 30
+          # Pull requests are labelled and commented on, but never closed
+          # automatically: a stale branch is still worth rebasing.
+          days-before-pr-close: -1
+          stale-issue-label: stale
+          stale-pr-label: stale
+          stale-issue-message: >
+            This issue has been inactive for 60 days. It will be closed in 30 days if there is no
+            further activity. Comment to keep it open.
+          stale-pr-message: >
+            This pull request has been inactive for 60 days. It will not be closed automatically,
+            but please rebase it on `main` and comment if it is still relevant.
+          close-issue-message: >
+            This issue was closed due to inactivity. Comment if it is still relevant and it will be
+            reopened.
+          exempt-issue-labels: good first issue,security,pinned
+          exempt-pr-labels: good first issue,security,pinned
