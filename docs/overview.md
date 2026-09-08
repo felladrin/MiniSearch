@@ -479,6 +479,7 @@ For complete security details, see `docs/security.md`.
 
 ## Related Topics
 
+- **HTTP API**: `docs/api.md` - Endpoint parameters, responses, and error codes
 - **Quick Start**: `docs/quick-start.md` - Installation and first run
 - **Configuration**: `docs/configuration.md` - All environment variables and settings
 - **AI Integration**: `docs/ai-integration.md` - Detailed AI inference options
