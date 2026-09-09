@@ -33,7 +33,7 @@ those two answer only their documented method and call `next()` otherwise, so a
 
 The token is CSRF protection, not authorization: it proves a request came from
 a page this server served. `server/searchToken.ts` writes it at build time,
-reads it once at startup and holds it for the life of the process, and
+reads it on first use and then holds it for the life of the process, and
 `/api/config` hands it out.
 
 A client never sends the raw token. It hashes it with argon2id using the
@@ -184,9 +184,10 @@ is not an error, and the client degrades to snippet-only answers for those
 results.
 
 Failures: `400` with the first validation message (`Missing query parameter`,
-`Missing url parameter`, `Invalid URL parameter`,
-`No more than 6 URLs can be read per request`), or `500`
-`{"error":"Internal server error"}`.
+`Query parameter must not exceed 2000 characters`, `Missing url parameter`,
+`Invalid URL parameter`, `No more than 6 URLs can be read per request`), or
+`500` `{"error":"Internal server error"}`. A `url` over 2048 characters is
+refused with Zod's own length message rather than one of these.
 
 ### `GET /thumbnail`
 
@@ -215,6 +216,7 @@ held in an in-process LRU (100 entries, 50 MB); failures never are.
 | `400` | `{"error":"Thumbnail URL too long"}` | `u` over 2048 characters |
 | `403` | `{"error":"Refusing to fetch a thumbnail from a non-public or unresolvable address"}` | The host is in private space or does not resolve |
 | `502` | `{"error":"Thumbnail could not be fetched"}` | Upstream failed, timed out, or answered with a type outside the list |
+| `500` | `{"error":"Internal server error"}` | Anything the hook itself threw, caught so Vite's connect stack does not see an unhandled rejection |
 
 Error responses carry `Cache-Control: no-store`, since neither a refusal nor an
 upstream failure is a stable property of the URL.
@@ -267,13 +269,18 @@ Failures before the stream starts:
 | `405` | `{"error":"Method Not Allowed"}` | Not a `POST`; the response carries `Allow: POST` |
 | `415` | `{"error":"Unsupported Media Type"}` | `Content-Type` is not JSON |
 | `400` | `{"error":"Invalid request body"}` or `{"error":"Invalid request body: <field> <message>"}` | Unparseable or schema-invalid body |
+| `400` | `{"error":"Invalid request body stream"}` | A body chunk arrived as neither a string nor bytes |
 | `413` | `{"error":"Request body too large"}` | Body over 1 MiB |
 | `500` | `{"error":"OpenAI API configuration is missing"}` | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` or `_API_KEY` unset |
 | `500` | `{"error":"Failed to fetch available models"}` | No model configured and the provider's listing failed |
 | `500` | `{"error":"No model available"}` | The listing succeeded but was empty |
 | `503` | `{"error":"Service unavailable - all models failed","lastError":"..."}` | Every attempt failed before the first token |
+| `500` | `{"error":"Internal server error","message":"..."}` | Anything else the hook threw |
 
 ### `GET /status`
+
+The hook claims the `/status` prefix, so `/status/anything` answers the same
+way.
 
 Unauthenticated and not rate-limited: uptime, the counters accumulated since
 the last restart, and the health of the reranker, the bi-encoder and SearXNG.
