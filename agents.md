@@ -26,6 +26,7 @@ This is your navigation hub. Start here, follow the links, and return when you n
 - **`docs/security.md`** - Access control, privacy, and security model
 
 ### Core Functionality
+- **`docs/api.md`** - HTTP endpoint reference: parameters, responses, and error codes
 - **`docs/ai-integration.md`** - AI inference types (Wllama, OpenAI, AI Horde, Internal)
 - **`docs/ui-components.md`** - Component architecture and PubSub patterns
 - **`docs/search-history.md`** - History database schema and management
