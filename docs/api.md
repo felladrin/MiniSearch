@@ -27,6 +27,11 @@ also what a method mismatch does on `/api/config` and `/api/validate-access-key`
 those two answer only their documented method and call `next()` otherwise, so a
 `GET` on the validation endpoint returns the app shell, not a 405.
 
+Those two compare the whole request target, query string included, so
+`/api/config?v=2` falls through as well. The `GET` endpoints in the table above
+do not check the method at all: a `POST` to `/search/text` is served like a
+`GET`. Only `/inference` answers `405`.
+
 ## Authentication
 
 ### Search token
@@ -54,8 +59,10 @@ The whole lifecycle is in
 the search token lifecycle section of `docs/security.md`.
 
 Verification runs before parameters are parsed, so a malformed request from an
-unauthenticated caller still costs a rate-limit point. Its failures are the same
-on every token-gated endpoint:
+unauthenticated caller still costs a rate-limit point. The exception is
+`/inference`, which answers `405` and `415` before it looks at the token, so
+those two rejections need no token and spend no rate-limit point. The failures
+below are the same on every token-gated endpoint:
 
 | Status | Body | When |
 | --- | --- | --- |
@@ -104,9 +111,9 @@ Query parameters:
 | --- | --- | --- |
 | `q` | yes | Search query, trimmed, 1 to 2000 characters |
 | `token` | yes | Search token hash |
-| `limit` | no | Result cap, default and maximum 30; a value that is not a positive integer falls back to the default |
+| `limit` | no | How many results to ask SearXNG for, default and maximum 30; a value that is not a positive integer falls back to the default. The score filter below can return fewer |
 
-Responds with a JSON array of tuples, most relevant first:
+Responds with a JSON array of tuples, in the order the client renders them:
 
 ```json
 [
@@ -114,10 +121,24 @@ Responds with a JSON array of tuples, most relevant first:
 ]
 ```
 
+The order is not a score sort. SearXNG's first result is pinned at index 0 and
+is the one result the score filter never drops; the next nine are the first nine
+survivors in SearXNG's order, sorted by score among themselves; everything after
+them is sorted by score too. So a result SearXNG ranked eleventh can outscore
+index 1 and still arrive at index 10 (`server/rankSearchResults.ts`, and the
+preserve top results section of `docs/reranking.md`).
+
+Reranking drops results rather than only reordering them: everything below
+`mean - 0.3 * standardDeviation` is filtered out, with a fallback at 40% of the
+top score when that would empty the batch. Fewer results than `limit` is
+therefore normal on both `/search/text` and `/search/images`, not a sign of an
+outage.
+
 The fourth element is the reranker's raw relevance logit, deliberately not
 passed through a sigmoid (see `docs/reranking.md`). It is absent when the
-reranker is unhealthy, in which case SearXNG's own order is returned unranked,
-so a client must treat the score as optional.
+reranker is unhealthy or a rerank call fails, in which case SearXNG's own order
+is returned unranked and unfiltered, so a client must treat the score as
+optional.
 
 Failures:
 
@@ -147,8 +168,9 @@ Responds with a JSON array of four-element tuples:
 ]
 ```
 
-In order: the title, the page the image was found on, the thumbnail URL exactly
-as SearXNG returned it, and the full image. The last is the embeddable player
+In order: the title, cut to 100 characters because that is the length the
+reranker sees, the page the image was found on, the thumbnail URL exactly as
+SearXNG returned it, and the full image. The last is the embeddable player
 URL for a video result, and an empty string when there is nothing to link to.
 
 The response never waits on a thumbnail host; the client loads each tile
@@ -168,7 +190,7 @@ The path is matched exactly, so `/page-content/anything` falls through.
 | --- | --- | --- |
 | `q` | yes | Query the passages are ranked against, 1 to 2000 characters |
 | `token` | yes | Search token hash |
-| `url` | yes | Page to read, `http` or `https`, up to 2048 characters. Repeat for more; up to 6 per request, duplicates removed |
+| `url` | yes | Page to read, `http` or `https`, up to 2048 characters. Repeat for more; at most 6 per request, counted before duplicates are removed, so 7 URLs are refused even when two of them are the same |
 
 Responds with an object keyed by URL:
 
@@ -214,8 +236,8 @@ held in an in-process LRU (100 entries, 50 MB); failures never are.
 | --- | --- | --- |
 | `400` | `{"error":"Missing thumbnail URL"}` | `u` missing |
 | `400` | `{"error":"Thumbnail URL too long"}` | `u` over 2048 characters |
-| `403` | `{"error":"Refusing to fetch a thumbnail from a non-public or unresolvable address"}` | The host is in private space or does not resolve |
-| `502` | `{"error":"Thumbnail could not be fetched"}` | Upstream failed, timed out, or answered with a type outside the list |
+| `403` | `{"error":"Refusing to fetch a thumbnail from a non-public or unresolvable address"}` | The host is in private space, does not resolve, or `u` is not a parseable `http`/`https` URL. `/page-content` answers `400` for that last case; this endpoint does not distinguish it |
+| `502` | `{"error":"Thumbnail could not be fetched"}` | Upstream failed, timed out, redirected more than 3 times, answered with a type outside the list, or sent an empty body |
 | `500` | `{"error":"Internal server error"}` | Anything the hook itself threw, caught so Vite's connect stack does not see an unhandled rejection |
 
 Error responses carry `Cache-Control: no-store`, since neither a refusal nor an
@@ -262,14 +284,16 @@ written the status line is already sent, so a later failure arrives as a data
 frame carrying an `error` field, followed by `[DONE]`, rather than as a status
 code.
 
+The stream carries `Content-Type: text/event-stream`, `Cache-Control: no-cache`
+and `Connection: keep-alive`.
+
 Failures before the stream starts:
 
 | Status | Body | When |
 | --- | --- | --- |
-| `405` | `{"error":"Method Not Allowed"}` | Not a `POST`; the response carries `Allow: POST` |
-| `415` | `{"error":"Unsupported Media Type"}` | `Content-Type` is not JSON |
+| `405` | `{"error":"Method Not Allowed"}` | Not a `POST`; the response carries `Allow: POST`. Checked before the token, so it needs no token and spends no rate-limit point |
+| `415` | `{"error":"Unsupported Media Type"}` | `Content-Type` is not JSON; also checked before the token |
 | `400` | `{"error":"Invalid request body"}` or `{"error":"Invalid request body: <field> <message>"}` | Unparseable or schema-invalid body |
-| `400` | `{"error":"Invalid request body stream"}` | A body chunk arrived as neither a string nor bytes |
 | `413` | `{"error":"Request body too large"}` | Body over 1 MiB |
 | `500` | `{"error":"OpenAI API configuration is missing"}` | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` or `_API_KEY` unset |
 | `500` | `{"error":"Failed to fetch available models"}` | No model configured and the provider's listing failed |
