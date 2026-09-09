@@ -132,15 +132,17 @@ after them is sorted by score too. So a result SearXNG ranked eleventh can
 outscore index 1 and still arrive at index 10 (`server/rankSearchResults.ts`,
 and the preserve top results section of `docs/reranking.md`).
 
-Reranking drops results rather than only reordering them. Scores are first
-shifted so the lowest in the batch is zero; everything below
+Reranking drops results rather than only reordering them. Every score is first
+shifted by the absolute value of the lowest score in the batch, which puts the
+lowest at zero only when it is negative; everything below
 `mean - 0.3 * standardDeviation` on that shifted scale is filtered out. If that
 leaves fewer than 40% of the batch, the threshold becomes 40% of the highest
-shifted score instead. Neither threshold can be reproduced from the raw logits
-in the response without applying the same shift. On `/search/text` the filter
-sees results 2..N only, since index 0 is exempt; on `/search/images` it sees all
-of them. Fewer results than `limit` is therefore normal on both, not a sign of
-an outage.
+shifted score instead, so the fallback keeps far more of an all-positive batch
+than of one that straddles zero. The response carries only the survivors, so
+neither threshold can be recomputed from it. On `/search/text` the filter sees
+results 2..N only, since index 0 is exempt; on `/search/images` it sees all of
+them. Fewer results than `limit` is therefore normal on both, not a sign of an
+outage.
 
 The fourth element is the reranker's raw relevance logit, deliberately not
 passed through a sigmoid (see `docs/reranking.md`). It is absent when the
