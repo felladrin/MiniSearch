@@ -111,7 +111,7 @@ Query parameters:
 | --- | --- | --- |
 | `q` | yes | Search query, trimmed, 1 to 2000 characters |
 | `token` | yes | Search token hash |
-| `limit` | no | How many results to ask SearXNG for, default and maximum 30; a value that is not a positive integer falls back to the default. The score filter below can return fewer |
+| `limit` | no | How many of SearXNG's results to consider, default and maximum 30; a value that is not a positive integer falls back to the default. SearXNG is not sent this number: it caps a single SearXNG response after duplicate URLs are dropped, and the score filter below can return fewer |
 
 Responds with a JSON array of tuples, in the order the client renders them:
 
@@ -121,18 +121,26 @@ Responds with a JSON array of tuples, in the order the client renders them:
 ]
 ```
 
-The order is not a score sort. SearXNG's first result is pinned at index 0 and
-is the one result the score filter never drops; the next nine are the first nine
-survivors in SearXNG's order, sorted by score among themselves; everything after
-them is sorted by score too. So a result SearXNG ranked eleventh can outscore
-index 1 and still arrive at index 10 (`server/rankSearchResults.ts`, and the
-preserve top results section of `docs/reranking.md`).
+Between SearXNG and the response the server drops duplicate URLs, keeps the
+first `limit` of what remains, and discards results with no title or no snippet.
+Index 0 is the first result that survives that.
 
-Reranking drops results rather than only reordering them: everything below
-`mean - 0.3 * standardDeviation` is filtered out, with a fallback at 40% of the
-top score when that would empty the batch. Fewer results than `limit` is
-therefore normal on both `/search/text` and `/search/images`, not a sign of an
-outage.
+The order is not a score sort. That first surviving result is pinned at index 0
+and is the one result the score filter never drops; the next nine are the first
+nine survivors in SearXNG's order, sorted by score among themselves; everything
+after them is sorted by score too. So a result SearXNG ranked eleventh can
+outscore index 1 and still arrive at index 10 (`server/rankSearchResults.ts`,
+and the preserve top results section of `docs/reranking.md`).
+
+Reranking drops results rather than only reordering them. Scores are first
+shifted so the lowest in the batch is zero; everything below
+`mean - 0.3 * standardDeviation` on that shifted scale is filtered out. If that
+leaves fewer than 40% of the batch, the threshold becomes 40% of the highest
+shifted score instead. Neither threshold can be reproduced from the raw logits
+in the response without applying the same shift. On `/search/text` the filter
+sees results 2..N only, since index 0 is exempt; on `/search/images` it sees all
+of them. Fewer results than `limit` is therefore normal on both, not a sign of
+an outage.
 
 The fourth element is the reranker's raw relevance logit, deliberately not
 passed through a sigmoid (see `docs/reranking.md`). It is absent when the
@@ -152,8 +160,12 @@ Failures:
 ### `GET /search/images`
 
 Same parameters and failures as `/search/text`. The hook claims the whole
-`/search/` prefix and treats everything that is not `/search/text` as an image
-search, so `/search/anything` is an image search.
+`/search/` prefix and treats every path that does not start with `/search/text`
+as an image search, so `/search/anything` is an image search.
+
+The ordering above does not carry over: image results are a plain score sort,
+nothing is pinned at index 0, and no result is exempt from the score filter
+(`preserveTopResults` is only passed for text, see `docs/reranking.md`).
 
 Responds with a JSON array of four-element tuples:
 
@@ -209,7 +221,7 @@ Failures: `400` with the first validation message (`Missing query parameter`,
 `Query parameter must not exceed 2000 characters`, `Missing url parameter`,
 `Invalid URL parameter`, `No more than 6 URLs can be read per request`), or
 `500` `{"error":"Internal server error"}`. A `url` over 2048 characters is
-refused with Zod's own length message rather than one of these.
+answered `Invalid URL parameter`, the same as any other unusable URL.
 
 ### `GET /thumbnail`
 
@@ -279,7 +291,9 @@ data: [DONE]
 ```
 
 When a model stalls or fails before the first token, the server retries with
-another model from the provider's list, up to 5 attempts. Once bytes have been
+another model from the provider's list, up to 5 attempts. That ladder needs the
+list: with `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` pinned there is no second
+model to try, so the first failure is the last attempt. Once bytes have been
 written the status line is already sent, so a later failure arrives as a data
 frame carrying an `error` field, followed by `[DONE]`, rather than as a status
 code.
