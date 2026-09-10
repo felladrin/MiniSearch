@@ -155,6 +155,7 @@ Need to:
 - `client/hooks/useSearchHistory.ts` - Search history management from IndexedDB
 - `client/hooks/useHistoryRestore.ts` - Restores full search state from history
 - `client/hooks/useDrawerState.ts` - Drawer open/close state with logging
+- `client/hooks/useScreenWakeLock.ts` - Keeps the screen awake while a response is generating
 
 ## Common Tasks Quick Reference
 

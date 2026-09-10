@@ -1,6 +1,7 @@
 import { CodeHighlightAdapterProvider } from "@mantine/code-highlight";
 import { usePubSub } from "create-pubsub/react";
 import { useMemo } from "react";
+import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import {
   chatMessagesPubSub,
   isRestoringFromHistoryPubSub,
@@ -12,12 +13,20 @@ import {
   textGenerationStatePubSub,
 } from "@/modules/pubSub";
 import { shikiAdapter } from "@/modules/shiki";
+import type { TextGenerationState } from "@/modules/types";
 import "@mantine/code-highlight/styles.css";
 import AiModelDownloadAllowanceContent from "./AiModelDownloadAllowanceContent";
 import AiResponseContent from "./AiResponseContent";
 import ChatInterface from "./ChatInterface";
 import LoadingModelContent from "./LoadingModelContent";
 import PreparingContent from "./PreparingContent";
+
+const statesKeepingTheScreenAwake: TextGenerationState[] = [
+  "loadingModel",
+  "awaitingSearchResults",
+  "preparingToGenerate",
+  "generating",
+];
 
 export default function AiResponseSection() {
   const [query] = usePubSub(queryPubSub);
@@ -30,6 +39,8 @@ export default function AiResponseSection() {
   const [modelSizeInMegabytes] = usePubSub(modelSizeInMegabytesPubSub);
   const [chatMessages] = usePubSub(chatMessagesPubSub);
   const [isRestoringFromHistory] = usePubSub(isRestoringFromHistoryPubSub);
+
+  useScreenWakeLock(statesKeepingTheScreenAwake.includes(textGenerationState));
 
   return useMemo(() => {
     if (!settings.enableAiResponse || textGenerationState === "idle") {

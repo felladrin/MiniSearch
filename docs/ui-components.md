@@ -403,6 +403,19 @@ const { isDrawerOpen, openDrawer, closeDrawer } = useDrawerState(
 );
 ```
 
+### useScreenWakeLock
+
+Holds the [Screen Wake Lock](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API)
+while the flag is true, so a phone left untouched during a long answer does not
+lock while the text streams in:
+```typescript
+useScreenWakeLock(statesKeepingTheScreenAwake.includes(textGenerationState));
+```
+
+The lock is requested by `AiResponseSection` for the initial answer and by
+`ChatInterface` for follow-up turns, and dropped as soon as generation ends.
+Browsers without the API get no lock and no error.
+
 ## Styling
 
 **Framework:** Mantine UI v9
