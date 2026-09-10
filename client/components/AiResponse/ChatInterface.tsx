@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import throttle from "throttleit";
+import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { persistChatMessages, runFollowUpSearch } from "@/modules/chatHelpers";
 import { generateFollowUpQuestion } from "@/modules/followUpQuestions";
 import { handleEnterKeyDown } from "@/modules/keyboard";
@@ -77,6 +78,8 @@ export default function ChatInterface({
     }, 1000 / 12),
     [],
   );
+
+  useScreenWakeLock(generationState.isGeneratingResponse);
 
   const regenerateFollowUpQuestion = useCallback(
     async (currentQuery: string, currentResponse: string) => {
