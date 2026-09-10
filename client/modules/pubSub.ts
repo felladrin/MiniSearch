@@ -183,6 +183,8 @@ export const chatGenerationStatePubSub = createPubSub({
   isGeneratingFollowUpQuestion: false,
 });
 
+export const [, , getChatGenerationState] = chatGenerationStatePubSub;
+
 export const followUpQuestionPubSub = createPubSub("");
 
 export const [updateFollowUpQuestion] = followUpQuestionPubSub;

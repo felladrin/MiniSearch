@@ -83,7 +83,7 @@ All state channels are defined in `client/modules/pubSub.ts`:
 | `modelSizeInMegabytesPubSub` | `number` | Model size in MB for progress calc | AiResponseSection |
 | `chatMessagesPubSub` | `ChatMessage[]` | Chat conversation | ChatInterface |
 | `chatInputPubSub` | `string` | Current chat input content | ChatInputArea |
-| `chatGenerationStatePubSub` | `{isGeneratingResponse, isGeneratingFollowUpQuestion}` | Chat generation states | ChatInterface |
+| `chatGenerationStatePubSub` | `{isGeneratingResponse, isGeneratingFollowUpQuestion}` | Chat generation states. Each flag has one owner: the send and regenerate handlers write `isGeneratingResponse`, `regenerateFollowUpQuestion` writes `isGeneratingFollowUpQuestion`, and every writer merges `getChatGenerationState()` so a concurrent flow is not clobbered | ChatInterface |
 | `conversationSummaryPubSub` | `{id, summary}` | Rolling conversation summary | TextGeneration module |
 | `followUpQuestionPubSub` | `string` | Generated follow-up question | AiResponseSection |
 | `suppressNextFollowUpPubSub` | `boolean` | Flag to skip next follow-up | FollowUpQuestions module |
@@ -413,8 +413,9 @@ useScreenWakeLock(statesKeepingTheScreenAwake.includes(textGenerationState));
 ```
 
 The lock is requested by `AiResponseSection` for the initial answer and by
-`ChatInterface` for follow-up turns, and dropped as soon as generation ends.
-Browsers without the API get no lock and no error.
+`ChatInterface` for follow-up turns and for the follow-up question that follows
+them, and dropped as soon as generation ends. Browsers without the API get no
+lock and no error.
 
 ## Styling
 

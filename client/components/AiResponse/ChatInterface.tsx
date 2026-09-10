@@ -18,6 +18,7 @@ import {
   chatGenerationStatePubSub,
   chatInputPubSub,
   followUpQuestionPubSub,
+  getChatGenerationState,
   imageSearchResultsPubSub,
   queryPubSub,
   settingsPubSub,
@@ -79,7 +80,10 @@ export default function ChatInterface({
     [],
   );
 
-  useScreenWakeLock(generationState.isGeneratingResponse);
+  useScreenWakeLock(
+    generationState.isGeneratingResponse ||
+      generationState.isGeneratingFollowUpQuestion,
+  );
 
   const regenerateFollowUpQuestion = useCallback(
     async (currentQuery: string, currentResponse: string) => {
@@ -88,7 +92,7 @@ export default function ChatInterface({
 
       try {
         setGenerationState({
-          isGeneratingResponse: false,
+          ...getChatGenerationState(),
           isGeneratingFollowUpQuestion: true,
         });
 
@@ -103,13 +107,13 @@ export default function ChatInterface({
         );
         setFollowUpQuestion(newQuestion);
         setGenerationState({
-          isGeneratingResponse: false,
+          ...getChatGenerationState(),
           isGeneratingFollowUpQuestion: false,
         });
       } catch (_) {
         setFollowUpQuestion("");
         setGenerationState({
-          isGeneratingResponse: false,
+          ...getChatGenerationState(),
           isGeneratingFollowUpQuestion: false,
         });
       }
@@ -205,7 +209,7 @@ export default function ChatInterface({
 
   const handleRegenerateResponse = useCallback(async () => {
     if (
-      generationState.isGeneratingResponse ||
+      getChatGenerationState().isGeneratingResponse ||
       messages.length < 3 ||
       messages[messages.length - 1].role !== "assistant"
     )
@@ -215,7 +219,10 @@ export default function ChatInterface({
     const lastUser = history[history.length - 1];
 
     setMessages(history);
-    setGenerationState({ ...generationState, isGeneratingResponse: true });
+    setGenerationState({
+      ...getChatGenerationState(),
+      isGeneratingResponse: true,
+    });
     setFollowUpQuestion("");
     setStreamedResponse("");
 
@@ -236,15 +243,20 @@ export default function ChatInterface({
         if (settings.enableNotificationOnAiComplete) {
           showAiCompleteNotification(lastUser.content);
         }
-        await regenerateFollowUpQuestion(lastUser.content, finalResponse);
+        // Not awaited: the follow-up question raises its own flag
+        // synchronously, so the `finally` below can hand the wake lock over
+        // and release the response flag while that question is still coming.
+        regenerateFollowUpQuestion(lastUser.content, finalResponse);
       }
     } catch (error) {
       addLogEntry(`Error re-generating response: ${error}`);
     } finally {
-      setGenerationState({ ...generationState, isGeneratingResponse: false });
+      setGenerationState({
+        ...getChatGenerationState(),
+        isGeneratingResponse: false,
+      });
     }
   }, [
-    generationState,
     messages,
     regenerateFollowUpQuestion,
     settings,
@@ -256,8 +268,12 @@ export default function ChatInterface({
   const handleSend = useCallback(
     async (textToSend?: string) => {
       const currentInput = textToSend ?? input;
-      if (currentInput.trim() === "" || generationState.isGeneratingResponse)
+      if (
+        currentInput.trim() === "" ||
+        getChatGenerationState().isGeneratingResponse
+      ) {
         return;
+      }
 
       const userMessage: ChatMessage = { role: "user", content: currentInput };
       const newMessages: ChatMessage[] = [...messages, userMessage];
@@ -265,7 +281,7 @@ export default function ChatInterface({
       setMessages(newMessages);
       if (!textToSend) setInput("");
       setGenerationState({
-        ...generationState,
+        ...getChatGenerationState(),
         isGeneratingResponse: true,
       });
       setFollowUpQuestion("");
@@ -302,7 +318,7 @@ export default function ChatInterface({
 
         await persistChatMessages(currentQuery, currentInput, finalResponse);
 
-        await regenerateFollowUpQuestion(currentInput, finalResponse);
+        regenerateFollowUpQuestion(currentInput, finalResponse);
       } catch (error) {
         addLogEntry(`Error in chat response: ${error}`);
         setMessages((prevMessages) => [
@@ -315,13 +331,12 @@ export default function ChatInterface({
         ]);
       } finally {
         setGenerationState({
-          ...generationState,
+          ...getChatGenerationState(),
           isGeneratingResponse: false,
         });
       }
     },
     [
-      generationState,
       messages,
       settings,
       input,
