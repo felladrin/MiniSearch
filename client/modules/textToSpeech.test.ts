@@ -23,9 +23,11 @@ const settings = {
   reasoningEndMarker: "</think>",
 };
 
+const mockUpdateState = vi.fn();
+
 vi.mock("./pubSub", () => ({
   getSettings: () => settings,
-  updateTextToSpeechState: vi.fn(),
+  updateTextToSpeechState: (state: string) => mockUpdateState(state),
 }));
 
 const englishVoice = {
@@ -49,6 +51,7 @@ function createFakeWorker() {
 }
 
 let spoken: string[] = [];
+let createdObjectUrls = 0;
 
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -59,7 +62,11 @@ beforeEach(async () => {
   mockVoices.mockResolvedValue([englishVoice]);
 
   vi.stubGlobal("navigator", { language: "en-US" });
-  URL.createObjectURL = () => "blob:fake";
+  createdObjectUrls = 0;
+  URL.createObjectURL = () => {
+    createdObjectUrls += 1;
+    return "blob:fake";
+  };
   URL.revokeObjectURL = vi.fn();
   vi.stubGlobal(
     "Audio",
@@ -129,23 +136,22 @@ describe("speak", () => {
     await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
 
     expect(worker.sent[0]).toEqual({
-      type: "speak",
       sentences: ["Hello there."],
       voiceId: "en_US-lessac-high",
     });
 
     worker.onmessage?.({
-      data: {
-        type: "audio",
-        requestId: 1,
-        index: 0,
-        buffer: new ArrayBuffer(8),
-      },
+      data: { type: "audio", index: 0, buffer: new ArrayBuffer(8) },
     });
-    worker.onmessage?.({ data: { type: "done", requestId: 1 } });
+    worker.onmessage?.({ data: { type: "done" } });
 
     await speaking;
+    expect(createdObjectUrls).toBe(1);
     expect(spoken).toEqual([]);
+    expect(mockUpdateState.mock.calls.map(([state]) => state)).toEqual([
+      "speaking",
+      "idle",
+    ]);
   });
 
   it("falls back to the system voice when the local engine cannot load", async () => {
@@ -156,7 +162,7 @@ describe("speak", () => {
     await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
 
     worker.onmessage?.({
-      data: { type: "error", requestId: 1, message: "model download failed" },
+      data: { type: "error", message: "model download failed" },
     });
 
     await speaking;
@@ -190,6 +196,79 @@ describe("speak", () => {
     expect(spoken).toEqual(["Hello there."]);
   });
 
+  it("keeps the answer that already played instead of restarting it", async () => {
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    const speaking = tts.speak("One. Two.");
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    worker.onmessage?.({
+      data: { type: "audio", index: 0, buffer: new ArrayBuffer(8) },
+    });
+    await vi.waitFor(() => expect(createdObjectUrls).toBe(1));
+    worker.onmessage?.({
+      data: { type: "error", message: "synthesis died halfway" },
+    });
+
+    await speaking;
+    expect(spoken).toEqual([]);
+  });
+
+  it("falls back when every synthesized chunk fails to play", async () => {
+    vi.stubGlobal(
+      "Audio",
+      class {
+        onended: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        pause = vi.fn();
+        src = "";
+        play() {
+          return Promise.reject(new Error("autoplay blocked"));
+        }
+      },
+    );
+
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    const speaking = tts.speak("Hello there.");
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    worker.onmessage?.({
+      data: { type: "audio", index: 0, buffer: new ArrayBuffer(8) },
+    });
+    worker.onmessage?.({ data: { type: "done" } });
+
+    await speaking;
+    expect(spoken).toEqual(["Hello there."]);
+  });
+
+  it("honours a stop pressed while the voice catalogue is still loading", async () => {
+    let releaseCatalogue: (voices: unknown[]) => void = () => {};
+    mockVoices.mockReturnValue(
+      new Promise((resolve) => {
+        releaseCatalogue = resolve;
+      }),
+    );
+
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    const speaking = tts.speak("Hello there.");
+    await vi.waitFor(() =>
+      expect(mockUpdateState).toHaveBeenCalledWith("speaking"),
+    );
+
+    tts.stopSpeaking();
+    releaseCatalogue([englishVoice]);
+
+    await speaking;
+    expect(worker.sent).toEqual([]);
+    expect(spoken).toEqual([]);
+    expect(mockUpdateState).toHaveBeenLastCalledWith("idle");
+  });
+
   it("stops playback without falling back to the system voice", async () => {
     const worker = createFakeWorker();
     tts.setWorkerFactory(() => worker as unknown as Worker);
@@ -200,7 +279,6 @@ describe("speak", () => {
     tts.stopSpeaking();
     await speaking;
 
-    expect(worker.sent).toContainEqual({ type: "stop" });
     expect(worker.terminate).toHaveBeenCalled();
     expect(spoken).toEqual([]);
   });

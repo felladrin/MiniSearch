@@ -24,6 +24,11 @@ export interface VoiceOption {
   languageCode: string;
 }
 
+/** The markers come from user settings, so a character like `(` must not be read as syntax. */
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Strips reasoning blocks, links and markdown punctuation so both engines are
  * fed the same plain text.
@@ -34,7 +39,10 @@ export function prepareTextForSpeech(
   reasoningEndMarker: string,
 ): string {
   const withoutReasoning = text.replace(
-    new RegExp(`${reasoningStartMarker}[\\s\\S]*?${reasoningEndMarker}`, "g"),
+    new RegExp(
+      `${escapeForRegExp(reasoningStartMarker)}[\\s\\S]*?${escapeForRegExp(reasoningEndMarker)}`,
+      "g",
+    ),
     "",
   );
   const withoutLinks = withoutReasoning.replace(
@@ -151,11 +159,16 @@ export function setWorkerFactory(factory: () => Worker) {
   workerFactory = factory;
 }
 
-let activeSession: { stop: () => void } | null = null;
-
-export function isSpeaking(): boolean {
-  return activeSession !== null;
+/**
+ * One playback. It is claimed synchronously by `speak()` before any await, so a
+ * stop pressed while the voice catalogue is still loading is remembered instead
+ * of being dropped; each engine then replaces `stop` with its own.
+ */
+interface SpeechSession {
+  stop: () => void;
 }
+
+let activeSession: SpeechSession | null = null;
 
 export function stopSpeaking(): void {
   activeSession?.stop();
@@ -164,6 +177,7 @@ export function stopSpeaking(): void {
 function speakWithSystemVoice(
   text: string,
   storedVoiceId: string,
+  session: SpeechSession,
 ): Promise<void> {
   return new Promise((resolve) => {
     const utterance = new SpeechSynthesisUtterance(text);
@@ -187,11 +201,9 @@ function speakWithSystemVoice(
       resolve();
     };
 
-    activeSession = {
-      stop: () => {
-        self.speechSynthesis.cancel();
-        resolve();
-      },
+    session.stop = () => {
+      self.speechSynthesis.cancel();
+      resolve();
     };
 
     self.speechSynthesis.speak(utterance);
@@ -206,6 +218,7 @@ function speakWithSystemVoice(
 function speakWithLocalVoice(
   sentences: string[],
   voiceId: VoiceId,
+  session: SpeechSession,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const worker = workerFactory();
@@ -215,7 +228,10 @@ function speakWithLocalVoice(
     let synthesisDone = false;
     let playing = false;
     let stopped = false;
-    let playedAnything = false;
+    /** A chunk left the queue and playback was attempted. */
+    let playbackStarted = false;
+    /** A chunk actually played to its end, so the user heard something. */
+    let playbackSucceeded = false;
 
     const cleanUp = () => {
       worker.terminate();
@@ -245,34 +261,51 @@ function speakWithLocalVoice(
       reject(new Error(message));
     };
 
+    const releaseCurrentAudio = () => {
+      playing = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = null;
+      }
+    };
+
     const playNext = () => {
       if (stopped || playing) return;
       const buffer = queue.shift();
       if (!buffer) {
-        if (synthesisDone) finish();
+        // Synthesis can report success while every chunk failed to play, for
+        // instance when the browser no longer counts the click as a gesture
+        // that allows audio. Reporting that as spoken would leave the user
+        // with a silent answer and no fallback.
+        if (!synthesisDone) return;
+        if (playbackSucceeded) finish();
+        else fail("The synthesized audio could not be played");
         return;
       }
 
       playing = true;
-      playedAnything = true;
+      playbackStarted = true;
       objectUrl = URL.createObjectURL(
         new Blob([buffer], { type: "audio/wav" }),
       );
       element = new Audio(objectUrl);
       element.onended = () => {
-        playing = false;
-        if (objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-          objectUrl = null;
-        }
+        playbackSucceeded = true;
+        releaseCurrentAudio();
         playNext();
       };
       element.onerror = () => {
-        playing = false;
+        addLogEntry("A synthesized audio chunk could not be played");
+        releaseCurrentAudio();
         playNext();
       };
-      element.play().catch(() => {
-        playing = false;
+      element.play().catch((error) => {
+        addLogEntry(
+          `Could not start audio playback: ${
+            error instanceof Error ? error.message : "unknown error"
+          }`,
+        );
+        releaseCurrentAudio();
         playNext();
       });
     };
@@ -291,7 +324,7 @@ function speakWithLocalVoice(
       }
       // Once audio has played the answer is already being read aloud, so
       // restarting it on the system voice would repeat what the user heard.
-      if (playedAnything) {
+      if (playbackStarted) {
         addLogEntry(`Local text-to-speech stopped early: ${data.message}`);
         finish();
       } else {
@@ -300,19 +333,13 @@ function speakWithLocalVoice(
     };
 
     worker.onerror = () => {
-      if (playedAnything) finish();
+      if (playbackStarted) finish();
       else fail("The local text-to-speech worker failed to start");
     };
 
-    activeSession = {
-      stop: () => {
-        const request: WorkerRequest = { type: "stop" };
-        worker.postMessage(request);
-        finish();
-      },
-    };
+    session.stop = () => finish();
 
-    const request: WorkerRequest = { type: "speak", sentences, voiceId };
+    const request: WorkerRequest = { sentences, voiceId };
     worker.postMessage(request);
   });
 }
@@ -335,6 +362,13 @@ export async function speak(text: string): Promise<void> {
   );
   if (!spokenText) return;
 
+  let stopRequested = false;
+  const session: SpeechSession = {
+    stop: () => {
+      stopRequested = true;
+    },
+  };
+  activeSession = session;
   updateTextToSpeechState("speaking");
 
   try {
@@ -349,8 +383,16 @@ export async function speak(text: string): Promise<void> {
           storedVoiceId,
           navigator.language,
         );
+        if (stopRequested) return;
         if (voiceId) {
-          await speakWithLocalVoice(splitIntoSentences(spokenText), voiceId);
+          // Returning here is what keeps a stop silent: `speakWithLocalVoice`
+          // resolves when the user stops, and falling through would then read
+          // the whole answer again with a system voice.
+          await speakWithLocalVoice(
+            splitIntoSentences(spokenText),
+            voiceId,
+            session,
+          );
           return;
         }
         addLogEntry(
@@ -365,9 +407,13 @@ export async function speak(text: string): Promise<void> {
       }
     }
 
-    await speakWithSystemVoice(spokenText, storedVoiceId);
+    if (stopRequested) return;
+    await speakWithSystemVoice(spokenText, storedVoiceId, session);
   } finally {
-    activeSession = null;
-    updateTextToSpeechState("idle");
+    // A session that has already been replaced must not clear the live one.
+    if (activeSession === session) {
+      activeSession = null;
+      updateTextToSpeechState("idle");
+    }
   }
 }
