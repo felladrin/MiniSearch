@@ -336,9 +336,11 @@ groups local voices for the current language separately from the OS voices.
 
 ### Third-party requests
 
-The local engine contacts four hosts the rest of the app never touches, when
-Listen is pressed and when the Voice settings panel lists the local voices. See
-the privacy note in `docs/security.md`.
+The local engine contacts four hosts, when Listen is pressed and when the Voice
+settings panel lists the local voices. Two of them are new to this feature: the
+ONNX runtime and the phonemizer come from CDNs, while browser inference already
+downloads its models from HuggingFace. See the privacy note in
+`docs/security.md`.
 
 ## Error Handling and Fallbacks
 

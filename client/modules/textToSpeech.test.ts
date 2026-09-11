@@ -14,7 +14,11 @@ vi.mock("./piper", () => ({
   predict: vi.fn(),
 }));
 
-vi.mock("./logEntries", () => ({ addLogEntry: vi.fn() }));
+const mockAddLogEntry = vi.fn();
+
+vi.mock("./logEntries", () => ({
+  addLogEntry: (message: string) => mockAddLogEntry(message),
+}));
 
 const settings = {
   selectedVoiceId: "",
@@ -186,6 +190,9 @@ describe("speak", () => {
     await tts.speak("Hello there.");
 
     expect(spoken).toEqual(["Hello there."]);
+    expect(mockAddLogEntry).toHaveBeenCalledWith(
+      "No local voice matches this language; using the system voices",
+    );
   });
 
   it("falls back when the voice catalogue cannot be reached", async () => {
@@ -356,6 +363,9 @@ describe("no speech engine at all", () => {
     await tts.speak("Hello there.");
 
     expect(spoken).toEqual([]);
+    expect(mockAddLogEntry).toHaveBeenCalledWith(
+      "This browser provides no speech synthesis voices",
+    );
     expect(mockUpdateState.mock.calls.map(([state]) => state)).toEqual([
       "speaking",
       "idle",
