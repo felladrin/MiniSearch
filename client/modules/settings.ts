@@ -59,6 +59,7 @@ export const defaultSettings = {
   historyRetentionDays: 30,
   historyGroupByDate: true,
   selectedVoiceId: "",
+  textToSpeechEngine: "local" as "local" | "system",
   reasoningStartMarker: "<think>",
   reasoningEndMarker: "</think>",
   enableNotificationOnAiComplete: false,

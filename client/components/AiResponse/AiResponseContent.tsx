@@ -19,10 +19,10 @@ import {
 } from "@tabler/icons-react";
 import type { PublishFunction } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
-import { type ReactNode, useMemo, useState } from "react";
-import { addLogEntry } from "@/modules/logEntries";
-import { settingsPubSub } from "@/modules/pubSub";
+import { type ReactNode, useMemo } from "react";
+import { settingsPubSub, textToSpeechStatePubSub } from "@/modules/pubSub";
 import { searchAndRespond } from "@/modules/textGeneration";
+import { speak } from "@/modules/textToSpeech";
 import CopyIconButton from "./CopyIconButton";
 import FormattedMarkdown from "./FormattedMarkdown";
 
@@ -45,7 +45,8 @@ export default function AiResponseContent({
   >;
 }) {
   const [settings, setSettings] = usePubSub(settingsPubSub);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [textToSpeechState] = usePubSub(textToSpeechStatePubSub);
+  const isSpeaking = textToSpeechState === "speaking";
   const isGenerating = textGenerationState === "generating";
 
   const ConditionalScrollArea = useMemo(
@@ -66,55 +67,6 @@ export default function AiResponseContent({
       },
     [settings.enableAiResponseScrolling],
   );
-
-  function speakResponse(text: string) {
-    if (isSpeaking) {
-      self.speechSynthesis.cancel();
-      setIsSpeaking(false);
-      return;
-    }
-
-    const prepareTextForSpeech = (textToClean: string) => {
-      const withoutReasoning = textToClean.replace(
-        new RegExp(
-          `${settings.reasoningStartMarker}[\\s\\S]*?${settings.reasoningEndMarker}`,
-          "g",
-        ),
-        "",
-      );
-      const withoutLinks = withoutReasoning.replace(
-        /\[([^\]]+)\]\([^)]+\)/g,
-        "($1)",
-      );
-      const withoutMarkdown = withoutLinks.replace(/[#*`_~[\]]/g, "");
-      return withoutMarkdown.trim();
-    };
-
-    const utterance = new SpeechSynthesisUtterance(prepareTextForSpeech(text));
-
-    const voices = self.speechSynthesis.getVoices();
-
-    if (voices.length > 0 && settings.selectedVoiceId) {
-      const voice = voices.find(
-        (voice) => voice.voiceURI === settings.selectedVoiceId,
-      );
-
-      if (voice) {
-        utterance.voice = voice;
-        utterance.lang = voice.lang;
-      }
-    }
-
-    utterance.onerror = () => {
-      addLogEntry("Failed to speak response");
-      setIsSpeaking(false);
-    };
-
-    utterance.onend = () => setIsSpeaking(false);
-
-    setIsSpeaking(true);
-    self.speechSynthesis.speak(utterance);
-  }
 
   return (
     <Card withBorder shadow="sm" radius="md">
@@ -158,7 +110,7 @@ export default function AiResponseContent({
               label={isSpeaking ? "Stop speaking" : "Listen to response"}
             >
               <ActionIcon
-                onClick={() => speakResponse(response)}
+                onClick={() => speak(response)}
                 variant="subtle"
                 color={isSpeaking ? "blue" : "gray"}
               >
