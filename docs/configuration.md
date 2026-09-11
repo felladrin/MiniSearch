@@ -180,7 +180,8 @@ Search results:
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `selectedVoiceId` | string | `""` | Voice ID for text-to-speech |
+| `selectedVoiceId` | string | `""` | Voice for reading answers aloud. `piper:<voice>` picks a local neural voice, `system:<voiceURI>` an OS voice, and `""` picks one automatically for the browser language. A bare value stored by an earlier version is read as an OS voice whenever the system engine runs; with the local engine it is ignored in favor of a language match |
+| `textToSpeechEngine` | `"local" \| "system"` | `"local"` | Which engine reads answers aloud. `"system"` also overrides a local voice picked above, and stops the voice list from being fetched, so it never contacts a third-party host. A profile that had picked an OS voice before this setting existed starts on `"system"`, so the upgrade does not replace that choice with a model download |
 | `reasoningStartMarker` | string | `"<think>"` | Marker for start of reasoning content |
 | `reasoningEndMarker` | string | `"</think>"` | Marker for end of reasoning content |
 

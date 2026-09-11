@@ -102,6 +102,12 @@ listenToTextGenerationStateChanges((textGenerationState) => {
   addLogEntry(`Text generation state changed to '${textGenerationState}'`);
 });
 
+export type TextToSpeechState = "idle" | "speaking";
+
+export const textToSpeechStatePubSub = createPubSub<TextToSpeechState>("idle");
+
+export const [updateTextToSpeechState] = textToSpeechStatePubSub;
+
 export const modelLoadingProgressPubSub = createPubSub(0);
 
 export const [updateModelLoadingProgress] = modelLoadingProgressPubSub;

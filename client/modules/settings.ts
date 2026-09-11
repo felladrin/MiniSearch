@@ -18,6 +18,34 @@ export const hasStoredUserSettings =
   localStorage.getItem(SETTINGS_STORAGE_KEY) !== null;
 
 /**
+ * Whether this profile picked an OS voice before the local engine existed.
+ * Such a value is a bare `speechSynthesis` voice URI rather than a prefixed
+ * one, and picking it was a deliberate choice, so the profile keeps the system
+ * engine instead of being moved onto a model download on the next upgrade.
+ */
+const hasLegacySystemVoice = (() => {
+  try {
+    const stored: unknown = JSON.parse(
+      localStorage.getItem(SETTINGS_STORAGE_KEY) ?? "{}",
+    );
+    if (typeof stored !== "object" || stored === null) return false;
+    const { selectedVoiceId, textToSpeechEngine } = stored as Record<
+      string,
+      unknown
+    >;
+    return (
+      textToSpeechEngine === undefined &&
+      typeof selectedVoiceId === "string" &&
+      selectedVoiceId.length > 0 &&
+      !selectedVoiceId.startsWith("piper:") &&
+      !selectedVoiceId.startsWith("system:")
+    );
+  } catch {
+    return false;
+  }
+})();
+
+/**
  * `navigator.hardwareConcurrency` reports logical processors, so half of it
  * approximates the physical core count on the SMT CPUs most users have.
  * wllama's throughput peaks there and degrades past it: on a 16-core/32-thread
@@ -59,6 +87,9 @@ export const defaultSettings = {
   historyRetentionDays: 30,
   historyGroupByDate: true,
   selectedVoiceId: "",
+  textToSpeechEngine: (hasLegacySystemVoice ? "system" : "local") as
+    | "local"
+    | "system",
   reasoningStartMarker: "<think>",
   reasoningEndMarker: "</think>",
   enableNotificationOnAiComplete: false,

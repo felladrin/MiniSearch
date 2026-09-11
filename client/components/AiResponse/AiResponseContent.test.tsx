@@ -12,8 +12,8 @@ vi.mock("@/modules/textGeneration", () => ({
   searchAndRespond: vi.fn(),
 }));
 
-vi.mock("@/modules/logEntries", () => ({
-  addLogEntry: vi.fn(),
+vi.mock("@/modules/textToSpeech", () => ({
+  speak: vi.fn(),
 }));
 
 vi.mock("./FormattedMarkdown", () => ({
@@ -23,10 +23,9 @@ vi.mock("./FormattedMarkdown", () => ({
 }));
 
 function renderContent(textGenerationState: string) {
-  vi.mocked(usePubSub).mockReturnValue([
-    { enableAiResponseScrolling: false },
-    vi.fn(),
-  ]);
+  vi.mocked(usePubSub)
+    .mockReturnValueOnce([{ enableAiResponseScrolling: false }, vi.fn()])
+    .mockReturnValueOnce(["idle", vi.fn()]);
 
   return render(
     <MantineProvider>

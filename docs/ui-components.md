@@ -70,6 +70,7 @@ All state channels are defined in `client/modules/pubSub.ts`:
 |---------|------|-------------|-------------------|
 | `queryPubSub` | `string` | Current search query | SearchForm, SearchButton |
 | `responsePubSub` | `string` | AI response content (throttled: 12/sec) | AiResponseSection |
+| `textToSpeechStatePubSub` | `TextToSpeechState` | Whether an answer is being read aloud: `"idle" \| "speaking"` | AiResponseContent |
 | `reasoningContentPubSub` | `string` | AI reasoning/thinking content (throttled: 12/sec) | AiResponseSection |
 | `settingsPubSub` | `Settings` | Application settings | SettingsForm, various components |
 | `textSearchResultsPubSub` | `TextSearchResults` | Text search results | SearchResultsSection |
@@ -259,7 +260,7 @@ function AiResponseSection() {
 - **SearchSettingsForm:** Result limits, image search toggle
 - **InterfaceSettingsForm:** UI preferences
 - **HistorySettings:** Retention days, max entries
-- **VoiceSettingsForm:** TTS voice selection
+- **VoiceSettingsForm:** Text-to-speech engine and voice selection
 - **ActionsForm:** Data management actions
 
 **PubSub:**

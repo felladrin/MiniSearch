@@ -296,6 +296,52 @@ Summarize this conversation in 3-5 sentences, preserving key facts
 and user intent. Be concise but informative.
 ```
 
+## Text-to-Speech
+
+The "Listen to response" button reads the answer aloud. Two engines back it:
+
+| Engine | Setting value | Voice source | Works offline |
+| --- | --- | --- | --- |
+| Local neural | `local` (default) | Piper (VITS) models run in the browser through `@diffusionstudio/vits-web` | No: only the voice model is stored in OPFS, so the voice index, the ONNX runtime and the phonemizer are fetched again |
+| System | `system` | `speechSynthesis`, whatever the OS provides | Yes |
+
+### Flow
+
+1. `speak()` in `client/modules/textToSpeech.ts` strips reasoning blocks, link
+   targets and markdown punctuation, then splits the answer into sentences.
+2. The sentences go to `client/modules/textToSpeechWorker.ts`, which synthesizes
+   them one at a time and posts each WAV buffer back, so playback starts on the
+   first sentence instead of waiting for the whole answer.
+3. The main thread queues the buffers and plays them in order.
+
+`client/modules/piper.ts` is the only module that imports the package, so
+replacing it with a bespoke `onnxruntime-web` setup is a one-file change.
+
+### Falling back
+
+The system voices take over when the local engine cannot run: the voice
+catalogue is unreachable, no local voice matches the language, the worker fails
+before anything is audible, or synthesis succeeds but no chunk could be played
+(a browser that no longer counts the click as a gesture allowing audio, for
+instance). Once a sentence has been heard, or while one is playing, the
+fallback is skipped, because restarting would repeat it. Stopping playback is
+not a failure and never falls back.
+
+### Voices
+
+The catalogue is fetched at runtime from the published voice index rather than
+hardcoded: it already lists more voices than the package's own `VoiceId` union,
+and a stale copy would offer voices that fail to download. The settings form
+groups local voices for the current language separately from the OS voices.
+
+### Third-party requests
+
+The local engine contacts four hosts, when Listen is pressed and when the Voice
+settings panel lists the local voices. Two of them are new to this feature: the
+ONNX runtime and the phonemizer come from CDNs, while browser inference already
+downloads its models from HuggingFace. See the privacy note in
+`docs/security.md`.
+
 ## Error Handling and Fallbacks
 
 ### Browser Inference Failures

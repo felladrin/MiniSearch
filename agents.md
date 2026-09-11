@@ -124,6 +124,10 @@ Need to:
 - `client/modules/systemPrompt.ts` - System prompt templates
 - `client/modules/logEntries.ts` - Application logging with unique IDs
 - `client/modules/appInfo.ts` - Application metadata and version info
+- `client/modules/textToSpeech.ts` - Reads answers aloud: engine selection, fallback, and the playback queue
+- `client/modules/textToSpeechWorker.ts` - Synthesizes sentences off the main thread
+- `client/modules/textToSpeechWorkerProtocol.ts` - Message types shared by both sides of the worker
+- `client/modules/piper.ts` - The only module that imports `@diffusionstudio/vits-web`
 - `client/modules/keyboard.ts` - Keyboard shortcut handling
 - `client/modules/stringFormatters.ts` - Text formatting utilities
 - `client/modules/types.ts` - Shared TypeScript type definitions

@@ -55,6 +55,10 @@ The `client/modules/` directory contains core business logic organized by domain
 | `parentWindow.ts` | PostMessage API for parent window embedding |
 | `logEntries.ts` | Application logging with unique IDs |
 | `appInfo.ts` | Application metadata and version info |
+| `textToSpeech.ts` | Reads answers aloud: engine selection, fallback, and the playback queue |
+| `textToSpeechWorker.ts` | Synthesizes sentences off the main thread |
+| `textToSpeechWorkerProtocol.ts` | Message types shared by both sides of the worker |
+| `piper.ts` | The only module that imports `@diffusionstudio/vits-web` |
 | `keyboard.ts` | Keyboard shortcut handling |
 | `pageContent.ts` | Requests extracted result-page text used to ground answers |
 | `systemPrompt.ts` | System prompt templates |

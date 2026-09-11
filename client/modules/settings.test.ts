@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ServerConfig } from "./config";
 import {
   applyServerConfig,
@@ -118,5 +118,43 @@ describe("Settings Module", () => {
     const applied = applyServerConfig(defaultSettings, config, true);
     expect(applied.wllamaModelId).toBe(defaultSettings.wllamaModelId);
     expect(applied.inferenceType).toBe(defaultSettings.inferenceType);
+  });
+});
+
+describe("legacy voice migration", () => {
+  const load = async (stored: Record<string, unknown> | null) => {
+    localStorage.clear();
+    if (stored) localStorage.setItem("settings", JSON.stringify(stored));
+    vi.resetModules();
+    return import("./settings");
+  };
+
+  it("keeps the system engine for a profile that picked an OS voice", async () => {
+    const { defaultSettings: settings } = await load({
+      selectedVoiceId: "urn:moz-tts:speechd:English (America)",
+    });
+
+    expect(settings.textToSpeechEngine).toBe("system");
+  });
+
+  it("uses the local engine for a profile that never picked a voice", async () => {
+    const { defaultSettings: settings } = await load({ selectedVoiceId: "" });
+
+    expect(settings.textToSpeechEngine).toBe("local");
+  });
+
+  it("leaves an already-migrated profile alone", async () => {
+    const { defaultSettings: settings } = await load({
+      selectedVoiceId: "urn:moz-tts:speechd:English (America)",
+      textToSpeechEngine: "local",
+    });
+
+    expect(settings.textToSpeechEngine).toBe("local");
+  });
+
+  it("uses the local engine for a fresh profile", async () => {
+    const { defaultSettings: settings } = await load(null);
+
+    expect(settings.textToSpeechEngine).toBe("local");
   });
 });
