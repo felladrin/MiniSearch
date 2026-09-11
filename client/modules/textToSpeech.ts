@@ -12,7 +12,8 @@ export type TextToSpeechEngine = "local" | "system";
 /**
  * Voice ids are stored with an engine prefix so one `Select` can offer both
  * engines. A value without a prefix is a `speechSynthesis` voice URI stored by
- * an earlier version, and is still honoured.
+ * an earlier version; it is honoured whenever the system engine runs, and
+ * ignored by the local engine, which matches on language instead.
  */
 const LOCAL_VOICE_PREFIX = "piper:";
 const SYSTEM_VOICE_PREFIX = "system:";
@@ -232,7 +233,7 @@ function speakWithLocalVoice(
     let synthesisDone = false;
     let playing = false;
     let stopped = false;
-    /** A chunk played to its end, so the user already heard part of the answer. */
+    /** Playback of a chunk actually began, so the user is hearing the answer. */
     let playbackSucceeded = false;
 
     const cleanUp = () => {
@@ -304,15 +305,22 @@ function speakWithLocalVoice(
         releaseCurrentAudio();
         playNext();
       };
-      element.play().catch((error) => {
-        addLogEntry(
-          `Could not start audio playback: ${
-            error instanceof Error ? error.message : "unknown error"
-          }`,
-        );
-        releaseCurrentAudio();
-        playNext();
-      });
+      element.play().then(
+        () => {
+          // Resolves once playback has begun, which is the only reliable
+          // signal that the user is actually hearing this chunk.
+          playbackSucceeded = true;
+        },
+        (error) => {
+          addLogEntry(
+            `Could not start audio playback: ${
+              error instanceof Error ? error.message : "unknown error"
+            }`,
+          );
+          releaseCurrentAudio();
+          playNext();
+        },
+      );
     };
 
     worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
@@ -327,10 +335,8 @@ function speakWithLocalVoice(
         playNext();
         return;
       }
-      // Once audio has played the answer is already being read aloud, so
-      // restarting it on the system voice would repeat what the user heard.
-      // Already heard, or currently audible: restarting would repeat it.
-      if (playbackSucceeded || playing) {
+      // Already audible: restarting on the system voice would repeat it.
+      if (playbackSucceeded) {
         addLogEntry(`Local text-to-speech stopped early: ${data.message}`);
         finish();
       } else {
@@ -339,7 +345,7 @@ function speakWithLocalVoice(
     };
 
     worker.onerror = () => {
-      if (playbackSucceeded || playing) finish();
+      if (playbackSucceeded) finish();
       else fail("The local text-to-speech worker failed to start");
     };
 
