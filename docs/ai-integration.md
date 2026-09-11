@@ -320,10 +320,12 @@ replacing it with a bespoke `onnxruntime-web` setup is a one-file change.
 ### Falling back
 
 The system voices take over when the local engine cannot run: the voice
-catalogue is unreachable, no local voice matches the language, or the worker
-fails before any audio plays. Once a sentence has played the fallback is
-skipped, because restarting would repeat what the user already heard. Stopping
-playback is not a failure and never falls back.
+catalogue is unreachable, no local voice matches the language, the worker fails
+before anything is audible, or synthesis succeeds but no chunk could be played
+(a browser that no longer counts the click as a gesture allowing audio, for
+instance). Once a sentence has been heard, or while one is playing, the
+fallback is skipped, because restarting would repeat it. Stopping playback is
+not a failure and never falls back.
 
 ### Voices
 

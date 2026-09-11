@@ -74,6 +74,7 @@ beforeEach(async () => {
       onended: (() => void) | null = null;
       onerror: (() => void) | null = null;
       pause = vi.fn();
+      removeAttribute = vi.fn();
       src = "";
       play() {
         queueMicrotask(() => this.onended?.());
@@ -196,7 +197,7 @@ describe("speak", () => {
     expect(spoken).toEqual(["Hello there."]);
   });
 
-  it("keeps the answer that already played instead of restarting it", async () => {
+  it("does not fall back after audio has started", async () => {
     const worker = createFakeWorker();
     tts.setWorkerFactory(() => worker as unknown as Worker);
 
@@ -222,6 +223,7 @@ describe("speak", () => {
         onended: (() => void) | null = null;
         onerror: (() => void) | null = null;
         pause = vi.fn();
+        removeAttribute = vi.fn();
         src = "";
         play() {
           return Promise.reject(new Error("autoplay blocked"));
@@ -242,6 +244,39 @@ describe("speak", () => {
 
     await speaking;
     expect(spoken).toEqual(["Hello there."]);
+  });
+
+  it("falls back when the worker fails and no chunk was ever audible", async () => {
+    vi.stubGlobal(
+      "Audio",
+      class {
+        onended: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        pause = vi.fn();
+        removeAttribute = vi.fn();
+        src = "";
+        play() {
+          return Promise.reject(new Error("autoplay blocked"));
+        }
+      },
+    );
+
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    const speaking = tts.speak("One. Two.");
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    worker.onmessage?.({
+      data: { type: "audio", index: 0, buffer: new ArrayBuffer(8) },
+    });
+    await vi.waitFor(() => expect(createdObjectUrls).toBe(1));
+    worker.onmessage?.({
+      data: { type: "error", message: "synthesis died halfway" },
+    });
+
+    await speaking;
+    expect(spoken).toEqual(["One. Two."]);
   });
 
   it("honours a stop pressed while the voice catalogue is still loading", async () => {

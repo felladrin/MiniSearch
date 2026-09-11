@@ -68,7 +68,7 @@ function primaryLanguage(code: string): string {
   return code.replace("_", "-").split("-")[0].toLowerCase();
 }
 
-let cachedLocalVoices: Voice[] | null = null;
+let cachedLocalVoices: Promise<Voice[]> | null = null;
 
 /**
  * The catalogue is fetched from the network, so it is read once per session.
@@ -76,9 +76,13 @@ let cachedLocalVoices: Voice[] | null = null;
  * voices than the package's own `VoiceId` union, and a stale copy would offer
  * voices that fail to download.
  */
-async function getLocalVoices(): Promise<Voice[]> {
-  if (cachedLocalVoices) return cachedLocalVoices;
-  cachedLocalVoices = await voices();
+function getLocalVoices(): Promise<Voice[]> {
+  if (!cachedLocalVoices) {
+    cachedLocalVoices = voices().catch((error) => {
+      cachedLocalVoices = null;
+      throw error;
+    });
+  }
   return cachedLocalVoices;
 }
 
@@ -228,16 +232,18 @@ function speakWithLocalVoice(
     let synthesisDone = false;
     let playing = false;
     let stopped = false;
-    /** A chunk left the queue and playback was attempted. */
-    let playbackStarted = false;
-    /** A chunk actually played to its end, so the user heard something. */
+    /** A chunk played to its end, so the user already heard part of the answer. */
     let playbackSucceeded = false;
 
     const cleanUp = () => {
       worker.terminate();
       if (element) {
+        // Detach first: clearing the source makes the element load the page
+        // itself and fire `error`, which would log a false playback failure.
+        element.onended = null;
+        element.onerror = null;
         element.pause();
-        element.src = "";
+        element.removeAttribute("src");
         element = null;
       }
       if (objectUrl) {
@@ -284,7 +290,6 @@ function speakWithLocalVoice(
       }
 
       playing = true;
-      playbackStarted = true;
       objectUrl = URL.createObjectURL(
         new Blob([buffer], { type: "audio/wav" }),
       );
@@ -324,7 +329,8 @@ function speakWithLocalVoice(
       }
       // Once audio has played the answer is already being read aloud, so
       // restarting it on the system voice would repeat what the user heard.
-      if (playbackStarted) {
+      // Already heard, or currently audible: restarting would repeat it.
+      if (playbackSucceeded || playing) {
         addLogEntry(`Local text-to-speech stopped early: ${data.message}`);
         finish();
       } else {
@@ -333,7 +339,7 @@ function speakWithLocalVoice(
     };
 
     worker.onerror = () => {
-      if (playbackStarted) finish();
+      if (playbackSucceeded || playing) finish();
       else fail("The local text-to-speech worker failed to start");
     };
 

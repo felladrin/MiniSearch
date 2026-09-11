@@ -181,7 +181,7 @@ Search results:
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `selectedVoiceId` | string | `""` | Voice for reading answers aloud. `piper:<voice>` picks a local neural voice, `system:<voiceURI>` an OS voice, and `""` picks one automatically for the browser language. A bare value stored by an earlier version is still read as an OS voice |
-| `textToSpeechEngine` | `"local" \| "system"` | `"local"` | Which engine reads answers aloud when no voice is selected explicitly |
+| `textToSpeechEngine` | `"local" \| "system"` | `"local"` | Which engine reads answers aloud. `"system"` also overrides a local voice picked above, so it never contacts a third-party host |
 | `reasoningStartMarker` | string | `"<think>"` | Marker for start of reasoning content |
 | `reasoningEndMarker` | string | `"</think>"` | Marker for end of reasoning content |
 
