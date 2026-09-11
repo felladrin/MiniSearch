@@ -302,7 +302,7 @@ The "Listen to response" button reads the answer aloud. Two engines back it:
 
 | Engine | Setting value | Voice source | Works offline |
 | --- | --- | --- | --- |
-| Local neural | `local` (default) | Piper (VITS) models run in the browser through `@diffusionstudio/vits-web` | After the first download |
+| Local neural | `local` (default) | Piper (VITS) models run in the browser through `@diffusionstudio/vits-web` | No: only the voice model is stored in OPFS, so the voice index, the ONNX runtime and the phonemizer are fetched again |
 | System | `system` | `speechSynthesis`, whatever the OS provides | Yes |
 
 ### Flow
@@ -336,8 +336,9 @@ groups local voices for the current language separately from the OS voices.
 
 ### Third-party requests
 
-Pressing Listen with the local engine contacts four hosts the rest of the app
-never touches. See the privacy note in `docs/security.md`.
+The local engine contacts four hosts the rest of the app never touches, when
+Listen is pressed and when the Voice settings panel lists the local voices. See
+the privacy note in `docs/security.md`.
 
 ## Error Handling and Fallbacks
 

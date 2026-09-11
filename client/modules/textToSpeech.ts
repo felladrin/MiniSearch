@@ -94,26 +94,31 @@ function getLocalVoices(): Promise<Voice[]> {
  */
 export async function listVoices(
   languageCode: string = navigator.language,
+  engine: TextToSpeechEngine = getSettings().textToSpeechEngine,
 ): Promise<VoiceOption[]> {
   const options: VoiceOption[] = [];
   const wanted = primaryLanguage(languageCode);
 
-  try {
-    for (const voice of await getLocalVoices()) {
-      if (primaryLanguage(voice.language.code) !== wanted) continue;
-      options.push({
-        value: `${LOCAL_VOICE_PREFIX}${voice.key}`,
-        label: `${voice.name} • ${voice.language.name_english} (${voice.quality})`,
-        engine: "local",
-        languageCode: voice.language.code,
-      });
+  // Listing the local voices means fetching the catalogue over the network, so
+  // it must not happen when the user has opted out of the local engine.
+  if (engine !== "system") {
+    try {
+      for (const voice of await getLocalVoices()) {
+        if (primaryLanguage(voice.language.code) !== wanted) continue;
+        options.push({
+          value: `${LOCAL_VOICE_PREFIX}${voice.key}`,
+          label: `${voice.name} • ${voice.language.name_english} (${voice.quality})`,
+          engine: "local",
+          languageCode: voice.language.code,
+        });
+      }
+    } catch (error) {
+      addLogEntry(
+        `Could not load the local voice list: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`,
+      );
     }
-  } catch (error) {
-    addLogEntry(
-      `Could not load the local voice list: ${
-        error instanceof Error ? error.message : "unknown error"
-      }`,
-    );
   }
 
   for (const voice of self.speechSynthesis?.getVoices() ?? []) {

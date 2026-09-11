@@ -347,6 +347,30 @@ describe("speak", () => {
   });
 });
 
+describe("no speech engine at all", () => {
+  it("resolves and logs when the local engine failed and there are no OS voices", async () => {
+    mockVoices.mockRejectedValue(new Error("offline"));
+    vi.stubGlobal("speechSynthesis", undefined);
+    self.speechSynthesis = undefined as unknown as SpeechSynthesis;
+
+    await tts.speak("Hello there.");
+
+    expect(spoken).toEqual([]);
+    expect(mockUpdateState.mock.calls.map(([state]) => state)).toEqual([
+      "speaking",
+      "idle",
+    ]);
+  });
+
+  it("lists no voices instead of throwing", async () => {
+    mockVoices.mockRejectedValue(new Error("offline"));
+    vi.stubGlobal("speechSynthesis", undefined);
+    self.speechSynthesis = undefined as unknown as SpeechSynthesis;
+
+    await expect(tts.listVoices("en-US")).resolves.toEqual([]);
+  });
+});
+
 describe("listVoices", () => {
   it("offers the local voices for the language and the system voices", async () => {
     const options = await tts.listVoices("en-US");
@@ -356,6 +380,17 @@ describe("listVoices", () => {
         value: "piper:en_US-lessac-high",
         engine: "local",
       }),
+      expect.objectContaining({ value: "system:os-voice", engine: "system" }),
+    ]);
+  });
+
+  it("does not fetch the catalogue when the system engine is selected", async () => {
+    settings.textToSpeechEngine = "system";
+
+    const options = await tts.listVoices("en-US");
+
+    expect(mockVoices).not.toHaveBeenCalled();
+    expect(options).toEqual([
       expect.objectContaining({ value: "system:os-voice", engine: "system" }),
     ]);
   });

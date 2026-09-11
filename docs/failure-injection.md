@@ -58,6 +58,11 @@ needed.
 | Response is already unwritable when streaming would start | No headers set, the upstream is never called | `server/internalApiEndpointServerHook.test.ts` › streaming path |
 | `/inference` answers 503 | Generation state becomes `failed`, nothing persisted | `client/modules/textGeneration.degradation.test.ts` |
 | Generation interrupted mid-stream | Partial answer preserved, state stays `interrupted` | `client/modules/textGeneration.degradation.test.ts` |
+| The local voice catalogue cannot be fetched | The local engine is skipped and the answer is read by an OS voice | `client/modules/textToSpeech.test.ts` › falls back when the voice catalogue cannot be reached |
+| No local voice matches the language | Same, with a log entry naming the reason | `client/modules/textToSpeech.test.ts` › falls back when no local voice matches the language |
+| The synthesis worker fails before anything is audible | The answer is read by an OS voice instead | `client/modules/textToSpeech.test.ts` › falls back to the system voice when the local engine cannot load |
+| Every synthesized chunk fails to play (blocked autoplay) | Treated as a local-engine failure, so an OS voice reads the answer rather than the user getting silence | `client/modules/textToSpeech.test.ts` › falls back when every synthesized chunk fails to play |
+| The browser provides no `speechSynthesis` at all and the local engine failed | Playback resolves and returns to idle with a log entry, instead of an unhandled rejection | `client/modules/textToSpeech.test.ts` › resolves and logs when the local engine failed and there are no OS voices |
 
 ## Adding a Row
 

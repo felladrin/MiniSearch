@@ -56,7 +56,7 @@ export default function VoiceSettingsForm() {
     };
 
     const updateVoices = () => {
-      listVoices().then((options) => {
+      listVoices(undefined, settings.textToSpeechEngine).then((options) => {
         if (!cancelled) setVoiceGroups(toGroups(options));
       });
     };
@@ -71,7 +71,7 @@ export default function VoiceSettingsForm() {
       cancelled = true;
       if (self.speechSynthesis) self.speechSynthesis.onvoiceschanged = null;
     };
-  }, [getCountryFlag]);
+  }, [getCountryFlag, settings.textToSpeechEngine]);
 
   return (
     <Stack gap="xs">

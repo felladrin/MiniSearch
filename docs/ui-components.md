@@ -260,7 +260,7 @@ function AiResponseSection() {
 - **SearchSettingsForm:** Result limits, image search toggle
 - **InterfaceSettingsForm:** UI preferences
 - **HistorySettings:** Retention days, max entries
-- **VoiceSettingsForm:** TTS voice selection
+- **VoiceSettingsForm:** Text-to-speech engine and voice selection
 - **ActionsForm:** Data management actions
 
 **PubSub:**
