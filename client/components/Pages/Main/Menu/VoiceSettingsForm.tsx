@@ -63,11 +63,13 @@ export default function VoiceSettingsForm() {
 
     updateVoices();
 
-    self.speechSynthesis.onvoiceschanged = updateVoices;
+    // Absent on the platforms this feature exists for, so it cannot be assumed.
+    if (self.speechSynthesis)
+      self.speechSynthesis.onvoiceschanged = updateVoices;
 
     return () => {
       cancelled = true;
-      self.speechSynthesis.onvoiceschanged = null;
+      if (self.speechSynthesis) self.speechSynthesis.onvoiceschanged = null;
     };
   }, [getCountryFlag]);
 

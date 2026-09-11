@@ -245,8 +245,9 @@ function speakWithLocalVoice(
     const cleanUp = () => {
       worker.terminate();
       if (element) {
-        // Detach first: clearing the source makes the element load the page
-        // itself and fire `error`, which would log a false playback failure.
+        // Detach first: the element can still fire `error` after teardown, for
+        // instance when the object URL is revoked while it is still loading,
+        // and a live handler would log that as a playback failure.
         element.onended = null;
         element.onerror = null;
         element.pause();
@@ -329,6 +330,9 @@ function speakWithLocalVoice(
           playbackSucceeded = true;
         },
         (error) => {
+          // `cleanUp()` pauses the element, which rejects a play() that has
+          // not started yet. That is a stop, not a failure worth logging.
+          if (stopped) return;
           addLogEntry(
             `Could not start audio playback: ${
               error instanceof Error ? error.message : "unknown error"

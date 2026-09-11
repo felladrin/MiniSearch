@@ -269,7 +269,7 @@ describe("speak", () => {
     worker.onmessage?.({ data: { type: "done" } });
     await speaking;
 
-    // Clearing the source makes a real element fire `error`; a still-attached
+    // A real element can still fire `error` during teardown; a still-attached
     // handler would log that as a playback failure on every normal finish.
     expect(handlersAtSourceClear).toEqual([{ onended: null, onerror: null }]);
   });
