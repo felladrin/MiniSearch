@@ -52,6 +52,10 @@ function createFakeWorker() {
 
 let spoken: string[] = [];
 let createdObjectUrls = 0;
+let handlersAtSourceClear: {
+  onended: (() => void) | null;
+  onerror: (() => void) | null;
+}[] = [];
 
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -63,6 +67,7 @@ beforeEach(async () => {
 
   vi.stubGlobal("navigator", { language: "en-US" });
   createdObjectUrls = 0;
+  handlersAtSourceClear = [];
   URL.createObjectURL = () => {
     createdObjectUrls += 1;
     return "blob:fake";
@@ -74,8 +79,13 @@ beforeEach(async () => {
       onended: (() => void) | null = null;
       onerror: (() => void) | null = null;
       pause = vi.fn();
-      removeAttribute = vi.fn();
       src = "";
+      removeAttribute() {
+        handlersAtSourceClear.push({
+          onended: this.onended,
+          onerror: this.onerror,
+        });
+      }
       play() {
         queueMicrotask(() => this.onended?.());
         return Promise.resolve();
@@ -244,6 +254,24 @@ describe("speak", () => {
 
     await speaking;
     expect(spoken).toEqual(["Hello there."]);
+  });
+
+  it("detaches the audio handlers before clearing the source", async () => {
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    const speaking = tts.speak("Hello there.");
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    worker.onmessage?.({
+      data: { type: "audio", index: 0, buffer: new ArrayBuffer(8) },
+    });
+    worker.onmessage?.({ data: { type: "done" } });
+    await speaking;
+
+    // Clearing the source makes a real element fire `error`; a still-attached
+    // handler would log that as a playback failure on every normal finish.
+    expect(handlersAtSourceClear).toEqual([{ onended: null, onerror: null }]);
   });
 
   it("falls back when the worker fails and no chunk was ever audible", async () => {

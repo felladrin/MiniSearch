@@ -185,6 +185,12 @@ function speakWithSystemVoice(
   session: SpeechSession,
 ): Promise<void> {
   return new Promise((resolve) => {
+    if (!self.speechSynthesis) {
+      addLogEntry("This browser provides no speech synthesis voices");
+      resolve();
+      return;
+    }
+
     const utterance = new SpeechSynthesisUtterance(text);
     const wantedUri = storedVoiceId.startsWith(SYSTEM_VOICE_PREFIX)
       ? storedVoiceId.slice(SYSTEM_VOICE_PREFIX.length)
@@ -294,18 +300,29 @@ function speakWithLocalVoice(
       objectUrl = URL.createObjectURL(
         new Blob([buffer], { type: "audio/wav" }),
       );
-      element = new Audio(objectUrl);
-      element.onended = () => {
+      const current = new Audio(objectUrl);
+      element = current;
+
+      /**
+       * A failed resource fires `error` on the element and rejects the pending
+       * `play()`, so without this guard one chunk would advance the queue
+       * twice and cut off the chunk after it.
+       */
+      const advance = () => {
+        if (element !== current) return;
+        releaseCurrentAudio();
+        playNext();
+      };
+
+      current.onended = () => {
         playbackSucceeded = true;
-        releaseCurrentAudio();
-        playNext();
+        advance();
       };
-      element.onerror = () => {
+      current.onerror = () => {
         addLogEntry("A synthesized audio chunk could not be played");
-        releaseCurrentAudio();
-        playNext();
+        advance();
       };
-      element.play().then(
+      current.play().then(
         () => {
           // Resolves once playback has begun, which is the only reliable
           // signal that the user is actually hearing this chunk.
@@ -317,8 +334,7 @@ function speakWithLocalVoice(
               error instanceof Error ? error.message : "unknown error"
             }`,
           );
-          releaseCurrentAudio();
-          playNext();
+          advance();
         },
       );
     };
