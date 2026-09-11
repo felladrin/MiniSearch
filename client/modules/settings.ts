@@ -23,7 +23,7 @@ export const hasStoredUserSettings =
  * one, and picking it was a deliberate choice, so the profile keeps the system
  * engine instead of being moved onto a model download on the next upgrade.
  */
-export const hasLegacySystemVoice = (() => {
+const hasLegacySystemVoice = (() => {
   try {
     const stored: unknown = JSON.parse(
       localStorage.getItem(SETTINGS_STORAGE_KEY) ?? "{}",
