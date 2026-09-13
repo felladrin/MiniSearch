@@ -491,29 +491,34 @@ describe("startDictation with the web speech fallback", () => {
     await session.stop();
   });
 
-  it("reports a recognizer that ends on its own", async () => {
+  it("ends the session quietly when the recognizer stops on its own", async () => {
     installRecognitionFake();
     const onError = vi.fn();
+    const onEnd = vi.fn();
 
     const session = await startDictation({
       onTranscript: vi.fn(),
+      onEnd,
       onError,
     });
 
-    // Chrome ends after silence even with `continuous`, which would otherwise
-    // leave the button saying Listening with nothing behind it.
+    // Chrome ends after silence even with `continuous`. The session is over,
+    // but there is nothing the user needs told about.
     instance?.onend?.();
 
-    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalled();
     await session.stop();
   });
 
   it("says nothing when the recognizer ends because it was stopped", async () => {
     installRecognitionFake();
     const onError = vi.fn();
+    const onEnd = vi.fn();
 
     const session = await startDictation({
       onTranscript: vi.fn(),
+      onEnd,
       onError,
     });
 
@@ -521,6 +526,7 @@ describe("startDictation with the web speech fallback", () => {
     instance?.onend?.();
 
     expect(onError).not.toHaveBeenCalled();
+    expect(onEnd).not.toHaveBeenCalled();
   });
 });
 

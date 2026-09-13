@@ -101,6 +101,12 @@ export interface DictationCallbacks {
    */
   onFallback?: () => void;
   /**
+   * The engine stopped on its own, without failing. The browser's recognizer
+   * ends after silence even with `continuous`, and the session is over once it
+   * does.
+   */
+  onEnd?: () => void;
+  /**
    * A failure after the engine loaded. The load itself rejects instead, so
    * this is the channel for a worker that dies mid-dictation, which would
    * otherwise leave the UI listening forever with the microphone open.
@@ -349,7 +355,6 @@ function startWebSpeechDictation(
   recognition.lang = navigator.language;
 
   let finalText = "";
-  let settled = false;
   /** The returned promise has resolved, so rejecting it would be a no-op. */
   let resolved = false;
   // `recognition.stop()` emits one last `result` by spec, and the caller has
@@ -358,7 +363,6 @@ function startWebSpeechDictation(
 
   return new Promise<DictationSession>((resolve, reject) => {
     recognition.onresult = (event) => {
-      settled = true;
       if (stopped) return;
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -392,16 +396,14 @@ function startWebSpeechDictation(
 
     recognition.onend = () => {
       if (stopped) return;
-      // The recognizer ends on its own after silence even with `continuous`,
-      // which would otherwise leave the button saying Listening forever.
-      const failure = new DictationError(
-        "engine",
-        settled
-          ? "Dictation stopped listening"
-          : "Dictation ended before any speech",
-      );
-      if (resolved) callbacks.onError?.(failure);
-      else reject(failure);
+      // The recognizer ends on its own after silence even with `continuous`.
+      // That is not a failure worth a notification, but the session is over, so
+      // the button has to come back from Listening.
+      if (resolved) {
+        callbacks.onEnd?.();
+        return;
+      }
+      reject(new DictationError("engine", "Dictation ended before any speech"));
     };
 
     try {

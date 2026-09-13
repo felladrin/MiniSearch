@@ -40,9 +40,10 @@ function spliceTranscript(
 }
 
 /**
- * The upstream sends no `Content-Length` for the model files, so `total` is
- * usually missing and a percentage would never appear. Megabytes still tell
- * the user the ~50 MB download is moving rather than stuck.
+ * `total` never arrives on this path: the library's asset downloader opens its
+ * progress session with an undefined total and reports that, whatever
+ * `Content-Length` the route sets. Megabytes still tell the user the ~51 MB
+ * download is moving rather than stuck.
  */
 function formatDownloadProgress(
   progress: { loaded: number; total?: number } | null,
@@ -143,10 +144,16 @@ export default memo(function DictationButton({
               "The on-device model could not run, so this browser's own speech recognition is transcribing instead. It may send the audio to the browser vendor.",
             color: "yellow",
           }),
+        onEnd: () => void stop(),
         onError: (error) => {
+          const denied = error.kind === "permission";
           notifications.show({
-            title: "Dictation stopped",
-            message: error.message,
+            title: denied
+              ? "Microphone permission denied"
+              : "Dictation stopped",
+            message: denied
+              ? "Allow microphone access in the browser settings to dictate a search."
+              : error.message,
             color: "red",
           });
           void stop();
