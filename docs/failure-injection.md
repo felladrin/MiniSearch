@@ -70,7 +70,7 @@ needed.
 | A caller streams an oversized body to `/api/validate-access-key` | Refused with `413` mid-upload and the socket dropped; the answer carries `Connection: close`, so the caller's next request opens a fresh connection instead of a dead one | `server/validateAccessKeyServerHook.socket.test.ts` › refuses an oversized body with 413 without breaking the next request |
 | Two follow-up question generations overlap | The older completion writes nothing, so the flag stays on until the newest finishes and the input keeps the newest question | `client/components/AiResponse/ChatInterface.test.tsx` › keeps the follow-up question flag on until the newest call finishes |
 | `ChatInterface` unmounts while a follow-up question is in flight | Both generation flags are cleared and the orphaned completion writes nothing into the next mount | `client/components/AiResponse/ChatInterface.test.tsx` › leaves both generation flags off after unmounting mid-generation |
-| `ChatInterface` unmounts while a send is still awaiting its response | The orphaned send asks for no follow-up question and leaves the next mount's response flag alone | `client/components/AiResponse/ChatInterface.test.tsx` › starts no follow-up question for a send that settles after unmount |
+| `ChatInterface` unmounts while a send is still awaiting its response | The orphaned send asks for no follow-up question and leaves the next mount's response flag alone | `client/components/AiResponse/ChatInterface.test.tsx` › starts no follow-up question for a send that settles after unmount, leaves the next mount's response flag alone when an orphaned send settles |
 
 ## Adding a Row
 

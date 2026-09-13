@@ -218,6 +218,11 @@ export default function ChatInterface({
   ]);
 
   useEffect(() => {
+    // Set on every run, not just the first: under StrictMode the cleanup fires
+    // once before the effect runs again, and a ref left false would kill the
+    // remounted instance.
+    isMountedRef.current = true;
+
     return () => {
       // Invalidate any in-flight call so its completion cannot write into the
       // next mount, then clear the generation flags the same way the question

@@ -521,6 +521,55 @@ describe("ChatInterface generation state", () => {
       secondResponse.resolve("The live answer.");
       await secondSend;
     });
+
+    expect(getChatGenerationState().isGeneratingResponse).toBe(false);
+  });
+
+  it("leaves the next mount's response flag alone when an orphaned regenerate settles", async () => {
+    const firstResponse = deferred<string>();
+    const secondResponse = deferred<string>();
+    vi.mocked(generateChatResponse)
+      .mockResolvedValueOnce("An answer.")
+      .mockReturnValueOnce(firstResponse.promise)
+      .mockReturnValueOnce(secondResponse.promise);
+
+    const first = renderChatInterface();
+
+    await act(async () => {
+      await sendMessage("And how do I use it?");
+    });
+
+    let firstRegenerate: Promise<void> = Promise.resolve();
+    await act(async () => {
+      firstRegenerate = regenerateResponse();
+    });
+
+    await act(async () => {
+      first.unmount();
+    });
+
+    renderChatInterface();
+
+    let secondSend: Promise<void> = Promise.resolve();
+    await act(async () => {
+      secondSend = sendMessage("Does it work offline?");
+    });
+
+    expect(getChatGenerationState().isGeneratingResponse).toBe(true);
+
+    await act(async () => {
+      firstResponse.resolve("The orphaned regeneration.");
+      await firstRegenerate;
+    });
+
+    expect(getChatGenerationState().isGeneratingResponse).toBe(true);
+
+    await act(async () => {
+      secondResponse.resolve("The live answer.");
+      await secondSend;
+    });
+
+    expect(getChatGenerationState().isGeneratingResponse).toBe(false);
   });
 
   it("starts one re-generation when two regenerates land in the same task", async () => {
