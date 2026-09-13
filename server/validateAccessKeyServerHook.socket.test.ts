@@ -58,15 +58,18 @@ describe("validateAccessKeyServerHook over a real socket", () => {
   it("refuses an oversized body with 413 without breaking the next request", async () => {
     const agent = new Agent({ keepAlive: true, maxSockets: 1 });
 
-    expect(await post(agent, Buffer.alloc(1024 * 1024, "x"))).toBe(
-      "status=413",
-    );
-    // Reuses the same pooled connection. Without `Connection: close` on the
-    // 413 this is an ECONNRESET, because the socket still holds the flood.
-    expect(await post(agent, JSON.stringify({ accessKeyHash: "x" }))).toBe(
-      "status=200",
-    );
-
-    agent.destroy();
+    try {
+      expect(await post(agent, Buffer.alloc(64 * 1024, "x"))).toBe(
+        "status=413",
+      );
+      // A fresh connection, because the 413 told the agent not to pool the
+      // old one. Without that header the agent reuses a socket still holding
+      // the flood, and this is an ECONNRESET.
+      expect(await post(agent, JSON.stringify({ accessKeyHash: "x" }))).toBe(
+        "status=200",
+      );
+    } finally {
+      agent.destroy();
+    }
   });
 });

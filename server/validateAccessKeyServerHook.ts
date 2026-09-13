@@ -34,7 +34,7 @@ export function validateAccessKeyServerHook<
 
     const accessKeys = process.env.ACCESS_KEYS?.split(",") ?? [];
 
-    let body = "";
+    const chunks: Buffer[] = [];
     let bodyBytes = 0;
     let bodyTooLarge = false;
 
@@ -42,7 +42,9 @@ export function validateAccessKeyServerHook<
       if (bodyTooLarge) return;
       bodyBytes += Buffer.byteLength(chunk);
       if (bodyBytes <= MAX_BODY_BYTES) {
-        body += chunk.toString();
+        // Decoded once at the end, so a multi-byte sequence split across two
+        // chunks survives. Bounded by the cap above.
+        chunks.push(Buffer.from(chunk));
         return;
       }
 
@@ -62,7 +64,7 @@ export function validateAccessKeyServerHook<
     req.on("end", async () => {
       if (bodyTooLarge) return;
       try {
-        const { accessKeyHash } = JSON.parse(body);
+        const { accessKeyHash } = JSON.parse(Buffer.concat(chunks).toString());
 
         // The client hashes with the shared parameters, so a hash carrying any
         // other block cannot be valid against this server. Checking before
