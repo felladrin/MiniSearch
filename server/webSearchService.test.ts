@@ -9,15 +9,19 @@ import {
   vi,
 } from "vitest";
 import {
+  getDegradedSearchTypes,
   getSearchesWithAllResultsDiscardedSinceLastRestart,
   getSearchesWithoutResultsSinceLastRestart,
   getSearchesWithUnresponsiveEnginesSinceLastRestart,
+  getUnresponsiveEngineStats,
 } from "./searchesSinceLastRestart";
 import { CircuitBreaker } from "./utils/circuitBreaker";
 import {
-  describeUnresponsiveEngines,
   fetchSearXNG,
+  formatUnresponsiveEngines,
+  getWebSearchServiceStatus,
   getWebSearchStatus,
+  parseUnresponsiveEngines,
 } from "./webSearchService";
 
 function createMockResponse(
@@ -132,11 +136,26 @@ describe("WebSearchService", () => {
   });
 });
 
-describe("describeUnresponsiveEngines", () => {
-  it("returns null when there are no unresponsive engines", () => {
-    expect(describeUnresponsiveEngines(undefined)).toBeNull();
-    expect(describeUnresponsiveEngines([])).toBeNull();
-    expect(describeUnresponsiveEngines("not-an-array")).toBeNull();
+const describeUnresponsiveEngines = (value: unknown) =>
+  formatUnresponsiveEngines(parseUnresponsiveEngines(value));
+
+describe("unresponsive engine reporting", () => {
+  it("reads nothing from an absent or malformed field", () => {
+    expect(parseUnresponsiveEngines(undefined)).toEqual([]);
+    expect(parseUnresponsiveEngines([])).toEqual([]);
+    expect(parseUnresponsiveEngines("not-an-array")).toEqual([]);
+  });
+
+  it("reads engine/reason pairs from SearXNG", () => {
+    expect(
+      parseUnresponsiveEngines([
+        ["google", "Timeout"],
+        ["bing", "Suspended: Access denied"],
+      ]),
+    ).toEqual([
+      { engine: "google", reason: "Timeout" },
+      { engine: "bing", reason: "Suspended: Access denied" },
+    ]);
   });
 
   it("formats engine/reason pairs from SearXNG", () => {
@@ -610,7 +629,7 @@ describe("query privacy", () => {
     vi.restoreAllMocks();
   });
 
-  function emptyResponse() {
+  function respondingEmptyResponse() {
     return createMockResponse(
       JSON.stringify({
         results: [],
@@ -650,7 +669,7 @@ describe("query privacy", () => {
     // The unresponsive engines, the malformed body and the network failure all
     // make fetchSearXNG throw; the point here is that no path ever logs the
     // query.
-    fetchMock.mockResolvedValue(emptyResponse());
+    fetchMock.mockResolvedValue(respondingEmptyResponse());
     const unresponsiveSearch = fetchSearXNG(
       DISTINCTIVE_QUERY,
       "text",
@@ -689,7 +708,7 @@ describe("query privacy", () => {
   });
 
   it("still names the unresponsive engines behind a failed empty response", async () => {
-    fetchMock.mockResolvedValue(emptyResponse());
+    fetchMock.mockResolvedValue(respondingEmptyResponse());
 
     const search = fetchSearXNG(
       DISTINCTIVE_QUERY,
@@ -770,5 +789,254 @@ describe("circuit breaker", () => {
     await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
 
     expect(fetchMock.mock.calls.length).toBe(callsWhileOpen);
+  });
+});
+
+describe("getWebSearchServiceStatus", () => {
+  const healthzOk = () => fetchMock.mockResolvedValue(createMockResponse("OK"));
+
+  const suspendedResponse = () =>
+    createMockResponse(
+      JSON.stringify({
+        results: [],
+        unresponsive_engines: [["google", "CAPTCHA"]],
+      }),
+    );
+
+  /** Answered, matched nothing. Not to be confused with the empty responses
+   *  elsewhere in this file, which carry unresponsive engines. */
+  const respondingEmptyResponse = () =>
+    createMockResponse(JSON.stringify({ results: [] }));
+
+  /** Leaves no search type flagged, so a test starts from a known state. */
+  async function clearDegradation(breaker: CircuitBreaker) {
+    fetchMock.mockResolvedValue(respondingEmptyResponse());
+    await fetchSearXNG("reset", "text", 30, breaker);
+    await fetchSearXNG("reset", "images", 30, breaker);
+    healthzOk();
+    expect(await getWebSearchServiceStatus(breaker)).toBe("healthy");
+  }
+
+  it("reports unhealthy while the circuit is open, though /healthz answers OK", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 1 });
+    fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+    expect(breaker.getState("searxng")).toBe("OPEN");
+
+    // SearXNG is listening, so the probe passes; every search still fails,
+    // because the breaker answers them without reaching SearXNG at all.
+    healthzOk();
+
+    expect(await getWebSearchServiceStatus(breaker)).toBe("unhealthy");
+  });
+
+  it("reports unhealthy when the probe fails, before it looks at the circuit", async () => {
+    vi.useFakeTimers();
+    try {
+      const breaker = new CircuitBreaker({
+        failureThreshold: 1,
+        resetTimeout: 1000,
+      });
+      fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+      await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+
+      // Half-open, not open: the circuit check would answer "degraded" here, so
+      // only a probe checked first can answer "unhealthy".
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(breaker.getState("searxng")).toBe("HALF_OPEN");
+
+      fetchMock.mockResolvedValue(createMockResponse("NOT_OK", false));
+
+      expect(await getWebSearchServiceStatus(breaker)).toBe("unhealthy");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports degraded while the circuit is half-open and nothing has proven it", async () => {
+    vi.useFakeTimers();
+    try {
+      const breaker = new CircuitBreaker({
+        failureThreshold: 1,
+        resetTimeout: 1000,
+      });
+      await clearDegradation(breaker);
+
+      fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+      await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(breaker.getState("searxng")).toBe("HALF_OPEN");
+
+      healthzOk();
+
+      // A 503 is not an engine failure, so nothing flagged a search type here:
+      // the verdict has to come from the circuit alone.
+      expect(await getWebSearchServiceStatus(breaker)).toBe("degraded");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports degraded after a search lost to unresponsive engines", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
+    await clearDegradation(breaker);
+
+    fetchMock.mockResolvedValue(suspendedResponse());
+    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow(
+      "google (CAPTCHA)",
+    );
+    expect(breaker.getState("searxng")).toBe("CLOSED");
+
+    healthzOk();
+
+    expect(await getWebSearchServiceStatus(breaker)).toBe("degraded");
+  });
+
+  it("stays degraded when an image search answers after a failed text search", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
+    await clearDegradation(breaker);
+
+    fetchMock.mockResolvedValue(suspendedResponse());
+    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+
+    // What the client actually does after a failed text search: it fires an
+    // image search, which goes out to a different engine pool. Answering there
+    // says nothing about the text engines that just failed.
+    fetchMock.mockResolvedValue(respondingEmptyResponse());
+    await fetchSearXNG("test", "images", 30, breaker);
+
+    healthzOk();
+
+    expect(await getWebSearchServiceStatus(breaker)).toBe("degraded");
+    expect(getDegradedSearchTypes()).toEqual(["text"]);
+  });
+
+  it("reports healthy again once SearXNG answers the search type that failed", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
+    await clearDegradation(breaker);
+
+    fetchMock.mockResolvedValue(suspendedResponse());
+    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+    const tallyWhileDegraded = getUnresponsiveEngineStats();
+
+    fetchMock.mockResolvedValue(successResponse());
+    await fetchSearXNG("test", "text", 30, breaker);
+
+    healthzOk();
+
+    expect(await getWebSearchServiceStatus(breaker)).toBe("healthy");
+    // Recovering clears the verdict, not the history: the tally is what an
+    // operator reads after the fact to see which engines it was.
+    expect(getUnresponsiveEngineStats()).toEqual(tallyWhileDegraded);
+  });
+
+  it("clears the degradation on zero results with no engine errors", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
+    await clearDegradation(breaker);
+
+    fetchMock.mockResolvedValue(suspendedResponse());
+    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+
+    // The engines replied, they just matched nothing, which is not a failure.
+    fetchMock.mockResolvedValue(respondingEmptyResponse());
+    await fetchSearXNG("test", "text", 30, breaker);
+
+    healthzOk();
+
+    expect(await getWebSearchServiceStatus(breaker)).toBe("healthy");
+  });
+
+  it("counts each engine in a response separately", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
+    const before = getUnresponsiveEngineStats().bing?.failures ?? 0;
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [],
+          unresponsive_engines: [
+            ["bing", "Suspended: Access denied"],
+            ["startpage", "Suspended: CAPTCHA"],
+          ],
+        }),
+      ),
+    );
+
+    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+
+    // SearXNG's own wording never reaches the payload: `/status` is public and
+    // the string is free-form text from an upstream engine.
+    expect(getUnresponsiveEngineStats().bing).toEqual({
+      failures: before + 1,
+      lastFailure: "blocked",
+    });
+    expect(getUnresponsiveEngineStats().startpage).toMatchObject({
+      lastFailure: "blocked",
+    });
+  });
+
+  it("classifies a timeout apart from a block, and an unknown reason apart from both", async () => {
+    vi.useFakeTimers();
+    try {
+      const breaker = new CircuitBreaker({ failureThreshold: 5 });
+      fetchMock.mockResolvedValue(
+        createMockResponse(
+          JSON.stringify({
+            results: [],
+            unresponsive_engines: [
+              ["qwant", "timeout"],
+              // SearXNG benches an engine for generic errors too, and those
+              // recover inside the backoff, so they must not read as blocked.
+              ["mojeek", "Suspended: server API error"],
+            ],
+          }),
+        ),
+      );
+
+      // Neither is a block, so this one spends the whole retry budget before it
+      // is counted, unlike the blocked engines above.
+      const search = fetchSearXNG("test", "text", 30, breaker);
+      const outcome = expect(search).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(7000);
+      await outcome;
+
+      expect(getUnresponsiveEngineStats().qwant?.lastFailure).toBe("timeout");
+      expect(getUnresponsiveEngineStats().mojeek?.lastFailure).toBe("other");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("names the search types the verdict is about", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
+    await clearDegradation(breaker);
+    expect(getDegradedSearchTypes()).toEqual([]);
+
+    fetchMock.mockResolvedValue(suspendedResponse());
+    await expect(fetchSearXNG("test", "images", 30, breaker)).rejects.toThrow();
+
+    // Without this an operator alerting on a non-healthy status has no way to
+    // tell which engine pool is the one still failing.
+    expect(getDegradedSearchTypes()).toEqual(["images"]);
+  });
+
+  it("ignores an entry that names no engine", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
+    const searchesWithoutResults = getSearchesWithoutResultsSinceLastRestart();
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({ results: [], unresponsive_engines: [[""]] }),
+      ),
+    );
+
+    // Nothing to report, so it takes the genuinely-empty path rather than
+    // retrying and tallying under an empty engine name.
+    await expect(fetchSearXNG("test", "text", 30, breaker)).resolves.toEqual(
+      [],
+    );
+    expect(getSearchesWithoutResultsSinceLastRestart()).toBe(
+      searchesWithoutResults + 1,
+    );
+    expect(getUnresponsiveEngineStats()[""]).toBeUndefined();
   });
 });

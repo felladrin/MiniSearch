@@ -245,16 +245,35 @@ The `/status` endpoint returns a JSON object:
 | `searchesWithoutResults` | number | Searches, text and image together, that SearXNG answered with zero results and no unresponsive engines |
 | `searchesWithUnresponsiveEngines` | number | Searches, text and image together, that came back with zero results and unresponsive engines, whether the retries were spent or an all-suspended set failed fast; one per search, not per attempt |
 | `searchesWithAllResultsDiscarded` | number | Text searches whose results were all dropped during processing |
+| `biEncoderServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `rerankerServiceStatus` | string | `"healthy"` or `"unhealthy"` |
-| `webSearchServiceStatus` | string | `"healthy"` or `"unhealthy"` |
+| `webSearchServiceStatus` | string | `"healthy"`, `"degraded"` or `"unhealthy"`, see below |
 | `pageReads` | object | Page-reading counters since last restart, see below |
 | `authorization` | object | Token and rate-limit outcomes since last restart, see below |
 | `inference` | object | AI answer counters since last restart, see below |
-| `searches` | object | Search timing, circuit state and grounding, see below |
+| `searches` | object | Search timing, circuit state and per-engine failures, see below |
 | `reranker` | object | Reranking cost and effect, see below |
 | `thumbnails` | object | `/thumbnail` request outcomes, see below |
 | `build.timestamp` | string | ISO 8601 build time |
 | `build.gitCommit` | string | Short Git commit hash |
+
+`webSearchServiceStatus` answers whether searches can be served, which
+SearXNG's `/healthz` alone does not: an open circuit fails every search without
+calling SearXNG at all, so the probe keeps answering OK straight through a
+total outage, and engines under suspension answer 200 with nothing usable. So
+`unhealthy` means the probe failed or the circuit is open. `degraded` means the
+last search of either type was lost to its engines, or the circuit is half-open,
+which it reaches on a timer with no successful search behind it. Neither covers
+a search that failed outright while the circuit was still closed, which stays
+`healthy` until the fifth consecutive failure opens it. A degradation is tracked
+per search type, because text and image searches go out to different engine
+pools and the client fires an image search straight after a failed text one;
+`searches.degradedSearchTypes` names the ones currently flagged. It clears as
+soon as SearXNG answers a search of that type, zero results included: the
+engines replied, so whatever was failing is not failing now.
+`rerankerServiceStatus` and `biEncoderServiceStatus` stay plain liveness probes,
+since neither sits behind a breaker and a failing one degrades a search instead
+of losing it.
 
 The three `searches...` counters are the aggregate form of the log lines that
 used to carry the query text. The log still names the unresponsive engines
@@ -391,7 +410,9 @@ way `pageReads` does:
 | `reranker.considered` | number | Nothing; results handed to the score filter, the denominator for `keptRate` |
 | `reranker.kept` | number | Nothing; results that survived it |
 | `searches.circuitState` | string | Nothing; whether searches are being short-circuited right now |
+| `searches.degradedSearchTypes` | array | Nothing; which of `text` and `images` is currently flagged, so a `degraded` verdict says which engine pool it is about. Empty when the half-open circuit is what triggered the verdict, which `circuitState` in the same object names |
 | `searches.circuitOpens` | number | `failureThreshold` and `resetTimeout` on the SearXNG breaker: each opening is a minute of serving no searches at all |
+| `searches.unresponsiveEngines` | object | Nothing; `failures` and `lastFailure` per engine name, which is how one engine timing out is told apart from every engine being CAPTCHA-blocked. `lastFailure` is `blocked` (a CAPTCHA, a rate limit or an access denial), `timeout` or `other`, never SearXNG's own wording, which is free-form text from an upstream engine and does not belong on an endpoint that needs no token. Counted on the searches `searchesWithUnresponsiveEngines` counts, so a search that recovered on a retry is not in it |
 | `reranker.reranks` | number | Nothing; the denominator for the rest |
 | `reranker.averageMs` | number | Whether reranking or SearXNG is what users wait for, and so whether to rerank a shortlist instead of all 30 results. Over `reranks`, covering the filtering and sorting as well as the model |
 | `reranker.keptRate` | number | `kStandardDeviationFactor`: near 100% means the filter is not filtering. Text and image reranks are pooled, and the two run through different paths, so this moves with the traffic mix as well as with the threshold |

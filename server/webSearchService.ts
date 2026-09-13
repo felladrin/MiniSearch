@@ -3,9 +3,15 @@ import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
 import {
+  type EngineFailure,
+  getDegradedSearchTypes,
   incrementSearchesWithAllResultsDiscardedSinceLastRestart,
   incrementSearchesWithoutResultsSinceLastRestart,
   incrementSearchesWithUnresponsiveEnginesSinceLastRestart,
+  recordRespondingEngines,
+  recordUnresponsiveEngines,
+  type SearchType,
+  type UnresponsiveEngine,
 } from "./searchesSinceLastRestart.ts";
 import { CircuitBreaker } from "./utils/circuitBreaker.ts";
 
@@ -27,8 +33,6 @@ const searxngCircuitBreaker = new CircuitBreaker({
   resetTimeout: 60_000,
   successThreshold: 1,
 });
-
-type SearchType = "text" | "images";
 
 interface SearxngSearchResult {
   title: string;
@@ -101,6 +105,29 @@ export async function getWebSearchStatus() {
   }
 }
 
+/**
+ * Whether searches can actually be served, which `/healthz` alone does not
+ * answer: an open circuit fails every search without calling SearXNG at all,
+ * so the probe keeps answering OK straight through a total outage, and engines
+ * under suspension answer 200 with nothing usable. `degraded` means SearXNG is
+ * up and reachable but search is not proven: the last search of either type was
+ * lost to its engines, or the circuit is waiting for one to prove it recovered.
+ */
+export async function getWebSearchServiceStatus(
+  breaker: CircuitBreaker = searxngCircuitBreaker,
+): Promise<"healthy" | "degraded" | "unhealthy"> {
+  if (!(await getWebSearchStatus())) return "unhealthy";
+
+  const circuitState = breaker.getState("searxng");
+  if (circuitState === "OPEN") return "unhealthy";
+
+  // HALF_OPEN is reached on a timer, with no successful search behind it, so
+  // reporting it as healthy would call the outage over because a minute passed.
+  if (circuitState === "HALF_OPEN") return "degraded";
+
+  return getDegradedSearchTypes().length > 0 ? "degraded" : "healthy";
+}
+
 function buildSearchUrl(query: string, searchType: SearchType) {
   const params = new URLSearchParams(defaultSearchParams);
   params.set("q", query);
@@ -109,57 +136,86 @@ function buildSearchUrl(query: string, searchType: SearchType) {
 }
 
 /**
- * Extracts a concise, human-readable reason from SearXNG's `unresponsive_engines`
- * field. SearXNG reports each failed engine as a `[engine, reason]` pair (e.g.
- * `["google", "Timeout"]`, `["bing", "Suspended: Access denied"]`). This is the
- * only failure signal available to MiniSearch, since SearXNG's own (very verbose)
- * stdout/stderr is intentionally discarded to keep the server logs clean.
- *
- * @returns A summary string, or null when no engine errors were reported.
+ * Reads SearXNG's `unresponsive_engines` field, which reports each failed
+ * engine as a `[engine, reason]` pair (e.g. `["google", "Timeout"]`,
+ * `["bing", "Suspended: Access denied"]`). This is the only failure signal
+ * available to MiniSearch, since SearXNG's own (very verbose) stdout/stderr is
+ * intentionally discarded to keep the server logs clean.
  */
-export function describeUnresponsiveEngines(
+export function parseUnresponsiveEngines(
   unresponsiveEngines: unknown,
-): string | null {
-  if (!Array.isArray(unresponsiveEngines) || unresponsiveEngines.length === 0) {
-    return null;
-  }
+): UnresponsiveEngine[] {
+  if (!Array.isArray(unresponsiveEngines)) return [];
 
-  return unresponsiveEngines
-    .map((entry) => {
-      if (Array.isArray(entry)) {
-        const [engine, reason] = entry;
-        return reason ? `${engine} (${reason})` : String(engine);
-      }
-      return String(entry);
-    })
+  return (
+    unresponsiveEngines
+      .map((entry) => {
+        const [engine, reason] = Array.isArray(entry)
+          ? entry
+          : [entry, undefined];
+        return { engine: String(engine), reason: reason ? String(reason) : "" };
+      })
+      // An entry that names no engine says nothing and would tally under an empty
+      // key; dropping it also keeps the search counted as one without results,
+      // the way an absent `unresponsive_engines` field is.
+      .filter(({ engine }) => engine.length > 0)
+  );
+}
+
+/** A concise, human-readable summary of the engines that failed. */
+export function formatUnresponsiveEngines(engines: UnresponsiveEngine[]) {
+  return engines
+    .map(({ engine, reason }) => (reason ? `${engine} (${reason})` : engine))
     .join(", ");
 }
 
 const SUSPENSION_REASON = /captcha|too many request|access denied/i;
+const TIMEOUT_REASON = /timeout|timed out/i;
+
+/**
+ * Sorts SearXNG's free-form reason into the vocabulary `/status` publishes.
+ * The raw string stays in the server log and in the thrown error, both of
+ * which only the operator sees.
+ */
+function classifyEngineFailure(reason: string): EngineFailure {
+  if (SUSPENSION_REASON.test(reason)) return "blocked";
+  if (TIMEOUT_REASON.test(reason)) return "timeout";
+  return "other";
+}
 
 /**
  * Whether every unresponsive engine is under a long suspension rather than a
  * transient error, so the whole set cannot recover within the retry backoff.
  */
-function allEnginesSuspended(unresponsiveEngines: unknown): boolean {
-  if (!Array.isArray(unresponsiveEngines) || unresponsiveEngines.length === 0) {
-    return false;
-  }
-  return unresponsiveEngines.every((entry) => {
-    const reason = Array.isArray(entry) ? entry[1] : undefined;
-    return typeof reason === "string" && SUSPENSION_REASON.test(reason);
-  });
+function allEnginesSuspended(engines: UnresponsiveEngine[]): boolean {
+  return (
+    engines.length > 0 &&
+    engines.every(({ reason }) => classifyEngineFailure(reason) === "blocked")
+  );
 }
 
 /**
  * Counts the search as an unresponsive-engine failure and throws the error the
  * endpoint turns into a non-200. The fail-fast and the retry-exhausted paths
- * both end here, so a search costs one user-visible failure either way.
+ * both end here, so a search costs one user-visible failure either way, and
+ * `/status` learns which engines it cost it on.
  */
-function failWithUnresponsiveEngines(reason: string): never {
+function failWithUnresponsiveEngines(
+  searchType: SearchType,
+  engines: UnresponsiveEngine[],
+): never {
   incrementSearchesWithUnresponsiveEnginesSinceLastRestart();
+  recordUnresponsiveEngines(
+    searchType,
+    engines.map(({ engine, reason }) => ({
+      engine,
+      failure: classifyEngineFailure(reason),
+    })),
+  );
   throw new Error(
-    `No results returned from SearXNG. Unresponsive engines: ${reason}`,
+    `No results returned from SearXNG. Unresponsive engines: ${formatUnresponsiveEngines(
+      engines,
+    )}`,
   );
 }
 
@@ -196,24 +252,28 @@ async function performSearch(
     const results = Array.isArray(data.results) ? data.results : [];
 
     if (results.length === 0) {
-      const reason = describeUnresponsiveEngines(data.unresponsive_engines);
+      const unresponsiveEngines = parseUnresponsiveEngines(
+        data.unresponsive_engines,
+      );
 
       // SearXNG answers 200 with an empty result set when its engines are
       // rate-limited, suspended or CAPTCHA-challenged, so the only sign that
       // the search layer is down arrives in `unresponsive_engines`. Returned as
       // an empty array it is indistinguishable from a query that genuinely
       // matches nothing.
-      if (reason) {
-        if (allEnginesSuspended(data.unresponsive_engines)) {
-          failWithUnresponsiveEngines(reason);
+      if (unresponsiveEngines.length > 0) {
+        if (allEnginesSuspended(unresponsiveEngines)) {
+          failWithUnresponsiveEngines(searchType, unresponsiveEngines);
         }
 
         if (attempt < MAX_RETRIES) {
-          retryReason = `returned no results (${reason})`;
+          retryReason = `returned no results (${formatUnresponsiveEngines(
+            unresponsiveEngines,
+          )})`;
           continue;
         }
 
-        failWithUnresponsiveEngines(reason);
+        failWithUnresponsiveEngines(searchType, unresponsiveEngines);
       }
 
       incrementSearchesWithoutResultsSinceLastRestart();
@@ -221,6 +281,10 @@ async function performSearch(
         "No results returned from SearXNG. No engine errors were reported; all engines returned zero results.",
       );
     }
+
+    // Reached only when SearXNG answered, retries included, so a degradation
+    // recorded on an earlier search stops being reported as current.
+    recordRespondingEngines(searchType);
 
     return results;
   }
