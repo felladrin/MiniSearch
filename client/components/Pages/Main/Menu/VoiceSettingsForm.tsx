@@ -4,16 +4,15 @@ import getUnicodeFlagIcon from "country-flag-icons/unicode";
 import { usePubSub } from "create-pubsub/react";
 import { useCallback, useEffect, useState } from "react";
 import { settingsPubSub } from "@/modules/pubSub";
-import { listVoices, type VoiceOption } from "@/modules/textToSpeech";
-
-interface VoiceGroup {
-  group: string;
-  items: { value: string; label: string }[];
-}
+import {
+  listVoices,
+  type TextToSpeechEngine,
+  type VoiceOption,
+} from "@/modules/textToSpeech";
 
 export default function VoiceSettingsForm() {
   const [settings, setSettings] = usePubSub(settingsPubSub);
-  const [voiceGroups, setVoiceGroups] = useState<VoiceGroup[]>([]);
+  const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
 
   const getCountryFlag = useCallback((langCode: string) => {
     try {
@@ -35,29 +34,9 @@ export default function VoiceSettingsForm() {
   useEffect(() => {
     let cancelled = false;
 
-    const toGroups = (options: VoiceOption[]): VoiceGroup[] => {
-      const byEngine: Record<string, { value: string; label: string }[]> = {
-        "Local voices": [],
-        "System voices": [],
-      };
-
-      for (const option of options) {
-        const group =
-          option.engine === "local" ? "Local voices" : "System voices";
-        byEngine[group].push({
-          value: option.value,
-          label: `${getCountryFlag(option.languageCode)} ${option.label}`,
-        });
-      }
-
-      return Object.entries(byEngine)
-        .filter(([, items]) => items.length > 0)
-        .map(([group, items]) => ({ group, items }));
-    };
-
     const updateVoices = () => {
       listVoices(undefined, settings.textToSpeechEngine).then((options) => {
-        if (!cancelled) setVoiceGroups(toGroups(options));
+        if (!cancelled) setVoiceOptions(options);
       });
     };
 
@@ -71,7 +50,7 @@ export default function VoiceSettingsForm() {
       cancelled = true;
       if (self.speechSynthesis) self.speechSynthesis.onvoiceschanged = null;
     };
-  }, [getCountryFlag, settings.textToSpeechEngine]);
+  }, [settings.textToSpeechEngine]);
 
   return (
     <Stack gap="xs">
@@ -89,20 +68,37 @@ export default function VoiceSettingsForm() {
       </Text>
       <Select
         {...form.getInputProps("textToSpeechEngine")}
+        onChange={(value) => {
+          if (!value || value === form.values.textToSpeechEngine) return;
+          // A voice from the engine being left cannot play under the new one,
+          // so the selection goes back to auto-detection in the same update.
+          form.setValues((current) => ({
+            ...current,
+            textToSpeechEngine: value as TextToSpeechEngine,
+            selectedVoiceId: "",
+          }));
+        }}
         data={[
-          { value: "local", label: "Local neural voice" },
+          { value: "local", label: "Local neural voice (English-only)" },
           { value: "system", label: "System voices" },
         ]}
         allowDeselect={false}
       />
       <Text size="sm">Voice Selection</Text>
       <Text size="xs" c="dimmed">
-        Choose the voice to use when reading AI responses aloud. Leave it empty
-        to pick one automatically for your language.
+        Choose the voice to use when reading AI responses aloud. Only the voices
+        of the selected engine are listed. Leave it empty to pick one
+        automatically for your language.
       </Text>
       <Select
+        // Remounting drops the label Mantine keeps for the previous value, which
+        // would otherwise filter the new engine's list as if it were typed.
+        key={settings.textToSpeechEngine}
         {...form.getInputProps("selectedVoiceId")}
-        data={voiceGroups}
+        data={voiceOptions.map((option) => ({
+          value: option.value,
+          label: `${getCountryFlag(option.languageCode)} ${option.label}`,
+        }))}
         searchable
         nothingFoundMessage="No voices found"
         placeholder="Auto-detected"

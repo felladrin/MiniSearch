@@ -88,9 +88,10 @@ function getLocalVoices(): Promise<Voice[]> {
 }
 
 /**
- * Local voices for the given language first, then every `speechSynthesis`
- * voice. Local voices are omitted when the catalogue cannot be reached, so the
- * form still lists the OS voices.
+ * Lists only the voices the given engine can actually play: the local voices for
+ * the given language, or every `speechSynthesis` voice. Listing the local
+ * voices means fetching the catalogue over the network, so it must not happen
+ * when the user has opted out of the local engine.
  */
 export async function listVoices(
   languageCode: string = navigator.language,
@@ -99,8 +100,6 @@ export async function listVoices(
   const options: VoiceOption[] = [];
   const wanted = primaryLanguage(languageCode);
 
-  // Listing the local voices means fetching the catalogue over the network, so
-  // it must not happen when the user has opted out of the local engine.
   if (engine !== "system") {
     try {
       for (const voice of await getLocalVoices()) {
@@ -120,6 +119,8 @@ export async function listVoices(
       );
     }
   }
+
+  if (engine === "local") return options;
 
   for (const voice of self.speechSynthesis?.getVoices() ?? []) {
     options.push({
