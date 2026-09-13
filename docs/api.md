@@ -21,6 +21,7 @@ carry.
 | `GET` | `/status` | none | none | Uptime, counters, and service health |
 | `GET` | `/api/config` | none | none | Runtime client configuration, including the search token |
 | `POST` | `/api/validate-access-key` | none | shared | Access key check |
+| `GET` | `/dictation-models/<version>/<file>` | none | none | Speech-to-text model files, served from the instance |
 
 A path that matches no hook falls through to Vite's static handler, which is
 also what a method mismatch does on `/api/config` and `/api/validate-access-key`:
@@ -377,6 +378,33 @@ the answer is a `413` sent while the caller is still uploading, so it carries
 | `429` | `{"error":"Too many requests."}` | Rate limited, kept distinct from a wrong key so the UI can say "try again" |
 | `400` | `{"valid":false,"error":"Invalid request"}` | Body is not JSON |
 | `413` | `{"error":"Request body too large"}` | Body over 4 KiB |
+
+### `GET /dictation-models/<version>/<file>`
+
+Serves the pinned speech-to-text model, so the page never contacts
+`download.moonshine.ai`. The version segment is `DICTATION_MODEL_VERSION` from
+`shared/dictationModel.ts`, currently `quantized_26_07_30`.
+
+Only seven filenames resolve: `frontend.ort`, `encoder.ort`, `adapter.ort`,
+`cross_kv.ort`, `decoder_kv.ort`, `streaming_config.json` and `tokenizer.bin`.
+Anything else is a `404`, so the route cannot be used as a proxy against the
+upstream host. No token and no rate-limit budget: the whitelist is what bounds
+it, and every file is on disk after the first request.
+
+The first request for a file fetches it from the upstream, checks it against a
+pinned SHA-256, and writes it under `DICTATION_MODELS_DIR` in a subdirectory
+named after the version. Concurrent first requests share one transfer. Responses
+are streamed and carry `Cache-Control: public, max-age=31536000, immutable`,
+which the version segment makes safe.
+
+| Status | Body | When |
+| --- | --- | --- |
+| `404` | `Unknown dictation model file` | The filename is not one of the seven |
+| `502` | `Could not serve <file>: <reason>` | The upstream failed, sent no body, exceeded the 64 MiB cap, or the bytes did not match the pinned digest |
+
+A failure once the body has started cannot be reported, because the headers are
+already gone; the response is ended rather than having an error appended to a
+truncated file.
 
 ## Related Topics
 

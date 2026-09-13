@@ -103,6 +103,7 @@ App
     ├── SearchForm
     │   ├── HistoryButton
     │   │   └── HistoryDrawer (lazy-loaded)
+    │   ├── DictationButton
     │   └── MenuButton
     │       └── MenuDrawer
     │           ├── AISettingsForm
@@ -260,7 +261,7 @@ function AiResponseSection() {
 - **SearchSettingsForm:** Result limits, image search toggle
 - **InterfaceSettingsForm:** UI preferences
 - **HistorySettings:** Retention days, max entries
-- **VoiceSettingsForm:** Text-to-speech engine and voice selection
+- **VoiceSettingsForm:** Dictation toggle, text-to-speech engine and voice selection
 - **ActionsForm:** Data management actions
 
 **PubSub:**
