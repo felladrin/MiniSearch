@@ -28,6 +28,7 @@ import { getRandomQuerySuggestion } from "@/modules/querySuggestions";
 import { sleepUntilIdle } from "@/modules/sleep";
 import { searchAndRespond } from "@/modules/textGeneration";
 import HistoryButton from "../History/HistoryButton";
+import DictationButton from "./DictationButton";
 
 function getUrlQuery() {
   return new URLSearchParams(window.location.search).get("q");
@@ -62,6 +63,19 @@ export default memo(function SearchForm({
   additionalButtons?: ReactNode;
 }) {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  /**
+   * The text the dictation button last asked for, held until React has
+   * committed it. `getDictationBase` reads the DOM, which trails the state by
+   * one commit, and the button strips its previous transcript out of what it
+   * reads before appending the new one. Read a stale value and that strip
+   * misses, so the whole transcript gets appended again on top of itself.
+   * Cleared after every commit, so typing, Clear and history restore take over
+   * as soon as the DOM disagrees with what dictation last wrote.
+   */
+  const pendingDictationRef = useRef<string | null>(null);
+  useEffect(() => {
+    pendingDictationRef.current = null;
+  });
   const defaultSuggestedQuery = "Anything you need!";
   const [state, setState] = useState<SearchFormState>({
     textAreaValue: query,
@@ -183,6 +197,16 @@ export default memo(function SearchForm({
     }));
   };
 
+  // Stable identities, so `memo` on the dictation button actually holds.
+  const getDictationBase = useCallback(
+    () => pendingDictationRef.current ?? textAreaRef.current?.value ?? "",
+    [],
+  );
+  const setDictatedText = useCallback((text: string) => {
+    pendingDictationRef.current = text;
+    setState((prev) => ({ ...prev, textAreaValue: text }));
+  }, []);
+
   const startSearching = useCallback(async () => {
     const queryToEncode =
       state.textAreaValue.trim().length >= 1
@@ -257,6 +281,10 @@ export default memo(function SearchForm({
         />
         <Group gap="xs">
           <HistoryButton onSearchSelect={restoreSearch} />
+          <DictationButton
+            getText={getDictationBase}
+            setText={setDictatedText}
+          />
           {state.textAreaValue.length >= 1 && (
             <Button
               size="xs"

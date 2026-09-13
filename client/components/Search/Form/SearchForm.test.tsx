@@ -1,5 +1,5 @@
 import { MantineProvider } from "@mantine/core";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SearchForm, {
   resetAutoSearchedQuery,
@@ -49,6 +49,19 @@ vi.mock("../../../modules/textGeneration", () => ({
 
 vi.mock("../../../modules/querySuggestions", () => ({
   getRandomQuerySuggestion: vi.fn(async () => "Anything you need!"),
+}));
+
+/** Captures the props `SearchForm` hands the real dictation button. */
+let dictationProps: {
+  getText: () => string;
+  setText: (text: string) => void;
+} = { getText: () => "", setText: () => {} };
+
+vi.mock("./DictationButton", () => ({
+  default: function DictationButtonProbe(props: typeof dictationProps) {
+    dictationProps = props;
+    return null;
+  },
 }));
 
 const renderSearchForm = (
@@ -116,5 +129,25 @@ describe("SearchForm component", () => {
     await waitFor(() => expect(searchAndRespond).toHaveBeenCalledTimes(1));
     await new Promise((r) => setTimeout(r, 50));
     expect(searchAndRespond).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads back what dictation last wrote before the DOM catches up", async () => {
+    renderSearchForm("", vi.fn());
+    const textarea = await waitForPlaceholder();
+    const { getText, setText } = dictationProps;
+
+    // The button strips the transcript it inserted last out of whatever it
+    // reads back before appending the newer one. A read that misses the write
+    // it just made makes that strip miss, and the whole transcript lands on
+    // top of itself, once per pause.
+    setText("hello there");
+    expect(getText()).toBe("hello there");
+
+    await act(async () => {});
+    expect(textarea).toHaveValue("hello there");
+
+    // Typing is the user's, so the field goes back to reading the DOM.
+    await userEvent.type(textarea, " friend");
+    expect(getText()).toBe("hello there friend");
   });
 });

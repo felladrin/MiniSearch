@@ -16,7 +16,8 @@ test("homepage loads, search runs, and results render", async ({ page }) => {
   await page.goto("/?q=playwright");
 
   await expect(page.getByRole("textbox")).toBeVisible();
-  await expect(page.getByRole("button", { name: /search/i })).toBeVisible();
+  // Anchored: the dictation button's label also contains "search".
+  await expect(page.getByRole("button", { name: /^search$/i })).toBeVisible();
 
   await expect(settledSearch(page)).toBeVisible({ timeout: 60_000 });
 

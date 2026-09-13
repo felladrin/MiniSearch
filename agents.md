@@ -128,6 +128,10 @@ Need to:
 - `client/modules/textToSpeechWorker.ts` - Synthesizes sentences off the main thread
 - `client/modules/textToSpeechWorkerProtocol.ts` - Message types shared by both sides of the worker
 - `client/modules/piper.ts` - The only module that imports `@diffusionstudio/vits-web`
+- `client/modules/speechToText.ts` - Dictation: microphone capture, the worker's lifecycle, and the `SpeechRecognition` fallback
+- `client/modules/speechToTextWorker.ts` - Runs the Moonshine transcriber off the main thread
+- `client/modules/speechToTextWorkerProtocol.ts` - Message types shared by both sides of the dictation worker
+- `client/modules/moonshine.ts` - The only module that imports `@moonshine-ai/moonshine-wasm`
 - `client/modules/keyboard.ts` - Keyboard shortcut handling
 - `client/modules/stringFormatters.ts` - Text formatting utilities
 - `client/modules/types.ts` - Shared TypeScript type definitions
@@ -142,6 +146,7 @@ Need to:
 - `server/rerankerServiceHook.ts` - Reranker model lifecycle management
 - `server/compressionServerHook.ts` - gzip/brotli compression for responses
 - `server/crossOriginServerHook.ts` - COOP/COEP headers for SharedArrayBuffer
+- `server/dictationModelServerHook.ts` - `/dictation-models/` endpoint: serves the pinned speech-to-text model files from the instance
 - `server/cacheServerHook.ts` - Cache-Control headers (preview server only)
 - `server/webSearchService.ts` - SearXNG integration with circuit breaker and retry logic
 - `server/pageContentService.ts` - Reads result pages and extracts query-relevant passages

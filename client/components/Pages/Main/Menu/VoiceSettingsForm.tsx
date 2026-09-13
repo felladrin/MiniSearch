@@ -1,4 +1,4 @@
-import { Select, Stack, Text } from "@mantine/core";
+import { Select, Stack, Switch, Text } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import getUnicodeFlagIcon from "country-flag-icons/unicode";
 import { usePubSub } from "create-pubsub/react";
@@ -75,6 +75,12 @@ export default function VoiceSettingsForm() {
 
   return (
     <Stack gap="xs">
+      <Switch
+        {...form.getInputProps("enableDictation", { type: "checkbox" })}
+        label="Dictate the search query"
+        description="Shows a microphone button next to the search field. The speech is transcribed on this device."
+        labelPosition="left"
+      />
       <Text size="sm">Speech Engine</Text>
       <Text size="xs" c="dimmed">
         The local engine downloads a small neural voice on the first use and
