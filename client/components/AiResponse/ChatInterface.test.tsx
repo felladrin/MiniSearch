@@ -13,7 +13,7 @@ import ChatInterface from "./ChatInterface";
 const [updateChatGenerationState, , getChatGenerationState] =
   chatGenerationStatePubSub;
 const [updateChatInput] = chatInputPubSub;
-const [updateFollowUpQuestion] = followUpQuestionPubSub;
+const [updateFollowUpQuestion, , getFollowUpQuestion] = followUpQuestionPubSub;
 const [updateSuppressNextFollowUp] = suppressNextFollowUpPubSub;
 
 vi.mock("@/modules/textGeneration", () => ({
@@ -323,6 +323,104 @@ describe("ChatInterface generation state", () => {
       regeneratedQuestion.resolve("A later question?");
       await Promise.all([send, regenerate]);
     });
+  });
+
+  it("keeps the follow-up question flag on until the newest call finishes", async () => {
+    const earlierQuestion = deferred<string>();
+    const newerQuestion = deferred<string>();
+    vi.mocked(generateFollowUpQuestion)
+      .mockReturnValueOnce(earlierQuestion.promise)
+      .mockReturnValueOnce(newerQuestion.promise);
+
+    renderChatInterface({ suppressInitialFollowUp: false });
+    await act(async () => {});
+
+    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+
+    let send: Promise<void> = Promise.resolve();
+    await act(async () => {
+      send = sendMessage("And how do I use it?");
+    });
+
+    // The orphaned call settles first. Its completion must write nothing.
+    await act(async () => {
+      earlierQuestion.resolve("The previous answer's question?");
+    });
+
+    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+    expect(getFollowUpQuestion()).toBe("");
+
+    await act(async () => {
+      newerQuestion.resolve("The newest question?");
+      await send;
+    });
+
+    expect(getFollowUpQuestion()).toBe("The newest question?");
+    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(false);
+  });
+
+  it("leaves both generation flags off after unmounting mid-generation", async () => {
+    const heldQuestion = deferred<string>();
+    vi.mocked(generateFollowUpQuestion).mockReturnValueOnce(
+      heldQuestion.promise,
+    );
+
+    const { unmount } = renderChatInterface({ suppressInitialFollowUp: false });
+    await act(async () => {});
+
+    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+
+    await act(async () => {
+      unmount();
+    });
+
+    expect(getChatGenerationState()).toEqual({
+      isGeneratingResponse: false,
+      isGeneratingFollowUpQuestion: false,
+    });
+
+    // The orphaned call lands after the unmount; it must not write into what
+    // is now the next mount's state.
+    await act(async () => {
+      heldQuestion.resolve("A question nobody asked for?");
+    });
+
+    expect(getChatGenerationState()).toEqual({
+      isGeneratingResponse: false,
+      isGeneratingFollowUpQuestion: false,
+    });
+    expect(getFollowUpQuestion()).toBe("");
+  });
+
+  it("leaves an in-flight call valid when a later one returns early", async () => {
+    const heldQuestion = deferred<string>();
+    vi.mocked(generateFollowUpQuestion).mockReturnValueOnce(
+      heldQuestion.promise,
+    );
+    // An empty answer makes the send's own follow-up call return at the
+    // `!currentResponse` guard, without ever reaching the request.
+    vi.mocked(generateChatResponse).mockResolvedValueOnce("");
+
+    renderChatInterface({ suppressInitialFollowUp: false });
+    await act(async () => {});
+
+    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+
+    await act(async () => {
+      await sendMessage("And how do I use it?");
+    });
+
+    // Only the held call ever asked for a question.
+    expect(generateFollowUpQuestion).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      heldQuestion.resolve("The original question?");
+    });
+
+    // The early return bumped nothing, so the in-flight call is still the
+    // current one and clears the flag. Bumping before the guards would have
+    // orphaned it and left the flag, and the wake lock, held until unmount.
+    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(false);
   });
 
   it("starts one re-generation when two regenerates land in the same task", async () => {

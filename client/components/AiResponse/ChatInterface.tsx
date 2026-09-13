@@ -73,6 +73,14 @@ export default function ChatInterface({
   const [streamedResponse, setStreamedResponse] = useState("");
   const hasInitialized = useRef(false);
   const prevInitialMessagesRef = useRef<ChatMessage[] | undefined>(undefined);
+  /**
+   * Identifies the newest `regenerateFollowUpQuestion` call. A boolean cannot
+   * represent two in flight, so a completion whose id is no longer current does
+   * nothing: otherwise whichever finished first would clear the flag while the
+   * other was still working, dropping the wake lock, and an orphaned call would
+   * write the previous answer's question into the input placeholder.
+   */
+  const followUpInvocationRef = useRef(0);
   const updateStreamedResponse = useCallback(
     throttle((response: string) => {
       setStreamedResponse(response);
@@ -90,6 +98,12 @@ export default function ChatInterface({
       if (suppressNextFollowUp) return;
       if (!currentResponse || !currentQuery.trim()) return;
 
+      // After the guards, never before them. A call that returns early never
+      // set the flag, so invalidating the in-flight one would make its
+      // completion a no-op and leave the flag, and the wake lock, held until
+      // unmount.
+      const invocation = ++followUpInvocationRef.current;
+
       try {
         setGenerationState({
           ...getChatGenerationState(),
@@ -102,6 +116,9 @@ export default function ChatInterface({
           previousQuestions: previousFollowUpQuestions,
         });
 
+        // A newer call, or an unmount, took over while this one awaited.
+        if (invocation !== followUpInvocationRef.current) return;
+
         setPreviousFollowUpQuestions((prev) =>
           [...prev, newQuestion].slice(-5),
         );
@@ -111,6 +128,7 @@ export default function ChatInterface({
           isGeneratingFollowUpQuestion: false,
         });
       } catch (_) {
+        if (invocation !== followUpInvocationRef.current) return;
         setFollowUpQuestion("");
         setGenerationState({
           ...getChatGenerationState(),
@@ -191,10 +209,19 @@ export default function ChatInterface({
 
   useEffect(() => {
     return () => {
+      // Invalidate any in-flight call so its completion cannot write into the
+      // next mount, then clear the generation flags the same way the question
+      // is cleared: an orphaned flow's `finally` would otherwise resurrect them
+      // there, and nothing else resets this channel on unmount.
+      followUpInvocationRef.current += 1;
       setFollowUpQuestion("");
       setPreviousFollowUpQuestions([]);
+      setGenerationState({
+        isGeneratingResponse: false,
+        isGeneratingFollowUpQuestion: false,
+      });
     };
-  }, [setFollowUpQuestion]);
+  }, [setFollowUpQuestion, setGenerationState]);
 
   const handleEditMessage = useCallback(
     (absoluteIndex: number) => {

@@ -68,6 +68,8 @@ needed.
 | Every synthesized chunk fails to play (blocked autoplay) | Treated as a local-engine failure, so an OS voice reads the answer rather than the user getting silence | `client/modules/textToSpeech.test.ts` › falls back when every synthesized chunk fails to play |
 | The browser provides no `speechSynthesis` at all and the local engine failed | Playback resolves and returns to idle with a log entry, instead of an unhandled rejection | `client/modules/textToSpeech.test.ts` › resolves and logs when the local engine failed and there are no OS voices |
 | A caller streams an oversized body to `/api/validate-access-key` | Refused with `413` mid-upload and the socket dropped; the answer carries `Connection: close`, so the caller's next request opens a fresh connection instead of a dead one | `server/validateAccessKeyServerHook.socket.test.ts` › refuses an oversized body with 413 without breaking the next request |
+| Two follow-up question generations overlap | The older completion writes nothing, so the flag stays on until the newest finishes and the input keeps the newest question | `client/components/AiResponse/ChatInterface.test.tsx` › keeps the follow-up question flag on until the newest call finishes |
+| `ChatInterface` unmounts while a follow-up question is in flight | Both generation flags are cleared and the orphaned completion writes nothing into the next mount | `client/components/AiResponse/ChatInterface.test.tsx` › leaves both generation flags off after unmounting mid-generation |
 
 ## Adding a Row
 
