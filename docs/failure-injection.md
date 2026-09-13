@@ -73,6 +73,9 @@ needed.
 | A follow-up question generation rejects after a newer one started | The failed call blanks nothing, so the newer question still lands and the flag stays on until it does | `client/components/AiResponse/ChatInterface.test.tsx` › blanks nothing when an orphaned call rejects after a newer one started |
 | `ChatInterface` unmounts while a regenerate is still awaiting its response | The orphaned regenerate leaves the next mount's response flag alone | `client/components/AiResponse/ChatInterface.test.tsx` › leaves the next mount's response flag alone when an orphaned regenerate settles |
 | `ChatInterface` unmounts while a send is still awaiting its response | The orphaned send asks for no follow-up question and leaves the next mount's response flag alone | `client/components/AiResponse/ChatInterface.test.tsx` › starts no follow-up question for a send that settles after unmount, leaves the next mount's response flag alone when an orphaned send settles |
+| The dictation model cannot load in the browser | The button falls back to the browser's `SpeechRecognition`, and hides when that is missing too | `client/modules/speechToText.test.ts` |
+| Microphone permission is denied | A notification says so instead of the press failing quietly | `client/components/Search/Form/DictationButton.test.tsx` |
+| An upstream dictation model file is unavailable | `/dictation-models/` answers the error rather than caching a partial file | `server/dictationModelServerHook.test.ts` |
 
 ## Adding a Row
 

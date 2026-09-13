@@ -83,6 +83,12 @@ These variables control the Vite development/preview server behavior:
 
 These defaults are provided by `docker-compose.yml`/`docker-compose.production.yml` (e.g. `PORT=${PORT:-7860}`), not by the application itself - `vite.config.ts` reads these variables with no fallback, so when running directly via `npm run dev`/`vite preview` without Docker, unset variables fall through to Vite's own built-in defaults.
 
+### Dictation
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DICTATION_MODELS_DIR` | `<system temp>/minisearch-dictation-models` | Directory where the server caches the speech-to-text model files it serves under `/dictation-models/`. The files are fetched once from the pinned upstream URL on the first request and reused after that |
+
 ## Application Settings
 
 Settings are stored in browser localStorage and can be changed via the Settings UI.
@@ -182,6 +188,7 @@ Search results:
 |---------|------|---------|-------------|
 | `selectedVoiceId` | string | `""` | Voice for reading answers aloud. `piper:<voice>` picks a local neural voice, `system:<voiceURI>` an OS voice, and `""` picks one automatically for the browser language. A bare value stored by an earlier version is read as an OS voice whenever the system engine runs; with the local engine it is ignored in favor of a language match |
 | `textToSpeechEngine` | `"local" \| "system"` | `"local"` | Which engine reads answers aloud. `"system"` also overrides a local voice picked above, and stops the voice list from being fetched, so it never contacts a third-party host. A profile that had picked an OS voice before this setting existed starts on `"system"`, so the upgrade does not replace that choice with a model download |
+| `enableDictation` | boolean | `true` | Shows the microphone button that fills the search field while the user speaks. Transcription runs on the device; turning this off hides the button and loads nothing |
 | `reasoningStartMarker` | string | `"<think>"` | Marker for start of reasoning content |
 | `reasoningEndMarker` | string | `"</think>"` | Marker for end of reasoning content |
 

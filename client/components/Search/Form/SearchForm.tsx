@@ -28,6 +28,7 @@ import { getRandomQuerySuggestion } from "@/modules/querySuggestions";
 import { sleepUntilIdle } from "@/modules/sleep";
 import { searchAndRespond } from "@/modules/textGeneration";
 import HistoryButton from "../History/HistoryButton";
+import DictationButton from "./DictationButton";
 
 function getUrlQuery() {
   return new URLSearchParams(window.location.search).get("q");
@@ -257,6 +258,12 @@ export default memo(function SearchForm({
         />
         <Group gap="xs">
           <HistoryButton onSearchSelect={restoreSearch} />
+          <DictationButton
+            getText={() => textAreaRef.current?.value ?? ""}
+            setText={(text) =>
+              setState((prev) => ({ ...prev, textAreaValue: text }))
+            }
+          />
           {state.textAreaValue.length >= 1 && (
             <Button
               size="xs"

@@ -87,6 +87,7 @@ export const defaultSettings = {
   historyRetentionDays: 30,
   historyGroupByDate: true,
   selectedVoiceId: "",
+  enableDictation: true,
   textToSpeechEngine: (hasLegacySystemVoice ? "system" : "local") as
     | "local"
     | "system",

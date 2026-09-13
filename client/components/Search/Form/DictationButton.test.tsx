@@ -1,0 +1,160 @@
+import { MantineProvider } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import DictationButton from "@/components/Search/Form/DictationButton";
+import {
+  DictationError,
+  getDictationEngine,
+  startDictation,
+} from "@/modules/speechToText";
+
+vi.mock("@/modules/speechToText", async () => {
+  const { DictationError: RealDictationError } = await import(
+    "@/modules/speechToText"
+  );
+  return {
+    DictationError: RealDictationError,
+    getDictationEngine: vi.fn(() => "wasm" as const),
+    startDictation: vi.fn(),
+  };
+});
+
+vi.mock("@mantine/notifications", () => ({
+  notifications: { show: vi.fn() },
+}));
+
+vi.mock("create-pubsub/react", () => ({
+  usePubSub: vi.fn((pubSub: unknown) => {
+    if (!Array.isArray(pubSub)) return [undefined, vi.fn()];
+    const maybeFactory = pubSub[2];
+    if (typeof maybeFactory !== "function") return [undefined, vi.fn()];
+    return [maybeFactory() ?? undefined, vi.fn()];
+  }),
+}));
+
+function renderButton(getText = () => "", setText = (_text: string) => {}) {
+  return render(
+    <MantineProvider>
+      <DictationButton getText={getText} setText={setText} />
+    </MantineProvider>,
+  );
+}
+
+const stopFn = vi.fn();
+
+beforeEach(() => {
+  vi.mocked(getDictationEngine).mockReturnValue("wasm");
+  vi.mocked(startDictation).mockResolvedValue({ stop: stopFn });
+  vi.mocked(notifications.show).mockClear();
+  stopFn.mockClear();
+});
+
+it("renders a dictation button with an accessible label", () => {
+  renderButton();
+  expect(
+    screen.getByRole("button", { name: "Dictate the search query" }),
+  ).toBeInTheDocument();
+});
+
+it("hides when no dictation engine is available", () => {
+  vi.mocked(getDictationEngine).mockReturnValue(null);
+  renderButton();
+  expect(
+    screen.queryByRole("button", { name: /dictate/i }),
+  ).not.toBeInTheDocument();
+});
+
+it("hides when the setting is off", async () => {
+  const { settingsPubSub } = await import("@/modules/pubSub");
+  settingsPubSub[0]({
+    ...(settingsPubSub[2]?.() ?? {}),
+    enableDictation: false,
+  });
+  renderButton();
+  expect(
+    screen.queryByRole("button", { name: /dictate/i }),
+  ).not.toBeInTheDocument();
+  settingsPubSub[0]({
+    ...(settingsPubSub[2]?.() ?? {}),
+    enableDictation: true,
+  });
+});
+
+it("switches to the recording state and stops on the second press", async () => {
+  const user = userEvent.setup();
+  renderButton();
+
+  await user.click(
+    screen.getByRole("button", { name: "Dictate the search query" }),
+  );
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Stop dictating the search query" }),
+    ).toHaveAttribute("aria-pressed", "true"),
+  );
+
+  await user.click(
+    screen.getByRole("button", { name: "Stop dictating the search query" }),
+  );
+
+  expect(stopFn).toHaveBeenCalledTimes(1);
+  expect(
+    screen.getByRole("button", { name: "Dictate the search query" }),
+  ).toHaveAttribute("aria-pressed", "false");
+});
+
+it("shows a notification when microphone permission is denied", async () => {
+  vi.mocked(startDictation).mockRejectedValue(
+    new DictationError("permission", "Permission denied"),
+  );
+  const user = userEvent.setup();
+  renderButton();
+
+  await user.click(
+    screen.getByRole("button", { name: "Dictate the search query" }),
+  );
+
+  await waitFor(() =>
+    expect(notifications.show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Microphone permission denied",
+        color: "red",
+      }),
+    ),
+  );
+});
+
+it("splices the transcript into the field without clobbering the base text", async () => {
+  let value = "existing query";
+  const getText = () => value;
+  const setText = (text: string) => {
+    value = text;
+  };
+  let onTranscript: (text: string) => void = () => {};
+
+  vi.mocked(startDictation).mockImplementation(async (callbacks) => {
+    onTranscript = callbacks.onTranscript;
+    return { stop: stopFn };
+  });
+
+  const user = userEvent.setup();
+  renderButton(getText, setText);
+
+  await user.click(
+    screen.getByRole("button", { name: "Dictate the search query" }),
+  );
+
+  onTranscript("hello");
+  expect(value).toBe("existing query hello");
+
+  onTranscript("hello world");
+  expect(value).toBe("existing query hello world");
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Stop dictating the search query" }),
+    ).toBeInTheDocument(),
+  );
+});
