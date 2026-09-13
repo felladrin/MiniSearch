@@ -350,14 +350,16 @@ describe("request body cap", () => {
       end: vi.fn((_payload: string, flushed?: () => void) => flushed?.()),
     };
 
-    handler(req, res, vi.fn());
-    await Promise.resolve();
-
-    // Two chunks, each within the cap on its own, over it together.
-    for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
-    for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
-    for (const cb of endCallbacks) cb();
-    await Promise.resolve();
+    await new Promise<void>((resolve) => {
+      void handler(req, res, vi.fn());
+      setImmediate(() => {
+        // Two chunks, each within the cap on its own, over it together.
+        for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
+        for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
+        for (const cb of endCallbacks) cb();
+        setTimeout(resolve, 50);
+      });
+    });
 
     expect(res.statusCode).toBe(413);
     expect(res.end).toHaveBeenCalledTimes(1);
