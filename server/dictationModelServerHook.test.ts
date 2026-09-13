@@ -44,17 +44,22 @@ async function call(url: string) {
       headers: Record<string, string | string[] | undefined>;
       body: Buffer;
     }>((resolve, reject) => {
-      const outgoing = httpRequest({ port, path: url }, (incoming) => {
-        const chunks: Buffer[] = [];
-        incoming.on("data", (chunk: Buffer) => chunks.push(chunk));
-        incoming.on("end", () =>
-          resolve({
-            statusCode: incoming.statusCode ?? 0,
-            headers: incoming.headers,
-            body: Buffer.concat(chunks),
-          }),
-        );
-      });
+      // `agent: false` disables keep-alive: a pooled socket would keep
+      // `server.close()` waiting and make this hang intermittently.
+      const outgoing = httpRequest(
+        { port, path: url, agent: false },
+        (incoming) => {
+          const chunks: Buffer[] = [];
+          incoming.on("data", (chunk: Buffer) => chunks.push(chunk));
+          incoming.on("end", () =>
+            resolve({
+              statusCode: incoming.statusCode ?? 0,
+              headers: incoming.headers,
+              body: Buffer.concat(chunks),
+            }),
+          );
+        },
+      );
       outgoing.on("error", reject);
       outgoing.end();
     });
@@ -124,13 +129,17 @@ describe("dictationModelServerHook", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     // Normalises to `/etc/passwd`, leaving nothing after the route prefix.
-    const traversed = await call("/dictation-models/../etc/passwd");
+    const traversed = await call(
+      "/dictation-models/quantized_26_07_30/../etc/passwd",
+    );
     expect(traversed.statusCode).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
 
     // Normalises back onto a whitelisted name, which is the case that really
     // exercises the prefix slice rather than the empty remainder.
-    const normalised = await call("/dictation-models/a/../encoder.ort");
+    const normalised = await call(
+      "/dictation-models/quantized_26_07_30/a/../encoder.ort",
+    );
     expect(normalised.statusCode).not.toBe(404);
   });
 
@@ -142,7 +151,9 @@ describe("dictationModelServerHook", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const first = await call("/dictation-models/streaming_config.json");
+    const first = await call(
+      "/dictation-models/quantized_26_07_30/streaming_config.json",
+    );
     expect(first.statusCode).toBe(200);
     expect(first.body).toEqual(Buffer.from(payload));
     expect(first.headers["content-length"]).toBe(String(payload.byteLength));
@@ -150,7 +161,9 @@ describe("dictationModelServerHook", () => {
       true,
     );
 
-    const second = await call("/dictation-models/streaming_config.json");
+    const second = await call(
+      "/dictation-models/quantized_26_07_30/streaming_config.json",
+    );
     expect(second.statusCode).toBe(200);
     expect(second.body).toEqual(Buffer.from(payload));
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -165,7 +178,9 @@ describe("dictationModelServerHook", () => {
       }),
     );
 
-    const response = await call("/dictation-models/streaming_config.json");
+    const response = await call(
+      "/dictation-models/quantized_26_07_30/streaming_config.json",
+    );
     expect(response.statusCode).toBe(502);
     expect(response.body.toString()).toContain("pinned digest");
     // A file that failed verification must not be left in the cache.
@@ -183,7 +198,9 @@ describe("dictationModelServerHook", () => {
       }),
     );
 
-    const response = await call("/dictation-models/streaming_config.json");
+    const response = await call(
+      "/dictation-models/quantized_26_07_30/streaming_config.json",
+    );
     expect(response.headers["content-type"]).toBe("application/json");
     expect(response.body.toString()).toBe(REAL_STREAMING_CONFIG);
   });
@@ -194,7 +211,9 @@ describe("dictationModelServerHook", () => {
       vi.fn().mockResolvedValue({ ok: false, status: 404 }),
     );
 
-    const response = await call("/dictation-models/encoder.ort");
+    const response = await call(
+      "/dictation-models/quantized_26_07_30/encoder.ort",
+    );
     expect(response.statusCode).toBe(502);
     expect(fs.existsSync(path.join(modelsDir, "encoder.ort"))).toBe(false);
   });

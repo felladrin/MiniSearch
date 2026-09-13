@@ -39,7 +39,6 @@ function spliceTranscript(
   return `${base}${separator}${transcript}`;
 }
 
-/** " 42%" when the total size is known, "" when it is not. */
 /**
  * The upstream sends no `Content-Length` for the model files, so `total` is
  * usually missing and a percentage would never appear. Megabytes still tell
@@ -56,7 +55,8 @@ function formatDownloadProgress(
     );
     return ` ${percent}%`;
   }
-  return ` ${Math.round(progress.loaded / 1_000_000)} MB`;
+  const megabytes = Math.round(progress.loaded / 1_000_000);
+  return megabytes > 0 ? ` ${megabytes} MB` : "";
 }
 
 export default memo(function DictationButton({
@@ -91,7 +91,12 @@ export default memo(function DictationButton({
     await session?.stop();
   }, []);
 
-  const unmountedRef = useRef(false);
+  /**
+   * Set when this session no longer has a UI: the button unmounted, or the
+   * setting was turned off. A session that resolves afterwards is stopped and
+   * discarded, because there would be nothing on screen to stop it.
+   */
+  const abandonedRef = useRef(false);
 
   useEffect(
     () => () => {
@@ -99,7 +104,7 @@ export default memo(function DictationButton({
       // dictating on the home page and pressing Search unmounts this button
       // mid-session. Without this the microphone track, the AudioContext and
       // the worker all outlive it, with the recording indicator still on.
-      unmountedRef.current = true;
+      abandonedRef.current = true;
       void sessionRef.current?.stop();
       sessionRef.current = null;
     },
@@ -109,7 +114,11 @@ export default memo(function DictationButton({
   useEffect(() => {
     // Returning null below is not an unmount, so the cleanup never runs and
     // the session would keep writing into a field with no button to stop it.
-    if (!settings.enableDictation && sessionRef.current) void stop();
+    // Not guarded on `sessionRef`: during the load that is still null, and the
+    // session arrives after the button is already gone.
+    if (settings.enableDictation) return;
+    abandonedRef.current = true;
+    void stop();
   }, [settings.enableDictation, stop]);
 
   const handleClick = useCallback(async () => {
@@ -119,6 +128,7 @@ export default memo(function DictationButton({
     }
     if (phase === "loading") return;
 
+    abandonedRef.current = false;
     setPhase("loading");
     try {
       const session = await startDictation({
@@ -141,9 +151,9 @@ export default memo(function DictationButton({
         },
       });
       // The load takes seconds and the permission prompt can take minutes, so
-      // the component may well be gone by now; the cleanup above had no
+      // the button may well be gone by now; whichever path removed it had no
       // session to stop when it ran.
-      if (unmountedRef.current) {
+      if (abandonedRef.current) {
         void session.stop();
         return;
       }

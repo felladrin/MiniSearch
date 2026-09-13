@@ -6,7 +6,13 @@ import { pipeline } from "node:stream/promises";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { isResponseWritable, safeEndResponse } from "./utils/streamUtils.ts";
 
-const ROUTE_PREFIX = "/dictation-models/";
+/**
+ * The pinned upstream version is part of the route, so the `immutable` cache
+ * header below is true: bumping the model changes every URL instead of leaving
+ * a year-long cache entry that no new build can reach.
+ */
+const MODEL_VERSION = "quantized_26_07_30";
+const ROUTE_PREFIX = `/dictation-models/${MODEL_VERSION}/`;
 
 /**
  * Pinned upstream location of the streaming English model (MIT-licensed).
@@ -14,20 +20,18 @@ const ROUTE_PREFIX = "/dictation-models/";
  * `download.moonshine.ai`, so the page makes no third-party requests; the
  * server downloads each file once and caches it on disk.
  */
-const UPSTREAM_BASE_URL =
-  "https://download.moonshine.ai/model/tiny-streaming-en/quantized_26_07_30";
+const UPSTREAM_BASE_URL = `https://download.moonshine.ai/model/tiny-streaming-en/${MODEL_VERSION}`;
 
 /**
- * Whitelist of servable files. Requests for files outside this map get a
- * 404, so the route cannot be turned into an open proxy against the
- * upstream host.
- */
-/**
- * SHA-256 of each file, taken from the download this feature was verified
- * against. It is trust-on-first-use, the same guarantee `package-lock.json`
- * integrity hashes give: it does not prove the upstream is honest, it pins the
- * artifact that was actually reviewed so a later change under a path segment
- * named `quantized_26_07_30` becomes a loud failure instead of a silent swap.
+ * Whitelist of servable files, each with the SHA-256 it must match. A request
+ * outside this map gets a 404, so the route cannot be turned into an open proxy
+ * against the upstream host.
+ *
+ * The digests are from the download this feature was verified against, which is
+ * trust-on-first-use: the same guarantee a lockfile integrity hash gives. It
+ * does not prove the upstream is honest, it pins the artifact that was actually
+ * reviewed, so a later change under a path segment named `quantized_26_07_30`
+ * becomes a loud failure instead of a silent swap.
  */
 const MODEL_FILES = new Map([
   [

@@ -180,6 +180,38 @@ describe("teardown", () => {
     await waitFor(() => expect(stopFn).toHaveBeenCalledTimes(1));
   });
 
+  it("discards a session that arrives after the setting was turned off", async () => {
+    const user = userEvent.setup();
+    const { settingsPubSub } = await import("@/modules/pubSub");
+    let release: ((session: { stop: () => Promise<void> }) => void) | undefined;
+    vi.mocked(startDictation).mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+
+    renderButton();
+    await user.click(screen.getByRole("button"));
+    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
+
+    try {
+      // Mid-load, with the session not yet in the ref: the button disappears,
+      // and the microphone would otherwise open with nothing to stop it.
+      settingsPubSub[0]({
+        ...(settingsPubSub[2]?.() ?? {}),
+        enableDictation: false,
+      });
+      release?.({ stop: stopFn });
+
+      await waitFor(() => expect(stopFn).toHaveBeenCalledTimes(1));
+    } finally {
+      settingsPubSub[0]({
+        ...(settingsPubSub[2]?.() ?? {}),
+        enableDictation: true,
+      });
+    }
+  });
+
   it("notifies and stops when the engine fails after it loaded", async () => {
     const user = userEvent.setup();
     renderButton();

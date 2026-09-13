@@ -35,7 +35,9 @@ const DICTATION_MODEL_FILES: Record<string, string> = Object.fromEntries(
     "decoder_kv.ort",
     "streaming_config.json",
     "tokenizer.bin",
-  ].map((file) => [file, `/dictation-models/${file}`]),
+    // The version segment matches the server route, which is what makes the
+    // long-lived cache headers on those files safe.
+  ].map((file) => [file, `/dictation-models/quantized_26_07_30/${file}`]),
 );
 
 /** The minimum the app needs from `window.SpeechRecognition`. */
@@ -228,20 +230,21 @@ async function startWasmDictation(
     worker.terminate();
   };
 
-  let audioContext: AudioContext;
-  let source: MediaStreamAudioSourceNode;
-  let processor: ScriptProcessorNode;
+  let audioContext: AudioContext | undefined;
+  let source: MediaStreamAudioSourceNode | undefined;
+  let processor: ScriptProcessorNode | undefined;
   try {
-    audioContext = new AudioContext({ sampleRate: 16000 });
-    source = audioContext.createMediaStreamSource(mediaStream);
+    const context = new AudioContext({ sampleRate: 16000 });
+    audioContext = context;
+    source = context.createMediaStreamSource(mediaStream);
     // A 1-channel ScriptProcessor downmixes stereo capture to mono, which
     // matters for devices whose microphone sits on the right channel only.
-    processor = audioContext.createScriptProcessor(4096, 1, 1);
+    processor = context.createScriptProcessor(4096, 1, 1);
 
     processor.onaudioprocess = (event) => {
       if (stopped) return;
       const input = event.inputBuffer.getChannelData(0);
-      const resampled = resampleTo16k(input, audioContext.sampleRate);
+      const resampled = resampleTo16k(input, context.sampleRate);
       // The capture buffer is reused and a transferred buffer cannot be read
       // again, so the untouched path needs a copy. `resampleTo16k` already
       // returned a fresh array nobody else holds.
@@ -257,13 +260,13 @@ async function startWasmDictation(
     };
 
     source.connect(processor);
-    processor.connect(audioContext.destination);
+    processor.connect(context.destination);
   } catch (error) {
     // `new AudioContext({ sampleRate })` throws when the rate is refused, and
     // Chrome throws once a page holds too many live contexts. Escaping here as
     // a plain Error would be caught as "the local engine cannot run" and hand
     // the microphone to the browser's cloud recognizer by accident.
-    releasePartialSession();
+    releasePartialSession(audioContext);
     throw new DictationError(
       "engine",
       `The audio pipeline could not be started: ${describeError(error)}`,
@@ -274,8 +277,8 @@ async function startWasmDictation(
     stop: async () => {
       if (stopped) return;
       stopped = true;
-      processor.disconnect();
-      source.disconnect();
+      processor?.disconnect();
+      source?.disconnect();
       mediaStream.getTracks().forEach((track) => {
         track.stop();
       });
@@ -291,8 +294,13 @@ async function startWasmDictation(
         new Promise<void>((resolve) => setTimeout(resolve, 2000)),
       ]);
 
-      await audioContext.close();
-      worker.terminate();
+      try {
+        await audioContext?.close();
+      } finally {
+        // Never skipped: a rejecting close would otherwise leave the worker,
+        // and its transcriber, running for the life of the page.
+        worker.terminate();
+      }
     },
   };
 }
