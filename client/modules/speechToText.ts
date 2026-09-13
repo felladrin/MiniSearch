@@ -185,10 +185,14 @@ async function startWasmDictation(
           else reject(failure);
         }
       };
-      worker.onerror = () =>
-        reject(
-          new DictationError("engine", "The dictation worker failed to start"),
+      worker.onerror = () => {
+        const failure = new DictationError(
+          "engine",
+          "The dictation worker failed to start",
         );
+        if (engineLoaded) failureAfterLoad = failure;
+        else reject(failure);
+      };
       worker.postMessage({ type: "load", modelFiles: DICTATION_MODEL_FILES });
     });
 
@@ -346,6 +350,8 @@ function startWebSpeechDictation(
 
   let finalText = "";
   let settled = false;
+  /** The returned promise has resolved, so rejecting it would be a no-op. */
+  let resolved = false;
   // `recognition.stop()` emits one last `result` by spec, and the caller has
   // already forgotten what it appended by then.
   let stopped = false;
@@ -368,37 +374,39 @@ function startWebSpeechDictation(
     };
 
     recognition.onerror = (event) => {
-      if (
-        event.error === "not-allowed" ||
-        event.error === "service-not-allowed"
-      ) {
-        reject(
-          new DictationError(
+      if (stopped) return;
+      const denied =
+        event.error === "not-allowed" || event.error === "service-not-allowed";
+      const failure = denied
+        ? new DictationError(
             "permission",
             "Microphone permission was denied for dictation",
-          ),
-        );
-      } else if (!settled) {
-        reject(
-          new DictationError("engine", `Dictation failed: ${event.error}`),
-        );
-      } else if (!stopped) {
-        callbacks.onError?.(
-          new DictationError("engine", `Dictation failed: ${event.error}`),
-        );
-      }
+          )
+        : new DictationError("engine", `Dictation failed: ${event.error}`);
+      // `start()` does not throw on a denial: the error arrives later, by which
+      // point this promise has already resolved and rejecting it is a no-op.
+      // Everything after the resolve therefore goes through `onError`.
+      if (resolved) callbacks.onError?.(failure);
+      else reject(failure);
     };
 
     recognition.onend = () => {
-      if (!settled) {
-        reject(
-          new DictationError("engine", "Dictation ended before any speech"),
-        );
-      }
+      if (stopped) return;
+      // The recognizer ends on its own after silence even with `continuous`,
+      // which would otherwise leave the button saying Listening forever.
+      const failure = new DictationError(
+        "engine",
+        settled
+          ? "Dictation stopped listening"
+          : "Dictation ended before any speech",
+      );
+      if (resolved) callbacks.onError?.(failure);
+      else reject(failure);
     };
 
     try {
       recognition.start();
+      resolved = true;
       resolve({
         stop: async () => {
           stopped = true;

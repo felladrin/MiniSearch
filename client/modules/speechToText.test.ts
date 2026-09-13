@@ -269,6 +269,35 @@ describe("startDictation with the wasm engine", () => {
     expect(started()).toBe(true);
   });
 
+  it("fails the load when the worker dies uncaught while permission is pending", async () => {
+    const { tracks, stream } = makeMediaStream();
+    let grantMicrophone: ((stream: MediaStream) => void) | undefined;
+    stubWasmSupport(
+      vi.fn().mockReturnValue(
+        new Promise((resolve) => {
+          grantMicrophone = resolve as (stream: MediaStream) => void;
+        }),
+      ),
+    );
+    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
+    const started = installLocalRecognitionFake();
+
+    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
+    const worker = FakeWorker.instances[0];
+    worker.respond({ type: "loaded" });
+
+    // An uncaught error rather than a posted one: the worker's own try/catch
+    // converts most failures, so this is the channel it cannot cover.
+    worker.onerror?.(new ErrorEvent("error"));
+    grantMicrophone?.(stream);
+
+    await sessionPromise;
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    expect(worker.terminated).toBe(true);
+    expect(started()).toBe(true);
+  });
+
   it("ignores a transcript that arrives after stop", async () => {
     const { stream } = makeMediaStream();
     stubWasmSupport(vi.fn().mockResolvedValue(stream));
@@ -433,7 +462,7 @@ describe("startDictation with the web speech fallback", () => {
     expect(instance?.stopped).toBe(true);
   });
 
-  it("reports a permission error from the recognition error event", async () => {
+  it("reports a permission error raised before the session resolves", async () => {
     installRecognitionFake(() => {
       instance?.onerror?.({ error: "not-allowed" });
     });
@@ -441,6 +470,57 @@ describe("startDictation with the web speech fallback", () => {
     await expect(
       startDictation({ onTranscript: vi.fn() }),
     ).rejects.toMatchObject({ kind: "permission" });
+  });
+
+  it("reports a denial that arrives after the session resolved", async () => {
+    // What a real browser does: `start()` returns, and the denial arrives on a
+    // later task. Rejecting the already-resolved promise would be a no-op, so
+    // without the `onError` route the user is told nothing at all.
+    installRecognitionFake();
+    const onError = vi.fn();
+
+    const session = await startDictation({
+      onTranscript: vi.fn(),
+      onError,
+    });
+
+    instance?.onerror?.({ error: "not-allowed" });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0][0]).toMatchObject({ kind: "permission" });
+    await session.stop();
+  });
+
+  it("reports a recognizer that ends on its own", async () => {
+    installRecognitionFake();
+    const onError = vi.fn();
+
+    const session = await startDictation({
+      onTranscript: vi.fn(),
+      onError,
+    });
+
+    // Chrome ends after silence even with `continuous`, which would otherwise
+    // leave the button saying Listening with nothing behind it.
+    instance?.onend?.();
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    await session.stop();
+  });
+
+  it("says nothing when the recognizer ends because it was stopped", async () => {
+    installRecognitionFake();
+    const onError = vi.fn();
+
+    const session = await startDictation({
+      onTranscript: vi.fn(),
+      onError,
+    });
+
+    await session.stop();
+    instance?.onend?.();
+
+    expect(onError).not.toHaveBeenCalled();
   });
 });
 
