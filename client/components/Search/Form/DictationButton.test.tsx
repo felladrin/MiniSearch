@@ -266,6 +266,28 @@ describe("teardown", () => {
     }
   });
 
+  it("leaves the recording state quietly when the engine ends on its own", async () => {
+    const user = userEvent.setup();
+    renderButton();
+
+    await user.click(screen.getByRole("button"));
+    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
+
+    const { onEnd } = vi.mocked(startDictation).mock.calls[0][0];
+    onEnd?.();
+
+    // The recognizer stopping itself is not a failure, but the button has to
+    // come back or it sits on "Listening" with nothing behind it.
+    await waitFor(() =>
+      expect(screen.getByRole("button")).toHaveAttribute(
+        "aria-label",
+        "Dictate the search query",
+      ),
+    );
+    expect(stopFn).toHaveBeenCalledTimes(1);
+    expect(notifications.show).not.toHaveBeenCalled();
+  });
+
   it("notifies and stops when the engine fails after it loaded", async () => {
     const user = userEvent.setup();
     renderButton();
