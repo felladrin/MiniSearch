@@ -57,8 +57,15 @@ async function downloadModelFile(fileName: string): Promise<void> {
   }
 
   const bytes = new Uint8Array(await response.arrayBuffer());
-  fs.writeFileSync(temporaryPath, bytes);
-  fs.renameSync(temporaryPath, filePath);
+  try {
+    fs.writeFileSync(temporaryPath, bytes);
+    fs.renameSync(temporaryPath, filePath);
+  } catch (error) {
+    // A half-written temporary file is never served, but it would sit in the
+    // cache directory forever.
+    fs.rmSync(temporaryPath, { force: true });
+    throw error;
+  }
 }
 
 /** Serves the file from the disk cache, downloading it once if it is missing. */

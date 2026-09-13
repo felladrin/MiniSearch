@@ -365,7 +365,22 @@ export async function startDictation(
   callbacks: DictationCallbacks,
 ): Promise<DictationSession> {
   const engine = getDictationEngine();
-  if (engine === "wasm") return startWasmDictation(callbacks);
+  if (engine === "wasm") {
+    try {
+      return await startWasmDictation(callbacks);
+    } catch (error) {
+      // A denied microphone is the user's answer, not an engine that cannot
+      // run, so it is reported rather than retried on a path that would ask
+      // again and, in Chrome, ship the audio to the browser vendor.
+      if (error instanceof DictationError && error.kind === "permission")
+        throw error;
+      if (!getSpeechRecognitionConstructor()) throw error;
+      addLogEntry(
+        `Local dictation failed, falling back to the browser's recognizer: ${describeError(error)}`,
+      );
+      return startWebSpeechDictation(callbacks);
+    }
+  }
   if (engine === "web-speech") return startWebSpeechDictation(callbacks);
   addLogEntry("Dictation is not available in this browser");
   throw new DictationError(

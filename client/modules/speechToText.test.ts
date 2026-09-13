@@ -181,6 +181,64 @@ describe("startDictation with the wasm engine", () => {
     expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
   });
 
+  /** Minimal `SpeechRecognition` stand-in; reports whether it was started. */
+  function installLocalRecognitionFake() {
+    let started = false;
+    class FakeRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = "";
+      onresult: unknown = null;
+      onerror: unknown = null;
+      onend: unknown = null;
+      start() {
+        started = true;
+      }
+      stop() {}
+    }
+    (window as unknown as Record<string, unknown>).webkitSpeechRecognition =
+      FakeRecognition;
+    return () => started;
+  }
+
+  it("falls back to the browser recognizer when the local engine fails", async () => {
+    const { stream } = makeMediaStream();
+    stubWasmSupport(vi.fn().mockResolvedValue(stream));
+    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
+    const started = installLocalRecognitionFake();
+
+    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
+    // A 502 from `/dictation-models/` is "cannot run here", not "no engine".
+    FakeWorker.instances[0].respond({
+      type: "error",
+      message: "model download failed",
+    });
+
+    await sessionPromise;
+    expect(started()).toBe(true);
+  });
+
+  it("reports a denied microphone instead of falling back", async () => {
+    stubWasmSupport(
+      vi
+        .fn()
+        .mockRejectedValue(
+          new DOMException("Permission denied", "NotAllowedError"),
+        ),
+    );
+    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
+    const started = installLocalRecognitionFake();
+
+    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
+    FakeWorker.instances[0].respond({ type: "loaded" });
+
+    await expect(sessionPromise).rejects.toMatchObject({ kind: "permission" });
+    // Falling back here would ask again and, in Chrome, send the audio away.
+    expect(started()).toBe(false);
+  });
+
   it("ignores a transcript that arrives after stop", async () => {
     const { stream } = makeMediaStream();
     stubWasmSupport(vi.fn().mockResolvedValue(stream));
