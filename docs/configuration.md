@@ -87,7 +87,7 @@ These defaults are provided by `docker-compose.yml`/`docker-compose.production.y
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DICTATION_MODELS_DIR` | `<system temp>/minisearch-dictation-models` | Directory where the server caches the speech-to-text model files it serves under `/dictation-models/`. The files are fetched once from the pinned upstream URL on the first request and reused after that |
+| `DICTATION_MODELS_DIR` | `<system temp>/minisearch-dictation-models` | Directory where the server caches the speech-to-text model files it serves under `/dictation-models/`. The files are fetched once from the pinned upstream URL on the first request, verified against a pinned SHA-256, and reused after that. They land in a subdirectory named after the model release, so a later release cannot be served from an older cache. The default lives under the system temp directory, so a container re-downloads ~51 MB after a restart unless this points at a volume |
 
 ## Application Settings
 

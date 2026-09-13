@@ -162,14 +162,28 @@ async function startWasmDictation(
    */
   let stopped = false;
 
+  /**
+   * An engine failure between `loaded` and the microphone being granted. The
+   * load promise has already settled by then, so rejecting it again is a no-op;
+   * the permission prompt can sit open for minutes, and the transcriber is
+   * already running and can die in that window.
+   */
+  let failureAfterLoad: DictationError | null = null;
+  let engineLoaded = false;
+
   const loadEngine = () =>
     new Promise<void>((resolve, reject) => {
       worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
-        if (data.type === "loaded") resolve();
-        else if (data.type === "progress")
+        if (data.type === "loaded") {
+          engineLoaded = true;
+          resolve();
+        } else if (data.type === "progress")
           callbacks.onProgress?.(data.loaded, data.total);
-        else if (data.type === "error")
-          reject(new DictationError("engine", data.message));
+        else if (data.type === "error") {
+          const failure = new DictationError("engine", data.message);
+          if (engineLoaded) failureAfterLoad = failure;
+          else reject(failure);
+        }
       };
       worker.onerror = () =>
         reject(
@@ -196,6 +210,17 @@ async function startWasmDictation(
       "permission",
       `The microphone could not be opened: ${describeError(error)}`,
     );
+  }
+
+  // Failed while the permission prompt was open. Thrown rather than reported
+  // through `onError`, so it lands in `startDictation`'s catch and takes the
+  // same fallback as any other engine failure.
+  if (failureAfterLoad) {
+    mediaStream.getTracks().forEach((track) => {
+      track.stop();
+    });
+    worker.terminate();
+    throw failureAfterLoad;
   }
 
   let acknowledgeStop: (() => void) | null = null;

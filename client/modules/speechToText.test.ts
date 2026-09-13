@@ -239,6 +239,36 @@ describe("startDictation with the wasm engine", () => {
     expect(started()).toBe(false);
   });
 
+  it("fails the load when the engine dies while permission is pending", async () => {
+    const { tracks, stream } = makeMediaStream();
+    let grantMicrophone: ((stream: MediaStream) => void) | undefined;
+    stubWasmSupport(
+      vi.fn().mockReturnValue(
+        new Promise((resolve) => {
+          grantMicrophone = resolve as (stream: MediaStream) => void;
+        }),
+      ),
+    );
+    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
+    const started = installLocalRecognitionFake();
+
+    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
+    const worker = FakeWorker.instances[0];
+    worker.respond({ type: "loaded" });
+
+    // The prompt can sit open for minutes, and the transcriber is already
+    // running by now. Rejecting the settled load promise would be a no-op.
+    worker.respond({ type: "error", message: "the transcriber died" });
+    grantMicrophone?.(stream);
+
+    await sessionPromise;
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    expect(worker.terminated).toBe(true);
+    // Treated as any other engine failure, so the browser recognizer takes it.
+    expect(started()).toBe(true);
+  });
+
   it("ignores a transcript that arrives after stop", async () => {
     const { stream } = makeMediaStream();
     stubWasmSupport(vi.fn().mockResolvedValue(stream));
