@@ -89,6 +89,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * The real published `streaming_config.json`, byte for byte. The hook verifies
+ * every download against a pinned SHA-256, so a made-up payload is refused,
+ * which is the point of the digest.
+ */
+const REAL_STREAMING_CONFIG =
+  '{\n  "encoder_dim": 320,\n  "decoder_dim": 320,\n  "depth": 6,\n  "nheads": 8,\n  "head_dim": 40,\n  "vocab_size": 32768,\n  "bos_id": 1,\n  "eos_id": 2,\n  "frame_len": 80,\n  "total_lookahead": 16,\n  "d_model_frontend": 320,\n  "c1": 640,\n  "c2": 320,\n  "frontend_state_shapes": {\n    "sample_buffer": [\n      1,\n      79\n    ],\n    "sample_len": [\n      1\n    ],\n    "conv1_buffer": [\n      1,\n      320,\n      4\n    ],\n    "conv2_buffer": [\n      1,\n      640,\n      4\n    ],\n    "frame_count": [\n      1\n    ]\n  }\n}';
+
+/** Minimal `ReadableStream` stand-in for the hook's capped body reader. */
+function bodyOf(bytes: Uint8Array) {
+  let sent = false;
+  return {
+    getReader: () => ({
+      read: async () => {
+        if (sent) return { done: true, value: undefined };
+        sent = true;
+        return { done: false, value: bytes };
+      },
+      cancel: async () => {},
+    }),
+  };
+}
+
 describe("dictationModelServerHook", () => {
   it("passes through requests that are not for the model route", async () => {
     const response = await call("/search?q=hello");
@@ -112,39 +135,57 @@ describe("dictationModelServerHook", () => {
   });
 
   it("downloads a whitelisted file once and caches it on disk", async () => {
-    const payload = new Uint8Array([1, 2, 3, 4]);
+    const payload = new TextEncoder().encode(REAL_STREAMING_CONFIG);
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      arrayBuffer: async () => payload.buffer,
+      body: bodyOf(payload),
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const first = await call("/dictation-models/tokenizer.bin");
+    const first = await call("/dictation-models/streaming_config.json");
     expect(first.statusCode).toBe(200);
     expect(first.body).toEqual(Buffer.from(payload));
-    expect(first.headers["content-type"]).toBe("application/octet-stream");
     expect(first.headers["content-length"]).toBe(String(payload.byteLength));
-    expect(fs.existsSync(path.join(modelsDir, "tokenizer.bin"))).toBe(true);
+    expect(fs.existsSync(path.join(modelsDir, "streaming_config.json"))).toBe(
+      true,
+    );
 
-    const second = await call("/dictation-models/tokenizer.bin");
+    const second = await call("/dictation-models/streaming_config.json");
     expect(second.statusCode).toBe(200);
     expect(second.body).toEqual(Buffer.from(payload));
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("serves the streaming config as JSON", async () => {
-    const config = JSON.stringify({ sample_rate: 16000 });
+  it("refuses a file whose digest does not match the pinned one", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
-        arrayBuffer: async () => new TextEncoder().encode(config).buffer,
+        body: bodyOf(new TextEncoder().encode("not the published file")),
+      }),
+    );
+
+    const response = await call("/dictation-models/streaming_config.json");
+    expect(response.statusCode).toBe(502);
+    expect(response.body.toString()).toContain("pinned digest");
+    // A file that failed verification must not be left in the cache.
+    expect(fs.existsSync(path.join(modelsDir, "streaming_config.json"))).toBe(
+      false,
+    );
+  });
+
+  it("serves the streaming config as JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        body: bodyOf(new TextEncoder().encode(REAL_STREAMING_CONFIG)),
       }),
     );
 
     const response = await call("/dictation-models/streaming_config.json");
     expect(response.headers["content-type"]).toBe("application/json");
-    expect(response.body.toString()).toBe(config);
+    expect(response.body.toString()).toBe(REAL_STREAMING_CONFIG);
   });
 
   it("returns a 502 when the upstream download fails", async () => {

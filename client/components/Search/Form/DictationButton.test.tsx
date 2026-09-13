@@ -71,14 +71,19 @@ it("hides when the setting is off", async () => {
     ...(settingsPubSub[2]?.() ?? {}),
     enableDictation: false,
   });
-  renderButton();
-  expect(
-    screen.queryByRole("button", { name: /dictate/i }),
-  ).not.toBeInTheDocument();
-  settingsPubSub[0]({
-    ...(settingsPubSub[2]?.() ?? {}),
-    enableDictation: true,
-  });
+  try {
+    renderButton();
+    expect(
+      screen.queryByRole("button", { name: /dictate/i }),
+    ).not.toBeInTheDocument();
+  } finally {
+    // Restored even on a failure: this channel is module state, so leaking
+    // `false` would hide the button in every later test in this file.
+    settingsPubSub[0]({
+      ...(settingsPubSub[2]?.() ?? {}),
+      enableDictation: true,
+    });
+  }
 });
 
 it("switches to the recording state and stops on the second press", async () => {

@@ -188,7 +188,7 @@ Search results:
 |---------|------|---------|-------------|
 | `selectedVoiceId` | string | `""` | Voice for reading answers aloud. `piper:<voice>` picks a local neural voice, `system:<voiceURI>` an OS voice, and `""` picks one automatically for the browser language. A bare value stored by an earlier version is read as an OS voice whenever the system engine runs; with the local engine it is ignored in favor of a language match |
 | `textToSpeechEngine` | `"local" \| "system"` | `"local"` | Which engine reads answers aloud. `"system"` also overrides a local voice picked above, and stops the voice list from being fetched, so it never contacts a third-party host. A profile that had picked an OS voice before this setting existed starts on `"system"`, so the upgrade does not replace that choice with a model download |
-| `enableDictation` | boolean | `true` | Shows the microphone button that fills the search field while the user speaks. Transcription runs on the device; turning this off hides the button and loads nothing |
+| `enableDictation` | boolean | `true` | Shows the microphone button that fills the search field while the user speaks. Transcription runs on the device; turning this off hides the button and loads nothing. The button is also hidden outside a secure context, so an instance served over plain HTTP on a LAN will not show it: no browser grants microphone access there |
 | `reasoningStartMarker` | string | `"<think>"` | Marker for start of reasoning content |
 | `reasoningEndMarker` | string | `"</think>"` | Marker for end of reasoning content |
 

@@ -95,6 +95,11 @@ export interface DictationCallbacks {
   /** Model download progress; `total` is undefined when sizes are unknown. */
   onProgress?: (loaded: number, total?: number) => void;
   /**
+   * The local engine could not run and the browser's own recognizer took over.
+   * That one sends audio to the browser vendor, so it is worth saying out loud.
+   */
+  onFallback?: () => void;
+  /**
    * A failure after the engine loaded. The load itself rejects instead, so
    * this is the channel for a worker that dies mid-dictation, which would
    * otherwise leave the UI listening forever with the microphone open.
@@ -215,32 +220,55 @@ async function startWasmDictation(
   // the fallback for devices that refuse the rate: its linear interpolation
   // has no lowpass, so everything above 8 kHz aliases into the band the model
   // listens to.
-  const audioContext = new AudioContext({ sampleRate: 16000 });
-  const source = audioContext.createMediaStreamSource(mediaStream);
-  // A 1-channel ScriptProcessor downmixes stereo capture to mono, which
-  // matters for devices whose microphone sits on the right channel only.
-  const processor = audioContext.createScriptProcessor(4096, 1, 1);
-
-  processor.onaudioprocess = (event) => {
-    if (stopped) return;
-    const input = event.inputBuffer.getChannelData(0);
-    const resampled = resampleTo16k(input, audioContext.sampleRate);
-    // The capture buffer is reused and a transferred buffer cannot be read
-    // again, so the untouched path needs a copy. `resampleTo16k` already
-    // returned a fresh array nobody else holds.
-    const copy = resampled === input ? new Float32Array(input) : resampled;
-    worker.postMessage(
-      { type: "audio", buffer: copy.buffer, sampleRate: 16000 },
-      [copy.buffer],
-    );
-    // The processor must stay connected to the destination to be called;
-    // zero the output so the microphone is not played back through the
-    // speakers.
-    event.outputBuffer.getChannelData(0).fill(0);
+  const releasePartialSession = (context?: AudioContext) => {
+    mediaStream.getTracks().forEach((track) => {
+      track.stop();
+    });
+    void context?.close();
+    worker.terminate();
   };
 
-  source.connect(processor);
-  processor.connect(audioContext.destination);
+  let audioContext: AudioContext;
+  let source: MediaStreamAudioSourceNode;
+  let processor: ScriptProcessorNode;
+  try {
+    audioContext = new AudioContext({ sampleRate: 16000 });
+    source = audioContext.createMediaStreamSource(mediaStream);
+    // A 1-channel ScriptProcessor downmixes stereo capture to mono, which
+    // matters for devices whose microphone sits on the right channel only.
+    processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+    processor.onaudioprocess = (event) => {
+      if (stopped) return;
+      const input = event.inputBuffer.getChannelData(0);
+      const resampled = resampleTo16k(input, audioContext.sampleRate);
+      // The capture buffer is reused and a transferred buffer cannot be read
+      // again, so the untouched path needs a copy. `resampleTo16k` already
+      // returned a fresh array nobody else holds.
+      const copy = resampled === input ? new Float32Array(input) : resampled;
+      worker.postMessage(
+        { type: "audio", buffer: copy.buffer, sampleRate: 16000 },
+        [copy.buffer],
+      );
+      // The processor must stay connected to the destination to be called;
+      // zero the output so the microphone is not played back through the
+      // speakers.
+      event.outputBuffer.getChannelData(0).fill(0);
+    };
+
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+  } catch (error) {
+    // `new AudioContext({ sampleRate })` throws when the rate is refused, and
+    // Chrome throws once a page holds too many live contexts. Escaping here as
+    // a plain Error would be caught as "the local engine cannot run" and hand
+    // the microphone to the browser's cloud recognizer by accident.
+    releasePartialSession();
+    throw new DictationError(
+      "engine",
+      `The audio pipeline could not be started: ${describeError(error)}`,
+    );
+  }
 
   return {
     stop: async () => {
@@ -378,6 +406,9 @@ export async function startDictation(
       addLogEntry(
         `Local dictation failed, falling back to the browser's recognizer: ${describeError(error)}`,
       );
+      // The user pressed a button documented as on-device, so the switch to a
+      // recognizer that ships audio to the browser vendor is announced.
+      callbacks.onFallback?.();
       return startWebSpeechDictation(callbacks);
     }
   }

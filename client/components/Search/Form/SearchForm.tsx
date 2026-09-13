@@ -184,6 +184,16 @@ export default memo(function SearchForm({
     }));
   };
 
+  // Stable identities, so `memo` on the dictation button actually holds.
+  const getDictationBase = useCallback(
+    () => textAreaRef.current?.value ?? "",
+    [],
+  );
+  const setDictatedText = useCallback(
+    (text: string) => setState((prev) => ({ ...prev, textAreaValue: text })),
+    [],
+  );
+
   const startSearching = useCallback(async () => {
     const queryToEncode =
       state.textAreaValue.trim().length >= 1
@@ -259,10 +269,8 @@ export default memo(function SearchForm({
         <Group gap="xs">
           <HistoryButton onSearchSelect={restoreSearch} />
           <DictationButton
-            getText={() => textAreaRef.current?.value ?? ""}
-            setText={(text) =>
-              setState((prev) => ({ ...prev, textAreaValue: text }))
-            }
+            getText={getDictationBase}
+            setText={setDictatedText}
           />
           {state.textAreaValue.length >= 1 && (
             <Button

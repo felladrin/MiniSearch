@@ -72,8 +72,13 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       );
       return;
     }
-    transcriber?.stop();
-    post({ type: "stopped" });
+    try {
+      transcriber?.stop();
+    } finally {
+      // Always acknowledged: without this the main thread waits out its whole
+      // timeout before terminating a worker that already gave up.
+      post({ type: "stopped" });
+    }
   } catch (error) {
     post({
       type: "error",

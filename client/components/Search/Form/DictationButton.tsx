@@ -40,15 +40,23 @@ function spliceTranscript(
 }
 
 /** " 42%" when the total size is known, "" when it is not. */
-function formatDownloadPercent(
+/**
+ * The upstream sends no `Content-Length` for the model files, so `total` is
+ * usually missing and a percentage would never appear. Megabytes still tell
+ * the user the ~50 MB download is moving rather than stuck.
+ */
+function formatDownloadProgress(
   progress: { loaded: number; total?: number } | null,
 ): string {
-  if (!progress?.total) return "";
-  const percent = Math.min(
-    100,
-    Math.round((progress.loaded / progress.total) * 100),
-  );
-  return ` ${percent}%`;
+  if (!progress) return "";
+  if (progress.total) {
+    const percent = Math.min(
+      100,
+      Math.round((progress.loaded / progress.total) * 100),
+    );
+    return ` ${percent}%`;
+  }
+  return ` ${Math.round(progress.loaded / 1_000_000)} MB`;
 }
 
 export default memo(function DictationButton({
@@ -83,17 +91,26 @@ export default memo(function DictationButton({
     await session?.stop();
   }, []);
 
+  const unmountedRef = useRef(false);
+
   useEffect(
     () => () => {
       // `SearchForm` is remounted the moment the query goes non-empty, so
       // dictating on the home page and pressing Search unmounts this button
-      // mid-recording. Without this the microphone track, the AudioContext and
+      // mid-session. Without this the microphone track, the AudioContext and
       // the worker all outlive it, with the recording indicator still on.
+      unmountedRef.current = true;
       void sessionRef.current?.stop();
       sessionRef.current = null;
     },
     [],
   );
+
+  useEffect(() => {
+    // Returning null below is not an unmount, so the cleanup never runs and
+    // the session would keep writing into a field with no button to stop it.
+    if (!settings.enableDictation && sessionRef.current) void stop();
+  }, [settings.enableDictation, stop]);
 
   const handleClick = useCallback(async () => {
     if (sessionRef.current) {
@@ -104,9 +121,16 @@ export default memo(function DictationButton({
 
     setPhase("loading");
     try {
-      sessionRef.current = await startDictation({
+      const session = await startDictation({
         onTranscript: handleTranscript,
         onProgress: (loaded, total) => setProgress({ loaded, total }),
+        onFallback: () =>
+          notifications.show({
+            title: "Using the browser's recognizer",
+            message:
+              "The on-device model could not run, so this browser's own speech recognition is transcribing instead. It may send the audio to the browser vendor.",
+            color: "yellow",
+          }),
         onError: (error) => {
           notifications.show({
             title: "Dictation stopped",
@@ -116,6 +140,14 @@ export default memo(function DictationButton({
           void stop();
         },
       });
+      // The load takes seconds and the permission prompt can take minutes, so
+      // the component may well be gone by now; the cleanup above had no
+      // session to stop when it ran.
+      if (unmountedRef.current) {
+        void session.stop();
+        return;
+      }
+      sessionRef.current = session;
       setPhase("recording");
     } catch (error) {
       setPhase("idle");
@@ -139,7 +171,7 @@ export default memo(function DictationButton({
   if (!settings.enableDictation || getDictationEngine() === null) return null;
 
   const recording = phase === "recording";
-  const percent = formatDownloadPercent(progress);
+  const percent = formatDownloadProgress(progress);
 
   return (
     <Button
