@@ -158,3 +158,36 @@ it("splices the transcript into the field without clobbering the base text", asy
     ).toBeInTheDocument(),
   );
 });
+
+describe("teardown", () => {
+  it("releases the microphone when the button unmounts mid-recording", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderButton();
+
+    await user.click(screen.getByRole("button"));
+    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
+    expect(stopFn).not.toHaveBeenCalled();
+
+    // `SearchForm` remounts the moment the query goes non-empty, so this is
+    // the primary flow, not a corner case.
+    unmount();
+
+    await waitFor(() => expect(stopFn).toHaveBeenCalledTimes(1));
+  });
+
+  it("notifies and stops when the engine fails after it loaded", async () => {
+    const user = userEvent.setup();
+    renderButton();
+
+    await user.click(screen.getByRole("button"));
+    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
+
+    const { onError } = vi.mocked(startDictation).mock.calls[0][0];
+    onError?.(new DictationError("engine", "the transcriber died"));
+
+    await waitFor(() => expect(stopFn).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(notifications.show)).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Dictation stopped" }),
+    );
+  });
+});

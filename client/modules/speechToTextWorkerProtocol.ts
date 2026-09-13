@@ -34,4 +34,11 @@ export type WorkerResponse =
       /** Everything dictated so far, completed lines and the in-progress one. */
       text: string;
     }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  /**
+   * Sent after `transcriber.stop()` returns. The transcriber runs
+   * synchronously inside `onmessage`, so a backlog of queued audio can leave
+   * the worker seconds behind; terminating before this arrives drops the last
+   * words.
+   */
+  | { type: "stopped" };

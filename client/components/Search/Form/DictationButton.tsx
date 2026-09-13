@@ -2,7 +2,7 @@ import { Button } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconMicrophone } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { settingsPubSub } from "@/modules/pubSub";
 import {
   DictationError,
@@ -83,6 +83,18 @@ export default memo(function DictationButton({
     await session?.stop();
   }, []);
 
+  useEffect(
+    () => () => {
+      // `SearchForm` is remounted the moment the query goes non-empty, so
+      // dictating on the home page and pressing Search unmounts this button
+      // mid-recording. Without this the microphone track, the AudioContext and
+      // the worker all outlive it, with the recording indicator still on.
+      void sessionRef.current?.stop();
+      sessionRef.current = null;
+    },
+    [],
+  );
+
   const handleClick = useCallback(async () => {
     if (sessionRef.current) {
       await stop();
@@ -95,6 +107,14 @@ export default memo(function DictationButton({
       sessionRef.current = await startDictation({
         onTranscript: handleTranscript,
         onProgress: (loaded, total) => setProgress({ loaded, total }),
+        onError: (error) => {
+          notifications.show({
+            title: "Dictation stopped",
+            message: error.message,
+            color: "red",
+          });
+          void stop();
+        },
       });
       setPhase("recording");
     } catch (error) {

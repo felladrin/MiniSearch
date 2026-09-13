@@ -1,5 +1,12 @@
 import fs from "node:fs";
-import type { IncomingMessage, ServerResponse } from "node:http";
+import {
+  createServer,
+  request as httpRequest,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
+import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,47 +22,45 @@ let modelsDir: string;
 let handler: Middleware;
 const originalModelsDirEnv = process.env.DICTATION_MODELS_DIR;
 
-function makeResponse() {
-  const response = {
-    statusCode: 200,
-    headers: {} as Record<string, string>,
-    body: "" as string | Buffer,
-    ended: false,
-    setHeader(key: string, value: string) {
-      this.headers[key] = value;
-    },
-    write(chunk: string | Buffer) {
-      this.body = chunk;
-      return true;
-    },
-    end(chunk?: string | Buffer) {
-      if (chunk !== undefined) this.body = chunk;
-      this.ended = true;
-    },
-    get writableEnded() {
-      return this.ended;
-    },
-    get destroyed() {
-      return false;
-    },
-  };
-  return response as unknown as ServerResponse & {
-    statusCode: number;
-    headers: Record<string, string>;
-    body: string | Buffer;
-    ended: boolean;
-  };
-}
-
+/**
+ * Drives the hook through a real `node:http` server. The files are streamed,
+ * so a mocked response with its own `end` would never exercise the path that
+ * serves them. Uses `http.request` rather than `fetch`, because these tests
+ * stub global `fetch` to control the upstream download.
+ */
 async function call(url: string) {
-  const response = makeResponse();
-  const next = vi.fn();
-  await handler(
-    { url } as IncomingMessage,
-    response as unknown as ServerResponse,
-    next,
-  );
-  return { response, next };
+  const server: Server = createServer((request, response) => {
+    void handler({ url: request.url } as IncomingMessage, response, () => {
+      response.statusCode = 404;
+      response.end("next");
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const port = (server.address() as AddressInfo).port;
+
+  try {
+    return await new Promise<{
+      statusCode: number;
+      headers: Record<string, string | string[] | undefined>;
+      body: Buffer;
+    }>((resolve, reject) => {
+      const outgoing = httpRequest({ port, path: url }, (incoming) => {
+        const chunks: Buffer[] = [];
+        incoming.on("data", (chunk: Buffer) => chunks.push(chunk));
+        incoming.on("end", () =>
+          resolve({
+            statusCode: incoming.statusCode ?? 0,
+            headers: incoming.headers,
+            body: Buffer.concat(chunks),
+          }),
+        );
+      });
+      outgoing.on("error", reject);
+      outgoing.end();
+    });
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 }
 
 beforeEach(() => {
@@ -86,19 +91,24 @@ afterEach(() => {
 
 describe("dictationModelServerHook", () => {
   it("passes through requests that are not for the model route", async () => {
-    const { response, next } = await call("/search?q=hello");
-    expect(next).toHaveBeenCalled();
-    expect(response.ended).toBe(false);
+    const response = await call("/search?q=hello");
+    // The server's own fall-through handler answers, not the hook.
+    expect(response.body.toString()).toBe("next");
   });
 
   it("rejects filenames outside the whitelist with a 404", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
-    const { response, next } = await call("/dictation-models/../etc/passwd");
-    expect(next).not.toHaveBeenCalled();
-    expect(response.statusCode).toBe(404);
+    // Normalises to `/etc/passwd`, leaving nothing after the route prefix.
+    const traversed = await call("/dictation-models/../etc/passwd");
+    expect(traversed.statusCode).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
+
+    // Normalises back onto a whitelisted name, which is the case that really
+    // exercises the prefix slice rather than the empty remainder.
+    const normalised = await call("/dictation-models/a/../encoder.ort");
+    expect(normalised.statusCode).not.toBe(404);
   });
 
   it("downloads a whitelisted file once and caches it on disk", async () => {
@@ -110,17 +120,15 @@ describe("dictationModelServerHook", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const first = await call("/dictation-models/tokenizer.bin");
-    expect(first.response.statusCode).toBe(200);
-    expect(Buffer.from(first.response.body as Buffer)).toEqual(
-      Buffer.from(payload),
-    );
-    expect(first.response.headers["Content-Type"]).toBe(
-      "application/octet-stream",
-    );
+    expect(first.statusCode).toBe(200);
+    expect(first.body).toEqual(Buffer.from(payload));
+    expect(first.headers["content-type"]).toBe("application/octet-stream");
+    expect(first.headers["content-length"]).toBe(String(payload.byteLength));
     expect(fs.existsSync(path.join(modelsDir, "tokenizer.bin"))).toBe(true);
 
     const second = await call("/dictation-models/tokenizer.bin");
-    expect(second.response.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect(second.body).toEqual(Buffer.from(payload));
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -134,9 +142,9 @@ describe("dictationModelServerHook", () => {
       }),
     );
 
-    const { response } = await call("/dictation-models/streaming_config.json");
-    expect(response.headers["Content-Type"]).toBe("application/json");
-    expect(String(response.body)).toBe(config);
+    const response = await call("/dictation-models/streaming_config.json");
+    expect(response.headers["content-type"]).toBe("application/json");
+    expect(response.body.toString()).toBe(config);
   });
 
   it("returns a 502 when the upstream download fails", async () => {
@@ -145,7 +153,7 @@ describe("dictationModelServerHook", () => {
       vi.fn().mockResolvedValue({ ok: false, status: 404 }),
     );
 
-    const { response } = await call("/dictation-models/encoder.ort");
+    const response = await call("/dictation-models/encoder.ort");
     expect(response.statusCode).toBe(502);
     expect(fs.existsSync(path.join(modelsDir, "encoder.ort"))).toBe(false);
   });

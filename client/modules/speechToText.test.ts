@@ -173,15 +173,88 @@ describe("startDictation with the wasm engine", () => {
     stubWasmSupport(getUserMedia);
     setWorkerFactory(() => new FakeWorker() as unknown as Worker);
 
-    await expect(
-      startDictation({ onTranscript: vi.fn() }),
-    ).rejects.toMatchObject({ kind: "permission" });
+    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
+    FakeWorker.instances[0].respond({ type: "loaded" });
+
+    await expect(sessionPromise).rejects.toMatchObject({ kind: "permission" });
     expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
   });
 
-  it("releases the microphone when the model fails to load", async () => {
-    const { tracks, stream } = makeMediaStream();
+  it("ignores a transcript that arrives after stop", async () => {
+    const { stream } = makeMediaStream();
     stubWasmSupport(vi.fn().mockResolvedValue(stream));
+    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
+    const onTranscript = vi.fn();
+
+    const sessionPromise = startDictation({ onTranscript });
+    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
+    const worker = FakeWorker.instances[0];
+    worker.respond({ type: "loaded" });
+    const session = await sessionPromise;
+
+    worker.respond({ type: "transcript", text: "hello world" });
+    expect(onTranscript).toHaveBeenCalledWith("hello world");
+
+    const stopping = session.stop();
+    // Both engines emit one last result after being told to stop. The caller
+    // has already forgotten what it appended, so this would be appended twice.
+    worker.respond({ type: "transcript", text: "hello world" });
+    worker.respond({ type: "stopped" });
+    await stopping;
+
+    expect(onTranscript).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for the worker to drain before terminating it", async () => {
+    const { stream } = makeMediaStream();
+    stubWasmSupport(vi.fn().mockResolvedValue(stream));
+    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
+
+    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
+    const worker = FakeWorker.instances[0];
+    worker.respond({ type: "loaded" });
+    const session = await sessionPromise;
+
+    const stopping = session.stop();
+    await Promise.resolve();
+    // The transcriber runs synchronously inside the worker's `onmessage`, so a
+    // backlog can leave it seconds behind; terminating now drops the tail.
+    expect(worker.terminated).toBe(false);
+
+    worker.respond({ type: "stopped" });
+    await stopping;
+    expect(worker.terminated).toBe(true);
+  });
+
+  it("reports a worker failure that happens after the engine loaded", async () => {
+    const { stream } = makeMediaStream();
+    stubWasmSupport(vi.fn().mockResolvedValue(stream));
+    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
+    const onError = vi.fn();
+
+    const sessionPromise = startDictation({
+      onTranscript: vi.fn(),
+      onError,
+    });
+    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
+    const worker = FakeWorker.instances[0];
+    worker.respond({ type: "loaded" });
+    await sessionPromise;
+
+    // The load promise has settled, so rejecting it again is a no-op: without
+    // a live channel the UI listens forever with the microphone open.
+    worker.respond({ type: "error", message: "the transcriber died" });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0][0]).toMatchObject({ kind: "engine" });
+  });
+
+  it("never opens the microphone when the model fails to load", async () => {
+    const { tracks, stream } = makeMediaStream();
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+    stubWasmSupport(getUserMedia);
     setWorkerFactory(() => new FakeWorker() as unknown as Worker);
 
     const sessionPromise = startDictation({ onTranscript: vi.fn() });
@@ -193,7 +266,10 @@ describe("startDictation with the wasm engine", () => {
     await expect(
       sessionPromise.catch((error: DictationError) => error.kind),
     ).resolves.toBe("engine");
-    expect(tracks.every((track) => track.stopped)).toBe(true);
+    // The load runs first, so a failed download never lights the recording
+    // indicator at all.
+    expect(getUserMedia).not.toHaveBeenCalled();
+    expect(tracks.every((track) => track.stopped)).toBe(false);
     expect(worker.terminated).toBe(true);
   });
 });

@@ -73,6 +73,7 @@ self.onmessage = async ({ data }: MessageEvent<WorkerRequest>) => {
       return;
     }
     transcriber?.stop();
+    post({ type: "stopped" });
   } catch (error) {
     post({
       type: "error",

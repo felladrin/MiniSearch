@@ -105,7 +105,8 @@ export function dictationModelServerHook<
 
     try {
       const filePath = await ensureModelFileOnDisk(fileName);
-      const bytes = fs.readFileSync(filePath);
+      if (!isResponseWritable(response)) return;
+
       response.statusCode = 200;
       response.setHeader(
         "Content-Type",
@@ -113,7 +114,7 @@ export function dictationModelServerHook<
           ? "application/json"
           : "application/octet-stream",
       );
-      response.setHeader("Content-Length", String(bytes.byteLength));
+      response.setHeader("Content-Length", String(fs.statSync(filePath).size));
       // The upstream files are pinned by an immutable version segment, so
       // the browser may keep them for a very long time; the worker's Cache
       // API entry is keyed by this URL and only refetched if it is evicted.
@@ -121,9 +122,15 @@ export function dictationModelServerHook<
         "Cache-Control",
         "public, max-age=31536000, immutable",
       );
-      if (isResponseWritable(response)) {
-        response.end(Buffer.from(bytes));
-      }
+      // Streamed rather than read whole: `encoder.ort` alone is tens of
+      // megabytes, and buffering it per request lets a handful of concurrent
+      // callers pin that much memory each.
+      await new Promise<void>((resolve, reject) => {
+        const stream = fs.createReadStream(filePath);
+        stream.on("error", reject);
+        response.on("close", resolve);
+        stream.pipe(response).on("finish", resolve);
+      });
     } catch (error) {
       response.statusCode = 502;
       safeEndResponse(

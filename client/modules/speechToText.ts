@@ -35,7 +35,7 @@ const DICTATION_MODEL_FILES: Record<string, string> = Object.fromEntries(
     "decoder_kv.ort",
     "streaming_config.json",
     "tokenizer.bin",
-  ].map((file) => [`dictation-models/${file}`, `/dictation-models/${file}`]),
+  ].map((file) => [file, `/dictation-models/${file}`]),
 );
 
 /** The minimum the app needs from `window.SpeechRecognition`. */
@@ -72,6 +72,11 @@ function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null 
  * WASM path nor `SpeechRecognition` is available and the button should hide.
  */
 export function getDictationEngine(): DictationEngine | null {
+  // Neither engine can open a microphone outside a secure context. Without
+  // this, a plain-HTTP LAN deployment falls through to `SpeechRecognition`,
+  // which then reports `not-allowed` and tells the user permission was denied
+  // when the real cause is the origin.
+  if (typeof isSecureContext !== "undefined" && !isSecureContext) return null;
   if (
     typeof Worker !== "undefined" &&
     typeof WebAssembly !== "undefined" &&
@@ -89,6 +94,12 @@ export interface DictationCallbacks {
   onTranscript: (text: string) => void;
   /** Model download progress; `total` is undefined when sizes are unknown. */
   onProgress?: (loaded: number, total?: number) => void;
+  /**
+   * A failure after the engine loaded. The load itself rejects instead, so
+   * this is the channel for a worker that dies mid-dictation, which would
+   * otherwise leave the UI listening forever with the microphone open.
+   */
+  onError?: (error: DictationError) => void;
 }
 
 export interface DictationSession {
@@ -136,30 +147,23 @@ function describeError(error: unknown): string {
 async function startWasmDictation(
   callbacks: DictationCallbacks,
 ): Promise<DictationSession> {
-  let mediaStream: MediaStream;
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (error) {
-    throw new DictationError(
-      "permission",
-      `The microphone could not be opened: ${describeError(error)}`,
-    );
-  }
-
   const worker = workerFactory();
+  /**
+   * Set the moment `stop()` is entered. Every callback is gated on it: the
+   * engines both emit one last result after being told to stop, and the button
+   * has already forgotten what it appended by then, so an ungated late
+   * transcript is appended a second time in full.
+   */
+  let stopped = false;
 
-  try {
-    await new Promise<void>((resolve, reject) => {
+  const loadEngine = () =>
+    new Promise<void>((resolve, reject) => {
       worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
-        if (data.type === "loaded") {
-          resolve();
-        } else if (data.type === "progress") {
+        if (data.type === "loaded") resolve();
+        else if (data.type === "progress")
           callbacks.onProgress?.(data.loaded, data.total);
-        } else if (data.type === "transcript") {
-          callbacks.onTranscript(data.text);
-        } else if (data.type === "error") {
+        else if (data.type === "error")
           reject(new DictationError("engine", data.message));
-        }
       };
       worker.onerror = () =>
         reject(
@@ -167,29 +171,64 @@ async function startWasmDictation(
         );
       worker.postMessage({ type: "load", modelFiles: DICTATION_MODEL_FILES });
     });
+
+  try {
+    await loadEngine();
   } catch (error) {
     worker.terminate();
-    mediaStream.getTracks().forEach((track) => {
-      track.stop();
-    });
     throw error;
   }
 
-  const audioContext = new AudioContext();
+  // Only once the model is ready: opening it first would light the browser's
+  // recording indicator for the whole of a first-run download.
+  let mediaStream: MediaStream;
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (error) {
+    worker.terminate();
+    throw new DictationError(
+      "permission",
+      `The microphone could not be opened: ${describeError(error)}`,
+    );
+  }
+
+  let acknowledgeStop: (() => void) | null = null;
+
+  worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
+    if (data.type === "stopped") {
+      acknowledgeStop?.();
+      return;
+    }
+    if (stopped) return;
+    if (data.type === "transcript") callbacks.onTranscript(data.text);
+    else if (data.type === "error")
+      callbacks.onError?.(new DictationError("engine", data.message));
+  };
+  worker.onerror = () => {
+    if (stopped) return;
+    callbacks.onError?.(
+      new DictationError("engine", "The dictation worker stopped unexpectedly"),
+    );
+  };
+
+  // Asking for 16 kHz lets the browser resample properly. `resampleTo16k` is
+  // the fallback for devices that refuse the rate: its linear interpolation
+  // has no lowpass, so everything above 8 kHz aliases into the band the model
+  // listens to.
+  const audioContext = new AudioContext({ sampleRate: 16000 });
   const source = audioContext.createMediaStreamSource(mediaStream);
   // A 1-channel ScriptProcessor downmixes stereo capture to mono, which
   // matters for devices whose microphone sits on the right channel only.
   const processor = audioContext.createScriptProcessor(4096, 1, 1);
 
   processor.onaudioprocess = (event) => {
+    if (stopped) return;
     const input = event.inputBuffer.getChannelData(0);
     const resampled = resampleTo16k(input, audioContext.sampleRate);
-    // Always hand over a fresh copy: the capture buffer is reused, and a
-    // transferred buffer cannot be read again afterwards.
-    const copy =
-      resampled === input
-        ? new Float32Array(input)
-        : new Float32Array(resampled);
+    // The capture buffer is reused and a transferred buffer cannot be read
+    // again, so the untouched path needs a copy. `resampleTo16k` already
+    // returned a fresh array nobody else holds.
+    const copy = resampled === input ? new Float32Array(input) : resampled;
     worker.postMessage(
       { type: "audio", buffer: copy.buffer, sampleRate: 16000 },
       [copy.buffer],
@@ -205,12 +244,25 @@ async function startWasmDictation(
 
   return {
     stop: async () => {
+      if (stopped) return;
+      stopped = true;
       processor.disconnect();
       source.disconnect();
-      worker.postMessage({ type: "stop" });
       mediaStream.getTracks().forEach((track) => {
         track.stop();
       });
+
+      // Wait for the transcriber to drain its queue, but never hang the UI on
+      // a worker that has stopped answering.
+      const acknowledged = new Promise<void>((resolve) => {
+        acknowledgeStop = resolve;
+      });
+      worker.postMessage({ type: "stop" });
+      await Promise.race([
+        acknowledged,
+        new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+      ]);
+
       await audioContext.close();
       worker.terminate();
     },
@@ -234,10 +286,14 @@ function startWebSpeechDictation(
 
   let finalText = "";
   let settled = false;
+  // `recognition.stop()` emits one last `result` by spec, and the caller has
+  // already forgotten what it appended by then.
+  let stopped = false;
 
   return new Promise<DictationSession>((resolve, reject) => {
     recognition.onresult = (event) => {
       settled = true;
+      if (stopped) return;
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
@@ -266,6 +322,10 @@ function startWebSpeechDictation(
         reject(
           new DictationError("engine", `Dictation failed: ${event.error}`),
         );
+      } else if (!stopped) {
+        callbacks.onError?.(
+          new DictationError("engine", `Dictation failed: ${event.error}`),
+        );
       }
     };
 
@@ -281,6 +341,7 @@ function startWebSpeechDictation(
       recognition.start();
       resolve({
         stop: async () => {
+          stopped = true;
           recognition.stop();
         },
       });
