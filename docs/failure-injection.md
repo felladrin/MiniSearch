@@ -67,18 +67,23 @@ needed.
 | The synthesis worker fails before anything is audible | The answer is read by an OS voice instead | `client/modules/textToSpeech.test.ts` › falls back to the system voice when the local engine cannot load, falls back when the worker fails and no chunk was ever audible |
 | Every synthesized chunk fails to play (blocked autoplay) | Treated as a local-engine failure, so an OS voice reads the answer rather than the user getting silence | `client/modules/textToSpeech.test.ts` › falls back when every synthesized chunk fails to play |
 | The browser provides no `speechSynthesis` at all and the local engine failed | Playback resolves and returns to idle with a log entry, instead of an unhandled rejection | `client/modules/textToSpeech.test.ts` › resolves and logs when the local engine failed and there are no OS voices |
+| A caller streams an oversized body to `/api/validate-access-key` | Refused with `413` mid-upload and the socket dropped; the answer carries `Connection: close`, so the caller's next request opens a fresh connection instead of a dead one | `server/validateAccessKeyServerHook.socket.test.ts` › refuses an oversized body with 413 without breaking the next request |
 
 ## Adding a Row
 
 Keep each case next to the module it covers, reusing that file's mocks and
 harness: a `describe("graceful degradation")` block where the file has no
 failure-shaped block yet, the existing one where it does (the `/inference` rows
-live under `environment configuration` and `streaming path`), or a sibling
+live under `environment configuration` and `streaming path`), a sibling
 `*.degradation.test.ts` when the case needs a harness of its own (the client
-rows drive `searchAndRespond` through a fake pubSub store). A row earns
+rows drive `searchAndRespond` through a fake pubSub store), or a sibling
+`*.socket.test.ts` when only a real connection can show the failure (the
+`/api/validate-access-key` body cap drops the socket mid-upload, and a mocked
+`req`/`res` has no pooled connection to lose). A row earns
 its place when it fails for the right reason: mutate the degradation branch in
-the module (delete the `catch`, the fallback, or the interrupt check) and confirm
-the case goes red before committing it.
+the module (delete the `catch`, the fallback, the interrupt check, or the
+response header the case depends on) and confirm the case goes red before
+committing it.
 
 ## Related Topics
 

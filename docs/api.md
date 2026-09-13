@@ -368,10 +368,15 @@ Responds `{"valid":true}` or `{"valid":false}`. A hash whose parameter block
 differs from `shared/argon2Parameters.ts` is answered `{"valid":false}` without
 any verification running.
 
+The body is capped at 4 KiB, which one encoded hash is nowhere near. Past that
+the answer is a `413` sent while the caller is still uploading, so it carries
+`Connection: close` and the socket is dropped once it has flushed.
+
 | Status | Body | When |
 | --- | --- | --- |
 | `429` | `{"error":"Too many requests."}` | Rate limited, kept distinct from a wrong key so the UI can say "try again" |
 | `400` | `{"valid":false,"error":"Invalid request"}` | Body is not JSON |
+| `413` | `{"error":"Request body too large"}` | Body over 4 KiB |
 
 ## Related Topics
 

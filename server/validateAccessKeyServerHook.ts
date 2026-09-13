@@ -3,6 +3,13 @@ import type { PreviewServer, ViteDevServer } from "vite";
 import { ARGON2_HASH_PREFIX } from "../shared/argon2Parameters.ts";
 import { consumeRateLimitPoint } from "./verifyTokenAndRateLimit.ts";
 
+/**
+ * The body is one argon2 encoded hash (~130 bytes), so a few KiB is generous.
+ * Without a cap a caller can stream unbounded bytes into the string before
+ * `JSON.parse` ever runs; the same lever `/inference` closes with its 1 MiB cap.
+ */
+const MAX_BODY_BYTES = 4 * 1024;
+
 /** POST /api/validate-access-key: checks an argon2id hash against the configured `ACCESS_KEYS`. */
 export function validateAccessKeyServerHook<
   T extends ViteDevServer | PreviewServer,
@@ -27,15 +34,42 @@ export function validateAccessKeyServerHook<
 
     const accessKeys = process.env.ACCESS_KEYS?.split(",") ?? [];
 
-    let body = "";
+    const chunks: Buffer[] = [];
+    let bodyBytes = 0;
+    let bodyTooLarge = false;
 
     req.on("data", (chunk) => {
-      body += chunk.toString();
+      if (bodyTooLarge) return;
+      bodyBytes += Buffer.byteLength(chunk);
+      if (bodyBytes <= MAX_BODY_BYTES) {
+        // Decoded once at the end, so a multi-byte sequence split across two
+        // chunks survives. Bounded by the cap above.
+        chunks.push(Buffer.from(chunk));
+        return;
+      }
+
+      bodyTooLarge = true;
+      res.statusCode = 413;
+      res.setHeader("Content-Type", "application/json");
+      // The socket is dropped below to cut the upload off, and a keep-alive
+      // client that had pooled it would send its next request into a dead
+      // connection. Closing tells it not to pool this one.
+      res.setHeader("Connection", "close");
+      res.end(JSON.stringify({ error: "Request body too large" }), () => {
+        // Only once the 413 is on the wire, so the answer is not truncated.
+        // Either this or the header above bounds the read; with neither, Node
+        // drains the whole upload to keep the connection reusable. Measured on
+        // an 8 MiB flood: 64 KiB here, 191 KiB on the header alone, all 8 MiB
+        // with neither. What the header uniquely buys is the caller's next
+        // request, which would otherwise land on this dropped socket.
+        req.destroy();
+      });
     });
 
     req.on("end", async () => {
+      if (bodyTooLarge) return;
       try {
-        const { accessKeyHash } = JSON.parse(body);
+        const { accessKeyHash } = JSON.parse(Buffer.concat(chunks).toString());
 
         // The client hashes with the shared parameters, so a hash carrying any
         // other block cannot be valid against this server. Checking before

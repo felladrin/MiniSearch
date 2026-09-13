@@ -316,3 +316,62 @@ describe("validateAccessKeyServerHook", () => {
     );
   });
 });
+
+describe("request body cap", () => {
+  it("answers 413 once and ignores the rest of the body", async () => {
+    process.env.ACCESS_KEYS = "test-key";
+    const { validateAccessKeyServerHook } = await import(
+      "./validateAccessKeyServerHook"
+    );
+    const use = vi.fn();
+    validateAccessKeyServerHook({ middlewares: { use } } as never);
+    const handler = use.mock.calls[0][0] as (
+      req: unknown,
+      res: unknown,
+      next: () => void,
+    ) => void;
+
+    const destroy = vi.fn();
+    const dataCallbacks: Array<(chunk: Buffer) => void> = [];
+    const endCallbacks: Array<() => void> = [];
+    const req = {
+      url: "/api/validate-access-key",
+      method: "POST",
+      headers: {},
+      destroy,
+      on: vi.fn((event: string, cb: (chunk: Buffer) => void) => {
+        if (event === "data") dataCallbacks.push(cb);
+        if (event === "end") endCallbacks.push(cb as () => void);
+      }),
+    };
+    // Does not invoke the flush callback, so the test can check the socket is
+    // still open while the 413 is in flight.
+    const res = { statusCode: 200, setHeader: vi.fn(), end: vi.fn() };
+
+    await new Promise<void>((resolve) => {
+      void handler(req, res, vi.fn());
+      setImmediate(() => {
+        // Two chunks, each within the cap on its own, over it together.
+        for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
+        for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
+        // A chunk after the cap: the branch must not answer a second time.
+        for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
+        for (const cb of endCallbacks) cb();
+        setTimeout(resolve, 50);
+      });
+    });
+
+    expect(res.statusCode).toBe(413);
+    expect(res.end).toHaveBeenCalledTimes(1);
+    expect(res.end.mock.calls[0][0]).toContain("Request body too large");
+    // The answer drops the connection, so the client must not pool it.
+    expect(res.setHeader).toHaveBeenCalledWith("Connection", "close");
+    // Still open while the answer is in flight, so it cannot be truncated...
+    expect(destroy).not.toHaveBeenCalled();
+    const flushed = res.end.mock.calls[0][1] as () => void;
+    expect(flushed).toBeInstanceOf(Function);
+    flushed();
+    // ...and dropped once it is on the wire.
+    expect(destroy).toHaveBeenCalledTimes(1);
+  });
+});
