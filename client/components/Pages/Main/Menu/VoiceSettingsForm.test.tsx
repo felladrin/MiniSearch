@@ -118,7 +118,7 @@ describe("VoiceSettingsForm", () => {
     const engine = screen.getAllByRole("combobox")[0] as HTMLElement;
     fireEvent.click(
       openSelect(engine).getByRole("option", {
-        name: "System voices",
+        name: "System voices (Multi-lingual)",
         hidden: true,
       }),
     );
