@@ -74,15 +74,16 @@ needed.
 Keep each case next to the module it covers, reusing that file's mocks and
 harness: a `describe("graceful degradation")` block where the file has no
 failure-shaped block yet, the existing one where it does (the `/inference` rows
-live under `environment configuration` and `streaming path`), or a sibling
+live under `environment configuration` and `streaming path`), a sibling
 `*.degradation.test.ts` when the case needs a harness of its own (the client
 rows drive `searchAndRespond` through a fake pubSub store), or a sibling
 `*.socket.test.ts` when only a real connection can show the failure (the
 `/api/validate-access-key` body cap drops the socket mid-upload, and a mocked
 `req`/`res` has no pooled connection to lose). A row earns
 its place when it fails for the right reason: mutate the degradation branch in
-the module (delete the `catch`, the fallback, or the interrupt check) and confirm
-the case goes red before committing it.
+the module (delete the `catch`, the fallback, the interrupt check, or the
+response header the case depends on) and confirm the case goes red before
+committing it.
 
 ## Related Topics
 

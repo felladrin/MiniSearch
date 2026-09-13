@@ -376,7 +376,7 @@ the answer is a `413` sent while the caller is still uploading, so it carries
 | --- | --- | --- |
 | `429` | `{"error":"Too many requests."}` | Rate limited, kept distinct from a wrong key so the UI can say "try again" |
 | `400` | `{"valid":false,"error":"Invalid request"}` | Body is not JSON |
-| `413` | `{"error":"Request body too large"}` | Body over 4 KiB. The socket is dropped once the answer is flushed, so the answer carries `Connection: close` and the caller's next request opens a fresh connection |
+| `413` | `{"error":"Request body too large"}` | Body over 4 KiB |
 
 ## Related Topics
 

@@ -57,9 +57,11 @@ export function validateAccessKeyServerHook<
       res.setHeader("Connection", "close");
       res.end(JSON.stringify({ error: "Request body too large" }), () => {
         // Only once the 413 is on the wire, so the answer is not truncated.
-        // The header above is what bounds the read: Node closes the socket
-        // after the answer flushes. Destroying here only cuts the upload off
-        // sooner, measured at 64 KiB instead of 191 KiB on an 8 MiB flood.
+        // Either this or the header above bounds the read; with neither, Node
+        // drains the whole upload to keep the connection reusable. Measured on
+        // an 8 MiB flood: 64 KiB here, 191 KiB on the header alone, all 8 MiB
+        // with neither. What the header uniquely buys is the caller's next
+        // request, which would otherwise land on this dropped socket.
         req.destroy();
       });
     });
