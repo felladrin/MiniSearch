@@ -316,3 +316,55 @@ describe("validateAccessKeyServerHook", () => {
     );
   });
 });
+
+describe("request body cap", () => {
+  it("answers 413 and stops buffering once the body passes the cap", async () => {
+    process.env.ACCESS_KEYS = "test-key";
+    const { validateAccessKeyServerHook } = await import(
+      "./validateAccessKeyServerHook"
+    );
+    const use = vi.fn();
+    validateAccessKeyServerHook({ middlewares: { use } } as never);
+    const handler = use.mock.calls[0][0] as (
+      req: unknown,
+      res: unknown,
+      next: () => void,
+    ) => void;
+
+    const destroy = vi.fn();
+    const dataCallbacks: Array<(chunk: Buffer) => void> = [];
+    const endCallbacks: Array<() => void> = [];
+    const req = {
+      url: "/api/validate-access-key",
+      method: "POST",
+      headers: {},
+      destroy,
+      on: vi.fn((event: string, cb: (chunk: Buffer) => void) => {
+        if (event === "data") dataCallbacks.push(cb);
+        if (event === "end") endCallbacks.push(cb as () => void);
+      }),
+    };
+    const res = {
+      statusCode: 200,
+      setHeader: vi.fn(),
+      end: vi.fn((_payload: string, flushed?: () => void) => flushed?.()),
+    };
+
+    handler(req, res, vi.fn());
+    await Promise.resolve();
+
+    // Two chunks, each within the cap on its own, over it together.
+    for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
+    for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
+    for (const cb of endCallbacks) cb();
+    await Promise.resolve();
+
+    expect(res.statusCode).toBe(413);
+    expect(res.end).toHaveBeenCalledTimes(1);
+    expect(res.end.mock.calls[0][0]).toContain("Request body too large");
+    // The socket carries unread bytes, so it must not be pooled for reuse.
+    expect(res.setHeader).toHaveBeenCalledWith("Connection", "close");
+    // ...and only torn down once the 413 is on the wire.
+    expect(destroy).toHaveBeenCalledTimes(1);
+  });
+});

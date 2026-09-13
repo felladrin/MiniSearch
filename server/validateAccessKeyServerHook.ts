@@ -3,6 +3,13 @@ import type { PreviewServer, ViteDevServer } from "vite";
 import { ARGON2_HASH_PREFIX } from "../shared/argon2Parameters.ts";
 import { consumeRateLimitPoint } from "./verifyTokenAndRateLimit.ts";
 
+/**
+ * The body is one argon2 encoded hash (~130 bytes), so a few KiB is generous.
+ * Without a cap a caller can stream unbounded bytes into the string before
+ * `JSON.parse` ever runs; the same lever `/inference` closes with its 1 MiB cap.
+ */
+const MAX_BODY_BYTES = 4 * 1024;
+
 /** POST /api/validate-access-key: checks an argon2id hash against the configured `ACCESS_KEYS`. */
 export function validateAccessKeyServerHook<
   T extends ViteDevServer | PreviewServer,
@@ -28,12 +35,32 @@ export function validateAccessKeyServerHook<
     const accessKeys = process.env.ACCESS_KEYS?.split(",") ?? [];
 
     let body = "";
+    let bodyBytes = 0;
+    let bodyTooLarge = false;
 
     req.on("data", (chunk) => {
-      body += chunk.toString();
+      if (bodyTooLarge) return;
+      bodyBytes += Buffer.byteLength(chunk);
+      if (bodyBytes <= MAX_BODY_BYTES) {
+        body += chunk.toString();
+        return;
+      }
+
+      bodyTooLarge = true;
+      res.statusCode = 413;
+      res.setHeader("Content-Type", "application/json");
+      // Answering mid-upload leaves the rest of the flood unread on the socket,
+      // and a keep-alive client would read those bytes as the start of its next
+      // response. Closing tells it not to reuse this connection.
+      res.setHeader("Connection", "close");
+      res.end(JSON.stringify({ error: "Request body too large" }), () => {
+        // Only once the 413 is on the wire: stop reading the rest.
+        req.destroy();
+      });
     });
 
     req.on("end", async () => {
+      if (bodyTooLarge) return;
       try {
         const { accessKeyHash } = JSON.parse(body);
 

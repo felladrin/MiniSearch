@@ -372,6 +372,7 @@ any verification running.
 | --- | --- | --- |
 | `429` | `{"error":"Too many requests."}` | Rate limited, kept distinct from a wrong key so the UI can say "try again" |
 | `400` | `{"valid":false,"error":"Invalid request"}` | Body is not JSON |
+| `413` | `{"error":"Request body too large"}` | Body over 4 KiB. The answer goes out mid-upload, so it carries `Connection: close` and the socket is dropped once it is flushed |
 
 ## Related Topics
 
