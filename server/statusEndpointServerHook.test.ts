@@ -11,7 +11,7 @@ vi.mock("./rerankerService.ts", () => ({
   getRerankerStatus: async () => true,
 }));
 vi.mock("./webSearchService.ts", () => ({
-  getWebSearchStatus: async () => true,
+  getWebSearchServiceStatus: async () => "degraded",
   getSearchCircuitStats: () => ({
     circuitState: "closed",
     circuitOpens: 0,
@@ -54,6 +54,19 @@ function callStatus(): Promise<Record<string, unknown>> {
 }
 
 describe("statusEndpointServerHook", () => {
+  it("publishes the web search verdict and the per-engine tally", async () => {
+    const status = await callStatus();
+
+    // Passed through rather than recomputed: the hook used to derive this
+    // field itself from a liveness probe, which reported an open circuit as
+    // healthy.
+    expect(status.webSearchServiceStatus).toBe("degraded");
+    expect(status.searches).toMatchObject({
+      degradedSearchTypes: [],
+      unresponsiveEngines: {},
+    });
+  });
+
   it("keeps startedAt fixed at the restart while uptime advances", async () => {
     const first = await callStatus();
     expect(typeof first.startedAt).toBe("string");

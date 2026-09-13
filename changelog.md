@@ -3,6 +3,11 @@
 Notable changes, grouped by date, most recent first.
 
 
+## 2026-09-13
+
+- Fixed /status reporting the web search service as healthy while its circuit breaker was open and every search was failing.
+- Added a degraded state and per-engine failure counts to the web search service status on /status.
+
 ## 2026-09-11
 
 - Added text-to-speech playback that reads answers aloud with a local neural TTS model, falling back to OS voices.

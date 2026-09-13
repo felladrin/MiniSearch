@@ -7,6 +7,7 @@ import { getPageReadStats } from "./pageReadsSinceLastRestart.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
 import { getRerankingStats } from "./rerankingSinceLastRestart.ts";
 import {
+  getDegradedSearchTypes,
   getGraphicalSearchesSinceLastRestart,
   getSearchesWithAllResultsDiscardedSinceLastRestart,
   getSearchesWithoutResultsSinceLastRestart,
@@ -14,6 +15,7 @@ import {
   getSearchStats,
   getTextualSearchesSinceLastRestart,
   getThumbnailStats,
+  getUnresponsiveEngineStats,
 } from "./searchesSinceLastRestart.ts";
 import {
   getActiveSessionsAmount,
@@ -21,7 +23,7 @@ import {
 } from "./verifiedTokens.ts";
 import {
   getSearchCircuitStats,
-  getWebSearchStatus,
+  getWebSearchServiceStatus,
 } from "./webSearchService.ts";
 
 const serverStartTime = Date.now();
@@ -48,9 +50,7 @@ export function statusEndpointServerHook<
     const rerankerServiceStatus = (await getRerankerStatus())
       ? "healthy"
       : "unhealthy";
-    const webSearchServiceStatus = (await getWebSearchStatus())
-      ? "healthy"
-      : "unhealthy";
+    const webSearchServiceStatus = await getWebSearchServiceStatus();
 
     // `vite.config.ts` sets this define with `JSON.stringify`, so in a Vite
     // build it is always a valid JSON string literal; the guard only fires if
@@ -89,7 +89,12 @@ export function statusEndpointServerHook<
       authorization: getAuthorizationStats(),
       inference: getInferenceStats(),
       activeSessions: getActiveSessionsAmount(),
-      searches: { ...getSearchStats(), ...getSearchCircuitStats() },
+      searches: {
+        ...getSearchStats(),
+        ...getSearchCircuitStats(),
+        degradedSearchTypes: getDegradedSearchTypes(),
+        unresponsiveEngines: getUnresponsiveEngineStats(),
+      },
       reranker: getRerankingStats(),
       thumbnails: getThumbnailStats(),
       build: {
