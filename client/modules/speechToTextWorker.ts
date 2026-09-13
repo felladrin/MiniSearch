@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import { DICTATION_MODEL_VERSION } from "@shared/dictationModel";
 import { AssetDownloader, ModelArch, Transcriber } from "./moonshine";
 import type {
   WorkerRequest,
@@ -24,7 +25,9 @@ let transcriber: Transcriber | null = null;
 
 async function load(modelFiles: Record<string, string>): Promise<void> {
   const downloader = new AssetDownloader({
-    cacheName: "minisearch-dictation",
+    // Versioned, so a model bump does not leave ~51 MB of unreachable entries
+    // behind in every user's Cache Storage.
+    cacheName: `minisearch-dictation-${DICTATION_MODEL_VERSION}`,
     onProgress: (loaded, total) => post({ type: "progress", loaded, total }),
   });
 

@@ -2,6 +2,7 @@ import { MantineProvider } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useSyncExternalStore } from "react";
 import DictationButton from "@/components/Search/Form/DictationButton";
 import {
   DictationError,
@@ -24,13 +25,20 @@ vi.mock("@mantine/notifications", () => ({
   notifications: { show: vi.fn() },
 }));
 
+/**
+ * Subscribes for real rather than reading a snapshot, so a settings change
+ * during a test re-renders the button the way it does in the app.
+ */
 vi.mock("create-pubsub/react", () => ({
-  usePubSub: vi.fn((pubSub: unknown) => {
-    if (!Array.isArray(pubSub)) return [undefined, vi.fn()];
-    const maybeFactory = pubSub[2];
-    if (typeof maybeFactory !== "function") return [undefined, vi.fn()];
-    return [maybeFactory() ?? undefined, vi.fn()];
-  }),
+  usePubSub: (pubSub: [unknown, unknown, unknown]) => {
+    const [publish, subscribe, get] = pubSub as [
+      unknown,
+      (listener: () => void) => () => void,
+      () => unknown,
+    ];
+    const value = useSyncExternalStore(subscribe, get, get);
+    return [value, publish];
+  },
 }));
 
 function renderButton(getText = () => "", setText = (_text: string) => {}) {
@@ -204,6 +212,52 @@ describe("teardown", () => {
       release?.({ stop: stopFn });
 
       await waitFor(() => expect(stopFn).toHaveBeenCalledTimes(1));
+    } finally {
+      settingsPubSub[0]({
+        ...(settingsPubSub[2]?.() ?? {}),
+        enableDictation: true,
+      });
+    }
+  });
+
+  it("does not adopt a load an earlier press abandoned", async () => {
+    const user = userEvent.setup();
+    const { settingsPubSub } = await import("@/modules/pubSub");
+    const firstStop = vi.fn().mockResolvedValue(undefined);
+    const secondStop = vi.fn().mockResolvedValue(undefined);
+    const releases: ((session: { stop: () => Promise<void> }) => void)[] = [];
+    vi.mocked(startDictation).mockImplementation(
+      () => new Promise((resolve) => releases.push(resolve)),
+    );
+
+    renderButton();
+    await user.click(screen.getByRole("button"));
+    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
+
+    try {
+      settingsPubSub[0]({
+        ...(settingsPubSub[2]?.() ?? {}),
+        enableDictation: false,
+      });
+      await waitFor(() =>
+        expect(screen.queryByRole("button")).not.toBeInTheDocument(),
+      );
+      settingsPubSub[0]({
+        ...(settingsPubSub[2]?.() ?? {}),
+        enableDictation: true,
+      });
+
+      await user.click(await screen.findByRole("button"));
+      await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(2));
+
+      releases[0]({ stop: firstStop });
+      releases[1]({ stop: secondStop });
+
+      // The first load lost its UI when the setting went off. Adopting it here
+      // leaves its microphone and worker running for the life of the page,
+      // because the second press overwrites the ref that would stop it.
+      await waitFor(() => expect(firstStop).toHaveBeenCalledTimes(1));
+      expect(secondStop).not.toHaveBeenCalled();
     } finally {
       settingsPubSub[0]({
         ...(settingsPubSub[2]?.() ?? {}),

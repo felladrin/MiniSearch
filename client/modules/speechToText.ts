@@ -1,3 +1,4 @@
+import { DICTATION_MODELS_ROUTE_PREFIX } from "@shared/dictationModel";
 import { addLogEntry } from "./logEntries";
 import type { WorkerResponse } from "./speechToTextWorkerProtocol";
 
@@ -35,9 +36,7 @@ const DICTATION_MODEL_FILES: Record<string, string> = Object.fromEntries(
     "decoder_kv.ort",
     "streaming_config.json",
     "tokenizer.bin",
-    // The version segment matches the server route, which is what makes the
-    // long-lived cache headers on those files safe.
-  ].map((file) => [file, `/dictation-models/quantized_26_07_30/${file}`]),
+  ].map((file) => [file, `${DICTATION_MODELS_ROUTE_PREFIX}${file}`]),
 );
 
 /** The minimum the app needs from `window.SpeechRecognition`. */

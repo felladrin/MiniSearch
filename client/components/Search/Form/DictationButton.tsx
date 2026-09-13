@@ -92,11 +92,13 @@ export default memo(function DictationButton({
   }, []);
 
   /**
-   * Set when this session no longer has a UI: the button unmounted, or the
-   * setting was turned off. A session that resolves afterwards is stopped and
-   * discarded, because there would be nothing on screen to stop it.
+   * Bumped once per press, and again whenever a session loses its UI: the
+   * button unmounted, or the setting was turned off. A load that resolves under
+   * a stale generation is stopped and discarded, because there would be nothing
+   * on screen to stop it. A counter rather than a flag, so a later press cannot
+   * un-abandon a load an earlier one gave up on.
    */
-  const abandonedRef = useRef(false);
+  const pressGenerationRef = useRef(0);
 
   useEffect(
     () => () => {
@@ -104,7 +106,7 @@ export default memo(function DictationButton({
       // dictating on the home page and pressing Search unmounts this button
       // mid-session. Without this the microphone track, the AudioContext and
       // the worker all outlive it, with the recording indicator still on.
-      abandonedRef.current = true;
+      pressGenerationRef.current += 1;
       void sessionRef.current?.stop();
       sessionRef.current = null;
     },
@@ -117,7 +119,7 @@ export default memo(function DictationButton({
     // Not guarded on `sessionRef`: during the load that is still null, and the
     // session arrives after the button is already gone.
     if (settings.enableDictation) return;
-    abandonedRef.current = true;
+    pressGenerationRef.current += 1;
     void stop();
   }, [settings.enableDictation, stop]);
 
@@ -128,7 +130,7 @@ export default memo(function DictationButton({
     }
     if (phase === "loading") return;
 
-    abandonedRef.current = false;
+    const generation = ++pressGenerationRef.current;
     setPhase("loading");
     try {
       const session = await startDictation({
@@ -153,7 +155,7 @@ export default memo(function DictationButton({
       // The load takes seconds and the permission prompt can take minutes, so
       // the button may well be gone by now; whichever path removed it had no
       // session to stop when it ran.
-      if (abandonedRef.current) {
+      if (pressGenerationRef.current !== generation) {
         void session.stop();
         return;
       }

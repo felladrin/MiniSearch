@@ -157,9 +157,11 @@ describe("dictationModelServerHook", () => {
     expect(first.statusCode).toBe(200);
     expect(first.body).toEqual(Buffer.from(payload));
     expect(first.headers["content-length"]).toBe(String(payload.byteLength));
-    expect(fs.existsSync(path.join(modelsDir, "streaming_config.json"))).toBe(
-      true,
-    );
+    expect(
+      fs.existsSync(
+        path.join(modelsDir, "quantized_26_07_30", "streaming_config.json"),
+      ),
+    ).toBe(true);
 
     const second = await call(
       "/dictation-models/quantized_26_07_30/streaming_config.json",
@@ -184,9 +186,11 @@ describe("dictationModelServerHook", () => {
     expect(response.statusCode).toBe(502);
     expect(response.body.toString()).toContain("pinned digest");
     // A file that failed verification must not be left in the cache.
-    expect(fs.existsSync(path.join(modelsDir, "streaming_config.json"))).toBe(
-      false,
-    );
+    expect(
+      fs.existsSync(
+        path.join(modelsDir, "quantized_26_07_30", "streaming_config.json"),
+      ),
+    ).toBe(false);
   });
 
   it("serves the streaming config as JSON", async () => {
@@ -215,6 +219,8 @@ describe("dictationModelServerHook", () => {
       "/dictation-models/quantized_26_07_30/encoder.ort",
     );
     expect(response.statusCode).toBe(502);
-    expect(fs.existsSync(path.join(modelsDir, "encoder.ort"))).toBe(false);
+    expect(
+      fs.existsSync(path.join(modelsDir, "quantized_26_07_30", "encoder.ort")),
+    ).toBe(false);
   });
 });

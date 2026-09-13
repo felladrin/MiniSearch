@@ -4,15 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { PreviewServer, ViteDevServer } from "vite";
+import {
+  DICTATION_MODEL_VERSION as MODEL_VERSION,
+  DICTATION_MODELS_ROUTE_PREFIX as ROUTE_PREFIX,
+} from "../shared/dictationModel.ts";
 import { isResponseWritable, safeEndResponse } from "./utils/streamUtils.ts";
-
-/**
- * The pinned upstream version is part of the route, so the `immutable` cache
- * header below is true: bumping the model changes every URL instead of leaving
- * a year-long cache entry that no new build can reach.
- */
-const MODEL_VERSION = "quantized_26_07_30";
-const ROUTE_PREFIX = `/dictation-models/${MODEL_VERSION}/`;
 
 /**
  * Pinned upstream location of the streaming English model (MIT-licensed).
@@ -115,7 +111,10 @@ async function readCappedBody(
 }
 
 async function downloadModelFile(fileName: string): Promise<void> {
-  const modelsDirectory = getModelsDirectory();
+  // Versioned on disk as well as in the route: a flat cache would serve the
+  // previous model under a new versioned URL, with `immutable` headers and the
+  // digest check skipped because the file already exists.
+  const modelsDirectory = path.join(getModelsDirectory(), MODEL_VERSION);
   const filePath = path.join(modelsDirectory, fileName);
   const temporaryPath = `${filePath}.${process.pid}.tmp`;
 
@@ -149,7 +148,7 @@ async function downloadModelFile(fileName: string): Promise<void> {
 
 /** Serves the file from the disk cache, downloading it once if it is missing. */
 async function ensureModelFileOnDisk(fileName: string): Promise<string> {
-  const filePath = path.join(getModelsDirectory(), fileName);
+  const filePath = path.join(getModelsDirectory(), MODEL_VERSION, fileName);
   if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
     return filePath;
   }
