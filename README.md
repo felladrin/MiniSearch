@@ -156,6 +156,10 @@ Yes. Configure the `INTERNAL_OPENAI_COMPATIBLE_API_*` variables from the [Config
 
 See the [Contributing Guidelines](.github/CONTRIBUTING.md), [Code of Conduct](.github/CODE_OF_CONDUCT.md), and [Security Policy](.github/SECURITY.md).
 
+## Releases
+
+Notable changes are documented in the [Changelog](changelog.md). Docker images are published to [ghcr.io/felladrin/minisearch](https://github.com/felladrin/MiniSearch/pkgs/container/minisearch) as `latest` and `YYYY.M.D-<short-sha>`; pin to a dated tag if you want a stable reference.
+
 ## License
 
 [Apache License 2.0](license.txt)
