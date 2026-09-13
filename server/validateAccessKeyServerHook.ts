@@ -51,12 +51,13 @@ export function validateAccessKeyServerHook<
       bodyTooLarge = true;
       res.statusCode = 413;
       res.setHeader("Content-Type", "application/json");
-      // Answering mid-upload leaves the rest of the flood unread on the socket,
-      // and a keep-alive client would read those bytes as the start of its next
-      // response. Closing tells it not to reuse this connection.
+      // The socket is dropped below to cut the upload off, and a keep-alive
+      // client that had pooled it would send its next request into a dead
+      // connection. Closing tells it not to pool this one.
       res.setHeader("Connection", "close");
       res.end(JSON.stringify({ error: "Request body too large" }), () => {
-        // Only once the 413 is on the wire: stop reading the rest.
+        // Only once the 413 is on the wire, so the answer is not truncated.
+        // Leaving the socket open instead would keep reading the flood.
         req.destroy();
       });
     });

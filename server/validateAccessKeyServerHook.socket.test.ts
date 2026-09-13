@@ -8,9 +8,9 @@ vi.mock("./verifyTokenAndRateLimit.ts", () => ({
 }));
 
 /**
- * The body cap answers while the client is still uploading, which leaves unread
- * bytes on the socket. Only a real connection shows what that does to the next
- * request: a mocked req/res cannot desynchronise a protocol it never speaks.
+ * The body cap answers mid-upload and drops the socket to stop reading. Only a
+ * real connection shows what that costs the caller's next request: a mocked
+ * req/res has no pooled connection to be dropped underneath it.
  *
  * Runs under the default jsdom environment on purpose. `node:http` works there,
  * and a per-file environment pragma cannot be used to switch it: the global
@@ -75,9 +75,9 @@ describe("validateAccessKeyServerHook over a real socket", () => {
       expect(await post(agent, Buffer.alloc(64 * 1024, "x"))).toBe(
         "status=413",
       );
-      // A fresh connection, because the 413 told the agent not to pool the
-      // old one. Without that header the agent reuses a socket still holding
-      // the flood, and this is an ECONNRESET.
+      // A fresh connection, because the 413 told the agent not to pool the one
+      // the server then dropped. Without that header the agent reuses the
+      // dropped socket and this is an ECONNRESET.
       expect(await post(agent, JSON.stringify({ accessKeyHash: "x" }))).toBe(
         "status=200",
       );

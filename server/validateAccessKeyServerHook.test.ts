@@ -356,6 +356,8 @@ describe("request body cap", () => {
         // Two chunks, each within the cap on its own, over it together.
         for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
         for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
+        // A chunk after the cap: the branch must not answer a second time.
+        for (const cb of dataCallbacks) cb(Buffer.alloc(3 * 1024, "x"));
         for (const cb of endCallbacks) cb();
         setTimeout(resolve, 50);
       });
@@ -364,9 +366,12 @@ describe("request body cap", () => {
     expect(res.statusCode).toBe(413);
     expect(res.end).toHaveBeenCalledTimes(1);
     expect(res.end.mock.calls[0][0]).toContain("Request body too large");
-    // The socket carries unread bytes, so it must not be pooled for reuse.
+    // The answer drops the connection, so the client must not pool it.
     expect(res.setHeader).toHaveBeenCalledWith("Connection", "close");
-    // ...and only torn down once the 413 is on the wire.
+    // ...and only torn down once the 413 is on the wire, never before it.
     expect(destroy).toHaveBeenCalledTimes(1);
+    expect(res.end.mock.invocationCallOrder[0]).toBeLessThan(
+      destroy.mock.invocationCallOrder[0],
+    );
   });
 });
