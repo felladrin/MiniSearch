@@ -80,7 +80,7 @@ export default function VoiceSettingsForm() {
         }}
         data={[
           { value: "local", label: "Local neural voice (English-only)" },
-          { value: "system", label: "System voices" },
+          { value: "system", label: "System voices (Multi-lingual)" },
         ]}
         allowDeselect={false}
       />
