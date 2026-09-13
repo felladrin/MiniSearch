@@ -218,9 +218,11 @@ export default function ChatInterface({
   ]);
 
   useEffect(() => {
-    // Set on every run, not just the first: under StrictMode the cleanup fires
-    // once before the effect runs again, and a ref left false would kill the
-    // remounted instance.
+    // Re-armed rather than left to the initial value, so a future re-run of
+    // this effect cannot leave the instance marked dead. It does not make the
+    // component StrictMode-safe: there the cleanup's token bump would orphan
+    // the mount effect's call while `hasInitialized` stays true, and the first
+    // answer would get no follow-up question at all.
     isMountedRef.current = true;
 
     return () => {

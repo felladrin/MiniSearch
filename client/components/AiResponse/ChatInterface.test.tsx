@@ -507,6 +507,8 @@ describe("ChatInterface generation state", () => {
     });
 
     expect(getChatGenerationState().isGeneratingResponse).toBe(true);
+    // The live generation really started, rather than the flag being stale.
+    expect(generateChatResponse).toHaveBeenCalledTimes(2);
 
     // The orphan's `finally` must not clear the live generation's flag, which
     // would drop the spinner and let a third send start alongside it.
@@ -556,6 +558,8 @@ describe("ChatInterface generation state", () => {
     });
 
     expect(getChatGenerationState().isGeneratingResponse).toBe(true);
+    // The live generation really started, rather than the flag being stale.
+    expect(generateChatResponse).toHaveBeenCalledTimes(3);
 
     await act(async () => {
       firstResponse.resolve("The orphaned regeneration.");
