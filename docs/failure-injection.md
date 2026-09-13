@@ -67,7 +67,7 @@ needed.
 | The synthesis worker fails before anything is audible | The answer is read by an OS voice instead | `client/modules/textToSpeech.test.ts` › falls back to the system voice when the local engine cannot load, falls back when the worker fails and no chunk was ever audible |
 | Every synthesized chunk fails to play (blocked autoplay) | Treated as a local-engine failure, so an OS voice reads the answer rather than the user getting silence | `client/modules/textToSpeech.test.ts` › falls back when every synthesized chunk fails to play |
 | The browser provides no `speechSynthesis` at all and the local engine failed | Playback resolves and returns to idle with a log entry, instead of an unhandled rejection | `client/modules/textToSpeech.test.ts` › resolves and logs when the local engine failed and there are no OS voices |
-| A caller streams an oversized body to `/api/validate-access-key` | Refused with `413` mid-upload and the socket dropped; the answer carries `Connection: close`, so the caller's next request opens a fresh connection instead of a dead one | `server/validateAccessKeyServerHook.socket.test.ts` |
+| A caller streams an oversized body to `/api/validate-access-key` | Refused with `413` mid-upload and the socket dropped; the answer carries `Connection: close`, so the caller's next request opens a fresh connection instead of a dead one | `server/validateAccessKeyServerHook.socket.test.ts` › refuses an oversized body with 413 without breaking the next request |
 
 ## Adding a Row
 

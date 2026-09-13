@@ -318,7 +318,7 @@ describe("validateAccessKeyServerHook", () => {
 });
 
 describe("request body cap", () => {
-  it("answers 413 and stops buffering once the body passes the cap", async () => {
+  it("answers 413 once and ignores the rest of the body", async () => {
     process.env.ACCESS_KEYS = "test-key";
     const { validateAccessKeyServerHook } = await import(
       "./validateAccessKeyServerHook"
@@ -344,11 +344,9 @@ describe("request body cap", () => {
         if (event === "end") endCallbacks.push(cb as () => void);
       }),
     };
-    const res = {
-      statusCode: 200,
-      setHeader: vi.fn(),
-      end: vi.fn((_payload: string, flushed?: () => void) => flushed?.()),
-    };
+    // Does not invoke the flush callback, so the test can check the socket is
+    // still open while the 413 is in flight.
+    const res = { statusCode: 200, setHeader: vi.fn(), end: vi.fn() };
 
     await new Promise<void>((resolve) => {
       void handler(req, res, vi.fn());
@@ -368,10 +366,12 @@ describe("request body cap", () => {
     expect(res.end.mock.calls[0][0]).toContain("Request body too large");
     // The answer drops the connection, so the client must not pool it.
     expect(res.setHeader).toHaveBeenCalledWith("Connection", "close");
-    // ...and only torn down once the 413 is on the wire, never before it.
+    // Still open while the answer is in flight, so it cannot be truncated...
+    expect(destroy).not.toHaveBeenCalled();
+    const flushed = res.end.mock.calls[0][1] as () => void;
+    expect(flushed).toBeInstanceOf(Function);
+    flushed();
+    // ...and dropped once it is on the wire.
     expect(destroy).toHaveBeenCalledTimes(1);
-    expect(res.end.mock.invocationCallOrder[0]).toBeLessThan(
-      destroy.mock.invocationCallOrder[0],
-    );
   });
 });
