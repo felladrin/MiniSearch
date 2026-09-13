@@ -81,6 +81,12 @@ export default function ChatInterface({
    * write the previous answer's question into the input placeholder.
    */
   const followUpInvocationRef = useRef(0);
+  /**
+   * False once this instance has unmounted. The pubsub setters are module-level
+   * publishers, so an orphaned flow keeps writing into whatever is mounted now
+   * unless it checks first.
+   */
+  const isMountedRef = useRef(true);
   const updateStreamedResponse = useCallback(
     throttle((response: string) => {
       setStreamedResponse(response);
@@ -95,6 +101,10 @@ export default function ChatInterface({
 
   const regenerateFollowUpQuestion = useCallback(
     async (currentQuery: string, currentResponse: string) => {
+      // A send that settles after unmount still runs its closure to the end and
+      // calls this. Bumping the dead instance's token would not stop it: it
+      // would pass its own check and write into the live mount.
+      if (!isMountedRef.current) return;
       if (suppressNextFollowUp) return;
       if (!currentResponse || !currentQuery.trim()) return;
 
@@ -213,6 +223,7 @@ export default function ChatInterface({
       // next mount, then clear the generation flags the same way the question
       // is cleared: an orphaned flow's `finally` would otherwise resurrect them
       // there, and nothing else resets this channel on unmount.
+      isMountedRef.current = false;
       followUpInvocationRef.current += 1;
       setFollowUpQuestion("");
       setPreviousFollowUpQuestions([]);
@@ -278,10 +289,12 @@ export default function ChatInterface({
     } catch (error) {
       addLogEntry(`Error re-generating response: ${error}`);
     } finally {
-      setGenerationState({
-        ...getChatGenerationState(),
-        isGeneratingResponse: false,
-      });
+      if (isMountedRef.current) {
+        setGenerationState({
+          ...getChatGenerationState(),
+          isGeneratingResponse: false,
+        });
+      }
     }
   }, [
     messages,
@@ -357,10 +370,12 @@ export default function ChatInterface({
           },
         ]);
       } finally {
-        setGenerationState({
-          ...getChatGenerationState(),
-          isGeneratingResponse: false,
-        });
+        if (isMountedRef.current) {
+          setGenerationState({
+            ...getChatGenerationState(),
+            isGeneratingResponse: false,
+          });
+        }
       }
     },
     [
