@@ -107,7 +107,7 @@ const untrustedTextDisclaimer =
  * model was actually given, so a hallucinated link is not an option.
  */
 const partialEvidenceHandoff =
-  "The snippets and `>` excerpts above are partial selections from their pages, and the part that answers the question may not be among them. If a detail you need is missing, say so and point the user to the result that most likely contains it. Only link URLs that appear in the results above; never invent one. Text missing from an excerpt is not evidence that a fact is false, so do not correct the user on that basis.";
+  "The snippets and `>` excerpts below are partial selections from their pages, and the part that answers the question may not be among them. If a detail you need is missing, say so and point the user to the result that most likely contains it. Only link URLs that appear in the results below; never invent one. Text missing from an excerpt is not evidence that a fact is false, so do not correct the user on that basis.";
 
 function formatExcerpt(excerpt: string) {
   const [firstLine, ...rest] = excerpt.split("\n");
