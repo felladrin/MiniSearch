@@ -159,37 +159,69 @@ export function internalApiEndpointServerHook<
 
       try {
         let rawRequestBody: unknown;
-        try {
-          const maxBodyBytes = 1024 * 1024;
+        const maxBodyBytes = 1024 * 1024;
+        const body = await new Promise<
+          | { status: "ok"; value: unknown }
+          | { status: "tooLarge" }
+          | { status: "invalid" }
+        >((resolve) => {
           const chunks: Buffer[] = [];
           let totalBytes = 0;
-          for await (const chunk of request) {
-            let buf: Buffer;
-            if (typeof chunk === "string") {
-              buf = Buffer.from(chunk);
-            } else if (chunk instanceof Uint8Array) {
-              buf = Buffer.from(chunk);
-            } else {
-              outcome = "badRequest";
-              sendJsonError(response, 400, {
-                error: "Invalid request body stream",
-              });
-              return;
-            }
-            totalBytes += buf.length;
+          let settled = false;
+          request.on("data", (chunk: Buffer | string) => {
+            if (settled) return;
+            totalBytes += Buffer.byteLength(chunk);
             if (totalBytes > maxBodyBytes) {
-              outcome = "badRequest";
-              sendJsonError(response, 413, { error: "Request body too large" });
+              settled = true;
+              resolve({ status: "tooLarge" });
               return;
             }
-            chunks.push(buf);
-          }
-          rawRequestBody = JSON.parse(Buffer.concat(chunks).toString());
-        } catch (_error) {
+            chunks.push(Buffer.from(chunk));
+          });
+          request.on("end", () => {
+            if (settled) return;
+            settled = true;
+            try {
+              resolve({
+                status: "ok",
+                value: JSON.parse(Buffer.concat(chunks).toString()),
+              });
+            } catch {
+              resolve({ status: "invalid" });
+            }
+          });
+          request.on("error", () => {
+            if (settled) return;
+            settled = true;
+            resolve({ status: "invalid" });
+          });
+        });
+
+        if (body.status === "tooLarge") {
+          outcome = "badRequest";
+          response.statusCode = 413;
+          response.setHeader("Content-Type", "application/json");
+          // Stopping the read alone leaves the rest of the upload on the
+          // socket, and a keep-alive client pooling it would read those
+          // bytes as the start of its next response. Closing tells the
+          // client not to pool this one.
+          response.setHeader("Connection", "close");
+          response.end(
+            JSON.stringify({ error: "Request body too large" }),
+            () => {
+              // Only once the 413 is on the wire, so the answer is not
+              // truncated.
+              request.destroy();
+            },
+          );
+          return;
+        }
+        if (body.status === "invalid") {
           outcome = "badRequest";
           sendJsonError(response, 400, { error: "Invalid request body" });
           return;
         }
+        rawRequestBody = body.value;
 
         const parsedRequestBody =
           chatCompletionRequestSchema.safeParse(rawRequestBody);
