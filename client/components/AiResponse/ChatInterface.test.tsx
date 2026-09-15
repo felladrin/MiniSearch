@@ -66,6 +66,8 @@ const { generateChatResponse } = await import("@/modules/textGeneration");
 const { generateFollowUpQuestion } = await import(
   "@/modules/followUpQuestions"
 );
+const { persistChatMessages } = await import("@/modules/chatHelpers");
+const { addLogEntry } = await import("@/modules/logEntries");
 
 /** A promise plus the handle to settle it, so a test can hold a call open. */
 function deferred<T>() {
@@ -647,5 +649,45 @@ describe("ChatInterface generation state", () => {
     });
 
     expect(release).toHaveBeenCalled();
+  });
+
+  it("logs the failure when the initial follow-up question generation fails", async () => {
+    vi.mocked(generateFollowUpQuestion).mockRejectedValueOnce(
+      new Error("boom"),
+    );
+
+    renderChatInterface({ suppressInitialFollowUp: false });
+
+    await act(async () => {});
+
+    expect(addLogEntry).toHaveBeenCalledWith(
+      expect.stringContaining("Error generating follow-up question"),
+    );
+    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(false);
+  });
+
+  it("keeps the answer and the follow-up question when persisting fails", async () => {
+    vi.mocked(persistChatMessages).mockRejectedValueOnce(
+      new Error("disk full"),
+    );
+
+    renderChatInterface();
+
+    await act(async () => {
+      await sendMessage("And how do I use it?");
+    });
+
+    expect(
+      messageListMessages.filter((message) => message.content === "An answer."),
+    ).toHaveLength(1);
+    expect(
+      messageListMessages.some((message) =>
+        message.content.includes("Sorry, I encountered an error"),
+      ),
+    ).toBe(false);
+    expect(addLogEntry).toHaveBeenCalledWith(
+      expect.stringContaining("Error persisting chat messages"),
+    );
+    expect(generateFollowUpQuestion).toHaveBeenCalled();
   });
 });

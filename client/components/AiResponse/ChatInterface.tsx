@@ -137,8 +137,9 @@ export default function ChatInterface({
           ...getChatGenerationState(),
           isGeneratingFollowUpQuestion: false,
         });
-      } catch (_) {
+      } catch (error) {
         if (invocation !== followUpInvocationRef.current) return;
+        addLogEntry(`Error generating follow-up question: ${error}`);
         setFollowUpQuestion("");
         setGenerationState({
           ...getChatGenerationState(),
@@ -363,7 +364,11 @@ export default function ChatInterface({
           showAiCompleteNotification(currentInput);
         }
 
-        await persistChatMessages(currentQuery, currentInput, finalResponse);
+        try {
+          await persistChatMessages(currentQuery, currentInput, finalResponse);
+        } catch (error) {
+          addLogEntry(`Error persisting chat messages: ${error}`);
+        }
 
         regenerateFollowUpQuestion(currentInput, finalResponse);
       } catch (error) {
