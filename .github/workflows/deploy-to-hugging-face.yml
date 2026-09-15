@@ -9,16 +9,26 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write # lets the job request the OIDC token
+    env:
+      HF_SPACE: ${{ vars.HF_SPACE_OWNER }}/${{ vars.HF_SPACE_NAME }}
+      HF_OIDC_RESOURCE: spaces/${{ vars.HF_SPACE_OWNER }}/${{ vars.HF_SPACE_NAME }}
     steps:
       - uses: actions/checkout@v7
-      # Pin to the tip of the action's `v1` branch, which is where its build
-      # output lives. Its release tags point at source commits, and `dist/` is
-      # gitignored there, so a tag digest resolves to a tree with no
-      # `dist/index.js` and the step fails before it runs.
-      - uses: JacobLinCool/huggingface-sync@48eb49940149dc1015d8294621cb203635fe9ff3 # v1 branch, 2026-05-12
-        with:
-          github: ${{ secrets.GITHUB_TOKEN }}
-          user: ${{ vars.HF_SPACE_OWNER }}
-          space: ${{ vars.HF_SPACE_NAME }}
-          token: ${{ secrets.HF_TOKEN }}
-          configuration: ".github/hf-space-config.yml"
+
+      - name: Install the Hugging Face CLI
+        run: |
+          pipx install huggingface_hub==1.31.0 # the OIDC exchange needs >= 1.19.0
+          hf version
+
+      - name: Prepend the Space configuration to README.md
+        run: |
+          { echo '---'; cat .github/hf-space-config.yml; echo '---'; echo; cat README.md; } > README.space.md
+          mv README.space.md README.md
+
+      - name: Sync to the Space
+        run: |
+          hf upload "$HF_SPACE" . . \
+            --repo-type=space \
+            --delete="*" \
+            --commit-message="Sync from $GITHUB_REPOSITORY@${GITHUB_SHA:0:7}"
