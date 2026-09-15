@@ -2,6 +2,19 @@ name: Publish Docker Image
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, CalVer YYYY.M.D (e.g. 2026.9.15). A second release on the same day adds a sequence starting at 1: 2026.9.15.1, then .2, .3."
+        required: true
+        type: string
+
+# The duplicate check runs before the build, so a concurrent dispatch of the
+# same version would pass it and only collide minutes later, on the tag push,
+# with the Docker tag already published. Serializing dispatches makes the
+# second run read the first run's tag and fail before it builds anything.
+concurrency:
+  group: publish-docker-image
+  cancel-in-progress: false
 
 jobs:
   build-and-push-image:
@@ -11,11 +24,66 @@ jobs:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+      - name: Validate the release version
+        env:
+          VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # CalVer: YYYY.M.D, with an optional same-day sequence that starts at 1.
+          # The bare date is the first release of the day; ".0" and a zero-padded
+          # month or day are rejected, so a given date has exactly one spelling
+          # and the duplicate check below cannot be walked around with `2026.09.15`.
+          # `[[ =~ ]]` anchors the whole value: `grep` matches line by line, so a
+          # multi-line input whose first line is a valid version would pass and
+          # then add a line of its own to the Docker `tags:` list.
+          version_pattern='^[0-9]{4}\.[1-9][0-9]?\.[1-9][0-9]?(\.[1-9][0-9]*)?$'
+          if [[ ! $VERSION =~ $version_pattern ]]; then
+            echo "Version '$VERSION' is not CalVer YYYY.M.D or YYYY.M.D.N (N >= 1, no zero padding)." >&2
+            exit 1
+          fi
+
+          # A Release cut from a side branch is listed as the latest release and
+          # its generated notes are diffed against a tag from another line of
+          # history. This is the gate; the `enable={{is_default_branch}}` guard on
+          # the `latest` Docker tag below is the backstop behind it.
+          if [[ $REF_NAME != "$DEFAULT_BRANCH" ]]; then
+            echo "Releases are cut from '$DEFAULT_BRANCH' only; this run is on '$REF_NAME'." >&2
+            exit 1
+          fi
+
+          # Fail before any push: a duplicate must never move an already-published
+          # Docker tag. `git ls-remote --exit-code` exits 0 when the tag exists and
+          # 2 when it is absent. Any other status is a failed lookup, not an
+          # absent tag, and must not be read as permission to release.
+          tag_lookup_status=0
+          git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null || tag_lookup_status=$?
+          case $tag_lookup_status in
+            0)
+              echo "Git tag '$VERSION' already exists. Use a sequence (e.g. $VERSION.1) for a same-day release." >&2
+              exit 1
+              ;;
+            2) ;;
+            *)
+              echo "Could not check whether git tag '$VERSION' exists: git ls-remote exited $tag_lookup_status." >&2
+              exit 1
+              ;;
+          esac
+
+          # Secondary guard, best-effort by construction: `gh release view` exits
+          # 1 both for a missing release and for a failed lookup, so it cannot be
+          # told apart the way the tag check can. Its stderr is left visible so
+          # the log shows which of the two happened.
+          if gh release view "$VERSION" >/dev/null; then
+            echo "GitHub Release '$VERSION' already exists. Use a sequence (e.g. $VERSION.1) for a same-day release." >&2
+            exit 1
+          fi
       - name: Log in to the Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4
         with:
@@ -30,10 +98,16 @@ jobs:
           # `latest` replaces the `main` tag this action emits by default. With
           # releases cut on demand, the image can sit several commits behind the
           # branch, so naming it after the branch misleads. The
-          # `is_default_branch` guard stops a dispatch from a side branch from
-          # moving the tag for everyone.
+          # `is_default_branch` guard is a backstop: the validation step already
+          # refuses a dispatch from a side branch, and this keeps `latest` from
+          # moving for everyone if that step is ever relaxed.
+          #
+          # This list is parsed one directive per line, so `version` is spliced
+          # in only after the step above has checked it against an anchored
+          # pattern; a value carrying a newline would otherwise add a directive.
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ inputs.version }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003  # v4
       - name: Build and push Docker Image
@@ -48,3 +122,11 @@ jobs:
           # already in use, so no extra job permissions are needed.
           provenance: mode=max
           sbom: true
+      - name: Tag the release and publish the GitHub Release
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          gh release create "$VERSION" --generate-notes --title "$VERSION"
