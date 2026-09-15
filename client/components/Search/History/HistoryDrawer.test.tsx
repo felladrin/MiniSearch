@@ -157,6 +157,31 @@ describe("HistoryDrawer component", () => {
   });
 
   it("deletes an entry only after a confirming second click", async () => {
+    const onSearchSelect = vi.fn();
+    const entry = makeEntry(1, "quantum tunneling");
+    const deleteEntry = vi.fn();
+    mockHistory({ filteredSearches: [entry], deleteEntry });
+
+    const user = userEvent.setup();
+    renderDrawer(onSearchSelect);
+    await screen.findByText("quantum tunneling");
+    const deleteButton = screen.getByRole("button", { name: "Delete search" });
+
+    await user.click(deleteButton);
+    expect(deleteEntry).not.toHaveBeenCalled();
+    // The delete button sits inside the selectable card. Without stopPropagation
+    // every delete click would also run the entry as a search.
+    expect(onSearchSelect).not.toHaveBeenCalled();
+
+    const confirmButton = screen.getByRole("button", {
+      name: "Click again to confirm delete",
+    });
+    await user.click(confirmButton);
+    expect(deleteEntry).toHaveBeenCalledWith(1);
+    expect(onSearchSelect).not.toHaveBeenCalled();
+  });
+
+  it("cancels the pending delete when the pointer leaves the button", async () => {
     const entry = makeEntry(1, "quantum tunneling");
     const deleteEntry = vi.fn();
     mockHistory({ filteredSearches: [entry], deleteEntry });
@@ -164,15 +189,25 @@ describe("HistoryDrawer component", () => {
     const user = userEvent.setup();
     renderDrawer();
     await screen.findByText("quantum tunneling");
-    const deleteButton = screen.getByRole("button", { name: "Delete search" });
 
-    await user.click(deleteButton);
-    expect(deleteEntry).not.toHaveBeenCalled();
-
-    const confirmButton = screen.getByRole("button", {
+    await user.hover(screen.getByRole("button", { name: "Delete search" }));
+    await user.click(screen.getByRole("button", { name: "Delete search" }));
+    const armed = screen.getByRole("button", {
       name: "Click again to confirm delete",
     });
-    await user.click(confirmButton);
-    expect(deleteEntry).toHaveBeenCalledWith(1);
+    expect(deleteEntry).not.toHaveBeenCalled();
+
+    await user.unhover(armed);
+
+    // Leaving reverts the button, so a later click arms the confirm again
+    // instead of deleting on the first press.
+    expect(
+      screen.getByRole("button", { name: "Delete search" }),
+    ).toBeInTheDocument();
+    expect(deleteEntry).not.toHaveBeenCalled();
+
+    await user.hover(screen.getByRole("button", { name: "Delete search" }));
+    await user.click(screen.getByRole("button", { name: "Delete search" }));
+    expect(deleteEntry).not.toHaveBeenCalled();
   });
 });

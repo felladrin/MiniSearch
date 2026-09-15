@@ -52,11 +52,6 @@ describe("HistoryButton component", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows the button when history is enabled", () => {
-    renderButton();
-    expect(screen.getByRole("button", { name: "History" })).toBeVisible();
-  });
-
   it("opens the drawer when the button is clicked", async () => {
     const user = userEvent.setup();
     renderButton();

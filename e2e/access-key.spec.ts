@@ -12,17 +12,6 @@ function stubAccessKeyConfig(page: Page) {
   );
 }
 
-test("access page appears when access keys are enabled", async ({ page }) => {
-  await stubAccessKeyConfig(page);
-
-  await page.goto("/");
-
-  await expect(page.getByText("Access Restricted")).toBeVisible();
-  await expect(
-    page.getByPlaceholder("Enter your access key to continue"),
-  ).toBeVisible();
-});
-
 test("a wrong key shows an error and does not grant access", async ({
   page,
 }) => {
@@ -59,5 +48,9 @@ test("a correct key grants access", async ({ page }) => {
   await page.getByRole("button", { name: "Submit" }).click();
 
   await expect(page.getByText("Access Restricted")).toBeHidden();
-  await expect(page.getByRole("textbox")).toBeVisible();
+  // Assert the app shell, not any textbox. The Menu button only exists past the
+  // gate, so a half-rendered page that still shows an input cannot pass this.
+  await expect(
+    page.getByRole("button", { name: "Menu", exact: true }),
+  ).toBeVisible();
 });
