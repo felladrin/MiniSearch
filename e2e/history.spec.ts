@@ -49,11 +49,17 @@ test("the history filter narrows the list and clearing it restores it", async ({
   await expect(entry).toBeVisible();
 });
 
-test("restoring a history entry closes the drawer and keeps the query", async ({
+test("restoring a history entry closes the drawer and writes the query back", async ({
   page,
 }) => {
   await page.goto(`/?q=${encodeURIComponent(QUERY)}`);
   await expect(settledSearch(page)).toBeVisible({ timeout: 60_000 });
+
+  // Make the live query differ from the stored entry first. The textarea keeps
+  // the query from the initial goto, so without this the value check below is
+  // already true before the click, and it passes even when the restore writes
+  // nothing back.
+  await page.getByRole("textbox").fill("a different live query");
 
   const drawer = await openHistoryDrawer(page);
   await drawer.getByText(QUERY, { exact: true }).click();
