@@ -6,7 +6,7 @@ React 19 + TypeScript + Mantine UI v9 (`@mantine/core`, `@mantine/hooks`, `@mant
 
 - **Build Tool**: Vite 8
 - **Linting/Formatting**: Biome 2
-- **Testing**: Vitest 4 + Testing Library
+- **Testing**: Vitest 5 + Testing Library
 - **State Management**: create-pubsub
 - **Routing**: Wouter 3
 - **AI Integration**: Wllama, OpenAI-compatible APIs
