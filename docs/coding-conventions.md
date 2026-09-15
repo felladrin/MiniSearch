@@ -63,6 +63,10 @@ React 19 + TypeScript + Mantine UI v9 (`@mantine/core`, `@mantine/hooks`, `@mant
 - Test files use `.test.ts` suffix
 - Mock files in `client/modules/testUtils.ts`
 
+## Documentation
+
+- Do not cite line numbers in docs (for example, `file.ts#123-456`). The ranges go stale when the source moves. Name the symbol instead, and keep a file path only when it is the only locator for what the sentence describes.
+
 ## Related Topics
 
 - **Project Structure**: `docs/project-structure.md` - Directory organization
