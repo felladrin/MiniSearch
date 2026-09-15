@@ -29,7 +29,8 @@
     "test:e2e": "playwright test",
     "eval": "vitest run --config vitest.eval.config.ts",
     "eval:retrieval": "vitest run --config vitest.eval.config.ts retrieval",
-    "eval:answer": "vitest run --config vitest.eval.config.ts answer"
+    "eval:answer": "vitest run --config vitest.eval.config.ts answer",
+    "license-check": "node scripts/license-check.cjs"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.0",
