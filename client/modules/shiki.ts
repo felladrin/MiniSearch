@@ -1,15 +1,20 @@
 import { createShikiAdapter } from "@mantine/code-highlight";
 
 async function loadShiki() {
-  const { createHighlighter, bundledLanguages } = await import(
-    "shiki/bundle/full"
-  );
+  const { createHighlighter } = await import("shiki/bundle/full");
 
   return await createHighlighter({
-    langs: Object.keys(bundledLanguages),
+    langs: [],
     themes: [],
   });
 }
 
-/** Mantine CodeHighlighter adapter backed by the full bundled Shiki language set. */
-export const shikiAdapter = createShikiAdapter(loadShiki);
+/**
+ * Mantine CodeHighlighter adapter backed by the full bundled Shiki language
+ * set. The highlighter starts with no languages loaded; each language is
+ * loaded on demand from the full bundle the first time a code block that uses
+ * it renders.
+ */
+export const shikiAdapter = createShikiAdapter(loadShiki, {
+  resolveLanguage: (language) => language,
+});
