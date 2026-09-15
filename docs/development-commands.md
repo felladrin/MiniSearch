@@ -69,7 +69,7 @@ The repository uses six GitHub Actions workflows for continuous integration, dep
 | `ci.yml` | Push/PR to `main` or `master` | Full lint (`npm run lint`), format check (`npm run format`), and Vitest test suite |
 | `on-push-to-main.yml` | Push to `main` | Delegates to `reusable-check-docker.yml` |
 | `on-pull-request-to-main.yml` | PR opened/synced/reopened to `main` | Delegates to `reusable-check-docker.yml`; skippable via `skip-check-docker` label |
-| `publish-docker-image.yml` | Manual (`workflow_dispatch`) | Builds multi-platform Docker image (linux/amd64, linux/arm64) and pushes to `ghcr.io` |
+| `publish-docker-image.yml` | Manual (`workflow_dispatch`), `main` only | Cuts a CalVer release: validates the `version` input, builds the multi-platform Docker image (linux/amd64, linux/arm64) and pushes it to `ghcr.io` as that version plus `latest`, then pushes the git tag and publishes the GitHub Release |
 | `scan-docker-image.yml` | Weekly (Monday 06:00 UTC) or manual | Trivy scan of the published image, reporting fixable HIGH/CRITICAL findings to code scanning |
 | `deploy-to-hugging-face.yml` | Manual (`workflow_dispatch`) | Syncs repository to Hugging Face Spaces using `JacobLinCool/huggingface-sync` |
 | `reusable-check-docker.yml` | Called by other workflows | Docker compose production build + health check via `curl localhost:7860` (lint/format/test are covered by `ci.yml`) |
@@ -85,11 +85,11 @@ Used by both `on-push-to-main` and `on-pull-request-to-main` to run the producti
 The Docker image uses a multi-stage build:
 The image installs Python/SearXNG, builds the Vite frontend, and runs SearXNG and Node.js in a single container via shell process composition. No compilation step is required: the reranker's ONNX Runtime binaries ship prebuilt with the npm dependency.
 
-The production image is published to `ghcr.io` with multi-platform support (linux/amd64, linux/arm64). Labels are auto-generated from Git metadata via `docker/metadata-action`, and each release is published as `latest`; to pin a build, users reference the image digest. Weekly, `scan-docker-image.yml` runs Trivy against the published `latest` and reports fixable HIGH/CRITICAL findings to code scanning.
+The production image is published to `ghcr.io` with multi-platform support (linux/amd64, linux/arm64). Labels are auto-generated from Git metadata via `docker/metadata-action`, and each release is published as `latest` and as its CalVer version tag; to pin a build, users reference the version tag or the image digest. Weekly, `scan-docker-image.yml` runs Trivy against the published `latest` and reports fixable HIGH/CRITICAL findings to code scanning.
 
 ### Manual Deployments
 
-- **Publish Docker Image**: Triggered via GitHub UI — builds and pushes to GitHub Container Registry
+- **Publish Docker Image**: Triggered via GitHub UI from `main`, with a CalVer `version` input — builds and pushes the image to GitHub Container Registry, then pushes the git tag and publishes the GitHub Release
 - **Deploy to Hugging Face**: Triggered via GitHub UI — syncs the repository to a Hugging Face Space using configuration from `.github/hf-space-config.yml`
 
 ## Quality Assurance
