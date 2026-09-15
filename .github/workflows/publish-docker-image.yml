@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version, CalVer YYYY.M.D (e.g. 2026.9.15)"
+        description: "Release version, CalVer YYYY.M.D (e.g. 2026.9.15). A second release on the same day adds a sequence starting at 1: 2026.9.15.1, then .2, .3."
         required: true
         type: string
 
@@ -21,6 +21,29 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+      - name: Validate the release version
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # CalVer: YYYY.M.D, with an optional same-day sequence that starts at 1.
+          # The bare date is the first release of the day; ".0" is rejected so the
+          # first release has exactly one spelling. See README "Releases".
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(\.[1-9][0-9]*)?$'; then
+            echo "Version '$VERSION' is not CalVer YYYY.M.D or YYYY.M.D.N (N >= 1)." >&2
+            exit 1
+          fi
+
+          # Fail before any push: a duplicate must never move an already-published
+          # Docker tag. git ls-remote exits 0 when the tag exists, 2 when absent.
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "Git tag '$VERSION' already exists. Use a sequence (e.g. $VERSION.1) for a same-day release." >&2
+            exit 1
+          fi
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "GitHub Release '$VERSION' already exists. Use a sequence (e.g. $VERSION.1) for a same-day release." >&2
+            exit 1
+          fi
       - name: Log in to the Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4
         with:
@@ -54,17 +77,11 @@ jobs:
           # already in use, so no extra job permissions are needed.
           provenance: mode=max
           sbom: true
-      - name: Validate the version format
-        run: |
-          if ! printf '%s' "${{ inputs.version }}" | grep -Eq '^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}$'; then
-            echo "Version '${{ inputs.version }}' is not CalVer YYYY.M.D" >&2
-            exit 1
-          fi
-
       - name: Tag the release and publish the GitHub Release
         env:
+          VERSION: ${{ inputs.version }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          git tag "${{ inputs.version }}"
-          git push origin "${{ inputs.version }}"
-          gh release create "${{ inputs.version }}" --generate-notes --title "${{ inputs.version }}"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          gh release create "$VERSION" --generate-notes --title "$VERSION"
