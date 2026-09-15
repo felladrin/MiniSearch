@@ -71,7 +71,7 @@ The repository uses six GitHub Actions workflows for continuous integration, dep
 | `on-pull-request-to-main.yml` | PR opened/synced/reopened to `main` | Delegates to `reusable-check-docker.yml`; skippable via `skip-check-docker` label |
 | `publish-docker-image.yml` | Manual (`workflow_dispatch`) | Builds multi-platform Docker image (linux/amd64, linux/arm64) and pushes to `ghcr.io` |
 | `scan-docker-image.yml` | Weekly (Monday 06:00 UTC) or manual | Trivy scan of the published image, reporting fixable HIGH/CRITICAL findings to code scanning |
-| `deploy-to-hugging-face.yml` | Manual (`workflow_dispatch`) | Syncs repository to Hugging Face Spaces using `JacobLinCool/huggingface-sync` |
+| `deploy-to-hugging-face.yml` | Manual (`workflow_dispatch`) | Syncs the repository to a Hugging Face Space with the `hf` CLI over OIDC Trusted Publishers |
 | `reusable-check-docker.yml` | Called by other workflows | Docker compose production build + health check via `curl localhost:7860` (lint/format/test are covered by `ci.yml`) |
 
 ### Reusable Workflow (`reusable-check-docker.yml`)
