@@ -2,6 +2,11 @@ name: Publish Docker Image
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, CalVer YYYY.M.D (e.g. 2026.9.15)"
+        required: true
+        type: string
 
 jobs:
   build-and-push-image:
@@ -11,7 +16,7 @@ jobs:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - name: Checkout repository
@@ -34,6 +39,7 @@ jobs:
           # moving the tag for everyone.
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ inputs.version }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003  # v4
       - name: Build and push Docker Image
@@ -48,3 +54,17 @@ jobs:
           # already in use, so no extra job permissions are needed.
           provenance: mode=max
           sbom: true
+      - name: Validate the version format
+        run: |
+          if ! printf '%s' "${{ inputs.version }}" | grep -Eq '^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}$'; then
+            echo "Version '${{ inputs.version }}' is not CalVer YYYY.M.D" >&2
+            exit 1
+          fi
+
+      - name: Tag the release and publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag "${{ inputs.version }}"
+          git push origin "${{ inputs.version }}"
+          gh release create "${{ inputs.version }}" --generate-notes --title "${{ inputs.version }}"

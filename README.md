@@ -158,7 +158,7 @@ See the [Contributing Guidelines](.github/CONTRIBUTING.md), [Code of Conduct](.g
 
 ## Releases
 
-Notable changes are documented in the [Changelog](changelog.md). Docker images are published to [ghcr.io/felladrin/minisearch](https://github.com/felladrin/MiniSearch/pkgs/container/minisearch) as `latest` and `YYYY.M.D-<short-sha>`; pin to a dated tag if you want a stable reference.
+Notable changes are documented in the [Changelog](changelog.md). Each release is cut with a CalVer tag (`YYYY.M.D`, e.g. `2026.9.15`): the tag is pushed to this repo, a GitHub Release with generated notes is published for it, and the Docker image is tagged with the same version on [ghcr.io/felladrin/minisearch](https://github.com/felladrin/MiniSearch/pkgs/container/minisearch) alongside `latest`. Pin to the version tag for a stable reference, or to the image digest for an immutable one (see Pin to a specific build above).
 
 ## License
 
