@@ -96,7 +96,16 @@ jobs:
           git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null || tag_lookup_status=$?
           case $tag_lookup_status in
             0)
-              echo "Git tag '$VERSION' already exists. Use a sequence (e.g. $VERSION.1) for a same-day release." >&2
+              # The tag can exist because a previous run pushed it and then
+              # failed before publishing the GitHub Release. That release is
+              # one command away against the tag that is already there, so
+              # name it: spending a sequence number on an image that is
+              # complete except for its notes would waste the version. A
+              # genuinely new same-day release still takes the sequence.
+              echo "Git tag '$VERSION' already exists, so this version was already published." >&2
+              echo "If the GitHub Release is missing (the publish step failed after the tag push), recover it against the existing tag:" >&2
+              echo "  gh release create $VERSION --generate-notes --title $VERSION" >&2
+              echo "For a new same-day release, use a sequence (e.g. $VERSION.1)." >&2
               exit 1
               ;;
             2) ;;
@@ -161,4 +170,15 @@ jobs:
         run: |
           git tag "$VERSION"
           git push origin "$VERSION"
-          gh release create "$VERSION" --generate-notes --title "$VERSION"
+          # Create the Release only when it is missing, so a repair run of
+          # this job is safe: if a previous attempt pushed the tag and then
+          # failed at `gh release create`, re-running the job must not die
+          # on "already exists". `gh release view` exits non-zero for a
+          # missing Release and for a failed lookup alike, so a failed
+          # lookup falls through to create: a loud create failure beats
+          # silently skipping a Release that was never made.
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "GitHub Release '$VERSION' already exists; skipping creation."
+          else
+            gh release create "$VERSION" --generate-notes --title "$VERSION"
+          fi
