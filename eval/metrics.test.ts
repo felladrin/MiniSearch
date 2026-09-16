@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dcgAtK, ndcgAtK, recallAtK } from "./metrics.ts";
+import { dcgAtK, ndcgAtK, rbo, recallAtK } from "./metrics.ts";
 
 describe("dcgAtK", () => {
   it("discounts relevance by position", () => {
@@ -74,5 +74,64 @@ describe("recallAtK", () => {
 
   it("is 0 when there are no relevant urls", () => {
     expect(recallAtK(["a"], [], 1)).toBe(0);
+  });
+});
+
+describe("rbo", () => {
+  it("is exactly 1 for identical lists", () => {
+    // The tail extrapolation term is what brings identical finite lists to
+    // the top anchor; the truncated sum alone gives 1 - p^k.
+    expect(rbo(["a", "b", "c"], ["a", "b", "c"], 0.9)).toBe(1);
+  });
+
+  it("is 0 for disjoint lists", () => {
+    expect(rbo(["a", "b"], ["c", "d"], 0.9)).toBe(0);
+  });
+
+  it("scores prefix agreement higher than suffix agreement", () => {
+    // Same shared urls, but earlier agreement weighs more in RBO.
+    const prefix = rbo(["a", "b", "c"], ["a", "b", "d"], 0.9);
+    const suffix = rbo(["a", "b", "c"], ["d", "b", "c"], 0.9);
+    expect(prefix).toBeGreaterThan(suffix);
+  });
+
+  it("is symmetric in its arguments", () => {
+    expect(rbo(["a", "b", "c"], ["b", "c", "d"], 0.9)).toBe(
+      rbo(["b", "c", "d"], ["a", "b", "c"], 0.9),
+    );
+    // Asymmetry is also a trap for uneven list lengths.
+    expect(rbo(["a", "b"], ["a", "b", "c"], 0.9)).toBe(
+      rbo(["a", "b", "c"], ["a", "b"], 0.9),
+    );
+  });
+
+  it("does not double-count a duplicated url", () => {
+    // The duplicate must not lift the score past the identical-list anchor
+    // or change the symmetric counterpart's reading.
+    const once = rbo(["a", "b"], ["a", "b"], 0.9);
+    const duplicated = rbo(["a", "a", "b"], ["a", "b"], 0.9);
+    expect(duplicated).toBeLessThanOrEqual(once);
+  });
+
+  it("returns 0 for two empty lists", () => {
+    expect(rbo([], [], 0.9)).toBe(0);
+  });
+
+  it("returns 0 when one list is empty", () => {
+    expect(rbo(["a"], [], 0.9)).toBe(0);
+  });
+
+  it("scores only rank 1 when p is 0", () => {
+    // (1 - p) keeps only the d = 1 term and the tail term vanishes.
+    expect(rbo(["a", "b"], ["b", "a"], 0)).toBeCloseTo(0);
+    expect(rbo(["a", "b"], ["a", "x"], 0)).toBeCloseTo(1);
+  });
+
+  it("rejects p outside [0, 1)", () => {
+    // p = 1 would make the (1 - p) discount factor vanish and degenerate the
+    // formula, so it is rejected instead of silently mis-scored.
+    expect(() => rbo(["a"], ["a"], 1)).toThrow(RangeError);
+    expect(() => rbo(["a"], ["a"], -0.1)).toThrow(RangeError);
+    expect(() => rbo(["a"], ["a"], 1.5)).toThrow(RangeError);
   });
 });

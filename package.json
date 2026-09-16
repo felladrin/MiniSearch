@@ -29,6 +29,7 @@
     "test:e2e": "playwright test",
     "eval": "vitest run --config vitest.eval.config.ts",
     "eval:retrieval": "vitest run --config vitest.eval.config.ts retrieval",
+    "eval:facets": "vitest run --config vitest.eval.config.ts facetDistinctness",
     "eval:answer": "vitest run --config vitest.eval.config.ts answer",
     "license-check": "node scripts/license-check.cjs"
   },

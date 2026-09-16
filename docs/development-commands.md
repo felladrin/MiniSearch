@@ -29,6 +29,7 @@ reranker, the system prompt, the search-results formatting, or the model. See
 
 - **`npm run eval`**: Run the full eval (retrieval + answer)
 - **`npm run eval:retrieval`**: Retrieval eval (real ONNX reranker; local only, needs the model in `server/models/`)
+- **`npm run eval:facets`**: Facet distinctness eval (report-only; needs SearXNG at `127.0.0.1:8888` and the model in `server/models/`, runs in the dev container)
 - **`npm run eval:answer`**: Answer eval (LLM judge; gated on `EVAL_LLM_API_KEY`, skips without one)
 
 ### Coverage Reports for AI Analysis

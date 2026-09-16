@@ -10,7 +10,8 @@ local signal:
 - `metrics.test.ts`, `goldenSet.test.ts`, `promptConstruction.test.ts` run in
   the default suite: pure math, golden-set structure, and prompt construction.
   No model, no API key.
-- `retrieval.integration.test.ts` (real ONNX model) and
+- `retrieval.integration.test.ts` (real ONNX model),
+  `facetDistinctness.integration.test.ts` (real ONNX model + SearXNG), and
   `answer.integration.test.ts` (network calls) run only under
   `vitest.eval.config.ts`.
 
@@ -67,6 +68,37 @@ default `npm test` suite and from CI (which has no model on disk), and runs
 under the node-environment eval config. It is a local signal, matching the
 `server/` integration-test house style. It prints a per-query table and the
 mean, and fails if the mean drops below the regression thresholds.
+
+## Facet distinctness eval (report-only)
+
+A one-shot experiment that answers one question before any clarification UI
+is built: does appending a candidate answer (facet) to an ambiguous query
+actually move the top results? For every (query, facet) pair in
+`facetSet.ts` (12 ambiguous queries, 2-4 facets each), it runs the base query
+and the refined query (`query + " " + facet`) through the real path -
+`fetchSearXNG`, then `rankSearchResults` with `preserveTopResults=true`,
+exactly the app's text-search call - and reports the Rank-Biased Overlap
+(p = 0.9) between the two top-3 url lists (`rbo` in `metrics.ts`). Low RBO
+means the facet steers and the clarifying-questions work is worth doing;
+uniformly high RBO means the idea is cosmetic and dies here.
+
+It is **report-only**: it prints a per-facet table and a summary line with
+the fraction of scored facets below RBO 0.5, and a human reads the verdict
+off the table. There is no pass/fail floor on RBO, so it is not a regression
+signal and it never fails a build for a low score - it only fails if the
+harness itself produced no scored pairs or an out-of-range score. Pairs whose
+refined query returns no results are reported as skipped, never scored
+(empty-vs-empty overlap would read as "perfectly distinct"). It sleeps ~500ms
+between SearXNG fetches because the circuit breaker is shared with the app.
+
+```sh
+npm run eval:facets
+```
+
+Needs SearXNG at `127.0.0.1:8888` (hardcoded in `webSearchService.ts`, so run
+it in the dev container) and the real ONNX model in `server/models/`. It
+skips cleanly with a printed reason when SearXNG is down or returns zero
+results for its probe query.
 
 ## Answer eval (LLM judge)
 
