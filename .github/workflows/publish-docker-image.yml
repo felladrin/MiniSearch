@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version, CalVer YYYY.M.D (e.g. 2026.9.15). A second release on the same day adds a sequence starting at 1: 2026.9.15.1, then .2, .3."
-        required: true
+        description: "Release version, CalVer YYYY.M.D (e.g. 2026.9.15). A second release on the same day adds a sequence starting at 1: 2026.9.15.1, then .2, .3. Leave empty to auto-compute today's date (UTC) and the next free sequence."
+        required: false
+        default: ""
         type: string
 
 # The duplicate check runs before the build, so a concurrent dispatch of the
@@ -30,12 +31,41 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
       - name: Validate the release version
+        id: release
         env:
           VERSION: ${{ inputs.version }}
           REF_NAME: ${{ github.ref_name }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Empty input means "release today": compute the bare date in UTC,
+          # then walk the same-day sequence until a slot has no git tag. The
+          # runners are already UTC, but pinning TZ keeps the pattern
+          # deterministic and fork-neutral: every instance cuts the same day
+          # from the same clock. A tag lookup that is neither "exists" nor
+          # "absent" aborts the loop: treating a failed lookup as "absent"
+          # could hand out a version that is already published. The GitHub
+          # Release check below still gates the computed value, so a tag-less
+          # Release collision fails here with the "use a sequence" hint.
+          if [[ -z $VERSION ]]; then
+            base=$(TZ=UTC date +'%Y.%-m.%-d')
+            VERSION=$base
+            seq=1
+            while :; do
+              lookup_status=0
+              git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null || lookup_status=$?
+              case $lookup_status in
+                0) VERSION="$base.$seq"; seq=$((seq + 1)) ;;
+                2) break ;;
+                *)
+                  echo "Could not check whether git tag '$VERSION' exists: git ls-remote exited $lookup_status." >&2
+                  exit 1
+                  ;;
+              esac
+            done
+            echo "No version input; auto-computed '$VERSION'."
+          fi
+
           # CalVer: YYYY.M.D, with an optional same-day sequence that starts at 1.
           # The bare date is the first release of the day; ".0" and a zero-padded
           # month or day are rejected, so a given date has exactly one spelling
@@ -84,6 +114,8 @@ jobs:
             echo "GitHub Release '$VERSION' already exists. Use a sequence (e.g. $VERSION.1) for a same-day release." >&2
             exit 1
           fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Log in to the Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4
         with:
@@ -107,7 +139,7 @@ jobs:
           # pattern; a value carrying a newline would otherwise add a directive.
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ inputs.version }}
+            type=raw,value=${{ steps.release.outputs.version }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4
       - name: Build and push Docker Image
@@ -124,7 +156,7 @@ jobs:
           sbom: true
       - name: Tag the release and publish the GitHub Release
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.release.outputs.version }}
           GH_TOKEN: ${{ github.token }}
         run: |
           git tag "$VERSION"
