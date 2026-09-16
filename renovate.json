@@ -1,4 +1,23 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["local>felladrin/.github:renovate-config"]
+  "extends": ["local>felladrin/.github:renovate-config"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^Dockerfile$/"],
+      "matchStrings": [
+        "ARG SEARXNG_COMMIT_SHA=\"(?<currentDigest>[0-9a-f]{40})\""
+      ],
+      "depNameTemplate": "searxng/searxng",
+      "packageNameTemplate": "https://github.com/searxng/searxng",
+      "currentValueTemplate": "master",
+      "datasourceTemplate": "git-refs"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchDepNames": ["searxng/searxng"],
+      "schedule": ["before 6am on monday"]
+    }
+  ]
 }
