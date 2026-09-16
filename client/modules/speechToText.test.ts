@@ -93,22 +93,41 @@ afterEach(() => {
 });
 
 describe("getDictationEngine", () => {
-  it("reports the wasm engine when every piece is present", () => {
-    stubWasmSupport(vi.fn());
-    expect(getDictationEngine()).toBe("wasm");
-  });
-
-  it("falls back to web-speech when the wasm pieces are missing", () => {
+  function installRecognitionFake() {
     class FakeRecognition {
       start = vi.fn();
     }
     (window as unknown as Record<string, unknown>).webkitSpeechRecognition =
       FakeRecognition;
-    expect(getDictationEngine()).toBe("web-speech");
+  }
+
+  it("reports the wasm engine when it is preferred and every piece is present", () => {
+    stubWasmSupport(vi.fn());
+    expect(getDictationEngine(true)).toBe("wasm");
+  });
+
+  it("falls back to web-speech when the wasm pieces are missing", () => {
+    installRecognitionFake();
+    expect(getDictationEngine(true)).toBe("web-speech");
+  });
+
+  it("prefers web-speech over a capable wasm path when the local model is off", () => {
+    stubWasmSupport(vi.fn());
+    installRecognitionFake();
+    expect(getDictationEngine(false)).toBe("web-speech");
+  });
+
+  it("keeps the wasm engine when the local model is off but no recognizer exists", () => {
+    // The preference reorders engines, it never empties the list: a browser
+    // without `SpeechRecognition` (Firefox, for one) must still get a
+    // working Dictate button with the setting off.
+    stubWasmSupport(vi.fn());
+    expect(getDictationEngine(false)).toBe("wasm");
   });
 
   it("reports no engine when neither path is available", () => {
-    expect(getDictationEngine()).toBeNull();
+    expect(getDictationEngine(true)).toBeNull();
+    expect(getDictationEngine(false)).toBeNull();
   });
 });
 
@@ -137,10 +156,13 @@ describe("startDictation with the wasm engine", () => {
     const transcripts: string[] = [];
     const progress: [number, number | undefined][] = [];
 
-    const sessionPromise = startDictation({
-      onTranscript: (text) => transcripts.push(text),
-      onProgress: (loaded, total) => progress.push([loaded, total]),
-    });
+    const sessionPromise = startDictation(
+      {
+        onTranscript: (text) => transcripts.push(text),
+        onProgress: (loaded, total) => progress.push([loaded, total]),
+      },
+      true,
+    );
 
     await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
     const worker = FakeWorker.instances[0];
@@ -173,7 +195,7 @@ describe("startDictation with the wasm engine", () => {
     stubWasmSupport(getUserMedia);
     setWorkerFactory(() => new FakeWorker() as unknown as Worker);
 
-    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
     await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
     FakeWorker.instances[0].respond({ type: "loaded" });
 
@@ -207,7 +229,7 @@ describe("startDictation with the wasm engine", () => {
     setWorkerFactory(() => new FakeWorker() as unknown as Worker);
     const started = installLocalRecognitionFake();
 
-    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
     await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
     // A 502 from `/dictation-models/` is "cannot run here", not "no engine".
     FakeWorker.instances[0].respond({
@@ -230,7 +252,7 @@ describe("startDictation with the wasm engine", () => {
     setWorkerFactory(() => new FakeWorker() as unknown as Worker);
     const started = installLocalRecognitionFake();
 
-    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
     await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
     FakeWorker.instances[0].respond({ type: "loaded" });
 
@@ -252,7 +274,7 @@ describe("startDictation with the wasm engine", () => {
     setWorkerFactory(() => new FakeWorker() as unknown as Worker);
     const started = installLocalRecognitionFake();
 
-    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
     await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
     const worker = FakeWorker.instances[0];
     worker.respond({ type: "loaded" });
@@ -282,7 +304,7 @@ describe("startDictation with the wasm engine", () => {
     setWorkerFactory(() => new FakeWorker() as unknown as Worker);
     const started = installLocalRecognitionFake();
 
-    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
     await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
     const worker = FakeWorker.instances[0];
     worker.respond({ type: "loaded" });
@@ -304,7 +326,7 @@ describe("startDictation with the wasm engine", () => {
     setWorkerFactory(() => new FakeWorker() as unknown as Worker);
     const onTranscript = vi.fn();
 
-    const sessionPromise = startDictation({ onTranscript });
+    const sessionPromise = startDictation({ onTranscript }, true);
     await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
     const worker = FakeWorker.instances[0];
     worker.respond({ type: "loaded" });
@@ -328,7 +350,7 @@ describe("startDictation with the wasm engine", () => {
     stubWasmSupport(vi.fn().mockResolvedValue(stream));
     setWorkerFactory(() => new FakeWorker() as unknown as Worker);
 
-    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
     await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
     const worker = FakeWorker.instances[0];
     worker.respond({ type: "loaded" });
@@ -351,10 +373,13 @@ describe("startDictation with the wasm engine", () => {
     setWorkerFactory(() => new FakeWorker() as unknown as Worker);
     const onError = vi.fn();
 
-    const sessionPromise = startDictation({
-      onTranscript: vi.fn(),
-      onError,
-    });
+    const sessionPromise = startDictation(
+      {
+        onTranscript: vi.fn(),
+        onError,
+      },
+      true,
+    );
     await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
     const worker = FakeWorker.instances[0];
     worker.respond({ type: "loaded" });
@@ -374,7 +399,7 @@ describe("startDictation with the wasm engine", () => {
     stubWasmSupport(getUserMedia);
     setWorkerFactory(() => new FakeWorker() as unknown as Worker);
 
-    const sessionPromise = startDictation({ onTranscript: vi.fn() });
+    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
     await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
     const worker = FakeWorker.instances[0];
     worker.respond({ type: "error", message: "model download failed" });
@@ -388,6 +413,63 @@ describe("startDictation with the wasm engine", () => {
     expect(getUserMedia).not.toHaveBeenCalled();
     expect(tracks.every((track) => track.stopped)).toBe(false);
     expect(worker.terminated).toBe(true);
+  });
+});
+
+describe("startDictation with the local model preference off", () => {
+  let recognitionStarted = false;
+
+  function installRecognitionFake(
+    startImpl: () => void = () => {
+      recognitionStarted = true;
+    },
+  ) {
+    class FakeRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = "";
+      onresult: unknown = null;
+      onerror: unknown = null;
+      onend: unknown = null;
+      start = startImpl;
+      stop = () => {};
+    }
+    (window as unknown as Record<string, unknown>).webkitSpeechRecognition =
+      FakeRecognition;
+  }
+
+  beforeEach(() => {
+    recognitionStarted = false;
+  });
+
+  it("never constructs the model worker on a fully wasm-capable browser", async () => {
+    // The whole point of the setting: with it off, the ~51 MB model must
+    // not be downloaded even where it could run.
+    const { stream } = makeMediaStream();
+    stubWasmSupport(vi.fn().mockResolvedValue(stream));
+    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
+    installRecognitionFake();
+
+    const session = await startDictation({ onTranscript: vi.fn() }, false);
+
+    expect(FakeWorker.instances.length).toBe(0);
+    expect(recognitionStarted).toBe(true);
+    await session.stop();
+  });
+
+  it("does not fall back to the wasm engine when the recognizer fails", async () => {
+    // A reverse fallback would start the ~51 MB download right after the
+    // user turned that model off; the failure must surface instead.
+    stubWasmSupport(vi.fn());
+    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
+    installRecognitionFake(() => {
+      throw new Error("recognizer refused to start");
+    });
+
+    await expect(
+      startDictation({ onTranscript: vi.fn() }, false),
+    ).rejects.toMatchObject({ kind: "unavailable" });
+    expect(FakeWorker.instances.length).toBe(0);
   });
 });
 
@@ -437,9 +519,12 @@ describe("startDictation with the web speech fallback", () => {
     installRecognitionFake();
 
     const transcripts: string[] = [];
-    const session = await startDictation({
-      onTranscript: (text) => transcripts.push(text),
-    });
+    const session = await startDictation(
+      {
+        onTranscript: (text) => transcripts.push(text),
+      },
+      true,
+    );
 
     expect(instance?.continuous).toBe(true);
     expect(instance?.interimResults).toBe(true);
@@ -468,7 +553,7 @@ describe("startDictation with the web speech fallback", () => {
     });
 
     await expect(
-      startDictation({ onTranscript: vi.fn() }),
+      startDictation({ onTranscript: vi.fn() }, true),
     ).rejects.toMatchObject({ kind: "permission" });
   });
 
@@ -479,10 +564,13 @@ describe("startDictation with the web speech fallback", () => {
     installRecognitionFake();
     const onError = vi.fn();
 
-    const session = await startDictation({
-      onTranscript: vi.fn(),
-      onError,
-    });
+    const session = await startDictation(
+      {
+        onTranscript: vi.fn(),
+        onError,
+      },
+      true,
+    );
 
     instance?.onerror?.({ error: "not-allowed" });
 
@@ -496,11 +584,14 @@ describe("startDictation with the web speech fallback", () => {
     const onError = vi.fn();
     const onEnd = vi.fn();
 
-    const session = await startDictation({
-      onTranscript: vi.fn(),
-      onEnd,
-      onError,
-    });
+    const session = await startDictation(
+      {
+        onTranscript: vi.fn(),
+        onEnd,
+        onError,
+      },
+      true,
+    );
 
     // Chrome ends after silence even with `continuous`. The session is over,
     // but there is nothing the user needs told about.
@@ -516,11 +607,14 @@ describe("startDictation with the web speech fallback", () => {
     const onError = vi.fn();
     const onEnd = vi.fn();
 
-    const session = await startDictation({
-      onTranscript: vi.fn(),
-      onEnd,
-      onError,
-    });
+    const session = await startDictation(
+      {
+        onTranscript: vi.fn(),
+        onEnd,
+        onError,
+      },
+      true,
+    );
 
     await session.stop();
     instance?.onend?.();
@@ -533,7 +627,7 @@ describe("startDictation with the web speech fallback", () => {
 describe("startDictation without any engine", () => {
   it("rejects with an unavailable error", async () => {
     await expect(
-      startDictation({ onTranscript: vi.fn() }),
+      startDictation({ onTranscript: vi.fn() }, true),
     ).rejects.toMatchObject({ kind: "unavailable" });
   });
 });

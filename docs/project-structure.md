@@ -59,7 +59,7 @@ The `client/modules/` directory contains core business logic organized by domain
 | `textToSpeechWorker.ts` | Synthesizes sentences off the main thread |
 | `textToSpeechWorkerProtocol.ts` | Message types shared by both sides of the worker |
 | `piper.ts` | The only module that imports `@diffusionstudio/vits-web` |
-| `speechToText.ts` | Dictation: microphone capture, the worker's lifecycle, and the `SpeechRecognition` fallback |
+| `speechToText.ts` | Dictation: microphone capture, the worker's lifecycle, and engine selection between the on-device model and `SpeechRecognition` |
 | `speechToTextWorker.ts` | Runs the Moonshine transcriber off the main thread |
 | `speechToTextWorkerProtocol.ts` | Message types shared by both sides of the dictation worker |
 | `moonshine.ts` | The only module that imports `@moonshine-ai/moonshine-wasm` |

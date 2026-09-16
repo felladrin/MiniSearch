@@ -57,8 +57,17 @@ export default function VoiceSettingsForm() {
       <Switch
         {...form.getInputProps("enableDictation", { type: "checkbox" })}
         label="Dictate the search query"
-        description="Shows a microphone button next to the search field. The speech is transcribed on this device."
+        description="Shows a Dictate button next to the search field. Which engine transcribes the speech is decided by the setting below."
         labelPosition="left"
+      />
+      <Switch
+        {...form.getInputProps("enableLocalDictationModel", {
+          type: "checkbox",
+        })}
+        label="On-device dictation model (English-only)"
+        description="Downloads a ~51 MB model on first use and transcribes without the audio leaving this device, but it only understands English. Turn it off to use your browser's built-in speech recognition instead, which handles other languages but may send the audio to your browser vendor. On browsers without built-in speech recognition, the on-device model is used regardless."
+        labelPosition="left"
+        disabled={!settings.enableDictation}
       />
       <Text size="sm">Speech Engine</Text>
       <Text size="xs" c="dimmed">

@@ -94,12 +94,44 @@ it("hides when the setting is off", async () => {
   }
 });
 
+it("passes the local-model preference through to the engine", async () => {
+  const { settingsPubSub } = await import("@/modules/pubSub");
+  settingsPubSub[0]({
+    ...(settingsPubSub[2]?.() ?? {}),
+    enableLocalDictationModel: false,
+  });
+  try {
+    const user = userEvent.setup();
+    renderButton();
+    await user.click(
+      screen.getByRole("button", { name: "Dictate the search query" }),
+    );
+    await waitFor(() =>
+      expect(startDictation).toHaveBeenCalledWith(expect.anything(), false),
+    );
+    expect(getDictationEngine).toHaveBeenCalledWith(false);
+  } finally {
+    settingsPubSub[0]({
+      ...(settingsPubSub[2]?.() ?? {}),
+      enableLocalDictationModel: true,
+    });
+  }
+});
+
 it("switches to the recording state and stops on the second press", async () => {
   const user = userEvent.setup();
   renderButton();
 
   await user.click(
     screen.getByRole("button", { name: "Dictate the search query" }),
+  );
+
+  // The mirror of the `false` case above: the pubsub holds a literal
+  // `true` restored by that test's finally block, so a hardcoded `false`
+  // at the forwarding sites fails here. The en-US derivation itself is
+  // pinned in settings.test.ts.
+  await waitFor(() =>
+    expect(startDictation).toHaveBeenCalledWith(expect.anything(), true),
   );
 
   await waitFor(() =>

@@ -58,6 +58,23 @@ export function getDefaultCpuThreads(
 }
 
 /**
+ * Whether the browser's primary language is English. The on-device dictation
+ * model understands English only, so a non-English profile should start on
+ * the browser's own multi-lingual recognizer instead.
+ *
+ * Only the primary language is consulted, never the full `navigator.languages`
+ * list: OEM images commonly append `en-US` to non-English installs, which
+ * would resolve "English" for a large share of the users this default exists
+ * to protect. The primary subtag is compared exactly, so a prefix match on
+ * `en` cannot pick up unrelated subtags like `enm`.
+ */
+export function prefersLocalDictationModel(
+  language: string = navigator.language,
+): boolean {
+  return language.toLowerCase().split("-")[0] === "en";
+}
+
+/**
  * Default application settings configuration.
  * Runtime server config is merged in via `applyServerConfig()` after
  * /api/config is fetched.
@@ -88,6 +105,7 @@ export const defaultSettings = {
   historyGroupByDate: true,
   selectedVoiceId: "",
   enableDictation: true,
+  enableLocalDictationModel: prefersLocalDictationModel(),
   textToSpeechEngine: (hasLegacySystemVoice ? "system" : "local") as
     | "local"
     | "system",

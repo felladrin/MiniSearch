@@ -128,7 +128,7 @@ Need to:
 - `client/modules/textToSpeechWorker.ts` - Synthesizes sentences off the main thread
 - `client/modules/textToSpeechWorkerProtocol.ts` - Message types shared by both sides of the worker
 - `client/modules/piper.ts` - The only module that imports `@diffusionstudio/vits-web`
-- `client/modules/speechToText.ts` - Dictation: microphone capture, the worker's lifecycle, and the `SpeechRecognition` fallback
+- `client/modules/speechToText.ts` - Dictation: microphone capture, the worker's lifecycle, and engine selection between the on-device model and `SpeechRecognition`
 - `client/modules/speechToTextWorker.ts` - Runs the Moonshine transcriber off the main thread
 - `client/modules/speechToTextWorkerProtocol.ts` - Message types shared by both sides of the dictation worker
 - `client/modules/moonshine.ts` - The only module that imports `@moonshine-ai/moonshine-wasm`

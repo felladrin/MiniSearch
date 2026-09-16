@@ -71,23 +71,32 @@ function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null 
 /**
  * The engine that would run a dictation right now, or null when neither the
  * WASM path nor `SpeechRecognition` is available and the button should hide.
+ *
+ * `preferLocalModel` reorders the two engines; it never empties the list.
+ * A user who turns the on-device model off on a browser without
+ * `SpeechRecognition` (Firefox, for one) must still get a working Dictate
+ * button, so the preference cannot be an exclusion.
  */
-export function getDictationEngine(): DictationEngine | null {
+export function getDictationEngine(
+  preferLocalModel: boolean,
+): DictationEngine | null {
   // Neither engine can open a microphone outside a secure context. Without
   // this, a plain-HTTP LAN deployment falls through to `SpeechRecognition`,
   // which then reports `not-allowed` and tells the user permission was denied
   // when the real cause is the origin.
   if (typeof isSecureContext !== "undefined" && !isSecureContext) return null;
-  if (
+  const wasmCapable =
     typeof Worker !== "undefined" &&
     typeof WebAssembly !== "undefined" &&
     typeof AudioContext !== "undefined" &&
-    typeof navigator.mediaDevices?.getUserMedia === "function"
-  ) {
-    return "wasm";
+    typeof navigator.mediaDevices?.getUserMedia === "function";
+  const webSpeechAvailable = getSpeechRecognitionConstructor() !== null;
+  if (preferLocalModel) {
+    if (wasmCapable) return "wasm";
+    return webSpeechAvailable ? "web-speech" : null;
   }
-  if (getSpeechRecognitionConstructor()) return "web-speech";
-  return null;
+  if (webSpeechAvailable) return "web-speech";
+  return wasmCapable ? "wasm" : null;
 }
 
 export interface DictationCallbacks {
@@ -433,8 +442,9 @@ function startWebSpeechDictation(
  */
 export async function startDictation(
   callbacks: DictationCallbacks,
+  preferLocalModel: boolean,
 ): Promise<DictationSession> {
-  const engine = getDictationEngine();
+  const engine = getDictationEngine(preferLocalModel);
   if (engine === "wasm") {
     try {
       return await startWasmDictation(callbacks);
@@ -454,7 +464,13 @@ export async function startDictation(
       return startWebSpeechDictation(callbacks);
     }
   }
-  if (engine === "web-speech") return startWebSpeechDictation(callbacks);
+  if (engine === "web-speech") {
+    // No reverse fallback to wasm when this recognizer fails. Falling through
+    // would start a ~51 MB model download right after the user turned that
+    // model off; a clear failure is the better answer, and it matches what
+    // web-speech-only browsers already do.
+    return startWebSpeechDictation(callbacks);
+  }
   addLogEntry("Dictation is not available in this browser");
   throw new DictationError(
     "unavailable",
