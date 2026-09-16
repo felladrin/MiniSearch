@@ -22,6 +22,7 @@ const { settings, setSettings, listVoices } = vi.hoisted(() => ({
   settings: {
     current: {
       enableDictation: false,
+      enableLocalDictationModel: true,
       selectedVoiceId: "",
       textToSpeechEngine: "local" as "local" | "system",
     },
@@ -72,6 +73,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   settings.current = {
     enableDictation: false,
+    enableLocalDictationModel: true,
     selectedVoiceId: "",
     textToSpeechEngine: "local",
   };
@@ -109,6 +111,32 @@ describe("VoiceSettingsForm", () => {
     expect(options.map((option) => option.textContent)).toEqual([
       "🇺🇸 OS Voice • en-US",
     ]);
+  });
+
+  it("disables the on-device model switch while dictation itself is off", () => {
+    renderForm();
+    expect(
+      screen.getByRole("switch", {
+        name: /On-device dictation model/i,
+      }),
+    ).toBeDisabled();
+  });
+
+  it("persists toggling the on-device dictation model while dictation is on", () => {
+    settings.current.enableDictation = true;
+    renderForm();
+
+    const switchInput = screen.getByRole("switch", {
+      name: /On-device dictation model/i,
+    }) as HTMLInputElement;
+    expect(switchInput).not.toBeDisabled();
+
+    fireEvent.click(switchInput);
+
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ enableLocalDictationModel: false }),
+      expect.anything(),
+    );
   });
 
   it("goes back to auto-detection when the engine changes", async () => {

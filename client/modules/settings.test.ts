@@ -5,6 +5,7 @@ import {
   defaultSettings,
   getDefaultCpuThreads,
   getInferenceTypes,
+  prefersLocalDictationModel,
 } from "./settings";
 
 const mockConfig: ServerConfig = {
@@ -52,6 +53,27 @@ describe("Settings Module", () => {
     it("should round down on an odd processor count", () => {
       expect(getDefaultCpuThreads(3)).toBe(1);
       expect(getDefaultCpuThreads(9)).toBe(4);
+    });
+  });
+
+  describe("prefersLocalDictationModel", () => {
+    it("is true when the primary language is English", () => {
+      expect(prefersLocalDictationModel("en")).toBe(true);
+      expect(prefersLocalDictationModel("en-US")).toBe(true);
+      expect(prefersLocalDictationModel("en-GB")).toBe(true);
+      expect(prefersLocalDictationModel("EN")).toBe(true);
+    });
+
+    it("is false when the primary language is not English", () => {
+      expect(prefersLocalDictationModel("pt")).toBe(false);
+      expect(prefersLocalDictationModel("pt-BR")).toBe(false);
+      expect(prefersLocalDictationModel("de-DE")).toBe(false);
+    });
+
+    it("compares the subtag exactly instead of by prefix", () => {
+      // `startsWith("en")` would match historical subtags like Middle
+      // English, which no browser UI actually uses.
+      expect(prefersLocalDictationModel("enm")).toBe(false);
     });
   });
 
@@ -156,5 +178,36 @@ describe("legacy voice migration", () => {
     const { defaultSettings: settings } = await load(null);
 
     expect(settings.textToSpeechEngine).toBe("local");
+  });
+});
+
+describe("dictation model default", () => {
+  const loadWithLanguage = async (language: string) => {
+    // Scoped restore rather than vi.restoreAllMocks(): the setup file installs
+    // matchMedia as a mock, and a broad restore would take it down with the
+    // language spy for anything that runs after this describe.
+    const languageSpy = vi
+      .spyOn(navigator, "language", "get")
+      .mockReturnValue(language);
+    vi.resetModules();
+    const module = await import("./settings");
+    languageSpy.mockRestore();
+    return module;
+  };
+
+  it("starts a non-English profile on the browser recognizer", async () => {
+    // The wiring from prefersLocalDictationModel into defaultSettings: a
+    // literal `true` here would leave every non-English first visit on a
+    // model that cannot transcribe their speech, while the pure function
+    // kept passing its own tests.
+    const { defaultSettings: settings } = await loadWithLanguage("pt-BR");
+
+    expect(settings.enableLocalDictationModel).toBe(false);
+  });
+
+  it("starts an English profile on the on-device model", async () => {
+    const { defaultSettings: settings } = await loadWithLanguage("en-US");
+
+    expect(settings.enableLocalDictationModel).toBe(true);
   });
 });

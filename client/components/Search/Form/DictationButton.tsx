@@ -1,9 +1,9 @@
 import { Button } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconMicrophone } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { settingsPubSub } from "@/modules/pubSub";
+import { prefersLocalDictationModel } from "@/modules/settings";
 import {
   DictationError,
   type DictationSession,
@@ -124,6 +124,15 @@ export default memo(function DictationButton({
     void stop();
   }, [settings.enableDictation, stop]);
 
+  /**
+   * An upgrading profile's stored settings lack this key until `App` merges
+   * the defaults after `/api/config` resolves. Reading it raw would be
+   * falsy in that window and hand the microphone to the vendor recognizer
+   * unnoticed, so the derived default is applied here as well.
+   */
+  const preferLocalModel =
+    settings.enableLocalDictationModel ?? prefersLocalDictationModel();
+
   const handleClick = useCallback(async () => {
     if (sessionRef.current) {
       await stop();
@@ -134,31 +143,34 @@ export default memo(function DictationButton({
     const generation = ++pressGenerationRef.current;
     setPhase("loading");
     try {
-      const session = await startDictation({
-        onTranscript: handleTranscript,
-        onProgress: (loaded, total) => setProgress({ loaded, total }),
-        onFallback: () =>
-          notifications.show({
-            title: "Using the browser's recognizer",
-            message:
-              "The on-device model could not run, so this browser's own speech recognition is transcribing instead. It may send the audio to the browser vendor.",
-            color: "yellow",
-          }),
-        onEnd: () => void stop(),
-        onError: (error) => {
-          const denied = error.kind === "permission";
-          notifications.show({
-            title: denied
-              ? "Microphone permission denied"
-              : "Dictation stopped",
-            message: denied
-              ? "Allow microphone access in the browser settings to dictate a search."
-              : error.message,
-            color: "red",
-          });
-          void stop();
+      const session = await startDictation(
+        {
+          onTranscript: handleTranscript,
+          onProgress: (loaded, total) => setProgress({ loaded, total }),
+          onFallback: () =>
+            notifications.show({
+              title: "Using the browser's recognizer",
+              message:
+                "The on-device model could not run, so this browser's own speech recognition is transcribing instead. It may send the audio to the browser vendor.",
+              color: "yellow",
+            }),
+          onEnd: () => void stop(),
+          onError: (error) => {
+            const denied = error.kind === "permission";
+            notifications.show({
+              title: denied
+                ? "Microphone permission denied"
+                : "Dictation stopped",
+              message: denied
+                ? "Allow microphone access in the browser settings to dictate a search."
+                : error.message,
+              color: "red",
+            });
+            void stop();
+          },
         },
-      });
+        preferLocalModel,
+      );
       // The load takes seconds and the permission prompt can take minutes, so
       // the button may well be gone by now; whichever path removed it had no
       // session to stop when it ran.
@@ -185,9 +197,13 @@ export default memo(function DictationButton({
         color: "red",
       });
     }
-  }, [handleTranscript, stop, phase]);
+  }, [handleTranscript, stop, phase, preferLocalModel]);
 
-  if (!settings.enableDictation || getDictationEngine() === null) return null;
+  if (
+    !settings.enableDictation ||
+    getDictationEngine(preferLocalModel) === null
+  )
+    return null;
 
   const recording = phase === "recording";
   const percent = formatDownloadProgress(progress);
@@ -205,14 +221,6 @@ export default memo(function DictationButton({
       }
       aria-pressed={recording}
       data-dictation-phase={phase}
-      leftSection={
-        <IconMicrophone
-          size={14}
-          style={
-            recording ? { color: "var(--mantine-color-red-filled)" } : undefined
-          }
-        />
-      }
     >
       {phase === "loading"
         ? `Loading${percent}`

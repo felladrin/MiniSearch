@@ -261,7 +261,7 @@ function AiResponseSection() {
 - **SearchSettingsForm:** Result limits, image search toggle
 - **InterfaceSettingsForm:** UI preferences
 - **HistorySettings:** Retention days, max entries
-- **VoiceSettingsForm:** Dictation toggle, text-to-speech engine and voice selection
+- **VoiceSettingsForm:** Dictation toggle, on-device dictation model toggle, text-to-speech engine and voice selection
 - **ActionsForm:** Data management actions
 
 **PubSub:**
