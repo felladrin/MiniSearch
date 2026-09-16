@@ -88,8 +88,10 @@ off the table. There is no pass/fail floor on RBO, so it is not a regression
 signal and it never fails a build for a low score - it only fails if the
 harness itself produced no scored pairs or an out-of-range score. Pairs whose
 refined query returns no results are reported as skipped, never scored
-(empty-vs-empty overlap would read as "perfectly distinct"). It sleeps ~500ms
-between SearXNG fetches because the circuit breaker is shared with the app.
+(empty-vs-empty overlap would read as "perfectly distinct"). It sleeps ~8s
+between SearXNG fetches because the circuit breaker is shared with the app and
+a faster sweep gets the upstream engines suspended, so the full run takes
+about 8 minutes.
 
 ```sh
 npm run eval:facets

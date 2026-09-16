@@ -21,8 +21,10 @@
  *
  * Needs SearXNG on 127.0.0.1:8888 (hardcoded in webSearchService.ts; run it
  * in the dev container) and the real ONNX model in server/models/. It sleeps
- * ~500ms between every SearXNG fetch because the circuit breaker is shared
- * and hammering upstream gets the engines CAPTCHA'd.
+ * ~8s between every SearXNG fetch because the circuit breaker is shared and
+ * hammering upstream gets the engines CAPTCHA'd, which costs the whole sweep:
+ * a suspended engine pool reports no results, and every remaining pair is
+ * skipped. The full sweep therefore takes ~8 minutes.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -40,7 +42,9 @@ const TOP = 3;
 // 30 matches the app's own DEFAULT_SEARCH_LIMIT/MAX_SEARCH_LIMIT, so the
 // reranker sees the same candidate pool the app's text search would give it.
 const FETCH_LIMIT = 30;
-const FETCH_GAP_MS = 500;
+// 8s, not the 500ms this started at: a sweep of 39 fetches at 500ms suspends
+// Brave and DuckDuckGo about a minute in, and every pair after that is lost.
+const FETCH_GAP_MS = 8000;
 /** RBO below this means the facet moved the top results. Read off the table. */
 const LOW_RBO = 0.5;
 
