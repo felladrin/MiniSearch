@@ -121,6 +121,9 @@ Need to:
 - `client/modules/parentWindow.ts` - PostMessage API for embedding in parent windows
 - `client/modules/searchTokenHash.ts` - CSRF protection token generation
 - `client/modules/pageContent.ts` - Requests extracted page text from `/page-content`
+- `client/modules/pageExcerptAllocation.ts` - Pure page-excerpt budget logic, shared by the worker and the synchronous fallback
+- `client/modules/pageExcerptWorker.ts` - Tokenizes page bodies off the main thread at the search-to-generation handoff
+- `client/modules/pageExcerptWorkerProtocol.ts` - Message types shared by both sides of the excerpt worker
 - `client/modules/systemPrompt.ts` - System prompt templates
 - `client/modules/logEntries.ts` - Application logging with unique IDs
 - `client/modules/appInfo.ts` - Application metadata and version info

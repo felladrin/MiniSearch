@@ -248,7 +248,7 @@ describe("answer eval: LLM-judged quality", () => {
     it.skipIf(!hasLlmKey)(
       `grades ${golden.id}`,
       async () => {
-        const messages = buildMessagesForGolden(state, golden.id);
+        const messages = await buildMessagesForGolden(state, golden.id);
         const answer = await chatCompletion(
           LLM_MODEL,
           messages,

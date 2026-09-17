@@ -165,7 +165,9 @@ export async function generateTextWithOpenAi() {
   await canStartResponding();
   updateTextGenerationState("preparingToGenerate");
 
-  const messages = getDefaultChatMessages(getFormattedSearchResults(true));
+  const messages = getDefaultChatMessages(
+    await getFormattedSearchResults(true),
+  );
   const settings = getSettings();
 
   await createOpenAiStream({

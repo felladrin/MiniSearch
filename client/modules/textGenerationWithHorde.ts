@@ -270,7 +270,9 @@ export async function fetchHordeUserInfo(
 export async function generateTextWithHorde() {
   await canStartResponding();
   updateTextGenerationState("preparingToGenerate");
-  const messages = getDefaultChatMessages(getFormattedSearchResults(true));
+  const messages = getDefaultChatMessages(
+    await getFormattedSearchResults(true),
+  );
   await executeHordeGeneration(messages, (text) => {
     updateResponse(text);
   });
