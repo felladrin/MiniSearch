@@ -1,4 +1,6 @@
+import gptTokenizer from "gpt-tokenizer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { addLogEntry } from "./logEntries";
 import { textGenerationFunctions } from "./textGeneration";
 import type { ChatMessage } from "./types";
 
@@ -46,7 +48,12 @@ vi.mock("./systemPrompt", () => ({
 
 vi.mock("gpt-tokenizer", () => ({
   default: {
-    encode: vi.fn().mockReturnValue({ data: [1, 2, 3] }),
+    // Deterministic stand-in: whitespace-delimited words as tokens, so
+    // tests can reason about counts. Note "\n\n" splits to ["", ""] —
+    // the separator itself costs tokens, mirroring that joins tokenize.
+    encode: vi.fn((text: string) =>
+      text.length === 0 ? [] : text.split(/\s+/),
+    ),
     decode: vi.fn(),
   },
 }));
@@ -188,6 +195,110 @@ describe("textGenerationFunctions", () => {
 
       expect(result).toContain("Previous context");
       expect(result).toContain("New question");
+    });
+
+    it("should encode each part exactly once and never a joined candidate", () => {
+      const { summarizeDroppedMessages } = textGenerationFunctions;
+      const messages: ChatMessage[] = [
+        { role: "user", content: "What is AI?" },
+        {
+          role: "assistant",
+          content: "AI stands for Artificial Intelligence.",
+        },
+      ];
+      summarizeDroppedMessages(messages, "Previous context");
+
+      // Separator first, then the loop walking newest to oldest — each
+      // string once, and the only argument containing "\n\n" is the bare
+      // separator whose cost is charged per join.
+      const encoded = vi
+        .mocked(gptTokenizer.encode)
+        .mock.calls.map(([text]) => text);
+      expect(encoded).toEqual([
+        "\n\n",
+        "ASSISTANT: AI stands for Artificial Intelligence.",
+        "USER: What is AI?",
+        "Previous context",
+      ]);
+      expect(encoded.filter((text) => text.includes("\n\n"))).toEqual(["\n\n"]);
+    });
+
+    it("should never exceed the budget, charging the separator per join", () => {
+      const { summarizeDroppedMessages } = textGenerationFunctions;
+      const messages: ChatMessage[] = [
+        { role: "user", content: "one two three" }, // 4 tokens
+        { role: "assistant", content: "four five six" }, // 4 tokens
+      ];
+      // Newest-first: 4, then 4+4+2=10, then 10+2+2=14 > 12 — the
+      // previous summary is the one that does not fit.
+      const result = summarizeDroppedMessages(messages, "old summary", 12);
+
+      expect(result).toBe("USER: one two three\n\nASSISTANT: four five six");
+      expect(gptTokenizer.encode(result).length).toBeLessThanOrEqual(12);
+      expect(vi.mocked(addLogEntry)).toHaveBeenCalledWith(
+        "Updated rolling summary (10 tokens)",
+      );
+    });
+
+    it("should keep the newest parts when the budget cannot hold everything", () => {
+      const { summarizeDroppedMessages } = textGenerationFunctions;
+      const messages: ChatMessage[] = [
+        { role: "user", content: "oldest" },
+        { role: "assistant", content: "middle" },
+        { role: "user", content: "newest" },
+      ];
+      // Each part is 2 tokens and the separator 2; 2+2+2=6 fits,
+      // adding the oldest would make 10.
+      const result = summarizeDroppedMessages(messages, "", 6);
+
+      expect(result).toBe("ASSISTANT: middle\n\nUSER: newest");
+    });
+
+    it("should return an empty summary when even the newest part exceeds the budget", () => {
+      const { summarizeDroppedMessages } = textGenerationFunctions;
+      const messages: ChatMessage[] = [
+        { role: "user", content: "one two three" },
+      ];
+      const result = summarizeDroppedMessages(messages, "", 2);
+
+      expect(result).toBe("");
+      expect(vi.mocked(addLogEntry)).toHaveBeenCalledWith(
+        "Updated rolling summary (0 tokens)",
+      );
+    });
+
+    it("should return an empty summary when there is nothing to keep", () => {
+      const { summarizeDroppedMessages } = textGenerationFunctions;
+
+      expect(summarizeDroppedMessages([], "")).toBe("");
+    });
+
+    it("should skip whitespace-only messages", () => {
+      const { summarizeDroppedMessages } = textGenerationFunctions;
+      const messages: ChatMessage[] = [
+        { role: "user", content: "   " },
+        { role: "assistant", content: "kept" },
+      ];
+
+      expect(summarizeDroppedMessages(messages, "")).toBe("ASSISTANT: kept");
+    });
+
+    it("should over-count rather than risk exceeding the budget", () => {
+      const { summarizeDroppedMessages } = textGenerationFunctions;
+      const messages: ChatMessage[] = [
+        { role: "user", content: "a b" },
+        { role: "assistant", content: "c d" },
+      ];
+      // Charged 3+3+2(separator)=8 against a limit of 8; the real joined
+      // string tokenises to 6. The logged count is the conservative
+      // (higher) one — the residual error never runs over budget.
+      summarizeDroppedMessages(messages, "", 8);
+
+      expect(vi.mocked(addLogEntry)).toHaveBeenCalledWith(
+        "Updated rolling summary (8 tokens)",
+      );
+      const joined = "USER: a b\n\nASSISTANT: c d";
+      expect(gptTokenizer.encode(joined).length).toBeLessThan(8);
     });
   });
 });

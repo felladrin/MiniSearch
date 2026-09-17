@@ -185,6 +185,19 @@ function clearConversationSummary() {
   updateConversationSummary({ conversationId: "", summary: "" });
 }
 
+/**
+ * Extractive fallback summary: keep the newest parts that fit the token
+ * budget. Each part is encoded exactly once and the count is carried
+ * forward, so the loop is linear in total text instead of re-encoding the
+ * joined candidate every iteration (which was quadratic in conversation
+ * length).
+ *
+ * Token counts do not distribute over a join — the "\n\n" separators
+ * tokenize too — so the separator's cost is charged per join. BPE can also
+ * merge across part boundaries, making the true joined count lower than
+ * the sum charged here; the residual error therefore over-counts, keeping
+ * the result on the conservative side of the limit (never over budget).
+ */
 function summarizeDroppedMessages(
   dropped: ChatMessage[],
   previousSummary: string,
@@ -201,11 +214,14 @@ function summarizeDroppedMessages(
   if (previousSummary) parts.push(previousSummary.trim());
   parts.push(...lines);
 
+  const separatorTokens = gptTokenizer.encode("\n\n").length;
+
   const kept: string[] = [];
   let tokens = 0;
   for (let i = parts.length - 1; i >= 0; i--) {
-    const candidate = [parts[i], ...kept].join("\n\n");
-    const nextTokens = gptTokenizer.encode(candidate).length;
+    const partTokens = gptTokenizer.encode(parts[i]).length;
+    const nextTokens =
+      kept.length === 0 ? partTokens : tokens + partTokens + separatorTokens;
     if (nextTokens > tokenLimit) break;
     kept.unshift(parts[i]);
     tokens = nextTokens;
