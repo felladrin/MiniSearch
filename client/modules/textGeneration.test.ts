@@ -15,7 +15,7 @@ vi.mock("./pubSub", () => ({
   getSettings: (...args: unknown[]) => mockGetSettings(...args),
   getConversationSummary: (...args: unknown[]) =>
     mockGetConversationSummary(...args),
-  listenToSettingsChanges: vi.fn(),
+  listenToSettingsChanges: vi.fn(() => vi.fn()),
   updateConversationSummary: vi.fn(),
   updateTextGenerationState: vi.fn(),
   getTextGenerationState: vi.fn(),

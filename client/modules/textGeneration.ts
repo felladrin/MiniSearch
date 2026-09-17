@@ -565,8 +565,9 @@ function canDownloadModels(): Promise<void> {
       resolve();
     } else {
       updateTextGenerationState("awaitingModelDownloadAllowance");
-      listenToSettingsChanges((settings) => {
+      const unsubscribe = listenToSettingsChanges((settings) => {
         if (settings.allowAiModelDownload) {
+          unsubscribe();
           resolve();
         }
       });
