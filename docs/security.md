@@ -86,9 +86,10 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 | `server/verifyTokenAndRateLimit.ts` | Verifies the Argon2 token hash and enforces rate limiting (10 requests per 10 seconds, shared by the search, page-content and inference endpoints; a separate 60-per-10-seconds budget for `/thumbnail`) |
 | `server/handleTokenVerification.ts` | Middleware bridge that calls `verifyTokenAndRateLimit` and writes 400/401/429 error responses for the search, page-content, thumbnail and inference endpoints |
 | `server/configEndpointServerHook.ts` | Serves the non-secret runtime config at `/api/config`, including whether access keys are enabled |
-| `server/utils/publicUrl.ts` | Rejects non-HTTP schemes and hosts resolving into private, loopback, link-local or reserved ranges before the server fetches a client-supplied URL |
+| `server/utils/publicUrl.ts` | Rejects non-HTTP schemes and hosts resolving into private, loopback, link-local or reserved ranges before the server fetches a client-supplied URL; `resolvePublicUrlAndAddress` also hands back the vetted IP so the caller can pin the connection to it |
+| `server/utils/pinnedFetch.ts` | Fetches a vetted URL over a socket pinned to the vetted IP, with the original hostname preserved for TLS SNI, certificate verification and the `Host` header, so the address checked is the address reached (closes the DNS-rebinding window between check and connect) |
 | `server/pageContentEndpointServerHook.ts` | Reads result pages at `/page-content` after token verification, capped at 6 URLs per request |
-| `server/thumbnailEndpointServerHook.ts` | Serves one search-result thumbnail at a time at `/thumbnail` after token verification, with an in-process LRU in front of the upstream host |
+| `server/thumbnailEndpointServerHook.ts` | Serves one search-result thumbnail at a time at `/thumbnail` after token verification, connecting only to the vetted pinned address, with an in-process LRU in front of the upstream host |
 
 ### Server-Side Fetching of Client-Supplied URLs
 
@@ -104,18 +105,54 @@ client loads each search-result thumbnail from it, one tile at a time, and the
 `u` parameter is client-supplied. In practice it carries the URLs SearXNG
 returned, but the endpoint is a general token-gated fetch for any public
 raster image, so the guard must hold for arbitrary input: every hop passes
-`resolvePublicUrl` (the documented DNS-rebinding residual applies per
-request), only raster content types are served, and the response carries
-`nosniff` plus a sandbox CSP because it is same-origin. It draws from its own
-rate-limit budget, since one grid fans out into up to 30 tile loads.
+`resolvePublicUrlAndAddress` and then connects to the vetted address through
+`requestPinnedToVettedAddress`, only raster content types are served, and the
+response carries `nosniff` plus a sandbox CSP because it is same-origin. It
+draws from its own rate-limit budget, since one grid fans out into up to 30
+tile loads. The full audit behind these choices, item by item against the
+issue's checklist, is in the next subsection.
 
-Every hop - the original URL and each redirect - passes `resolvePublicUrl`
-before a request is made, which blocks loopback, link-local (including
+Every hop - the original URL and each redirect - is validated before a
+request is made, which blocks loopback, link-local (including
 `169.254.169.254`), private, carrier-grade-NAT, multicast and reserved
-addresses. The DNS answer is checked rather than pinned; the residual rebinding
+addresses. On `/thumbnail` the address that was checked is also the address
+the socket dials: `server/utils/pinnedFetch.ts` overrides the connect-time
+resolver with the vetted IP, so a DNS answer that flips to a private address
+after validation cannot be reached, while the original hostname is preserved
+for TLS SNI, certificate verification and the `Host` header. `/page-content`
+still checks the DNS answer rather than pinning it; that residual rebinding
 window and why it is accepted are documented in `docs/page-content.md`.
 Thumbnail responses are also capped in size, so an oversized image cannot pin
 the server's memory.
+
+### Thumbnail SSRF Audit (Issue #2524)
+
+Audited 2026-09-17 on branch `security/thumbnail-ssrf-audit`. Each item of
+the issue's checklist, answered from the code:
+
+| Checklist item | Status | Where |
+|---|---|---|
+| Blocks private ranges (10/8, 172.16/12, 192.168/16) | Yes | `BLOCKED_CIDRS` / `isBlockedAddress`, `server/utils/publicUrl.ts` |
+| Blocks link-local (169.254.0.0/16) | Yes | same table |
+| Blocks loopback (127/8, `::1`) | Yes | same table |
+| Blocks cloud metadata (169.254.169.254) | Yes | covered by the link-local block |
+| Blocks IPv4-mapped IPv4-compatible IPv6 spellings | Yes | IPv4 blocks are matched in mapped form; the IPv4-compatible `::/96` is refused wholesale, as are NAT64/6to4/Teredo, whose embedded IPv4 cannot be vetted |
+| Blocks DNS rebinding | Yes — this was the gap this issue closed | validate-then-pin: `resolvePublicUrlAndAddress` returns the vetted IP and `requestPinnedToVettedAddress` (`server/utils/pinnedFetch.ts`) connects to it without re-resolving; hostname is kept for SNI, certificate verification and `Host` |
+| URL length limited | Yes | `MAX_THUMBNAIL_URL_LENGTH` (2048), refused before any work |
+| Only HTTP/HTTPS schemes | Yes | `resolvePublicUrlAndAddress` |
+| Redirects safe (no redirect to a private IP) | Yes | followed by hand in `fetchThumbnail`; every hop re-validated under one shared deadline |
+| Content-Type checked to be an image | Yes | raster-only allowlist in `thumbnailEndpointServerHook.ts`; SVG is excluded because served same-origin it is a script-carrying document |
+| Response size limited | Yes | `MAX_THUMBNAIL_BYTES` (500 KB) via `readCappedStream` |
+| Timeout configured | Yes | `THUMBNAIL_TIMEOUT_MS` (3 s), shared across DNS and every hop |
+| Rate limited per client | Yes | `thumbnailRateLimiter`, a dedicated 60-per-10-seconds budget keyed on client IP |
+| Global rate limit | No, by design | the per-client limiter plus the shared token gate bound the total; a global cap would let one caller's grid starve every other user's tiles |
+
+Residual risk after the change: the endpoint still fetches arbitrary public
+URLs, so a caller can use it to GET any public host — bounded by the rate
+limiter, the size cap and the timeout, and useful only for raster images.
+Fetched content is untrusted: it is served with `nosniff` and a sandbox CSP,
+and only raster types pass the allowlist. `/page-content` has not adopted the
+pin and keeps the old rebinding residual.
 
 ## Threat Model
 

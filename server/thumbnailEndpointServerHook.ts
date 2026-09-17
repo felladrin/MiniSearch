@@ -1,4 +1,4 @@
-import type { ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
 import {
@@ -6,9 +6,56 @@ import {
   recordThumbnailDropped,
   recordThumbnailRequested,
 } from "./searchesSinceLastRestart.ts";
-import { resolvePublicUrl } from "./utils/publicUrl.ts";
-import { readCappedBytes, safeEndResponse } from "./utils/streamUtils.ts";
+import {
+  readCappedStream,
+  requestPinnedToVettedAddress,
+} from "./utils/pinnedFetch.ts";
+import { resolvePublicUrlAndAddress } from "./utils/publicUrl.ts";
+import { safeEndResponse } from "./utils/streamUtils.ts";
 import { thumbnailRateLimiter } from "./verifyTokenAndRateLimit.ts";
+
+/**
+ * Security review for issue #2524 (audited 2026-09-17). What each item of
+ * the audit checklist maps to:
+ *
+ * - Private ranges (10/8, 172.16/12, 192.168/16), link-local including
+ *   the cloud metadata address 169.254.169.254, loopback (127/8, ::1),
+ *   CGNAT 100.64/10, multicast and reserved space, and the IPv4-mapped /
+ *   IPv4-compatible IPv6 spellings: `BLOCKED_CIDRS` and `isBlockedAddress`
+ *   in `server/utils/publicUrl.ts`, enforced per hop by
+ *   `resolvePublicUrlAndAddress`. NAT64/6to4/Teredo are refused wholesale
+ *   because an embedded IPv4 cannot be vetted.
+ * - DNS rebinding: closed. The vetted address is pinned to the socket by
+ *   `requestPinnedToVettedAddress` (`server/utils/pinnedFetch.ts`); the
+ *   connect never re-resolves, so a second, private DNS answer cannot be
+ *   reached. TLS SNI and certificate verification still run against the
+ *   original hostname, as does the `Host` header.
+ * - URL length: `MAX_THUMBNAIL_URL_LENGTH` (2048), refused before any
+ *   work is done.
+ * - Schemes: http/https only, in `resolvePublicUrlAndAddress`.
+ * - Redirects: followed by hand below, every hop re-validated under one
+ *   shared deadline.
+ * - Content-Type: raster-only allowlist below; SVG is deliberately
+ *   excluded because served same-origin it is a script-carrying document.
+ * - Response size: `MAX_THUMBNAIL_BYTES` via `readCappedStream`.
+ * - Timeout: `THUMBNAIL_TIMEOUT_MS`, shared across DNS and every hop.
+ * - Rate limiting: per client IP via `thumbnailRateLimiter`, a dedicated
+ *   60-per-10s budget so a grid of tiles cannot exhaust the search
+ *   budget. There is no separate global limiter: the per-client limiter
+ *   plus the shared token gate bound the total, and a global cap would let
+ *   one caller's grid starve every other user's tiles.
+ *
+ * Residual risk after this change: the endpoint still fetches arbitrary
+ * public URLs, so a caller can use it to GET any public host — bounded by
+ * the rate limiter, the size cap and the timeout, and useful only for
+ * raster images. The pinned address is the one DNS gave at vetting time; a
+ * host whose DNS later repoints stays unreachable here until its records
+ * are re-checked, which is the pin working, not failing. Content itself is
+ * untrusted: served same-origin, it carries `nosniff` and a sandbox CSP,
+ * and only raster types pass the allowlist, so no script-carrying format
+ * reaches a browser. `/page-content` has not adopted the pin yet and still
+ * carries the old rebinding residual (see `resolvePublicUrl`'s docstring).
+ */
 
 /**
  * Off the critical path: the search response no longer waits on a thumbnail,
@@ -109,9 +156,10 @@ function isRedirect(status: number): boolean {
 }
 
 /**
- * `resolvePublicUrl`'s DNS lookup does not take a signal, so it is raced
- * against the hop deadline: a hanging resolver would otherwise add its own
- * timeout on top of the one that is documented to bound the whole chain.
+ * `resolvePublicUrlAndAddress`'s DNS lookup does not take a signal, so it
+ * is raced against the hop deadline: a hanging resolver would otherwise
+ * add its own timeout on top of the one that is documented to bound the
+ * whole chain.
  */
 function timeoutError(): Error {
   const error = new Error("The operation was aborted");
@@ -119,18 +167,18 @@ function timeoutError(): Error {
   return error;
 }
 
-function resolveWithinDeadline(
+function resolveWithinDeadline<T>(
   deadline: AbortSignal,
-  work: Promise<URL>,
-): Promise<URL> {
+  work: Promise<T>,
+): Promise<T> {
   if (deadline.aborted) return Promise.reject(timeoutError());
-  return new Promise<URL>((resolve, reject) => {
+  return new Promise<T>((resolve, reject) => {
     const onAbort = () => reject(timeoutError());
     deadline.addEventListener("abort", onAbort, { once: true });
     work.then(
-      (url) => {
+      (value) => {
         deadline.removeEventListener("abort", onAbort);
-        resolve(url);
+        resolve(value);
       },
       (error) => {
         deadline.removeEventListener("abort", onAbort);
@@ -141,10 +189,14 @@ function resolveWithinDeadline(
 }
 
 /**
- * Follows redirects by hand so that every hop is validated, the way
- * `pageContentService` does: `redirect: "follow"` would let a public host
- * bounce the server into a private address. The chain shares one deadline, so
- * a redirector cannot buy extra time per hop.
+ * Follows redirects by hand so that every hop is validated and pinned, the
+ * way `pageContentService` follows them: `redirect: "follow"` would let a
+ * public host bounce the server into a private address. The chain shares one
+ * deadline, so a redirector cannot buy extra time per hop.
+ *
+ * Each hop connects to the address `resolvePublicUrlAndAddress` vetted, via
+ * `requestPinnedToVettedAddress`, so the address checked is the address
+ * reached: a second, private DNS answer has no path to the socket.
  *
  * The URL is client-supplied (it arrives as a query parameter), so on failure
  * it is not logged, matching `/page-content`; the outcome is counted instead.
@@ -155,8 +207,12 @@ async function fetchThumbnail(rawUrl: string): Promise<ThumbnailOutcome> {
 
   for (let hop = 0; hop <= MAX_THUMBNAIL_REDIRECTS; hop++) {
     let url: URL;
+    let address: string;
     try {
-      url = await resolveWithinDeadline(deadline, resolvePublicUrl(target));
+      ({ url, address } = await resolveWithinDeadline(
+        deadline,
+        resolvePublicUrlAndAddress(target),
+      ));
     } catch (error) {
       if (error instanceof Error && error.name === "TimeoutError") {
         return { kind: "failed", reason: "TimeoutError" };
@@ -164,10 +220,9 @@ async function fetchThumbnail(rawUrl: string): Promise<ThumbnailOutcome> {
       return { kind: "blocked" };
     }
 
-    let response: Response;
+    let response: IncomingMessage;
     try {
-      response = await fetch(url, {
-        redirect: "manual",
+      response = await requestPinnedToVettedAddress(url, address, {
         signal: deadline,
       });
     } catch (error) {
@@ -177,9 +232,10 @@ async function fetchThumbnail(rawUrl: string): Promise<ThumbnailOutcome> {
       };
     }
 
-    const location = response.headers.get("location");
-    if (isRedirect(response.status) && location) {
-      await response.body?.cancel().catch(() => {});
+    const location = response.headers.location;
+    if (isRedirect(response.statusCode ?? 0) && location) {
+      // Tear the socket down rather than drain a body nobody asked for.
+      response.destroy();
       try {
         target = new URL(location, url).toString();
       } catch {
@@ -188,17 +244,18 @@ async function fetchThumbnail(rawUrl: string): Promise<ThumbnailOutcome> {
       continue;
     }
 
-    if (!response.ok) {
-      await response.body?.cancel().catch(() => {});
-      return { kind: "failed", reason: `HTTP ${response.status}` };
+    const status = response.statusCode ?? 0;
+    if (status < 200 || status >= 300) {
+      response.destroy();
+      return { kind: "failed", reason: `HTTP ${status}` };
     }
 
-    const normalizedType = (response.headers.get("content-type") ?? "")
+    const normalizedType = (response.headers["content-type"] ?? "")
       .split(";")[0]
       .trim()
       .toLowerCase();
     if (!ACCEPTED_CONTENT_TYPES.includes(normalizedType)) {
-      await response.body?.cancel().catch(() => {});
+      response.destroy();
       return {
         kind: "failed",
         reason: normalizedType
@@ -209,7 +266,7 @@ async function fetchThumbnail(rawUrl: string): Promise<ThumbnailOutcome> {
 
     let bytes: Uint8Array;
     try {
-      ({ bytes } = await readCappedBytes(response, MAX_THUMBNAIL_BYTES));
+      ({ bytes } = await readCappedStream(response, MAX_THUMBNAIL_BYTES));
     } catch (error) {
       return {
         kind: "failed",
@@ -309,8 +366,8 @@ export function thumbnailEndpointServerHook<
         // `dropped` is the total of what never reached the client, blocked
         // included, so `requested` minus `dropped` stays the served count.
         recordThumbnailDropped();
-        // Covers both refusals resolvePublicUrl reports the same way: a host
-        // in private space and a host that does not resolve.
+        // Covers both refusals resolvePublicUrlAndAddress reports the same
+        // way: a host in private space and a host that does not resolve.
         serveError(
           response,
           403,

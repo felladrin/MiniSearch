@@ -18,6 +18,21 @@ vi.mock("./searchesSinceLastRestart", () => ({
   recordThumbnailBlocked: vi.fn(),
 }));
 
+// The hook's connect goes through the pinned request, so that is the seam
+// under test here; the capped reader stays real so the size-cap semantics
+// this file asserts are the shipped ones. The pin itself is covered by
+// pinnedFetch.test.ts.
+const pinnedRequestMock = vi.hoisted(() => vi.fn());
+
+vi.mock("./utils/pinnedFetch", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("./utils/pinnedFetch.ts")>();
+  return {
+    ...actual,
+    requestPinnedToVettedAddress: pinnedRequestMock,
+  };
+});
+
 import { handleTokenVerification } from "./handleTokenVerification";
 import {
   recordThumbnailBlocked,
@@ -29,9 +44,6 @@ import {
   resetThumbnailCache,
   thumbnailEndpointServerHook,
 } from "./thumbnailEndpointServerHook";
-
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
 
 function createRequest(url: string): IncomingMessage {
   return {
@@ -75,20 +87,34 @@ function requestUrlFor(thumbnailUrl: string): string {
   return `/thumbnail?u=${encodeURIComponent(thumbnailUrl)}&token=abc`;
 }
 
+// Shaped like the IncomingMessage the pinned request resolves with: the
+// fields the hook reads, plus the async iteration readCappedStream drives.
+function fakeIncoming(
+  bytes: Uint8Array,
+  statusCode: number,
+  headers: Record<string, string>,
+): IncomingMessage {
+  return {
+    statusCode,
+    headers,
+    destroy: vi.fn(),
+    async *[Symbol.asyncIterator]() {
+      if (bytes.byteLength > 0) yield bytes;
+    },
+  } as unknown as IncomingMessage;
+}
+
 function imageResponse(
   bytes: Uint8Array<ArrayBuffer> = new Uint8Array([1, 2, 3]),
   contentType = "image/jpeg",
-): Response {
-  return new Response(bytes, {
-    status: 200,
-    headers: { "content-type": contentType },
-  });
+): IncomingMessage {
+  return fakeIncoming(bytes, 200, { "content-type": contentType });
 }
 
 describe("thumbnailEndpointServerHook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetch.mockReset();
+    pinnedRequestMock.mockReset();
     lookupMock.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: true,
@@ -107,7 +133,7 @@ describe("thumbnailEndpointServerHook", () => {
     await handler(createRequest("/status"), createResponse(), next);
 
     expect(next).toHaveBeenCalled();
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(pinnedRequestMock).not.toHaveBeenCalled();
   });
 
   it("stops processing when token verification fails", async () => {
@@ -122,7 +148,7 @@ describe("thumbnailEndpointServerHook", () => {
       vi.fn(),
     );
 
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(pinnedRequestMock).not.toHaveBeenCalled();
     expect(recordThumbnailRequested).not.toHaveBeenCalled();
   });
 
@@ -136,12 +162,12 @@ describe("thumbnailEndpointServerHook", () => {
     expect(response.end).toHaveBeenCalledWith(
       JSON.stringify({ error: "Missing thumbnail URL" }),
     );
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(pinnedRequestMock).not.toHaveBeenCalled();
     expect(recordThumbnailRequested).not.toHaveBeenCalled();
   });
 
   it("serves a fetched image with its normalized content type and a private cache", async () => {
-    mockFetch.mockResolvedValue(
+    pinnedRequestMock.mockResolvedValue(
       imageResponse(new Uint8Array([1, 2, 3]), "IMAGE/JPEG; charset=binary"),
     );
     const handler = getRegisteredHandler();
@@ -179,7 +205,7 @@ describe("thumbnailEndpointServerHook", () => {
   });
 
   it("verifies through the thumbnail's own rate-limit budget", async () => {
-    mockFetch.mockResolvedValue(imageResponse());
+    pinnedRequestMock.mockResolvedValue(imageResponse());
     const { thumbnailRateLimiter } = await import("./verifyTokenAndRateLimit");
     const handler = getRegisteredHandler();
 
@@ -202,14 +228,14 @@ describe("thumbnailEndpointServerHook", () => {
 
   it("serves a repeat request from the cache without fetching again", async () => {
     const url = publicThumbnailUrl();
-    // A fresh Response per call: a body can only be read once.
-    mockFetch.mockImplementation(async () => imageResponse());
+    // A fresh response per call: a body can only be read once.
+    pinnedRequestMock.mockImplementation(async () => imageResponse());
     const handler = getRegisteredHandler();
 
     await handler(createRequest(requestUrlFor(url)), createResponse(), vi.fn());
     await handler(createRequest(requestUrlFor(url)), createResponse(), vi.fn());
 
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(pinnedRequestMock).toHaveBeenCalledTimes(1);
     // Both requests are demand, so both count even though only one fetched.
     expect(recordThumbnailRequested).toHaveBeenCalledTimes(2);
   });
@@ -226,7 +252,7 @@ describe("thumbnailEndpointServerHook", () => {
     );
 
     expect(response.statusCode).toBe(403);
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(pinnedRequestMock).not.toHaveBeenCalled();
     expect(recordThumbnailBlocked).toHaveBeenCalledTimes(1);
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
   });
@@ -242,7 +268,7 @@ describe("thumbnailEndpointServerHook", () => {
     );
 
     expect(response.statusCode).toBe(403);
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(pinnedRequestMock).not.toHaveBeenCalled();
     expect(recordThumbnailBlocked).toHaveBeenCalledTimes(1);
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
   });
@@ -255,18 +281,43 @@ describe("thumbnailEndpointServerHook", () => {
     await handler(createRequest(requestUrlFor(longUrl)), response, vi.fn());
 
     expect(response.statusCode).toBe(400);
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(pinnedRequestMock).not.toHaveBeenCalled();
     expect(recordThumbnailRequested).not.toHaveBeenCalled();
+  });
+
+  it("pins the address vetted at the first DNS answer, never the rebound one", async () => {
+    // The rebinding attack: the first answer is public, the second — the
+    // one a re-resolving fetch would get at connect time — is private.
+    // The pinned connect must use the vetted answer, and the private one
+    // must never be dialed.
+    lookupMock
+      .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
+      .mockResolvedValue([{ address: "10.0.0.7", family: 4 }]);
+    pinnedRequestMock.mockResolvedValue(imageResponse());
+    const handler = getRegisteredHandler();
+    const response = createResponse();
+
+    await handler(
+      createRequest(requestUrlFor(publicThumbnailUrl())),
+      response,
+      vi.fn(),
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(pinnedRequestMock).toHaveBeenCalledTimes(1);
+    expect(pinnedRequestMock.mock.calls[0][1]).toBe("93.184.216.34");
+    expect(
+      pinnedRequestMock.mock.calls.some((call) => call[1] === "10.0.0.7"),
+    ).toBe(false);
   });
 
   it("does not follow a redirect into a private address", async () => {
     lookupMock
       .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
       .mockResolvedValue([{ address: "10.0.0.7", family: 4 }]);
-    mockFetch.mockResolvedValueOnce(
-      new Response(null, {
-        status: 302,
-        headers: { location: "http://10.0.0.7/thumb.jpg" },
+    pinnedRequestMock.mockResolvedValueOnce(
+      fakeIncoming(new Uint8Array(), 302, {
+        location: "http://10.0.0.7/thumb.jpg",
       }),
     );
     const handler = getRegisteredHandler();
@@ -279,12 +330,17 @@ describe("thumbnailEndpointServerHook", () => {
     );
 
     expect(response.statusCode).toBe(403);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    // The redirect target was refused at validation: its socket was never
+    // opened, so the private address was never connected to.
+    expect(pinnedRequestMock).toHaveBeenCalledTimes(1);
+    expect(pinnedRequestMock.mock.calls[0][1]).toBe("93.184.216.34");
     expect(recordThumbnailBlocked).toHaveBeenCalledTimes(1);
   });
 
   it("answers 502 with no-store when the upstream returns an error status", async () => {
-    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+    pinnedRequestMock.mockResolvedValue(
+      fakeIncoming(new Uint8Array(), 404, {}),
+    );
     const handler = getRegisteredHandler();
     const response = createResponse();
 
@@ -306,10 +362,9 @@ describe("thumbnailEndpointServerHook", () => {
   });
 
   it("answers 502 when the upstream answer is not an accepted image type", async () => {
-    mockFetch.mockResolvedValue(
-      new Response("<html></html>", {
-        status: 200,
-        headers: { "content-type": "text/html" },
+    pinnedRequestMock.mockResolvedValue(
+      fakeIncoming(new TextEncoder().encode("<html></html>"), 200, {
+        "content-type": "text/html",
       }),
     );
     const handler = getRegisteredHandler();
@@ -327,11 +382,12 @@ describe("thumbnailEndpointServerHook", () => {
 
   it("answers 502 when the upstream answer is an SVG", async () => {
     // An SVG is a document: served same-origin it would run its scripts.
-    mockFetch.mockResolvedValue(
-      new Response("<svg><script>alert(1)</script></svg>", {
-        status: 200,
-        headers: { "content-type": "image/svg+xml" },
-      }),
+    pinnedRequestMock.mockResolvedValue(
+      fakeIncoming(
+        new TextEncoder().encode("<svg><script>alert(1)</script></svg>"),
+        200,
+        { "content-type": "image/svg+xml" },
+      ),
     );
     const handler = getRegisteredHandler();
     const response = createResponse();
@@ -347,11 +403,8 @@ describe("thumbnailEndpointServerHook", () => {
   });
 
   it("does not follow a redirect with a malformed Location", async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(null, {
-        status: 302,
-        headers: { location: "http://[" },
-      }),
+    pinnedRequestMock.mockResolvedValueOnce(
+      fakeIncoming(new Uint8Array(), 302, { location: "http://[" }),
     );
     const handler = getRegisteredHandler();
     const response = createResponse();
@@ -363,14 +416,14 @@ describe("thumbnailEndpointServerHook", () => {
     );
 
     expect(response.statusCode).toBe(502);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(pinnedRequestMock).toHaveBeenCalledTimes(1);
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
   });
 
   it("does not cache a failure, so the next load retries the upstream", async () => {
     const url = publicThumbnailUrl();
-    mockFetch
-      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+    pinnedRequestMock
+      .mockResolvedValueOnce(fakeIncoming(new Uint8Array(), 404, {}))
       .mockResolvedValueOnce(imageResponse());
     const handler = getRegisteredHandler();
 
@@ -381,15 +434,12 @@ describe("thumbnailEndpointServerHook", () => {
     const second = createResponse();
     await handler(createRequest(requestUrlFor(url)), second, vi.fn());
     expect(second.statusCode).toBe(200);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(pinnedRequestMock).toHaveBeenCalledTimes(2);
   });
 
   it("answers 502 when the upstream body is empty", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(new Uint8Array(), {
-        status: 200,
-        headers: { "content-type": "image/jpeg" },
-      }),
+    pinnedRequestMock.mockResolvedValue(
+      fakeIncoming(new Uint8Array(), 200, { "content-type": "image/jpeg" }),
     );
     const handler = getRegisteredHandler();
     const response = createResponse();
@@ -422,7 +472,7 @@ describe("thumbnailEndpointServerHook", () => {
       await handled;
 
       expect(response.statusCode).toBe(502);
-      expect(mockFetch).not.toHaveBeenCalled();
+      expect(pinnedRequestMock).not.toHaveBeenCalled();
       expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
@@ -434,10 +484,10 @@ describe("thumbnailEndpointServerHook", () => {
     const thumbnailTimeoutMs = 3000;
     vi.useFakeTimers();
     try {
-      mockFetch.mockImplementation(
-        (_url: string, init?: RequestInit) =>
+      pinnedRequestMock.mockImplementation(
+        (_url: URL, _address: string, options?: { signal?: AbortSignal }) =>
           new Promise((_resolve, reject) => {
-            init?.signal?.addEventListener("abort", () =>
+            options?.signal?.addEventListener("abort", () =>
               reject(new Error("The operation was aborted")),
             );
           }),
@@ -460,10 +510,9 @@ describe("thumbnailEndpointServerHook", () => {
   });
 
   it("answers 502 after the redirect budget is spent", async () => {
-    mockFetch.mockResolvedValue(
-      new Response(null, {
-        status: 302,
-        headers: { location: "https://thumbs.example.com/loop.jpg" },
+    pinnedRequestMock.mockResolvedValue(
+      fakeIncoming(new Uint8Array(), 302, {
+        location: "https://thumbs.example.com/loop.jpg",
       }),
     );
     const handler = getRegisteredHandler();
@@ -477,13 +526,13 @@ describe("thumbnailEndpointServerHook", () => {
 
     expect(response.statusCode).toBe(502);
     // One request per hop, four hops for three redirects.
-    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(pinnedRequestMock).toHaveBeenCalledTimes(4);
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
   });
 
   it("truncates an oversized body to the byte cap", async () => {
     const bigBody = new Uint8Array(600_000).fill(7);
-    mockFetch.mockResolvedValue(imageResponse(bigBody));
+    pinnedRequestMock.mockResolvedValue(imageResponse(bigBody));
     const handler = getRegisteredHandler();
     const response = createResponse();
 
@@ -500,8 +549,8 @@ describe("thumbnailEndpointServerHook", () => {
   });
 
   it("evicts the least recently used entry, not the least recently loaded one", async () => {
-    // A fresh Response per call: a body can only be read once.
-    mockFetch.mockImplementation(async () => imageResponse());
+    // A fresh response per call: a body can only be read once.
+    pinnedRequestMock.mockImplementation(async () => imageResponse());
     const handler = getRegisteredHandler();
     // A clean slate, so the eviction side is exactly where this test puts it.
     resetThumbnailCache();
@@ -511,7 +560,8 @@ describe("thumbnailEndpointServerHook", () => {
     const load = (url: string) =>
       handler(createRequest(requestUrlFor(url)), createResponse(), vi.fn());
     const fetched = (url: string) =>
-      mockFetch.mock.calls.filter((call) => String(call[0]) === url).length;
+      pinnedRequestMock.mock.calls.filter((call) => String(call[0]) === url)
+        .length;
 
     await load(firstUrl);
     await load(secondUrl);
