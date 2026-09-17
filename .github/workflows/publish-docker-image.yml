@@ -18,20 +18,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-push-image:
-    name: Publish Docker Image to GitHub Packages
+  build:
+    name: Build and push the Docker image
     runs-on: ubuntu-latest
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
+    # This job never writes to the repository. Everything that runs between
+    # the checkout and the image push - the Docker build, and the npm install
+    # inside the Dockerfile - holds the job token, so that token is scoped to
+    # read. The tag push and the GitHub Release live in the `release` job,
+    # which is the only job with `contents: write`.
     permissions:
-      contents: write
+      contents: read
       packages: write
+    outputs:
+      # The release job publishes exactly this version rather than deriving
+      # its own: re-running it cannot pick a version other than the one whose
+      # image was just built, and it never re-runs the duplicate-tag guard
+      # that would (correctly) reject a version this run already pushed.
+      version: ${{ steps.validate-version.outputs.version }}
+      # The commit the image was built from. The release job checks this out
+      # by SHA instead of resolving the branch again, so a re-run tags the
+      # commit that was released even if the default branch has moved on.
+      commit: ${{ steps.record-commit.outputs.sha }}
+      digest: ${{ steps.build-and-push.outputs.digest }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
       - name: Validate the release version
-        id: release
+        id: validate-version
         env:
           VERSION: ${{ inputs.version }}
           REF_NAME: ${{ github.ref_name }}
@@ -97,14 +113,15 @@ jobs:
           case $tag_lookup_status in
             0)
               # The tag can exist because a previous run pushed it and then
-              # failed before publishing the GitHub Release. That release is
-              # one command away against the tag that is already there, so
-              # name it: spending a sequence number on an image that is
-              # complete except for its notes would waste the version. A
-              # genuinely new same-day release still takes the sequence.
+              # failed before publishing the GitHub Release. That release no
+              # longer needs this job: the `release` job downstream is
+              # idempotent and finishes it against the tag that is already
+              # there, without rebuilding the image. Spending a sequence
+              # number on an image that is complete except for its notes
+              # would waste the version. A genuinely new same-day release
+              # still takes the sequence.
               echo "Git tag '$VERSION' already exists, so this version was already published." >&2
-              echo "If the GitHub Release is missing (the publish step failed after the tag push), recover it against the existing tag:" >&2
-              echo "  gh release create $VERSION --generate-notes --title $VERSION" >&2
+              echo "If the GitHub Release is missing, re-run only the 'Tag the release and publish the GitHub Release' job of the run that pushed the tag; it is idempotent and will not rebuild." >&2
               echo "For a new same-day release, use a sequence (e.g. $VERSION.1)." >&2
               exit 1
               ;;
@@ -125,6 +142,9 @@ jobs:
           fi
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Record the commit being released
+        id: record-commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Log in to the Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4
         with:
@@ -148,10 +168,11 @@ jobs:
           # pattern; a value carrying a newline would otherwise add a directive.
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ steps.release.outputs.version }}
+            type=raw,value=${{ steps.validate-version.outputs.version }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4
       - name: Build and push Docker Image
+        id: build-and-push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7
         with:
           context: .
@@ -163,13 +184,101 @@ jobs:
           # already in use, so no extra job permissions are needed.
           provenance: mode=max
           sbom: true
-      - name: Tag the release and publish the GitHub Release
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-          GH_TOKEN: ${{ github.token }}
+  release:
+    name: Tag the release and publish the GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    # The only job that writes to the repository, and only once the image is
+    # already in the registry. Keeping the write scope here is the whole point
+    # of the split: nothing that runs during the build can reach it.
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      DIGEST: ${{ needs.build.outputs.digest }}
+      # The commit the build job validated and built. The tag has to name it,
+      # so it is both what gets checked out and what the push is verified
+      # against.
+      EXPECTED_SHA: ${{ needs.build.outputs.commit }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the released commit
+        uses: actions/checkout@v7
+        with:
+          # Pin the checkout to the built commit rather than letting the
+          # branch resolve again. A re-run of this job must publish against
+          # the commit the image came from, whatever `main` points at by then.
+          ref: ${{ needs.build.outputs.commit }}
+      - name: Push the release tag
         run: |
-          git tag "$VERSION"
-          git push origin "$VERSION"
+          # This job is the recovery path for a half-finished release, so it
+          # is written to be re-run on its own: the version comes from the
+          # build job's output and is deliberately not re-validated here. The
+          # duplicate-tag guard belongs to the build job, where failing early
+          # saves a build; here a tag that already exists is the expected
+          # state of a retry, not a reason to stop.
+          if [[ -z $VERSION || -z $EXPECTED_SHA ]]; then
+            echo "The build job produced no version or commit; refusing to tag or release." >&2
+            exit 1
+          fi
+          echo "Publishing $VERSION from image digest ${DIGEST:-unknown}."
+
+          # The tag is what ties the published image back to source, so it
+          # must name the commit the image was built from. The checkout above
+          # asks for that commit by SHA; this confirms it is what landed
+          # before anything is pushed under that name.
+          head_sha=$(git rev-parse HEAD)
+          if [[ $head_sha != "$EXPECTED_SHA" ]]; then
+            echo "Checked out $head_sha, but this run is for $EXPECTED_SHA; refusing to tag." >&2
+            exit 1
+          fi
+
+          # Both the bare ref and the peeled `^{}` ref are requested in one
+          # lookup. An annotated tag's bare ref names the tag object, so only
+          # the peeled entry names the commit; a lightweight tag has no
+          # peeled entry and its bare ref is already the commit. `--exit-code`
+          # keeps the lookup three-valued: 0 exists, 2 absent, anything else a
+          # failed lookup that must not be read as "absent".
+          lookup_status=0
+          remote_refs=$(git ls-remote --exit-code origin "refs/tags/$VERSION" "refs/tags/$VERSION^{}") || lookup_status=$?
+          case $lookup_status in
+            0)
+              tag_commit=$(printf '%s\n' "$remote_refs" | awk -v ref="refs/tags/$VERSION^{}" '$2 == ref { print $1; exit }')
+              if [[ -z $tag_commit ]]; then
+                tag_commit=$(printf '%s\n' "$remote_refs" | awk -v ref="refs/tags/$VERSION" '$2 == ref { print $1; exit }')
+              fi
+              if [[ -z $tag_commit ]]; then
+                # The ref matched but neither form resolved to an object: the
+                # remote said something this script cannot interpret, so it
+                # must not push over it.
+                echo "Git tag '$VERSION' exists but could not be resolved to a commit; refusing to touch it." >&2
+                exit 1
+              elif [[ $tag_commit == "$head_sha" ]]; then
+                # A previous attempt got this far. Nothing to do, and nothing
+                # to undo: continue on to the Release, which is the step that
+                # is likely still missing.
+                echo "Git tag '$VERSION' already points at $head_sha; nothing to push."
+              else
+                # The version belongs to other code. Moving a published tag
+                # would silently re-point a released version at a different
+                # build, so this stops rather than forcing.
+                echo "Git tag '$VERSION' already points at $tag_commit, not $head_sha." >&2
+                echo "Refusing to move a published tag. Use a same-day sequence (e.g. $VERSION.1)." >&2
+                exit 1
+              fi
+              ;;
+            2)
+              git tag "$VERSION"
+              git push origin "$VERSION"
+              echo "Pushed git tag '$VERSION' at $head_sha."
+              ;;
+            *)
+              echo "Could not check whether git tag '$VERSION' exists: git ls-remote exited $lookup_status." >&2
+              exit 1
+              ;;
+          esac
+      - name: Publish the GitHub Release
+        run: |
           # Create the Release only when it is missing, so a repair run of
           # this job is safe: if a previous attempt pushed the tag and then
           # failed at `gh release create`, re-running the job must not die
