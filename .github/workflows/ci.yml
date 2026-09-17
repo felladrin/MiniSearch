@@ -32,6 +32,12 @@ jobs:
       - name: Run npm audit
         run: npm audit --audit-level=high
 
+      # Complements the advisory audit above: verifies native/WASM pins,
+      # lockfile integrity, install-script policy coverage and registry
+      # signatures — none of which `npm audit` looks at.
+      - name: Verify native module integrity
+        run: npm run native-module-check
+
       - name: Run lint
         run: npm run lint
 

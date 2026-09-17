@@ -82,6 +82,51 @@ MiniSearch is designed as a privacy-focused search application with the followin
 - Browser extensions could interfere with the application
 - Man-in-the-middle attacks without HTTPS
 
+## Native & WebAssembly Module Trust Model
+
+A few of MiniSearch's dependencies ship native code or WebAssembly rather than auditable JavaScript. They run with the application's privileges, so they are held to a stricter install-time policy than the rest of the dependency tree.
+
+### Inventory
+
+| Module | Type | Where it runs | Why it is trusted |
+| --- | --- | --- | --- |
+| `onnxruntime-node` | Native (Node addon) | Server-side reranker, CPU only | Microsoft-published ONNX Runtime; exact pin; its install script is **denied** (see below), so nothing is fetched at install time |
+| `@wllama/wllama` | WebAssembly | Browser inference | Published wllama project; exact pin; no install script |
+| `@huggingface/tokenizers` | Native (Node addon) | Server-side tokenization | Hugging Face-published; exact pin; no install script |
+| `hash-wasm` | WebAssembly | argon2id hashing (browser and server) | Widely-used, audited WASM hash library; exact pin; no install script |
+| `@moonshine-ai/moonshine-wasm` | WebAssembly | Browser dictation | Exact pin; no install script |
+
+### What is verified at install
+
+1. **Exact pins** — every native/WASM dependency is declared with a single exact version in `package.json` (no `^`/`~`), so a newer publish can never be installed without a deliberate change.
+2. **Lockfile integrity** — `package-lock.json` pins each tarball with a SHA-512 `integrity` hash; `npm ci` refuses any tarball that does not match.
+3. **Install-script policy** — `package.json#allowScripts` records an explicit allow/deny decision for every package in the tree that ships an install script, and `.npmrc` sets `strict-allow-scripts = true`, so an install script with no recorded decision **fails the install** instead of warning. (The `.npmrc` layer can only allow, never deny, which is why the policy lives in `package.json`.)
+4. **Registry signatures** — `npm run native-module-check` (`scripts/native-module-integrity.cjs`) re-checks the pins, the lockfile, the policy coverage and `npm audit signatures` for every tracked module, and runs in CI.
+
+### Install-script decisions
+
+- **`onnxruntime-node` — denied.** Its postinstall downloads a CUDA 12 nupkg on linux/x64 and unpacks it with `adm-zip`, which follows symlinks at the extraction destination (GHSA-vwc7-r8mq-g2x9, unfixed upstream). Both inference services pin `executionProviders: ["cpu"]`, so those GPU binaries are never loaded; the CPU runtime (`onnxruntime_binding.node` + `libonnxruntime.so`) ships inside the package tarball itself. Denying the script removes the download and the symlink-traversal exposure entirely.
+- **`protobufjs` — denied.** Its postinstall only prints a version-scheme advisory to stderr; nothing in the installed package depends on it running. Denying keeps the set of executed install scripts minimal.
+- **`fsevents@2.3.3` — allowed, pinned.** The optional macOS file watcher compiles in its install script; denying it would break file watching on macOS developer machines. The allow is pinned to the exact locked version, so a bump requires a fresh decision.
+
+### What is NOT verified
+
+- **Binary semantics.** A registry signature proves the tarball came from the npm registry unmodified; it does not prove the native/WASM binary is free of malicious behaviour. Native and WASM payloads are opaque and are not human-audited here.
+- **Runtime downloads.** Model files fetched at use time (HuggingFace, `download.moonshine.ai`, the text-to-speech engine's CDN hosts) are outside the install-time gate; their trust model is documented in [docs/security.md](../docs/security.md).
+- **Future approvals.** An install script added by a later version or a new dependency is only as trustworthy as the review behind the `approve-scripts` entry that covers it.
+
+### Approving a new install script
+
+Under `strict-allow-scripts`, any package that ships an install script without a recorded decision fails the install. To unblock it, a maintainer must:
+
+1. Read the script first (`npm view <pkg> scripts`, or the unpacked tarball) and decide whether it is acceptable.
+2. Record the decision: `npm approve-scripts <pkg>` writes a version-pinned `"<name>@<version>": true` entry to `package.json#allowScripts` (`allow-scripts-pin` is on); `npm deny-scripts <pkg>` writes `"<name>": false`, denying every version of the package.
+3. Update the decision list above in the same PR, with the reasoning.
+
+### Reviewing a version bump
+
+Because native/WASM deps are exact pins, a Renovate bump arrives as a one-line version change and is reviewed like any dependency PR, plus: if the new version ships an install script not covered by the pinned policy, the install fails until the script is reviewed and re-approved. `npm run native-module-check` re-verifies pins, lockfile integrity and registry signatures in CI on every change.
+
 ## Security Best Practices
 
 ### For Users
