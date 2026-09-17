@@ -1,15 +1,14 @@
 import {
-  getQuery,
   getTextGenerationState,
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
 import { getSearchTokenHash } from "./searchTokenHash";
-import { getSystemPrompt } from "./systemPrompt";
 import {
   ChatGenerationError,
   canStartResponding,
   getDefaultChatCompletionCreateParamsStreaming,
+  getDefaultChatMessages,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
 import type { ChatMessage } from "./types";
@@ -23,14 +22,9 @@ export async function generateTextWithInternalApi() {
   await canStartResponding();
   updateTextGenerationState("preparingToGenerate");
 
-  const messages: ChatMessage[] = [
-    {
-      role: "user",
-      content: getSystemPrompt(await getFormattedSearchResults(true)),
-    },
-    { role: "assistant", content: "Ok!" },
-    { role: "user", content: getQuery() },
-  ];
+  const messages = getDefaultChatMessages(
+    await getFormattedSearchResults(true),
+  );
 
   const streamedMessage = await processStreamResponse(messages, (message) => {
     if (getTextGenerationState() === "interrupted") {
