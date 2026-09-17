@@ -13,7 +13,7 @@ vi.mock("./pubSub", () => ({
     allowAiModelDownload: true,
   })),
   getTextGenerationState: vi.fn(() => "idle"),
-  listenToSettingsChanges: vi.fn(),
+  listenToSettingsChanges: vi.fn(() => vi.fn()),
   updateChatMessages: vi.fn(),
   updateConversationSummary: vi.fn(),
   updateImageSearchResults: vi.fn(),
