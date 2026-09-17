@@ -88,6 +88,7 @@ export default function AiResponseContent({
             {textGenerationState === "generating" ? (
               <Tooltip label="Interrupt generation">
                 <ActionIcon
+                  aria-label="Interrupt generation"
                   onClick={() => setTextGenerationState("interrupted")}
                   variant="subtle"
                   color="gray"
@@ -98,6 +99,7 @@ export default function AiResponseContent({
             ) : (
               <Tooltip label="Regenerate response">
                 <ActionIcon
+                  aria-label="Regenerate response"
                   onClick={() => searchAndRespond()}
                   variant="subtle"
                   color="gray"
@@ -110,6 +112,7 @@ export default function AiResponseContent({
               label={isSpeaking ? "Stop speaking" : "Listen to response"}
             >
               <ActionIcon
+                aria-label={isSpeaking ? "Stop speaking" : "Listen to response"}
                 onClick={() => speak(response)}
                 variant="subtle"
                 color={isSpeaking ? "blue" : "gray"}
@@ -120,6 +123,7 @@ export default function AiResponseContent({
             {settings.enableAiResponseScrolling ? (
               <Tooltip label="Show full response without scroll bar">
                 <ActionIcon
+                  aria-label="Show full response without scroll bar"
                   onClick={() => {
                     setSettings({
                       ...settings,
@@ -135,6 +139,7 @@ export default function AiResponseContent({
             ) : (
               <Tooltip label="Enable scroll bar">
                 <ActionIcon
+                  aria-label="Enable scroll bar"
                   onClick={() => {
                     setSettings({
                       ...settings,

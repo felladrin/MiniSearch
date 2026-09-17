@@ -19,6 +19,7 @@ export default function CopyIconButton({
           position="right"
         >
           <ActionIcon
+            aria-label={tooltipLabel}
             color={copied ? "teal" : "gray"}
             variant="subtle"
             onClick={copy}
