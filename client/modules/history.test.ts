@@ -572,4 +572,44 @@ describe("History Module - Dexie CRUD", () => {
       expect(messages).toEqual([]);
     });
   });
+
+  describe("clearAllHistory", () => {
+    it("should clear searches, llmResponses, and chatHistory in a single transaction", async () => {
+      const { clearAllHistory, historyDatabase } = await import("./history");
+
+      await historyDatabase.searches.add({
+        searchRunId: "run-1",
+        query: "test query",
+        timestamp: Date.now(),
+        source: "text",
+        pinned: false,
+      });
+
+      await historyDatabase.llmResponses.add({
+        searchId: 1,
+        searchRunId: "run-1",
+        timestamp: Date.now(),
+        prompt: "test prompt",
+        response: "test response",
+        model: "gpt-4o",
+      });
+
+      await historyDatabase.chatHistory.add({
+        role: "user",
+        content: "hello",
+        timestamp: Date.now(),
+        conversationId: "run-1",
+      });
+
+      expect(await historyDatabase.searches.count()).toBe(1);
+      expect(await historyDatabase.llmResponses.count()).toBe(1);
+      expect(await historyDatabase.chatHistory.count()).toBe(1);
+
+      await clearAllHistory();
+
+      expect(await historyDatabase.searches.count()).toBe(0);
+      expect(await historyDatabase.llmResponses.count()).toBe(0);
+      expect(await historyDatabase.chatHistory.count()).toBe(0);
+    });
+  });
 });

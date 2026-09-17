@@ -356,3 +356,19 @@ export async function getChatMessagesForQuery(
     return [];
   }
 }
+
+export async function clearAllHistory(): Promise<void> {
+  await historyDatabase.transaction(
+    "rw",
+    historyDatabase.searches,
+    historyDatabase.llmResponses,
+    historyDatabase.chatHistory,
+    async () => {
+      await Promise.all([
+        historyDatabase.searches.clear(),
+        historyDatabase.llmResponses.clear(),
+        historyDatabase.chatHistory.clear(),
+      ]);
+    },
+  );
+}

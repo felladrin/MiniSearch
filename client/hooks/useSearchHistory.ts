@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addSearchToHistory,
+  clearAllHistory,
   getRecentSearches,
   historyDatabase,
   type ImageResults,
@@ -213,7 +214,7 @@ export function useSearchHistory(
 
   const clearAll = useCallback(async () => {
     try {
-      await historyDatabase.searches.clear();
+      await clearAllHistory();
       setRecentSearches([]);
       setFilteredSearches([]);
       addLogEntry("All search history cleared");
