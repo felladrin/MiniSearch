@@ -124,22 +124,22 @@ export function isBlockedAddress(address: string): boolean {
 }
 
 /**
- * Validates a URL that the server is about to fetch on a client's behalf,
- * rejecting non-HTTP schemes and hosts that resolve into a blocked range.
+ * Validates a URL the server is about to fetch on a client's behalf and
+ * returns the address the fetch must connect to.
  *
- * The DNS answer is checked, not pinned: a name that resolves to a public
- * address here and to a private one microseconds later during the fetch would
- * still get through, and returning the extracted text is what would carry the
- * result back, so this is a real gap rather than one the response shape closes.
- * Pinning means connecting to the vetted IP with the hostname preserved for TLS,
- * which needs a custom `undici` dispatcher this project has no other use for.
- * The residual risk is up to one GET per redirect hop from inside the instance's
- * network, and the readable text of whatever those GETs return.
+ * Returning the vetted address is what makes pinning possible. A caller
+ * that validates here and then dials the hostname again (a plain `fetch`)
+ * re-resolves at connect time, and that second answer can differ from the
+ * one that was checked — the DNS-rebinding window. Handing the checked
+ * answer to `requestPinnedToVettedAddress` in `pinnedFetch.ts` makes the
+ * checked address and the connected address one and the same.
  *
- * @returns The parsed URL when it is safe to fetch
+ * @returns The parsed URL and the vetted IP literal to pin the connection to
  * @throws When the scheme is unsupported or the host resolves into a blocked range
  */
-export async function resolvePublicUrl(rawUrl: string): Promise<URL> {
+export async function resolvePublicUrlAndAddress(
+  rawUrl: string,
+): Promise<{ url: URL; address: string }> {
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -158,7 +158,7 @@ export async function resolvePublicUrl(rawUrl: string): Promise<URL> {
     if (isBlockedAddress(hostname)) {
       throw new Error(`Refusing to fetch a non-public address: ${hostname}`);
     }
-    return url;
+    return { url, address: hostname };
   }
 
   const addresses = await lookup(hostname, { all: true });
@@ -173,5 +173,27 @@ export async function resolvePublicUrl(rawUrl: string): Promise<URL> {
     );
   }
 
-  return url;
+  return { url, address: addresses[0].address };
+}
+
+/**
+ * Validates a URL that the server is about to fetch on a client's behalf,
+ * rejecting non-HTTP schemes and hosts that resolve into a blocked range.
+ *
+ * This check alone does not close the DNS-rebinding window: a caller that
+ * fetches by hostname after validating here re-resolves at connect time,
+ * so a name that answers publicly now and privately a moment later still
+ * gets through, and the response carries the result back. Callers that
+ * want the window closed must pin the connection with
+ * `requestPinnedToVettedAddress` using the address from
+ * `resolvePublicUrlAndAddress`. `/thumbnail` does; `/page-content` does
+ * not yet, and carries the residual: up to one GET per redirect hop from
+ * inside the instance's network, and the readable text of whatever those
+ * GETs return.
+ *
+ * @returns The parsed URL when it is safe to fetch
+ * @throws When the scheme is unsupported or the host resolves into a blocked range
+ */
+export async function resolvePublicUrl(rawUrl: string): Promise<URL> {
+  return (await resolvePublicUrlAndAddress(rawUrl)).url;
 }
