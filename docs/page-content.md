@@ -30,7 +30,12 @@ and no page is read either way until AI responses are on.
    suppression, so syndicated paragraphs reach the prompt once.
 4. The response is published to the `pageContents` PubSub channel, keyed by URL.
 5. `getFormattedSearchResults` (`client/modules/textGenerationUtilities.ts`)
-   appends each excerpt under its result before the prompt is built.
+   appends each excerpt under its result before the prompt is built. The
+   tokenization that trims the excerpts runs in
+   `client/modules/pageExcerptWorker.ts`, so the handoff from search to
+   generation does not block the main thread; when the worker cannot run,
+   the same allocation (`client/modules/pageExcerptAllocation.ts`) falls
+   back to running synchronously.
 
 The read is started when the text results are in and awaited at the very end of
 `startTextSearch`, so the AI answer waits for it while the rendered results,

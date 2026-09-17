@@ -1,4 +1,9 @@
-import gptTokenizer from "gpt-tokenizer";
+import { addLogEntry } from "./logEntries";
+import { allocatePageExcerpts } from "./pageExcerptAllocation";
+import type {
+  WorkerRequest,
+  WorkerResponse,
+} from "./pageExcerptWorkerProtocol";
 import {
   getLlmTextSearchResults,
   getPageContents,
@@ -44,47 +49,78 @@ function getPageContentTokenBudget() {
   return Math.floor(contextSize * pageContentTokenBudgetRatio);
 }
 
-/**
- * Trims page excerpts to fit a shared token budget.
- *
- * Pages are served shortest-first, each taking at most an equal share of what
- * is left, so a single long article cannot crowd out the others and whatever
- * short pages leave unused rolls over to the ones that need it.
- */
-export function allocatePageExcerpts(
+let workerFactory = () =>
+  new Worker(new URL("./pageExcerptWorker.ts", import.meta.url), {
+    type: "module",
+  });
+
+/** Lets the tests supply a fake worker; the real one needs a bundler. */
+export function setWorkerFactory(factory: () => Worker) {
+  workerFactory = factory;
+}
+
+/** Runs one allocation on a fresh worker and resolves with its answer. */
+function allocateExcerptsInWorker(
   contents: string[],
   tokenBudget: number,
-): string[] {
-  const excerpts = contents.map(() => "");
-  const pending = contents
-    .map((content, index) => ({
-      index,
-      tokens: content.length > 0 ? gptTokenizer.encode(content) : [],
-    }))
-    .filter(({ tokens }) => tokens.length > 0)
-    .sort((a, b) => a.tokens.length - b.tokens.length);
+): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const worker = workerFactory();
 
-  let remainingBudget = Math.max(0, tokenBudget);
-  let remainingPages = pending.length;
+    const cleanUp = () => {
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.terminate();
+    };
 
-  for (const { index, tokens } of pending) {
-    const taken = Math.min(
-      tokens.length,
-      Math.floor(remainingBudget / remainingPages),
-    );
+    worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
+      cleanUp();
+      if (data.type === "excerpts") resolve(data.excerpts);
+      else reject(new Error(data.message));
+    };
+    worker.onerror = () => {
+      cleanUp();
+      reject(new Error("The page excerpt worker failed to start"));
+    };
 
-    if (taken > 0) {
-      excerpts[index] =
-        taken === tokens.length
-          ? contents[index]
-          : `${gptTokenizer.decode(tokens.slice(0, taken)).trimEnd()}…`;
-    }
+    const request: WorkerRequest = { contents, tokenBudget };
+    worker.postMessage(request);
+  });
+}
 
-    remainingBudget -= taken;
-    remainingPages--;
+/**
+ * Allocates the page excerpts off the main thread.
+ *
+ * Tokenizing the full body of every page read can take over several complete
+ * articles, and this runs right at the handoff from search to generation -
+ * exactly when the UI should stay responsive - so the work goes to
+ * `pageExcerptWorker` and the handoff awaits the result.
+ */
+async function allocatePageExcerptsAsync(
+  contents: string[],
+  tokenBudget: number,
+): Promise<string[]> {
+  // Nothing to tokenize when no page was read; a worker per handoff would
+  // cost more than the empty allocation it would return.
+  if (!contents.some((content) => content.length > 0)) {
+    return allocatePageExcerpts(contents, tokenBudget);
   }
 
-  return excerpts;
+  try {
+    return await allocateExcerptsInWorker(contents, tokenBudget);
+  } catch (error) {
+    // A worker this environment cannot run - no `Worker` global, or one
+    // whose construction or run failed - must not break generation. The
+    // synchronous path costs the main thread what the worker was meant to
+    // take off it, which is what the handoff did before the worker existed;
+    // arriving late beats not arriving at all.
+    addLogEntry(
+      `Page excerpt worker unavailable, tokenizing on the main thread: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`,
+    );
+    return allocatePageExcerpts(contents, tokenBudget);
+  }
 }
 
 /**
@@ -164,15 +200,18 @@ function getRelevanceTags(
 /**
  * Formats the results for the prompt, appending the excerpt read from each
  * page when one is available for it, and a relative relevance tag when the
- * results carry a reranker score.
+ * results carry a reranker score. The excerpt tokenization runs in a worker,
+ * so callers await the formatted string.
  */
-export function getFormattedSearchResults(shouldIncludeUrl: boolean) {
+export async function getFormattedSearchResults(
+  shouldIncludeUrl: boolean,
+): Promise<string> {
   const searchResults = getLlmTextSearchResults();
 
   if (searchResults.length === 0) return "None.";
 
   const pageContents = getPageContents();
-  const excerpts = allocatePageExcerpts(
+  const excerpts = await allocatePageExcerptsAsync(
     searchResults.map(([, , url]) => pageContents[url] ?? ""),
     getPageContentTokenBudget(),
   );

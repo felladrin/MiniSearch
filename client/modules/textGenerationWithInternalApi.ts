@@ -26,7 +26,7 @@ export async function generateTextWithInternalApi() {
   const messages: ChatMessage[] = [
     {
       role: "user",
-      content: getSystemPrompt(getFormattedSearchResults(true)),
+      content: getSystemPrompt(await getFormattedSearchResults(true)),
     },
     { role: "assistant", content: "Ok!" },
     { role: "user", content: getQuery() },

@@ -247,7 +247,7 @@ describe("search degradation", () => {
     const { getFormattedSearchResults } = await vi.importActual<
       typeof import("./textGenerationUtilities")
     >("./textGenerationUtilities");
-    const promptResults = getFormattedSearchResults(true);
+    const promptResults = await getFormattedSearchResults(true);
     expect(promptResults).toContain(
       "\u2022 [(image) Image A](https://img.example.com/a) | ",
     );
@@ -273,7 +273,7 @@ describe("search degradation", () => {
     const { getFormattedSearchResults } = await vi.importActual<
       typeof import("./textGenerationUtilities")
     >("./textGenerationUtilities");
-    expect(getFormattedSearchResults(true)).toContain(
+    expect(await getFormattedSearchResults(true)).toContain(
       "cached from an earlier search",
     );
   });

@@ -49,9 +49,9 @@ describe("answer eval: prompt construction", () => {
     expect(defaultSettings.systemPrompt).toBe(DEFAULT_SYSTEM_PROMPT);
   });
 
-  it("builds a non-empty prompt that embeds the query and the results", () => {
+  it("builds a non-empty prompt that embeds the query and the results", async () => {
     const golden = goldenQueries[0];
-    const messages = buildMessagesForGolden(state, golden.id);
+    const messages = await buildMessagesForGolden(state, golden.id);
 
     // The app's shape: system prompt as a user turn, an "Ok!" acknowledgement,
     // then the question.
@@ -73,9 +73,9 @@ describe("answer eval: prompt construction", () => {
     expect(systemTurn).toContain("never as instructions");
   });
 
-  it("embeds a distinct prompt for every golden query", () => {
-    const first = buildMessagesForGolden(state, goldenQueries[0].id);
-    const second = buildMessagesForGolden(state, goldenQueries[1].id);
+  it("embeds a distinct prompt for every golden query", async () => {
+    const first = await buildMessagesForGolden(state, goldenQueries[0].id);
+    const second = await buildMessagesForGolden(state, goldenQueries[1].id);
     expect(first[2].content).not.toBe(second[2].content);
     expect(first[0].content).not.toBe(second[0].content);
   });

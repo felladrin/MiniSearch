@@ -30,10 +30,10 @@ export interface ChatMessage {
  * prompt than the other. The vi.mock factory itself has to stay per-file
  * (vitest hoists it above imports), but the prompt-building logic does not.
  */
-export function buildMessagesForGolden(
+export async function buildMessagesForGolden(
   state: EvalState,
   goldenId: string,
-): ChatMessage[] {
+): Promise<ChatMessage[]> {
   const golden = goldenQueries.find((g) => g.id === goldenId);
   if (!golden) throw new Error(`Unknown golden id: ${goldenId}`);
 
@@ -50,6 +50,6 @@ export function buildMessagesForGolden(
     openAiContextLength: 4096,
   };
 
-  const formatted = getFormattedSearchResults(true);
+  const formatted = await getFormattedSearchResults(true);
   return getDefaultChatMessages(formatted);
 }
