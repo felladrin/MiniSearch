@@ -62,6 +62,17 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 - **No PII Collection**: No personally identifiable information stored
 - **User Control**: Users can export and delete all their data
 
+## Supply Chain: Native & WebAssembly Modules
+
+The full trust model lives in [`.github/SECURITY.md`](../.github/SECURITY.md) ("Native & WebAssembly Module Trust Model"); the operational parts are mirrored here.
+
+- **Exact pins**: the native/WASM dependencies — `onnxruntime-node@1.29.0`, `@wllama/wllama@3.6.1`, `@huggingface/tokenizers@0.2.0`, `hash-wasm@4.12.0` and `@moonshine-ai/moonshine-wasm@0.1.5` — are declared with single exact versions in `package.json` (no caret ranges), and `package-lock.json` pins each tarball's SHA-512 integrity hash
+- **Install-script policy**: `package.json#allowScripts` carries an explicit decision for every package in the tree that ships an install script — `onnxruntime-node` **denied** (its postinstall downloads CUDA 12 nupkgs unpacked by symlink-following `adm-zip`, GHSA-vwc7-r8mq-g2x9; both inference services run `executionProviders: ["cpu"]` and the CPU runtime ships in the tarball), `protobufjs` **denied** (its postinstall only prints a version-scheme advisory), `fsevents@2.3.3` **allowed** (the optional macOS file watcher must compile at install)
+- **Strict mode**: `.npmrc` sets `strict-allow-scripts = true`, so an install script with no recorded decision fails `npm ci` instead of warning; the `.npmrc` layer itself can only allow, never deny, which is why the policy lives in `package.json`
+- **CI gate**: `npm run native-module-check` (`scripts/native-module-integrity.cjs`) verifies the pins, the lockfile integrity, that every install-script-bearing package has a policy entry, and `npm audit signatures` for the tracked modules; it runs in CI next to `npm audit --audit-level=high`, which covers advisories rather than signatures and pins
+- **Not verified**: registry signatures prove publisher identity and transport integrity, not benign binary semantics; and model files fetched at use time (HuggingFace, `download.moonshine.ai`, the TTS engine's CDN hosts) are outside the install-time gate — see the Privacy section above
+- **Approving a new install script or bumping a pinned version**: read the script first, then `npm approve-scripts <pkg>` / `npm deny-scripts <pkg>` (writes the pinned decision into `package.json#allowScripts`) and update the decision list in `.github/SECURITY.md` in the same PR
+
 ## Security Best Practices
 
 - Input validation on all endpoints
