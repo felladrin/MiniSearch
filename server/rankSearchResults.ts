@@ -1,8 +1,11 @@
 import { rerank } from "./rerankerService.ts";
 import { recordRerank } from "./rerankingSinceLastRestart.ts";
 
+import type { SearchType } from "./searchesSinceLastRestart.ts";
+
 export async function rankSearchResults(
   query: string,
+  searchType: SearchType,
   searchResults: [title: string, content: string, url: string][],
   preserveTopResults = false,
 ): Promise<ScoredSearchResultTuple[]> {
@@ -22,7 +25,7 @@ export async function rankSearchResults(
   // instances where searches are coming back empty.
   const report = (considered: number, kept: number) => {
     if (considered === 0) return;
-    recordRerank({
+    recordRerank(searchType, {
       considered,
       kept,
       durationMs: performance.now() - startedAt,

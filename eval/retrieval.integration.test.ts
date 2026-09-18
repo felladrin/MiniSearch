@@ -59,7 +59,12 @@ describe("retrieval eval (real reranker)", () => {
         golden.results.map(({ title, snippet, url }) => [title, snippet, url]);
 
       // preserveTopResults=true matches the app's text-search call.
-      const ranked = await rankSearchResults(golden.query, candidates, true);
+      const ranked = await rankSearchResults(
+        golden.query,
+        "text",
+        candidates,
+        true,
+      );
       expect(ranked.length, `${golden.id}: empty ranking`).toBeGreaterThan(0);
 
       // The pin is the point of the [1,3] entries: the first candidate must

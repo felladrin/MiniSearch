@@ -11,6 +11,7 @@ import {
   incrementGraphicalSearchesSinceLastRestart,
   incrementTextualSearchesSinceLastRestart,
   recordSearchDuration,
+  type SearchType,
 } from "./searchesSinceLastRestart.ts";
 import { sendValidationError } from "./utils/httpResponse.ts";
 import { fetchSearXNG } from "./webSearchService.ts";
@@ -46,8 +47,9 @@ type ImageResult = [
 
 async function handleRanking(
   query: string,
+  searchType: SearchType,
   results: [title: string, content: string, url: string][],
-  isTextSearch?: boolean,
+  preserveTopResults = false,
 ): Promise<[title: string, content: string, url: string, score?: number][]> {
   const isRerankerHealthy = await getRerankerStatus();
   if (!isRerankerHealthy) {
@@ -57,7 +59,12 @@ async function handleRanking(
 
   try {
     if (isRerankerHealthy) {
-      return await rankSearchResults(query, results, isTextSearch);
+      return await rankSearchResults(
+        query,
+        searchType,
+        results,
+        preserveTopResults,
+      );
     }
     return results;
   } catch (error) {
@@ -128,7 +135,12 @@ export function searchEndpointServerHook<
 
       if (isTextSearch) {
         const results = searxngResults as TextResult[];
-        const rankedResults = await handleRanking(query, results, true);
+        const rankedResults = await handleRanking(
+          query,
+          searchType,
+          results,
+          true,
+        );
 
         incrementTextualSearchesSinceLastRestart();
 
@@ -139,7 +151,11 @@ export function searchEndpointServerHook<
         const resultsText = results.map(
           ([title, url]) => [title?.slice(0, 100) || "", "", url] as TextResult,
         );
-        const rankedResults = await handleRanking(query, resultsText);
+        const rankedResults = await handleRanking(
+          query,
+          searchType,
+          resultsText,
+        );
 
         const processedResults = rankedResults
           .map(([title, , rankedResultUrl]) => {
