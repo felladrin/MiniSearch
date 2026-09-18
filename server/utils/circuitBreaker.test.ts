@@ -30,6 +30,27 @@ describe("CircuitBreaker", () => {
         }),
       ).rejects.toThrow("function error");
     });
+
+    it("resets failure count on success so spaced failures do not open the circuit", async () => {
+      const cb = new CircuitBreaker();
+      const fail = () =>
+        expect(
+          cb.execute("key", async () => {
+            throw new Error("transient");
+          }),
+        ).rejects.toThrow("transient");
+
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await fail();
+      }
+      await cb.execute("key", async () => "success");
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await fail();
+      }
+
+      expect(cb.getState("key")).toBe("CLOSED");
+      expect(cb.getOpens("key")).toBe(0);
+    });
   });
   describe("getOpens", () => {
     afterEach(() => {
