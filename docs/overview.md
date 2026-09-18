@@ -307,7 +307,9 @@ is counted at all (see `docs/page-content.md`):
 | `excerptKeptRate` | number | `MAX_PAGE_CHARS` and the 0.9 dedup threshold, as the share of pooled passages that survive |
 | `skipped.blocked` | number | The SSRF guard, and how often callers aim at private space |
 | `skipped.notADocument` | number | `READABLE_CONTENT_TYPES` |
-| `skipped.httpError` | number | Nothing; how often sites refuse the instance |
+| `skipped.httpForbidden` | number | Bot walls and rate limits (401, 403, 429) |
+| `skipped.httpNotFound` | number | Dead links (404, 410) |
+| `skipped.httpOtherError` | number | Other non-ok HTTP statuses |
 | `skipped.redirectLimit` | number | `MAX_REDIRECTS` |
 | `skipped.timedOut` | number | `REQUEST_TIMEOUT_MS` |
 | `skipped.tooLittleText` | number | `MIN_USEFUL_CHARS`, and the extractor's selectors |

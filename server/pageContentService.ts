@@ -124,6 +124,18 @@ function isRedirect(status: number): boolean {
   );
 }
 
+function classifyHttpError(
+  status: number,
+): "httpForbidden" | "httpNotFound" | "httpOtherError" {
+  if (status === 401 || status === 403 || status === 429) {
+    return "httpForbidden";
+  }
+  if (status === 404 || status === 410) {
+    return "httpNotFound";
+  }
+  return "httpOtherError";
+}
+
 function findCharset(text: string, pattern: RegExp): string | null {
   const match = pattern.exec(text);
   return match ? match[1] : null;
@@ -207,7 +219,7 @@ async function downloadDocument(rawUrl: string): Promise<DownloadResult> {
 
     if (!response.ok) {
       await response.body?.cancel().catch(() => {});
-      return { outcome: "httpError" };
+      return { outcome: classifyHttpError(response.status) };
     }
 
     const contentType = response.headers.get("content-type") ?? "";

@@ -38,19 +38,23 @@ describe("recordPageRead", () => {
     const counted = delta(() => {
       recordPageRead({ outcome: "blocked", durationMs: 1 });
       recordPageRead({ outcome: "notADocument", durationMs: 2 });
-      recordPageRead({ outcome: "httpError", durationMs: 3 });
-      recordPageRead({ outcome: "redirectLimit", durationMs: 4 });
+      recordPageRead({ outcome: "httpForbidden", durationMs: 3 });
+      recordPageRead({ outcome: "httpNotFound", durationMs: 4 });
+      recordPageRead({ outcome: "httpOtherError", durationMs: 5 });
+      recordPageRead({ outcome: "redirectLimit", durationMs: 6 });
       recordPageRead({ outcome: "timedOut", durationMs: 6000 });
-      recordPageRead({ outcome: "tooLittleText", durationMs: 5 });
-      recordPageRead({ outcome: "failed", durationMs: 6 });
+      recordPageRead({ outcome: "tooLittleText", durationMs: 7 });
+      recordPageRead({ outcome: "failed", durationMs: 8 });
     });
 
-    expect(counted.requested).toBe(7);
+    expect(counted.requested).toBe(9);
     expect(counted.read).toBe(0);
     expect(counted.skipped).toEqual({
       blocked: 1,
       notADocument: 1,
-      httpError: 1,
+      httpForbidden: 1,
+      httpNotFound: 1,
+      httpOtherError: 1,
       redirectLimit: 1,
       timedOut: 1,
       tooLittleText: 1,
