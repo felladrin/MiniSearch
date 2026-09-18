@@ -6,7 +6,9 @@ export type PageReadOutcome =
   | "read"
   | "blocked"
   | "notADocument"
-  | "httpError"
+  | "httpForbidden"
+  | "httpNotFound"
+  | "httpOtherError"
   | "redirectLimit"
   | "timedOut"
   | "tooLittleText"
@@ -26,7 +28,9 @@ const outcomes: Record<PageReadOutcome, number> = {
   read: 0,
   blocked: 0,
   notADocument: 0,
-  httpError: 0,
+  httpForbidden: 0,
+  httpNotFound: 0,
+  httpOtherError: 0,
   redirectLimit: 0,
   timedOut: 0,
   tooLittleText: 0,

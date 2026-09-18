@@ -245,6 +245,9 @@ this limit set where it should be", not "who read what":
 | `skipped.tooLittleText` | Is the 200-character floor discarding real pages, or is the extractor missing their text |
 | `skipped.notADocument` | Are useful content types being turned away |
 | `skipped.blocked` | Are callers aiming at private space, deliberately or otherwise |
+| `skipped.httpForbidden` | How often bot walls or rate limits turn the instance away (401, 403, 429) |
+| `skipped.httpNotFound` | How often results point to dead links (404, 410) |
+| `skipped.httpOtherError` | How often hosts return other non-ok HTTP statuses |
 | `bodiesTruncated` | Is the 1.5 MB body cap biting |
 | `excerptKeptRate` | How much of a page the per-URL cap and dedup keep |
 
@@ -260,9 +263,13 @@ grounded on before:
 
 | Failure | Result |
 | --- | --- |
-| Host resolves privately, or the scheme is not HTTP | That page is skipped, no request is made |
-| Page times out, errors, or is not a document | That page is skipped |
-| Page yields less than 200 characters | That page is skipped |
+| Host resolves privately, or the scheme is not HTTP | That page is skipped, no request is made (`blocked`) |
+| Page times out or redirects fail | That page is skipped (`timedOut`, `redirectLimit`, `failed`) |
+| Page is not an HTML/PDF document | That page is skipped (`notADocument`) |
+| Bot wall, rate limit, or auth required (401, 403, 429) | That page is skipped (`httpForbidden`) |
+| Dead link (404, 410) | That page is skipped (`httpNotFound`) |
+| Other HTTP error (5xx, other non-ok status) | That page is skipped (`httpOtherError`) |
+| Page yields less than 200 characters | That page is skipped (`tooLittleText`) |
 | `/page-content` fails or times out | Answer falls back to snippets |
 | Setting turned off, or AI responses off | No page is ever read |
 | A newer search starts while pages are still being read | The late result is dropped instead of grounding the new answer |

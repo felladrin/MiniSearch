@@ -485,10 +485,27 @@ describe("page read counters", () => {
     });
   });
 
-  it("tells an error status apart from a page that is not a document", async () => {
+  it("classifies HTTP error statuses by class and tells them apart from non-documents", async () => {
     fetchMock.mockResolvedValue(new Response("nope", { status: 403 }));
     expect((await countOutcomes("https://example.com/x")).skipped).toEqual({
-      httpError: 1,
+      httpForbidden: 1,
+    });
+
+    fetchMock.mockResolvedValue(new Response("rate limited", { status: 429 }));
+    expect((await countOutcomes("https://example.com/rate")).skipped).toEqual({
+      httpForbidden: 1,
+    });
+
+    fetchMock.mockResolvedValue(new Response("missing", { status: 404 }));
+    expect(
+      (await countOutcomes("https://example.com/missing")).skipped,
+    ).toEqual({
+      httpNotFound: 1,
+    });
+
+    fetchMock.mockResolvedValue(new Response("server error", { status: 500 }));
+    expect((await countOutcomes("https://example.com/err")).skipped).toEqual({
+      httpOtherError: 1,
     });
 
     // A PDF is no longer dropped as notADocument; it goes through the passage
