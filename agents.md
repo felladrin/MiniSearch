@@ -73,7 +73,7 @@ Need to:
 ### Entry Points
 - `client/index.tsx` - React app initialization
 - `vite.config.ts` - Vite dev server with hooks
-- `Dockerfile` - Multi-stage container build
+- `Dockerfile` - Single-stage container build
 
 ### Business Logic Modules
 - `client/modules/search.ts` - Search orchestration and caching

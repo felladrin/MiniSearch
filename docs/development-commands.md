@@ -60,18 +60,20 @@ AI agents can parse these to identify:
 
 ## CI/CD Pipeline
 
-The repository uses six GitHub Actions workflows for continuous integration, deployment, and release management:
+The repository uses nine GitHub Actions workflows for continuous integration, deployment, release management, security scanning, and issue triage:
 
 ### Workflow Files
 
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `ci.yml` | Push/PR to `main` or `master` | Full lint (`npm run lint`), format check (`npm run format`), and Vitest test suite |
+| `security.yml` | Push/PR to `main` or `master` | Secret scanning (Gitleaks) and license compliance check (`npm run license-check`) with artifact upload |
 | `on-push-to-main.yml` | Push to `main` | Delegates to `reusable-check-docker.yml` |
 | `on-pull-request-to-main.yml` | PR opened/synced/reopened to `main` | Delegates to `reusable-check-docker.yml`; skippable via `skip-check-docker` label |
 | `publish-docker-image.yml` | Manual (`workflow_dispatch`), `main` only | Cuts a CalVer release: validates the optional `version` input (empty auto-computes today's date in UTC plus the next free same-day sequence), builds the multi-platform Docker image (linux/amd64, linux/arm64) and pushes it to `ghcr.io` as that version plus `latest` (build job, `contents: read` + `packages: write`), then a second job holding `contents: write` pushes the git tag and publishes the GitHub Release. The release job is idempotent: when a run pushed the tag but failed before publishing the Release, re-running that job alone finishes it without rebuilding |
 | `scan-docker-image.yml` | Weekly (Monday 06:00 UTC) or manual | Trivy scan of the published image, reporting fixable HIGH/CRITICAL findings to code scanning |
 | `deploy-to-hugging-face.yml` | Manual (`workflow_dispatch`) | Syncs the repository to a Hugging Face Space with the `hf` CLI over OIDC Trusted Publishers |
+| `stale.yml` | Daily (01:30 UTC) or manual | Marks and closes inactive issues and labels stale pull requests |
 | `reusable-check-docker.yml` | Called by other workflows | Docker compose production build + health check via `curl localhost:7860` (lint/format/test are covered by `ci.yml`) |
 
 ### Reusable Workflow (`reusable-check-docker.yml`)
@@ -82,7 +84,7 @@ Used by both `on-push-to-main` and `on-pull-request-to-main` to run the producti
 
 ### Docker Image Builds
 
-The Docker image uses a multi-stage build:
+The Docker image uses a single runtime stage:
 The image installs Python/SearXNG, builds the Vite frontend, and runs SearXNG and Node.js in a single container via shell process composition. No compilation step is required: the reranker's ONNX Runtime binaries ship prebuilt with the npm dependency.
 
 The production image is published to `ghcr.io` with multi-platform support (linux/amd64, linux/arm64). Labels are auto-generated from Git metadata via `docker/metadata-action`, and each release is published as `latest` and as its CalVer version tag; to pin a build, users reference the version tag or the image digest. Weekly, `scan-docker-image.yml` runs Trivy against the published `latest` and reports fixable HIGH/CRITICAL findings to code scanning.
