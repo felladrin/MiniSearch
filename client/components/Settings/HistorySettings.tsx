@@ -23,8 +23,12 @@ interface HistorySettingsProps {
 
 export default function HistorySettings({ onClose }: HistorySettingsProps) {
   const [settings, setSettings] = usePubSub(settingsPubSub);
-  const { recentSearches, clearAll } = useSearchHistory();
+  const { recentSearches, llmResponseCount, chatMessageCount, clearAll } =
+    useSearchHistory();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const hasHistory =
+    recentSearches.length > 0 || llmResponseCount > 0 || chatMessageCount > 0;
 
   const form = useForm({
     initialValues: {
@@ -102,7 +106,7 @@ export default function HistorySettings({ onClose }: HistorySettingsProps) {
               color="default"
               variant="default"
               onClick={() => setShowClearConfirm(true)}
-              disabled={recentSearches.length === 0}
+              disabled={!hasHistory}
             >
               Clear all history
             </Button>
@@ -124,8 +128,8 @@ export default function HistorySettings({ onClose }: HistorySettingsProps) {
       >
         <Stack gap="md">
           <Alert color="orange" icon={<IconInfoCircle size={16} />}>
-            This action will permanently delete all {recentSearches.length}{" "}
-            search entries. This cannot be undone.
+            This action will permanently delete all your saved searches, AI
+            responses and chat messages. This cannot be undone.
           </Alert>
 
           <Text size="sm">
