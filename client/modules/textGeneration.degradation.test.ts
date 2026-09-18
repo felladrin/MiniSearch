@@ -115,6 +115,13 @@ vi.mock("./textGenerationUtilities", () => ({
   },
   canStartResponding: vi.fn().mockResolvedValue(undefined),
   defaultContextSize: 4096,
+  // Mirror of the real getDefaultChatMessages shape; the prompts and query come
+  // from the harness state so assertions on the streamed flow keep working.
+  getDefaultChatMessages: (_searchResults: string) => [
+    { role: "user", content: "system prompt" },
+    { role: "assistant", content: "Ok!" },
+    { role: "user", content: harness.state.query },
+  ],
   getDefaultChatCompletionCreateParamsStreaming: vi.fn(() => ({
     max_tokens: 1000,
   })),
