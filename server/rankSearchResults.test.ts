@@ -42,16 +42,18 @@ describe("rankSearchResults", () => {
 
   it("should sort results by score descending when preserveTopResults is false", async () => {
     mockRerank.mockResolvedValue([
-      { index: 0, relevance_score: 0.9 },
-      { index: 1, relevance_score: 0.8 },
+      { index: 0, relevance_score: 0.8 },
+      { index: 1, relevance_score: 0.9 },
+      { index: 2, relevance_score: 0.5 },
     ] as { index: number; relevance_score: number }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
     const result = await rankSearchResults("query", [
       ["A", "a", "https://a.com"],
       ["B", "b", "https://b.com"],
+      ["C", "c", "https://c.com"],
     ]);
-    // Results are sorted by score descending (A has higher score)
-    expect(result[0][0]).toBe("A");
+    // Results are sorted by score descending (B has higher score than A, C is dropped by score filter)
+    expect(result[0][0]).toBe("B");
   });
 
   it("carries the reranker score through as a fourth tuple element", async () => {
