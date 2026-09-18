@@ -73,7 +73,7 @@ Need to:
 ### Entry Points
 - `client/index.tsx` - React app initialization
 - `vite.config.ts` - Vite dev server with hooks
-- `Dockerfile` - Multi-stage container build
+- `Dockerfile` - Single-stage container build
 
 ### Business Logic Modules
 - `client/modules/search.ts` - Search orchestration and caching
@@ -220,7 +220,7 @@ The project is split across three TypeScript configs, and the default one covers
 | Config | Covers |
 | --- | --- |
 | `tsconfig.json` | `client`, `shared`, `test` |
-| `tsconfig.node.json` | `vite.config.ts`, `server`, `shared` |
+| `tsconfig.node.json` | `vite.config.ts`, `server`, `shared`, `e2e`, `playwright.config.ts` |
 | `tsconfig.eval.json` | `eval`, `shared` |
 
 So `npx tsc --noEmit` reports success while type errors sit in `server/` or `eval/`, and CI then fails on a change that looked clean locally. Only `npm run lint` runs all three configs. Never treat a bare `tsc` as a green typecheck.
