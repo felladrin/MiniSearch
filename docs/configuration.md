@@ -113,7 +113,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `inferenceType` | enum | `'browser'` | AI provider: `browser`, `openai`, `horde`, `internal` |
-| `cpuThreads` | number | (auto) | Number of CPU threads for inference (Wllama), defaults to `navigator.hardwareConcurrency - 2` |
+| `cpuThreads` | number | (auto) | Number of CPU threads for inference (Wllama), defaults to half the logical processors (`navigator.hardwareConcurrency / 2`), minimum 1 |
 | `allowAiModelDownload` | boolean | `false` | Allow automatic AI model downloads |
 | `wllamaModelId` | string | `WLLAMA_DEFAULT_MODEL_ID` env var | Default Wllama model ID |
 | `hordeApiKey` | string | `'0000000000'` | AI Horde API key (default is anonymous) |
@@ -262,7 +262,8 @@ Client-facing configuration (access keys, inference type, internal API settings)
   "wllamaDefaultModelId": "littlelamb-290m",
   "internalApiEnabled": true,
   "internalApiName": "Internal API",
-  "defaultInferenceType": "browser"
+  "defaultInferenceType": "browser",
+  "searchToken": "<search-token>"
 }
 ```
 
