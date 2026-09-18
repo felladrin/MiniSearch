@@ -1,7 +1,6 @@
 import type { Wllama } from "@wllama/wllama";
 import { addLogEntry } from "./logEntries";
 import {
-  getQuery,
   getSettings,
   getTextGenerationState,
   updateModelLoadingProgress,
@@ -9,11 +8,11 @@ import {
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
-import { getSystemPrompt } from "./systemPrompt";
 import {
   ChatGenerationError,
   canStartResponding,
   defaultContextSize,
+  getDefaultChatMessages,
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
 import type { ChatMessage } from "./types";
@@ -36,18 +35,11 @@ export async function generateTextWithWllama(): Promise<void> {
       messages: async () => {
         const settings = getSettings();
         const modelConfig = wllamaModels[settings.wllamaModelId];
-        return [
-          {
-            role: "user",
-            content: getSystemPrompt(
-              await getFormattedSearchResults(
-                modelConfig.shouldIncludeUrlsOnPrompt,
-              ),
-            ),
-          },
-          { role: "assistant", content: "Ok!" },
-          { role: "user", content: getQuery() },
-        ];
+        return getDefaultChatMessages(
+          await getFormattedSearchResults(
+            modelConfig.shouldIncludeUrlsOnPrompt,
+          ),
+        );
       },
       onUpdate: updateResponse,
       shouldCheckCanRespond: true,
