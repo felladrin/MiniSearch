@@ -69,4 +69,27 @@ describe("AiResponseContent", () => {
       .closest("[aria-live]");
     expect(liveRegion).toHaveAttribute("aria-busy", "false");
   });
+
+  it("gives the toolbar action icons accessible names while generating", () => {
+    renderContent("generating");
+    expect(
+      screen.getByRole("button", { name: "Interrupt generation" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Listen to response" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Enable scroll bar" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy response" }),
+    ).toBeInTheDocument();
+  });
+
+  it("gives the regenerate button an accessible name when completed", () => {
+    renderContent("completed");
+    expect(
+      screen.getByRole("button", { name: "Regenerate response" }),
+    ).toBeInTheDocument();
+  });
 });

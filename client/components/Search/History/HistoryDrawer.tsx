@@ -281,6 +281,7 @@ export default function HistoryDrawer({
               rightSection={
                 searchQuery && (
                   <ActionIcon
+                    aria-label="Clear filter"
                     variant="subtle"
                     color="gray"
                     size="sm"
