@@ -54,6 +54,8 @@ const mockHistory = (overrides: SearchHistoryOverrides = {}) => {
   const noop = vi.fn(async (): Promise<void> => {});
   vi.mocked(useSearchHistory).mockReturnValue({
     recentSearches: [],
+    llmResponseCount: 0,
+    chatMessageCount: 0,
     filteredSearches: overrides.filteredSearches ?? [],
     groupedSearches: overrides.groupedSearches ?? {},
     isLoading: false,
