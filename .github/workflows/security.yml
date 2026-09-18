@@ -45,6 +45,7 @@ jobs:
         run: npm run license-check -- --report LICENSES.md
 
       - name: Upload license report
+        if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
           name: license-report

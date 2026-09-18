@@ -9,5 +9,11 @@
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": ["vite.config.ts", "server", "shared"]
+  "include": [
+    "vite.config.ts",
+    "server",
+    "shared",
+    "e2e",
+    "playwright.config.ts"
+  ]
 }
