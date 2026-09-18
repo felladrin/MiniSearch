@@ -12,12 +12,40 @@ beforeEach(() => {
 });
 
 describe("rankSearchResults", () => {
+  it.each([
+    ["text", false],
+    ["images", true],
+  ] as const)(
+    "records %s independently of preserveTopResults=%s",
+    async (searchType, preserveTopResults) => {
+      const { getRerankingStats } = await import("./rerankingSinceLastRestart");
+      const { rankSearchResults } = await import("./rankSearchResults");
+      const before = getRerankingStats();
+      const otherType = searchType === "text" ? "images" : "text";
+      mockRerank.mockResolvedValue([{ index: 0, relevance_score: 1 }]);
+
+      await rankSearchResults(
+        "query",
+        searchType,
+        [["Title", "Snippet", "https://example.com"]],
+        preserveTopResults,
+      );
+
+      expect(getRerankingStats().byType[searchType].reranks).toBe(
+        before.byType[searchType].reranks + 1,
+      );
+      expect(getRerankingStats().byType[otherType]).toEqual(
+        before.byType[otherType],
+      );
+    },
+  );
+
   it("should return empty array when no results provided", async () => {
     mockRerank.mockResolvedValue(
       [] as { index: number; relevance_score: number }[],
     );
     const { rankSearchResults } = await import("./rankSearchResults");
-    const result = await rankSearchResults("test query", []);
+    const result = await rankSearchResults("test query", "text", []);
     expect(result).toEqual([]);
     expect(mockRerank).toHaveBeenCalledWith("test query", []);
   });
@@ -28,7 +56,7 @@ describe("rankSearchResults", () => {
       { index: 1, relevance_score: 0.5 },
     ] as { index: number; relevance_score: number }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
-    await rankSearchResults("Test Query", [
+    await rankSearchResults("Test Query", "text", [
       ["Title A", "Content A", "https://a.com"],
       ["Title B", "Content B", "https://b.com"],
     ]);
@@ -46,7 +74,7 @@ describe("rankSearchResults", () => {
       { index: 1, relevance_score: 0.8 },
     ] as { index: number; relevance_score: number }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
-    const result = await rankSearchResults("query", [
+    const result = await rankSearchResults("query", "text", [
       ["A", "a", "https://a.com"],
       ["B", "b", "https://b.com"],
     ]);
@@ -61,7 +89,7 @@ describe("rankSearchResults", () => {
       { index: 2, relevance_score: 8.8 },
     ] as { index: number; relevance_score: number }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
-    const result = await rankSearchResults("query", [
+    const result = await rankSearchResults("query", "text", [
       ["A", "a", "https://a.com"],
       ["B", "b", "https://b.com"],
       ["C", "c", "https://c.com"],
@@ -83,6 +111,7 @@ describe("rankSearchResults", () => {
     const { rankSearchResults } = await import("./rankSearchResults");
     const result = await rankSearchResults(
       "query",
+      "text",
       [
         ["Top", "top", "https://top.com"],
         ["A", "a", "https://a.com"],
@@ -112,6 +141,7 @@ describe("rankSearchResults", () => {
     const { rankSearchResults } = await import("./rankSearchResults");
     const result = await rankSearchResults(
       "query",
+      "text",
       [
         ["Top", "top content", "https://top.com"],
         ["Other", "other content", "https://other.com"],
@@ -126,7 +156,7 @@ describe("rankSearchResults", () => {
       [] as { index: number; relevance_score: number }[],
     );
     const { rankSearchResults } = await import("./rankSearchResults");
-    const result = await rankSearchResults("query", [
+    const result = await rankSearchResults("query", "text", [
       ["A", "a", "https://a.com"],
     ]);
     expect(result).toEqual([]);
@@ -139,7 +169,9 @@ describe("rankSearchResults", () => {
     }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
     const longTitle = "A".repeat(600);
-    await rankSearchResults("query", [[longTitle, "short", "https://a.com"]]);
+    await rankSearchResults("query", "text", [
+      [longTitle, "short", "https://a.com"],
+    ]);
     const docs = mockRerank.mock.calls[0][1] as string[];
     // Truncation is now token-based inside the reranker, so the full document
     // reaches it; nothing is cut by character count upstream.
@@ -153,7 +185,7 @@ describe("rankSearchResults", () => {
       relevance_score: number;
     }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
-    await rankSearchResults("query", [
+    await rankSearchResults("query", "text", [
       ["Title", 'Content with "quotes"', "https://a.com"],
     ]);
     const docs = mockRerank.mock.calls[0][1] as string[];
@@ -173,8 +205,8 @@ describe("rankSearchResults", () => {
     ] as { index: number; relevance_score: number }[]);
 
     const before = getRerankingStats();
-    await rankSearchResults("test", results);
-    await rankSearchResults("test", results, true);
+    await rankSearchResults("test", "text", results);
+    await rankSearchResults("test", "text", results, true);
 
     expect(getRerankingStats().reranks).toBe(before.reranks + 2);
 
@@ -183,7 +215,7 @@ describe("rankSearchResults", () => {
     mockRerank.mockResolvedValue(
       [] as { index: number; relevance_score: number }[],
     );
-    await rankSearchResults("test", []);
+    await rankSearchResults("test", "text", []);
 
     expect(getRerankingStats().reranks).toBe(before.reranks + 2);
   });
@@ -198,7 +230,7 @@ describe("rankSearchResults", () => {
     ] as { index: number; relevance_score: number }[]);
 
     const before = getRerankingStats();
-    const ranked = await rankSearchResults("test", [
+    const ranked = await rankSearchResults("test", "text", [
       ["A", "a", "https://a.com"],
       ["B", "b", "https://b.com"],
       ["C", "c", "https://c.com"],
@@ -221,7 +253,7 @@ describe("rankSearchResults", () => {
     ] as { index: number; relevance_score: number }[]);
     const { rankSearchResults } = await import("./rankSearchResults");
 
-    const ranked = await rankSearchResults("test", [
+    const ranked = await rankSearchResults("test", "text", [
       ["A", "a", "https://a.com"],
       ["B", "b", "https://b.com"],
       ["C", "c", "https://c.com"],
@@ -252,6 +284,7 @@ describe("rankSearchResults", () => {
 
     await rankSearchResults(
       "test",
+      "text",
       Array.from({ length: 10 }, (_unused, index) => [
         `T${index}`,
         `C${index}`,

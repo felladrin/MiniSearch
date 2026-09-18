@@ -416,6 +416,7 @@ way `pageReads` does:
 | `reranker.reranks` | number | Nothing; the denominator for the rest |
 | `reranker.averageMs` | number | Whether reranking or SearXNG is what users wait for, and so whether to rerank a shortlist instead of all 30 results. Over `reranks`, covering the filtering and sorting as well as the model |
 | `reranker.keptRate` | number | `kStandardDeviationFactor`: near 100% means the filter is not filtering. Text and image reranks are pooled, and the two run through different paths, so this moves with the traffic mix as well as with the threshold |
+| `reranker.byType.text`, `reranker.byType.images` | object | Each reports `reranks`, `averageMs`, `considered`, `kept` and `keptRate` for its search type; see `docs/reranking.md`. The existing top-level values remain combined totals |
 | `reranker.fallbackApplied` | number | `minPercentageFallback`: a large share means the deviation threshold is emptying batches the fallback then has to rescue |
 | `reranker.skippedUnhealthy` | number | Nothing; searches served in SearXNG's own order because the model was not loaded |
 | `reranker.failed` | number | Nothing; the same, because reranking threw |

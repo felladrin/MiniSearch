@@ -107,12 +107,12 @@ The search endpoint coordinates reranking in `searchEndpointServerHook.ts`:
 ```
 1. fetchSearXNG(query, searchType, limit) - internally fetches from SearXNG, deduplicates, and cleans results
 2. Check getRerankerStatus()
-   - If healthy: rankSearchResults(query, results, preserveTopResults)
+   - If healthy: rankSearchResults(query, searchType, results, preserveTopResults)
    - If unhealthy: return unranked results (fallback)
 3. Return structured JSON response
 ```
 
-Reranking is applied to both text and image search results. For image results, titles and URLs are reformatted into the same text-tuple shape used for text search before being sent through the reranker, then the original image data (including thumbnails) is re-matched to the reranked order by URL. The only difference is that text search passes `preserveTopResults: true` to keep the original top SearXNG result pinned, while image search does not.
+Reranking is applied to both text and image search results. For image results, titles and URLs are reformatted into the same text-tuple shape used for text search before being sent through the reranker, then the original image data (including thumbnails) is re-matched to the reranked order by URL. Text search passes `preserveTopResults: true` to keep the original top SearXNG result pinned, while image search does not.
 
 ## Model Details
 
@@ -166,8 +166,47 @@ npx vitest run --config vitest.integration.config.ts
 how long a rerank takes, the share of results that survive the score filter,
 how often the percentage fallback has to rescue a batch, and how often a search
 was served in SearXNG's own order because the model was not loaded or threw.
-The two thresholds in `filterResultsByScore` have no other evidence behind
-them; see the `/status` section of `docs/overview.md` for the field reference.
+The existing top-level fields remain combined totals. `byType.text` and
+`byType.images` each report `reranks`, `averageMs`, `considered`, `kept` and
+`keptRate`, so text snippets and image titles can be assessed separately.
+For example, two text reranks taking 100 ms and 300 ms and one image rerank
+taking 20 ms produce:
+
+```json
+{
+  "reranker": {
+    "reranks": 3,
+    "averageMs": 140,
+    "considered": 22,
+    "kept": 7,
+    "keptRate": 31.8,
+    "fallbackApplied": 1,
+    "skippedUnhealthy": 0,
+    "failed": 0,
+    "byType": {
+      "text": { "reranks": 2, "averageMs": 200, "considered": 20, "kept": 5, "keptRate": 25 },
+      "images": { "reranks": 1, "averageMs": 20, "considered": 2, "kept": 2, "keptRate": 100 }
+    }
+  }
+}
+```
+
+`averageMs` divides elapsed time by completed, non-empty reranks and rounds to
+whole milliseconds; it includes score filtering and sorting. `keptRate` is the
+percentage of considered results kept, rounded to one decimal place. Combined
+values use summed durations and counts, not an average of the two category
+averages or percentages. Empty categories report zeros, and an empty ranking
+batch does not increment either category or the combined totals.
+
+`fallbackApplied`, `skippedUnhealthy` and `failed` stay at the top level.
+An unhealthy or throwing model increments the existing skip or failure counter
+without counting a completed rerank. All counters reset on server restart.
+The search endpoint passes an explicit `"text"` or `"images"` category through
+ranking to the counters; it is independent of whether the top result is pinned.
+Only the category, counts, duration and fallback flag are recorded, never a
+query, URL or result text.
+
+See the `/status` section of `docs/overview.md` for the full field reference.
 
 ## Related Topics
 

@@ -71,8 +71,9 @@ describe("searchEndpointServerHook", () => {
       shouldContinue: true,
     });
     vi.mocked(getRerankerStatus).mockResolvedValue(false);
-    vi.mocked(rankSearchResults).mockImplementation(async (_query, results) =>
-      results.map(([title, content, url]) => [title, content, url, 0]),
+    vi.mocked(rankSearchResults).mockImplementation(
+      async (_query, _searchType, results) =>
+        results.map(([title, content, url]) => [title, content, url, 0]),
     );
   });
 
@@ -210,6 +211,7 @@ describe("searchEndpointServerHook", () => {
     expect(fetchSearXNG).toHaveBeenCalledWith("test", "text", 5);
     expect(rankSearchResults).toHaveBeenCalledWith(
       "test",
+      "text",
       [
         ["A", "snippet a", "https://a.com"],
         ["B", "snippet b", "https://b.com"],
