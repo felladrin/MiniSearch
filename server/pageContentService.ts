@@ -19,6 +19,8 @@ const MIN_USEFUL_CHARS = 200;
 const MIN_PASSAGE_CHARS = 180;
 const MAX_PASSAGE_CHARS = 1200;
 const OVERLAP_CHARS = 200;
+const MAX_DENSE_PASSAGES = 256;
+const RRF_K = 60;
 
 const appName = repository.url.slice(repository.url.lastIndexOf("/") + 1);
 
@@ -533,6 +535,43 @@ function rankPassages(
     .sort((a, b) => b.score - a.score || a.index - b.index);
 }
 
+async function rankPassagesWithDenseScores(
+  query: string,
+  passages: { url: string; text: string; positionInPage: number }[],
+): Promise<RankedPassage[]> {
+  const lexicalRanked = rankPassages(query, passages);
+  if (passages.length === 0 || passages.length > MAX_DENSE_PASSAGES) {
+    return lexicalRanked;
+  }
+
+  let denseScores: number[];
+  try {
+    denseScores = await scorePassages(
+      query,
+      passages.map((p) => p.text),
+    );
+  } catch {
+    console.warn("Dense passage scoring failed; using lexical ranking.");
+    return lexicalRanked;
+  }
+  if (denseScores.length === 0) return lexicalRanked;
+
+  const denseRanks: number[] = [];
+  denseScores
+    .map((score, index) => ({ score, index }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .forEach(({ index }, rank) => {
+      denseRanks[index] = rank + 1;
+    });
+
+  return lexicalRanked
+    .map((passage, rank) => ({
+      ...passage,
+      score: 1 / (RRF_K + rank + 1) + 1 / (RRF_K + denseRanks[passage.index]),
+    }))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+}
+
 const JACCARD_THRESHOLD = 0.9;
 
 /**
@@ -614,7 +653,7 @@ function selectPassagesAcrossPages(
  * what was transferred and never what the model read.
  *
  * Lexical and dense (bi-encoder) scores are fused with reciprocal rank fusion;
- * when the model is unavailable the lexical score alone is used.
+ * unavailable or failed scoring and pools above 256 passages keep lexical order.
  *
  * @param passages - Candidate passages from a single page; the wrapper feeds
  * them through the production selector so tests exercise the real code path.
@@ -632,29 +671,7 @@ export async function selectPassages(
     positionInPage: index,
   }));
 
-  const lexicalRanked = rankPassages(query, input);
-
-  // Dense scores from the bi-encoder; empty array when the model is not loaded.
-  const denseScores = await scorePassages(query, passages);
-
-  // Reciprocal rank fusion: combine lexical and dense ranks.
-  const RRF_K = 60;
-  const fused = lexicalRanked.map((p, i) => {
-    const lexicalRank = i + 1;
-    const denseRank =
-      denseScores.length > 0
-        ? [...denseScores]
-            .map((s, idx) => ({ s, idx }))
-            .sort((a, b) => b.s - a.s)
-            .findIndex((r) => r.idx === i) + 1
-        : lexicalRank;
-    return {
-      ...p,
-      score:
-        1 / (RRF_K + lexicalRank) +
-        (denseScores.length > 0 ? 1 / (RRF_K + denseRank) : 0),
-    };
-  });
+  const fused = await rankPassagesWithDenseScores(query, input);
 
   return selectPassagesAcrossPages(fused, maxChars, maxChars).get("") ?? [];
 }
@@ -739,7 +756,7 @@ export async function fetchPageContents(
     })),
   );
 
-  const ranked = rankPassages(query, allPassages);
+  const ranked = await rankPassagesWithDenseScores(query, allPassages);
   const selectedByUrl = selectPassagesAcrossPages(
     ranked,
     MAX_PAGE_CHARS * pages.length,
