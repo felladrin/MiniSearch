@@ -86,6 +86,29 @@ Passages are ranked by how much of the query they cover, with a prior for lead
 passages (the definition or summary usually opens a page). The prior is worth at
 most half a matched term, so it settles ties without outweighing coverage.
 
+For pools of at most 256 passages, the server also scores every passage with
+its local multilingual bi-encoder. Lexical and dense ranks are combined with
+reciprocal rank fusion: `1 / (60 + lexicalRank) + 1 / (60 + denseRank)`, with
+ranks starting at 1. Dense scores stay attached to their original passages
+when lexical ranking reorders the pool. Fused scores are sorted highest first;
+equal dense or fused scores use original pool order as the tie-breaker. The
+same shared ranking feeds production and the single-page test wrapper, before
+the existing per-page character cap and cross-page duplicate suppression.
+
+Pools above 256 passages keep the exact lexical ranking of the whole pool;
+they are not truncated to a shortlist. An unloaded model (empty dense scores)
+or a scoring error also keeps lexical ranking. Errors log a fixed diagnostic
+without query, URL, passage text or model error details.
+
+The limit bounds inference work, not elapsed time. On an Apple M2 Pro CPU,
+ONNX Runtime 1.30.0 took 7.42–7.48 seconds for 256 passages, 15.07–15.20 seconds
+for 512, and 22.37–22.94 seconds for 768, with two warm runs per pool using
+roughly 1,083-character English passages near the model's 256-token limit.
+These are scoring-only measurements, not production latency guarantees.
+The browser's 20-second request timeout also includes page downloads, which
+can take up to 6 seconds; slower hosts and concurrent requests can still exceed
+it at 256 passages. Larger pools therefore retain lexical-only selection.
+
 The excerpt is returned best-first rather than in document order. It reads less
 like prose that way, and it is the only order that survives what happens next:
 the client trims each excerpt again against the model's context and keeps a
