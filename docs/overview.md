@@ -212,7 +212,7 @@ MiniSearch implements all server-side logic as Vite plugin hooks. Each hook regi
 Key server-side modules:
 
 - **`server/webSearchService.ts`**: Integrates with SearXNG at `http://127.0.0.1:8888`. Implements a circuit breaker (opens after 5 failures, resets after 60s) and retry logic (up to 3 retries with exponential backoff, for 500s and for empty responses naming transiently unresponsive engines; an all-suspended set fails fast on the first attempt, since SearXNG suspensions last an hour to a day).
-- **`server/pageContentService.ts`**: Reads result pages for answer grounding: SSRF-guarded fetches with a byte cap, readable-text extraction, and query-relevant passage selection.
+- **`server/pageContentService.ts`**: Reads result pages for answer grounding: SSRF-guarded fetches with a byte cap, readable-text extraction, and query-relevant passage selection. Reads run under a per-host circuit breaker (`server/pageReadHostBreaker.ts`) that skips a host for 5 minutes after 3 refusals in a row, then probes it with one read.
 - **`server/searchToken.ts`**: Manages a token at `{os.tempdir()}/minisearch-token` used for CSRF protection on search requests.
 - **`server/verifiedTokens.ts`**: In-memory `Map` of verified session token to last-seen time, evicted after 30 idle minutes, plus a cumulative count of the distinct sessions seen since the last restart.
 - **`server/rejectedTokens.ts`**: Bounded in-memory set of tokens that already failed a completed verification, so a replay is refused without a second argon2 check until the set evicts it at the cap; a token refused once cannot become valid in the same process, so the set is exact, and a token that never got a verification result never occupies a slot.
@@ -305,7 +305,9 @@ is counted at all (see `docs/page-content.md`):
 | `averageReadMs` | number | `REQUEST_TIMEOUT_MS`, including the reads that hit it |
 | `bodiesTruncated` | number | `MAX_RESPONSE_BYTES` |
 | `excerptKeptRate` | number | `MAX_PAGE_CHARS` and the 0.9 dedup threshold, as the share of pooled passages that survive |
+| `circuitOpens` | number | `failureThreshold` on the page-read host breaker: how often a host was boxed, summed over every host, since no host is named |
 | `skipped.blocked` | number | The SSRF guard, and how often callers aim at private space |
+| `skipped.skippedByBreaker` | number | `resetTimeout` on the host breaker: reads refused on the server because the host had refused the last three, which is what the box saved |
 | `skipped.notADocument` | number | `READABLE_CONTENT_TYPES` |
 | `skipped.httpForbidden` | number | Bot walls and rate limits (401, 403, 429) |
 | `skipped.httpNotFound` | number | Dead links (404, 410) |

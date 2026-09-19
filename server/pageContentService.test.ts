@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { repository, version } from "../package.json" with { type: "json" };
 
 const lookupMock = vi.hoisted(() => vi.fn());
@@ -24,6 +24,10 @@ import {
   splitIntoPassages,
   splitLongPassage,
 } from "./pageContentService";
+import {
+  getPageReadCircuitStats,
+  PageReadHostBreaker,
+} from "./pageReadHostBreaker";
 import { getPageReadStats } from "./pageReadsSinceLastRestart";
 
 const fetchMock = vi.fn();
@@ -62,6 +66,30 @@ beforeEach(() => {
   pdfDestroyMock.mockReset();
   pdfDestroyMock.mockResolvedValue(undefined);
 });
+
+/**
+ * Counts what one call to `fetchPageContents` added, by outcome. A fresh
+ * breaker per call unless one is passed, so the refusals a case injects never
+ * add up to a host being skipped in a later one.
+ */
+async function countOutcomes(url: string, breaker = new PageReadHostBreaker()) {
+  const before = getPageReadStats();
+  await fetchPageContents("cats", [url], breaker);
+  const after = getPageReadStats();
+
+  return {
+    read: after.read - before.read,
+    skipped: Object.fromEntries(
+      Object.entries(after.skipped)
+        .map(([outcome, count]) => [
+          outcome,
+          count - before.skipped[outcome as keyof typeof before.skipped],
+        ])
+        .filter(([, count]) => count !== 0),
+    ),
+    bodiesTruncated: after.bodiesTruncated - before.bodiesTruncated,
+  };
+}
 
 describe("extractReadableText", () => {
   it("keeps the article and drops site chrome, scripts and styles", () => {
@@ -448,26 +476,6 @@ describe("selectPassagesAcrossPages", () => {
 });
 
 describe("page read counters", () => {
-  /** Counts what one call to `fetchPageContents` added, by outcome. */
-  async function countOutcomes(url: string, query = "cats") {
-    const before = getPageReadStats();
-    await fetchPageContents(query, [url]);
-    const after = getPageReadStats();
-
-    return {
-      read: after.read - before.read,
-      skipped: Object.fromEntries(
-        Object.entries(after.skipped)
-          .map(([outcome, count]) => [
-            outcome,
-            count - before.skipped[outcome as keyof typeof before.skipped],
-          ])
-          .filter(([, count]) => count !== 0),
-      ),
-      bodiesTruncated: after.bodiesTruncated - before.bodiesTruncated,
-    };
-  }
-
   it("counts a page it could read", async () => {
     respondWithHtml(articlePage);
 
@@ -596,16 +604,219 @@ describe("page read counters", () => {
     expect(stats.excerptKeptRate).toBeLessThan(65);
   });
 
-  it("records no query or URL anywhere in what it reports", async () => {
+  it("records no query, URL or host anywhere in what it reports", async () => {
+    // Refused enough to box the host, so the breaker is holding its name in
+    // memory at the moment the stats are read.
+    const breaker = new PageReadHostBreaker({ failureThreshold: 1 });
+    fetchMock.mockResolvedValue(new Response("nope", { status: 403 }));
+    await fetchPageContents(
+      "a very distinctive private query",
+      ["https://secret.example.com/wall"],
+      breaker,
+    );
     respondWithHtml(articlePage);
-    await fetchPageContents("a very distinctive private query", [
-      "https://secret.example.com/private-page",
-    ]);
+    await fetchPageContents(
+      "a very distinctive private query",
+      ["https://secret.example.com/private-page"],
+      breaker,
+    );
 
-    const reported = JSON.stringify(getPageReadStats());
+    const reported = JSON.stringify({
+      ...getPageReadStats(),
+      ...getPageReadCircuitStats(),
+      circuitOpens: breaker.getOpens(),
+    });
 
     expect(reported).not.toContain("distinctive");
     expect(reported).not.toContain("secret.example.com");
+  });
+});
+
+describe("host circuit breaker", () => {
+  // A short window on fake timers, so that "still boxed" holds for as long as
+  // the test says and not for however long the machine takes to reach the
+  // next line.
+  const breakerOptions = {
+    failureThreshold: 3,
+    resetTimeout: 1000,
+    successThreshold: 1,
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function refuse(status: number) {
+    fetchMock.mockResolvedValue(new Response("nope", { status }));
+  }
+
+  async function boxHost(breaker: PageReadHostBreaker, host: string) {
+    refuse(403);
+    for (const page of ["a", "b", "c"]) {
+      await countOutcomes(`https://${host}/${page}`, breaker);
+    }
+  }
+
+  it("skips a host after three refusals in a row, without a request, and counts the skip", async () => {
+    const breaker = new PageReadHostBreaker(breakerOptions);
+    refuse(403);
+
+    for (const page of ["a", "b", "c"]) {
+      expect(
+        (await countOutcomes(`https://wall.example.com/${page}`, breaker))
+          .skipped,
+      ).toEqual({ httpForbidden: 1 });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(breaker.getOpens()).toBe(1);
+
+    // Boxed now: the fourth read is refused here and never reaches the host,
+    // and it is counted, so read plus skipped still adds up to requested.
+    respondWithHtml(articlePage);
+    expect(
+      (await countOutcomes("https://wall.example.com/d", breaker)).skipped,
+    ).toEqual({ skippedByBreaker: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    // The box is per host.
+    expect(
+      (await countOutcomes("https://open.example.com/", breaker)).read,
+    ).toBe(1);
+  });
+
+  it("counts a timeout and a dropped connection toward the box, as an HTTP error does", async () => {
+    const breaker = new PageReadHostBreaker(breakerOptions);
+    const timeout = new Error("The operation was aborted due to timeout");
+    timeout.name = "TimeoutError";
+
+    fetchMock.mockRejectedValue(timeout);
+    await countOutcomes("https://slow.example.com/a", breaker);
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+    await countOutcomes("https://slow.example.com/b", breaker);
+    refuse(503);
+    await countOutcomes("https://slow.example.com/c", breaker);
+
+    respondWithHtml(articlePage);
+    expect(
+      (await countOutcomes("https://slow.example.com/d", breaker)).skipped,
+    ).toEqual({ skippedByBreaker: 1 });
+  });
+
+  it("does not count a dead link or a thin page, and either one ends a run of refusals", async () => {
+    const breaker = new PageReadHostBreaker(breakerOptions);
+
+    refuse(403);
+    await countOutcomes("https://mixed.example.com/a", breaker);
+    await countOutcomes("https://mixed.example.com/b", breaker);
+    // The host answered, so it is not refusing: the run starts over.
+    refuse(404);
+    await countOutcomes("https://mixed.example.com/gone", breaker);
+    refuse(403);
+    await countOutcomes("https://mixed.example.com/c", breaker);
+    await countOutcomes("https://mixed.example.com/d", breaker);
+    respondWithHtml("<html><body><p>Accept cookies</p></body></html>");
+    await countOutcomes("https://mixed.example.com/wall", breaker);
+    refuse(403);
+    await countOutcomes("https://mixed.example.com/e", breaker);
+    await countOutcomes("https://mixed.example.com/f", breaker);
+
+    // Six refusals, never three in a row, so every read reached the host.
+    respondWithHtml(articlePage);
+    expect(
+      (await countOutcomes("https://mixed.example.com/g", breaker)).read,
+    ).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(9);
+    expect(breaker.getOpens()).toBe(0);
+  });
+
+  it("lets one probe through once the window has passed, and a success closes the box", async () => {
+    const breaker = new PageReadHostBreaker(breakerOptions);
+    await boxHost(breaker, "wall.example.com");
+    expect(
+      (await countOutcomes("https://wall.example.com/d", breaker)).skipped,
+    ).toEqual({ skippedByBreaker: 1 });
+
+    await vi.advanceTimersByTimeAsync(breakerOptions.resetTimeout + 1);
+    respondWithHtml(articlePage);
+
+    // The probe reaches the host, and its success lets every read through.
+    expect(
+      (await countOutcomes("https://wall.example.com/e", breaker)).read,
+    ).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    // One Response object serves every mocked fetch, and the probe consumed
+    // its body, so the next read needs a fresh one.
+    respondWithHtml(articlePage);
+    expect(
+      (await countOutcomes("https://wall.example.com/f", breaker)).read,
+    ).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(breaker.getOpens()).toBe(1);
+  });
+
+  it("boxes the host again when the probe is refused", async () => {
+    const breaker = new PageReadHostBreaker(breakerOptions);
+    await boxHost(breaker, "wall.example.com");
+    await vi.advanceTimersByTimeAsync(breakerOptions.resetTimeout + 1);
+
+    expect(
+      (await countOutcomes("https://wall.example.com/probe", breaker)).skipped,
+    ).toEqual({ httpForbidden: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+
+    expect(
+      (await countOutcomes("https://wall.example.com/after", breaker)).skipped,
+    ).toEqual({ skippedByBreaker: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(breaker.getOpens()).toBe(2);
+  });
+
+  it("sends one probe when the boxed host appears twice in the same batch", async () => {
+    const breaker = new PageReadHostBreaker(breakerOptions);
+    await boxHost(breaker, "wall.example.com");
+    await vi.advanceTimersByTimeAsync(breakerOptions.resetTimeout + 1);
+    respondWithHtml(articlePage);
+
+    const before = getPageReadStats();
+    const contents = await fetchPageContents(
+      "cats",
+      ["https://wall.example.com/one", "https://wall.example.com/two"],
+      breaker,
+    );
+    const after = getPageReadStats();
+
+    // The reads run in parallel. The first to ask is the probe; the second is
+    // refused rather than sent behind it, which is the double read the box
+    // exists to stop.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(contents).toHaveLength(1);
+    expect(after.read - before.read).toBe(1);
+    expect(
+      after.skipped.skippedByBreaker - before.skipped.skippedByBreaker,
+    ).toBe(1);
+  });
+
+  it("stops a redirect chain at a boxed host without asking it", async () => {
+    const breaker = new PageReadHostBreaker(breakerOptions);
+    await boxHost(breaker, "wall.example.com");
+
+    fetchMock.mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://wall.example.com/landing" },
+      }),
+    );
+    expect(
+      (await countOutcomes("https://open.example.com/moved", breaker)).skipped,
+    ).toEqual({ skippedByBreaker: 1 });
+    // One request more: the redirect itself. The host it pointed at was never
+    // asked, and sending a redirect did not count against the host that sent it.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(breaker.getOpens()).toBe(1);
   });
 });
 

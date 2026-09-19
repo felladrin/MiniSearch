@@ -67,6 +67,17 @@ describe("statusEndpointServerHook", () => {
     });
   });
 
+  it("publishes the page-read circuit count beside the outcome counters", async () => {
+    const status = await callStatus();
+
+    // Counts and nothing else: the hosts the breaker boxes come from search
+    // results, so naming one here would say something about a query.
+    expect(status.pageReads).toMatchObject({
+      circuitOpens: expect.any(Number),
+      skipped: { skippedByBreaker: expect.any(Number) },
+    });
+  });
+
   it("keeps startedAt fixed at the restart while uptime advances", async () => {
     const first = await callStatus();
     expect(typeof first.startedAt).toBe("string");
