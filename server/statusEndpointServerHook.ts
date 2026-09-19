@@ -3,6 +3,7 @@ import type { PreviewServer, ViteDevServer } from "vite";
 import { getAuthorizationStats } from "./authorizationSinceLastRestart.ts";
 import { getBiEncoderStatus } from "./biEncoderService.ts";
 import { getInferenceStats } from "./inferencesSinceLastRestart.ts";
+import { getPageReadCircuitStats } from "./pageReadHostBreaker.ts";
 import { getPageReadStats } from "./pageReadsSinceLastRestart.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
 import { getRerankingStats } from "./rerankingSinceLastRestart.ts";
@@ -85,7 +86,10 @@ export function statusEndpointServerHook<
       biEncoderServiceStatus,
       rerankerServiceStatus,
       webSearchServiceStatus,
-      pageReads: getPageReadStats(),
+      pageReads: {
+        ...getPageReadStats(),
+        ...getPageReadCircuitStats(),
+      },
       authorization: getAuthorizationStats(),
       inference: getInferenceStats(),
       activeSessions: getActiveSessionsAmount(),

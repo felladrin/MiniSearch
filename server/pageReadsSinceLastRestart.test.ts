@@ -37,6 +37,7 @@ describe("recordPageRead", () => {
   it("counts every outcome against the total requested", () => {
     const counted = delta(() => {
       recordPageRead({ outcome: "blocked", durationMs: 1 });
+      recordPageRead({ outcome: "skippedByBreaker", durationMs: 0 });
       recordPageRead({ outcome: "notADocument", durationMs: 2 });
       recordPageRead({ outcome: "httpForbidden", durationMs: 3 });
       recordPageRead({ outcome: "httpNotFound", durationMs: 4 });
@@ -47,10 +48,11 @@ describe("recordPageRead", () => {
       recordPageRead({ outcome: "failed", durationMs: 8 });
     });
 
-    expect(counted.requested).toBe(9);
+    expect(counted.requested).toBe(10);
     expect(counted.read).toBe(0);
     expect(counted.skipped).toEqual({
       blocked: 1,
+      skippedByBreaker: 1,
       notADocument: 1,
       httpForbidden: 1,
       httpNotFound: 1,

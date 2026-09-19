@@ -52,6 +52,44 @@ describe("CircuitBreaker", () => {
       expect(cb.getOpens("key")).toBe(0);
     });
   });
+  describe("allows, recordSuccess and recordFailure", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("drive the circuit through the same states execute does", () => {
+      vi.useFakeTimers();
+      const resetTimeout = 1000;
+      const cb = new CircuitBreaker({
+        failureThreshold: 2,
+        resetTimeout,
+        successThreshold: 1,
+      });
+
+      expect(cb.allows("host")).toBe(true);
+      // A success under a circuit nothing has failed on has nothing to record.
+      cb.recordSuccess("host");
+      expect(cb.getState("host")).toBe("CLOSED");
+
+      cb.recordFailure("host");
+      cb.recordFailure("host");
+      expect(cb.getState("host")).toBe("OPEN");
+      expect(cb.allows("host")).toBe(false);
+      expect(cb.getOpens("host")).toBe(1);
+
+      // The clock moves without the reset timer firing, so the circuit is still
+      // open when asked: the caller that asks after the window is the probe.
+      vi.setSystemTime(Date.now() + resetTimeout + 1);
+      expect(cb.getState("host")).toBe("OPEN");
+      expect(cb.allows("host")).toBe(true);
+      expect(cb.getState("host")).toBe("HALF_OPEN");
+
+      cb.recordSuccess("host");
+      expect(cb.getState("host")).toBe("CLOSED");
+      expect(cb.getOpens("host")).toBe(1);
+    });
+  });
+
   describe("getOpens", () => {
     afterEach(() => {
       vi.useRealTimers();

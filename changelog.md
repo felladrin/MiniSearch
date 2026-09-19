@@ -3,6 +3,10 @@
 Notable changes, grouped by date, most recent first.
 
 
+## 2026-09-19
+
+- Added a per-host circuit breaker to the page reader: a host that refused the last three reads is skipped for five minutes, then probed with one read. Skipped reads are counted on /status under pageReads.skipped.skippedByBreaker.
+
 ## 2026-09-13
 
 - Fixed /status reporting the web search service as healthy while its circuit breaker was open and every search was failing.

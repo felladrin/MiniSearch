@@ -99,7 +99,7 @@ Middleware registered via Vite plugin hooks (`configureServer`, `configurePrevie
 
 ### Circuit Breaker
 
-A resilience pattern used in `webSearchService.ts` to handle SearXNG service degradation. Opens after 5 consecutive failures, blocking requests for 60 seconds before attempting reset.
+A resilience pattern used in `webSearchService.ts` to handle SearXNG service degradation. Opens after 5 consecutive failures, blocking requests for 60 seconds before attempting reset. The page reader keeps one per result host in `pageReadHostBreaker.ts`, on the same `CircuitBreaker` class: three refusals in a row skip the host for five minutes, then one read probes it.
 
 ### LRU Pruning
 

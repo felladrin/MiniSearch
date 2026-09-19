@@ -153,6 +153,7 @@ Need to:
 - `server/cacheServerHook.ts` - Cache-Control headers (preview server only)
 - `server/webSearchService.ts` - SearXNG integration with circuit breaker and retry logic
 - `server/pageContentService.ts` - Reads result pages and extracts query-relevant passages
+- `server/pageReadHostBreaker.ts` - Per-host circuit breaker for page reads: skips a host that refused the last three reads, then probes it once
 - `server/utils/publicUrl.ts` - Blocks private and reserved addresses before a server-side fetch
 - `server/rerankerService.ts` - Reranker service (ONNX Runtime inference)
 - `server/rankSearchResults.ts` - Score-based filtering and result reordering

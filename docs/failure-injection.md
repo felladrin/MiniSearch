@@ -51,6 +51,9 @@ needed.
 | Result page host resolves into a private range | Page skipped, no request is made | `server/pageContentService.test.ts` › fetchPageContents |
 | Result page redirects into a private range | Redirect not followed, page skipped | `server/pageContentService.test.ts` › fetchPageContents |
 | Result page errors, is not a document, or yields no text | That page is skipped, the others still return | `server/pageContentService.test.ts` › fetchPageContents |
+| Result host refuses three reads in a row | The host is skipped without a request for the cooling window, and the skip is counted as `skippedByBreaker` | `server/pageContentService.test.ts` › host circuit breaker |
+| The window passes on a skipped host | One read probes the host; a success reopens it, a refusal boxes it again | `server/pageContentService.test.ts` › host circuit breaker |
+| A skipped host appears twice in one batch after the window | One probe is sent, the other read is skipped | `server/pageContentService.test.ts` › host circuit breaker |
 | Result page body never ends | Reading stops at the byte cap | `server/pageContentService.test.ts` › fetchPageContents |
 | `/page-content` errors or never answers | Answer falls back to snippets, search still completes | `client/modules/pageContent.test.ts`, `client/modules/textGeneration.degradation.test.ts` › page content grounding |
 | `/inference` upstream is not configured | HTTP 500 with a JSON error | `server/internalApiEndpointServerHook.test.ts` › environment configuration |
