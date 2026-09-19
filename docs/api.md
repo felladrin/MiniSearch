@@ -74,6 +74,19 @@ below are the same on every token-gated endpoint:
 A 401 that persists across reloads usually means two processes hold different
 tokens: the server logs that once, on the way out.
 
+The `400` and `401` rejections have a second shape for a person rather than a
+program. The token rides in the query string, so a search URL can be
+bookmarked, shared or set as a browser's search engine, and every such URL
+dies when the instance rotates its token. When the request's `Accept` header
+names `text/html`, which is what a browser sends when it navigates to a URL,
+the same status comes back with `Content-Type: text/html; charset=utf-8` and a
+short static page that says the token was rotated and links to `/`, where the
+app takes a current token through `/api/config`. The page carries no token,
+sets no cookie and redirects nowhere, and nothing from the request is echoed
+into it. Any other `Accept`, including `*/*` and none at all, gets the JSON
+body above, so API clients see no change; `429` is JSON either way. The
+rejection is counted the same whichever shape it is answered with.
+
 ### Access keys
 
 `ACCESS_KEYS` gates the app's UI, not these endpoints. The client asks
