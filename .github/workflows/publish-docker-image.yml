@@ -20,7 +20,7 @@ concurrency:
 jobs:
   build:
     name: Build and push the Docker image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
@@ -187,7 +187,7 @@ jobs:
   release:
     name: Tag the release and publish the GitHub Release
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # The only job that writes to the repository, and only once the image is
     # already in the registry. Keeping the write scope here is the whole point
     # of the split: nothing that runs during the build can reach it.

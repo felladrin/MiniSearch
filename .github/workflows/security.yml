@@ -9,7 +9,7 @@ on:
 jobs:
   secret-scanning:
     name: Secret Scanning (Gitleaks)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -25,7 +25,7 @@ jobs:
 
   license-compliance:
     name: License Compliance
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
