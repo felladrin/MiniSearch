@@ -172,6 +172,8 @@ anything.
 | Pages read per search | 6 | `searchResultsToConsider`, mirrored by `MAX_URLS` in the endpoint |
 | Per-page deadline, redirects included | 6 s | `REQUEST_TIMEOUT_MS` |
 | Redirects followed | 3, each re-validated | `MAX_REDIRECTS` |
+| Refusals before a host is skipped | 3 in a row | `failureThreshold` in `server/pageReadHostBreaker.ts` |
+| How long a skipped host stays skipped | 5 minutes, then one probe read | `resetTimeout` in `server/pageReadHostBreaker.ts` |
 | Body read per page | 1.5 MB | `MAX_RESPONSE_BYTES` |
 | Excerpt cap per URL | 6,000 characters | `MAX_PAGE_CHARS`, `selectPassagesAcrossPages` |
 | Global excerpt budget | `MAX_PAGE_CHARS × pages` | `fetchPageContents` |
@@ -248,12 +250,56 @@ cannot open a line of its own choosing in the prompt. That property is load
 bearing, and it is a side effect of normalizing whitespace rather than a check:
 anything that stops collapsing newlines removes it silently.
 
+## Hosts That Refuse
+
+A host that turns the instance away keeps doing so: a bot wall answers 403 to
+every read, a rate limit answers 429 for a while, an outage times out for as
+long as it lasts. Without a memory of that, each read of such a host costs the
+batch its full wait again, up to the 6 s deadline, and a host that appears
+twice in one batch costs it twice.
+
+So `server/pageReadHostBreaker.ts` keeps one circuit per host, on the same
+`CircuitBreaker` class as the SearXNG breaker in `webSearchService.ts` and
+with the same three states. A host that refuses three reads in a row is boxed:
+for the next five minutes a read of it is skipped on the server without a
+request, and counted as `skippedByBreaker`. When the window has passed, one
+read is let through to probe the host. If it succeeds the circuit closes and
+every read goes through again; if it is refused the host is boxed for another
+window. Reads run in parallel over a batch, so a boxed host that appears twice
+in the same batch gets one probe, not two.
+
+What counts as a refusal is the host's doing and nothing else: 401, 403 and
+429 (`httpForbidden`), any other non-ok status (`httpOtherError`), a read that
+hit the deadline (`timedOut`), and a connection that was refused or dropped
+(`failed`). A dead link (`httpNotFound`) is the host answering, a page with too
+little text is the page's fault, and a blocked address never reached the host,
+so none of those count, and any of them ends a run of refusals the way a read
+that worked does. A redirect counts for the host that sent it as an answer;
+the chain is then judged again at the host it lands on, and stops there if that
+host is boxed.
+
+The circuit is keyed on `url.host` once `resolvePublicUrl` has cleared it, so
+the breaker only ever holds hosts the instance was going to fetch from. Its
+state is in memory and resets on restart, like every counter in the server.
+
+The thresholds come from the public instance's `/status`. Three refusals
+rather than the SearXNG breaker's five, because a refused read costs the whole
+batch its wait and the hosts that refuse there do so on every read, so the
+third is as sure as the fifth. Five minutes rather than one, because at that
+instance's traffic the same host comes back minutes apart, within one user's
+run of searches, and a one-minute box would usually have expired by then.
+
 ## What Gets Recorded
 
 Nothing that says what anyone searched for. Reading pages is the part of
 MiniSearch most tempting to log, because the useful line to write while
 debugging is the query and the URL, and that pair is the search itself. So
-`pageContentService` logs neither, nor the host, nor a timestamp per read.
+`pageContentService` logs neither, nor the host, nor a timestamp per read. The
+one place a host name is held is the host breaker, which needs it to know
+which host to skip; it stays inside that object and leaves it only as counts.
+A page-read host is not configured infrastructure the way a SearXNG engine is:
+it comes from the search results, downstream of the query, so naming it on
+`/status` would say something about what someone searched for.
 
 What it keeps is counters, in `server/pageReadsSinceLastRestart.ts`, served
 under `pageReads` on `/status` and reset by a restart. Every one of them is
@@ -271,6 +317,8 @@ this limit set where it should be", not "who read what":
 | `skipped.httpForbidden` | How often bot walls or rate limits turn the instance away (401, 403, 429) |
 | `skipped.httpNotFound` | How often results point to dead links (404, 410) |
 | `skipped.httpOtherError` | How often hosts return other non-ok HTTP statuses |
+| `skipped.skippedByBreaker` | How many reads the host breaker saved, which is what its five-minute window is worth |
+| `circuitOpens` | How often a host was boxed, across every host: thirty skips can be one host boxed for a window or thirty hosts boxed once, and those move the threshold in different directions |
 | `bodiesTruncated` | Is the 1.5 MB body cap biting |
 | `excerptKeptRate` | How much of a page the per-URL cap and dedup keep |
 
@@ -292,6 +340,7 @@ grounded on before:
 | Bot wall, rate limit, or auth required (401, 403, 429) | That page is skipped (`httpForbidden`) |
 | Dead link (404, 410) | That page is skipped (`httpNotFound`) |
 | Other HTTP error (5xx, other non-ok status) | That page is skipped (`httpOtherError`) |
+| Host refused the last three reads | That page is skipped without a request for five minutes, then one read probes the host (`skippedByBreaker`) |
 | Page yields less than 200 characters | That page is skipped (`tooLittleText`) |
 | `/page-content` fails or times out | Answer falls back to snippets |
 | Setting turned off, or AI responses off | No page is ever read |

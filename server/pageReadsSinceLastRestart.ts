@@ -1,10 +1,13 @@
 /**
  * How a single page read ended. Everything other than `read` means the page
  * contributed nothing to the prompt and its result kept only its snippet.
+ * `skippedByBreaker` is a read that never left the server: its host had
+ * refused enough recent reads that `pageReadHostBreaker` boxed it.
  */
 export type PageReadOutcome =
   | "read"
   | "blocked"
+  | "skippedByBreaker"
   | "notADocument"
   | "httpForbidden"
   | "httpNotFound"
@@ -20,13 +23,15 @@ export type PageReadOutcome =
  * Deliberately counts and nothing else. The obvious thing to log while reading
  * pages is the query and the URL, and that is exactly the pair that says what
  * a user searched for, so none of it is recorded: no query, no URL, no host, no
- * timestamp per read. What is left still answers the questions worth asking of
- * this feature, because every counter below is attached to a constant someone
- * will want to move.
+ * timestamp per read. The hosts the breaker keys on stay inside it and reach
+ * this file only as the count of reads it skipped. What is left still answers
+ * the questions worth asking of this feature, because every counter below is
+ * attached to a constant someone will want to move.
  */
 const outcomes: Record<PageReadOutcome, number> = {
   read: 0,
   blocked: 0,
+  skippedByBreaker: 0,
   notADocument: 0,
   httpForbidden: 0,
   httpNotFound: 0,

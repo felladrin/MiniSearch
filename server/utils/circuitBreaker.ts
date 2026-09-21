@@ -1,6 +1,7 @@
 type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
-interface CircuitBreakerOptions {
+/** Thresholds for one breaker, shared by every circuit it keeps. */
+export interface CircuitBreakerOptions {
   failureThreshold: number;
   resetTimeout: number;
   successThreshold: number;
@@ -31,23 +32,73 @@ export class CircuitBreaker {
 
   /** Runs `fn` under the named circuit, tripping it after repeated failures. */
   async execute<T>(key: string, fn: () => Promise<T>): Promise<T> {
-    const metrics = this.getOrCreateMetrics(key);
-
-    if (metrics.state === "OPEN") {
-      if (this.shouldAttemptReset(metrics)) {
-        metrics.state = "HALF_OPEN";
-      } else {
-        throw new Error(`Circuit breaker is open for ${key}`);
-      }
+    if (!this.allows(key)) {
+      throw new Error(`Circuit breaker is open for ${key}`);
     }
 
     try {
       const result = await fn();
-      this.recordSuccess(metrics);
+      this.recordSuccess(key);
       return result;
     } catch (error) {
-      this.recordFailure(metrics);
+      this.recordFailure(key);
       throw error;
+    }
+  }
+
+  /**
+   * Whether a call under the named circuit may go ahead right now. An open
+   * circuit whose reset timeout has elapsed becomes half-open here, so the
+   * caller that asked is the one that probes it. With `recordSuccess` and
+   * `recordFailure` this is `execute` taken apart, for a caller whose
+   * failures are return values rather than exceptions.
+   */
+  allows(key: string): boolean {
+    const metrics = this.metrics.get(key);
+    if (metrics?.state !== "OPEN") return true;
+
+    if (!this.shouldAttemptReset(metrics)) return false;
+
+    metrics.state = "HALF_OPEN";
+    return true;
+  }
+
+  /** A success under the named circuit: clears its failures, or closes it after a probe. */
+  recordSuccess(key: string): void {
+    // A circuit nothing has failed under is closed with no failures already,
+    // so a success on it has nothing to record and no entry to create.
+    const metrics = this.metrics.get(key);
+    if (!metrics) return;
+
+    if (metrics.state === "HALF_OPEN") {
+      metrics.successes++;
+      if (metrics.successes >= this.options.successThreshold) {
+        this.resetMetrics(metrics);
+      }
+    } else {
+      metrics.failures = 0;
+    }
+  }
+
+  /** A failure under the named circuit, opening it at the threshold. */
+  recordFailure(key: string): void {
+    const metrics = this.getOrCreateMetrics(key);
+
+    metrics.failures++;
+    metrics.lastFailure = Date.now();
+    metrics.successes = 0;
+
+    if (
+      metrics.failures >= this.options.failureThreshold &&
+      metrics.state !== "OPEN"
+    ) {
+      metrics.state = "OPEN";
+      metrics.opens++;
+      setTimeout(() => {
+        if (metrics.state === "OPEN") {
+          metrics.state = "HALF_OPEN";
+        }
+      }, this.options.resetTimeout);
     }
   }
 
@@ -87,36 +138,6 @@ export class CircuitBreaker {
 
     const now = Date.now();
     return now - metrics.lastFailure > this.options.resetTimeout;
-  }
-
-  private recordSuccess(metrics: CircuitMetrics): void {
-    if (metrics.state === "HALF_OPEN") {
-      metrics.successes++;
-      if (metrics.successes >= this.options.successThreshold) {
-        this.resetMetrics(metrics);
-      }
-    } else {
-      metrics.failures = 0;
-    }
-  }
-
-  private recordFailure(metrics: CircuitMetrics): void {
-    metrics.failures++;
-    metrics.lastFailure = Date.now();
-    metrics.successes = 0;
-
-    if (
-      metrics.failures >= this.options.failureThreshold &&
-      metrics.state !== "OPEN"
-    ) {
-      metrics.state = "OPEN";
-      metrics.opens++;
-      setTimeout(() => {
-        if (metrics.state === "OPEN") {
-          metrics.state = "HALF_OPEN";
-        }
-      }, this.options.resetTimeout);
-    }
   }
 
   private resetMetrics(metrics: CircuitMetrics): void {

@@ -3,6 +3,10 @@ import { PDFParse } from "pdf-parse";
 import { repository, version } from "../package.json" with { type: "json" };
 import { scorePassages } from "./biEncoderService.ts";
 import {
+  type PageReadHostBreaker,
+  pageReadHostBreaker,
+} from "./pageReadHostBreaker.ts";
+import {
   type PageReadOutcome,
   recordPageRead,
 } from "./pageReadsSinceLastRestart.ts";
@@ -176,16 +180,88 @@ type DownloadResult =
   | { outcome: "ok"; html?: string; text?: string; bodyTruncated: boolean }
   | { outcome: Exclude<PageReadOutcome, "read" | "tooLittleText"> };
 
+type HopResult = DownloadResult | { outcome: "redirect"; target: string };
+
+/**
+ * One request of a redirect chain: the fetch, and the body unless the host
+ * answered with a redirect. Everything it can fail on comes back as an outcome
+ * rather than an exception, so its caller can settle the host's circuit on it.
+ */
+async function readHop(url: URL, deadline: AbortSignal): Promise<HopResult> {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: REQUEST_HEADERS,
+      redirect: "manual",
+      signal: deadline,
+    });
+  } catch (error) {
+    return { outcome: isTimeout(error) ? "timedOut" : "failed" };
+  }
+
+  const location = response.headers.get("location");
+  if (isRedirect(response.status) && location) {
+    await response.body?.cancel().catch(() => {});
+    try {
+      return { outcome: "redirect", target: new URL(location, url).toString() };
+    } catch {
+      return { outcome: "failed" };
+    }
+  }
+
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {});
+    return { outcome: classifyHttpError(response.status) };
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!READABLE_CONTENT_TYPES.test(contentType.trim())) {
+    // PDF is not in READABLE_CONTENT_TYPES but we still want to read it.
+    if (!contentType.trim().toLowerCase().startsWith("application/pdf")) {
+      await response.body?.cancel().catch(() => {});
+      return { outcome: "notADocument" };
+    }
+  }
+
+  try {
+    const { bytes, truncated } = await readCappedBytes(
+      response,
+      MAX_RESPONSE_BYTES,
+    );
+    if (contentType.trim().toLowerCase().startsWith("application/pdf")) {
+      return {
+        outcome: "ok",
+        text: await extractPdfText(bytes),
+        bodyTruncated: truncated,
+      };
+    }
+    return {
+      outcome: "ok",
+      html: decodeDocument(bytes, contentType),
+      bodyTruncated: truncated,
+    };
+  } catch (error) {
+    return { outcome: isTimeout(error) ? "timedOut" : "failed" };
+  }
+}
+
 /**
  * Follows redirects by hand so that every hop is validated: `redirect:
  * "follow"` would let a public URL bounce the server into a private address.
  * The whole chain shares one deadline, so a page cannot buy extra time by
  * redirecting.
  *
+ * Each hop runs under the circuit of the host it is about to reach, keyed on
+ * `url.host` once `resolvePublicUrl` has cleared it, so a chain that lands on
+ * a boxed host stops there and a redirect counts for the host that sent it.
+ *
  * Returns why it gave up rather than throwing, because the caller counts the
  * reasons and a thrown `Error` would have to be identified by its message.
  */
-async function downloadDocument(rawUrl: string): Promise<DownloadResult> {
+async function downloadDocument(
+  rawUrl: string,
+  breaker: PageReadHostBreaker,
+): Promise<DownloadResult> {
   let target = rawUrl;
   const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 
@@ -197,62 +273,19 @@ async function downloadDocument(rawUrl: string): Promise<DownloadResult> {
       return { outcome: "blocked" };
     }
 
-    let response: Response;
+    if (!breaker.admit(url.host)) return { outcome: "skippedByBreaker" };
+
+    // Settled whatever happens, or a half-open host would wait forever for a
+    // probe that never reported back.
+    let result: HopResult = { outcome: "failed" };
     try {
-      response = await fetch(url, {
-        headers: REQUEST_HEADERS,
-        redirect: "manual",
-        signal: deadline,
-      });
-    } catch (error) {
-      return { outcome: isTimeout(error) ? "timedOut" : "failed" };
+      result = await readHop(url, deadline);
+    } finally {
+      breaker.settle(url.host, result.outcome);
     }
 
-    const location = response.headers.get("location");
-    if (isRedirect(response.status) && location) {
-      await response.body?.cancel().catch(() => {});
-      try {
-        target = new URL(location, url).toString();
-      } catch {
-        return { outcome: "failed" };
-      }
-      continue;
-    }
-
-    if (!response.ok) {
-      await response.body?.cancel().catch(() => {});
-      return { outcome: classifyHttpError(response.status) };
-    }
-
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!READABLE_CONTENT_TYPES.test(contentType.trim())) {
-      // PDF is not in READABLE_CONTENT_TYPES but we still want to read it.
-      if (!contentType.trim().toLowerCase().startsWith("application/pdf")) {
-        await response.body?.cancel().catch(() => {});
-        return { outcome: "notADocument" };
-      }
-    }
-
-    try {
-      const { bytes, truncated } = await readCappedBytes(
-        response,
-        MAX_RESPONSE_BYTES,
-      );
-      if (contentType.trim().toLowerCase().startsWith("application/pdf")) {
-        return {
-          outcome: "ok",
-          text: await extractPdfText(bytes),
-          bodyTruncated: truncated,
-        };
-      }
-      return {
-        outcome: "ok",
-        html: decodeDocument(bytes, contentType),
-        bodyTruncated: truncated,
-      };
-    } catch (error) {
-      return { outcome: isTimeout(error) ? "timedOut" : "failed" };
-    }
+    if (result.outcome !== "redirect") return result;
+    target = result.target;
   }
 
   return { outcome: "redirectLimit" };
@@ -676,7 +709,10 @@ export async function selectPassages(
   return selectPassagesAcrossPages(fused, maxChars, maxChars).get("") ?? [];
 }
 
-async function fetchPageContent(url: string): Promise<{
+async function fetchPageContent(
+  url: string,
+  breaker: PageReadHostBreaker,
+): Promise<{
   url: string;
   passages: string[];
   durationMs: number;
@@ -685,7 +721,7 @@ async function fetchPageContent(url: string): Promise<{
   const startedAt = performance.now();
   const since = () => performance.now() - startedAt;
 
-  const download = await downloadDocument(url);
+  const download = await downloadDocument(url, breaker);
 
   if (download.outcome !== "ok") {
     recordPageRead({ outcome: download.outcome, durationMs: since() });
@@ -731,18 +767,25 @@ async function fetchPageContent(url: string): Promise<{
  * character cap and near-duplicate suppression, so syndicated paragraphs that
  * appear on several pages reach the prompt once.
  *
+ * A host that refused enough recent reads is skipped without a request, under
+ * `breaker`, and that skip is counted like any other outcome.
+ *
  * Nothing here is logged. Every read is counted instead, by outcome, in
  * `pageReadsSinceLastRestart`, since a line naming the query or the URL would
  * record what someone searched for.
  *
  * @param urls - Page URLs to read, already ranked by the search pipeline
+ * @param breaker - The per-host circuits to read under; injectable for tests
  * @returns One entry per page that yielded usable text
  */
 export async function fetchPageContents(
   query: string,
   urls: string[],
+  breaker: PageReadHostBreaker = pageReadHostBreaker,
 ): Promise<PageContent[]> {
-  const results = await Promise.all(urls.map((url) => fetchPageContent(url)));
+  const results = await Promise.all(
+    urls.map((url) => fetchPageContent(url, breaker)),
+  );
 
   const pages = results.filter((r): r is FetchedPage => r !== null);
 
