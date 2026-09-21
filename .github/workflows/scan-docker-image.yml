@@ -17,10 +17,19 @@ jobs:
       contents: read
       security-events: write
     steps:
+      # OCI image references must be all lowercase, and GHCR lowercases the
+      # name on push, so the image lives at `felladrin/minisearch`.
+      # `github.repository` keeps the repo's mixed-case name ("MiniSearch"),
+      # and Trivy rejects it: "could not parse reference:
+      # ghcr.io/felladrin/MiniSearch:latest". GitHub expressions have no
+      # lowercasing function, so the ref is computed here instead.
+      - name: Lowercase the image reference
+        id: image
+        run: echo "ref=ghcr.io/$(tr '[:upper:]' '[:lower:]' <<<"${{ github.repository }}"):latest" >> "$GITHUB_OUTPUT"
       - name: Run Trivy on the published image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository }}:latest
+          image-ref: ${{ steps.image.outputs.ref }}
           format: sarif
           output: trivy-results.sarif
           severity: HIGH,CRITICAL
