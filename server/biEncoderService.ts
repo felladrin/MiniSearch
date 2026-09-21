@@ -10,9 +10,8 @@ const MODEL_HF_REPO =
 
 /**
  * The ONNX export. ~450 MB, multilingual (50+ languages), 384-dimensional
- * embeddings. Fast enough for batched passage encoding: a batch of 64 passages
- * takes ~30 ms on CPU, well within the 20 s client timeout even for six pages
- * with hundreds of passages each.
+ * embeddings. CPU cost depends on passage length and pool size; the page-content
+ * selector limits dense scoring to 256 passages. See docs/page-content.md.
  */
 const MODEL_HF_FILE = "onnx/model.onnx";
 
@@ -23,8 +22,7 @@ const MODEL_HF_FILE = "onnx/model.onnx";
  */
 const MAX_SEQUENCE_LENGTH = 256;
 
-/** Batch size for passage encoding. Larger batches speed up encoding but use
- * more memory; 64 is a safe default on CPU. */
+/** Maximum concurrent single-text inference calls within each chunk. */
 const BATCH_SIZE = 64;
 
 let isReady = false;

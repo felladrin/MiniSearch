@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { repository, version } from "../package.json" with { type: "json" };
 
+const scorePassagesMock = vi.hoisted(() => vi.fn());
+vi.mock("./biEncoderService.ts", () => ({ scorePassages: scorePassagesMock }));
+
 const lookupMock = vi.hoisted(() => vi.fn());
 const pdfGetTextMock = vi.hoisted(() => vi.fn());
 const pdfDestroyMock = vi.hoisted(() => vi.fn());
@@ -54,6 +57,7 @@ ${paragraph("Cats sleep between twelve and sixteen hours a day.")}
 </body></html>`;
 
 beforeEach(() => {
+  scorePassagesMock.mockReset().mockResolvedValue([]);
   fetchMock.mockReset();
   lookupMock.mockReset();
   lookupMock.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
@@ -381,71 +385,79 @@ describe("selectPassages across scripts", () => {
   }
 });
 
-describe("selectPassagesAcrossPages", () => {
-  // Helper to call the internal selector indirectly through fetchPageContents.
-  async function selectFrom(urls: string[], htmls: string[]) {
-    fetchMock.mockReset();
-    for (const html of htmls) {
-      fetchMock.mockResolvedValueOnce(
-        new Response(html, {
-          status: 200,
-          headers: { "content-type": "text/html" },
-        }),
-      );
+describe.each(["lexical", "dense"])(
+  "selectPassagesAcrossPages (%s)",
+  (mode) => {
+    // Helper to call the internal selector indirectly through fetchPageContents.
+    async function selectFrom(urls: string[], htmls: string[]) {
+      if (mode === "dense") {
+        scorePassagesMock.mockImplementation(async (_query, pool: string[]) =>
+          pool.map((_, i) => -i),
+        );
+      }
+      fetchMock.mockReset();
+      for (const html of htmls) {
+        fetchMock.mockResolvedValueOnce(
+          new Response(html, {
+            status: 200,
+            headers: { "content-type": "text/html" },
+          }),
+        );
+      }
+      return fetchPageContents("test query", urls);
     }
-    return fetchPageContents("test query", urls);
-  }
 
-  it("suppresses a syndicated paragraph that appears on multiple pages", async () => {
-    const syndicated =
-      "This paragraph is syndicated across many sites. ".repeat(10);
-    const uniqueA = "Unique content on page A. ".repeat(10);
-    const uniqueB = "Unique content on page B. ".repeat(10);
+    it("suppresses a syndicated paragraph that appears on multiple pages", async () => {
+      const syndicated =
+        "This paragraph is syndicated across many sites. ".repeat(10);
+      const uniqueA = "Unique content on page A. ".repeat(10);
+      const uniqueB = "Unique content on page B. ".repeat(10);
 
-    const contents = await selectFrom(
-      ["https://example.com/a", "https://example.com/b"],
-      [
-        `<article><p>${uniqueA}</p><p>${syndicated}</p></article>`,
-        `<article><p>${syndicated}</p><p>${uniqueB}</p></article>`,
-      ],
-    );
+      const contents = await selectFrom(
+        ["https://example.com/a", "https://example.com/b"],
+        [
+          `<article><p>${uniqueA}</p><p>${syndicated}</p></article>`,
+          `<article><p>${syndicated}</p><p>${uniqueB}</p></article>`,
+        ],
+      );
 
-    // The syndicated paragraph should appear in only one of the two responses.
-    // Text extraction trims trailing whitespace, so match a trimmed marker
-    // rather than the exact paragraph text.
-    const marker = syndicated.trimEnd();
-    const aText = contents.find((c) => c.url.includes("/a"))?.content ?? "";
-    const bText = contents.find((c) => c.url.includes("/b"))?.content ?? "";
-    const count = (aText + bText).split(marker).length - 1;
-    expect(count).toBe(1);
-  });
+      // The syndicated paragraph should appear in only one of the two responses.
+      // Text extraction trims trailing whitespace, so match a trimmed marker
+      // rather than the exact paragraph text.
+      const marker = syndicated.trimEnd();
+      const aText = contents.find((c) => c.url.includes("/a"))?.content ?? "";
+      const bText = contents.find((c) => c.url.includes("/b"))?.content ?? "";
+      const count = (aText + bText).split(marker).length - 1;
+      expect(count).toBe(1);
+    });
 
-  it("drops a page whose passages are all near-duplicates of an earlier page", async () => {
-    // Page A has one passage. Page B has one near-duplicate passage
-    // (Jaccard >= 0.9). The new global dedup should suppress B's copy,
-    // leaving B with no selected passages so it vanishes from the response.
-    // The old per-page code would have returned both pages.
-    // Note: with a query that matches no terms, A wins purely on flatten
-    // order (lower global index), not on relevance. The test guards the
-    // dedup drop path, not the ranking order.
-    const base =
-      "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 ";
-    const passageA = base.repeat(15);
-    const passageB = `${base}word11 `.repeat(15);
+    it("drops a page whose passages are all near-duplicates of an earlier page", async () => {
+      // Page A has one passage. Page B has one near-duplicate passage
+      // (Jaccard >= 0.9). The new global dedup should suppress B's copy,
+      // leaving B with no selected passages so it vanishes from the response.
+      // The old per-page code would have returned both pages.
+      // Note: with a query that matches no terms, A wins purely on flatten
+      // order (lower global index), not on relevance. The test guards the
+      // dedup drop path, not the ranking order.
+      const base =
+        "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 ";
+      const passageA = base.repeat(15);
+      const passageB = `${base}word11 `.repeat(15);
 
-    const contents = await selectFrom(
-      ["https://example.com/a", "https://example.com/b"],
-      [
-        `<article><p>${passageA}</p></article>`,
-        `<article><p>${passageB}</p></article>`,
-      ],
-    );
+      const contents = await selectFrom(
+        ["https://example.com/a", "https://example.com/b"],
+        [
+          `<article><p>${passageA}</p></article>`,
+          `<article><p>${passageB}</p></article>`,
+        ],
+      );
 
-    // Only page A should survive; page B's sole passage is a near-duplicate.
-    expect(contents).toHaveLength(1);
-    expect(contents[0].url).toContain("/a");
-  });
-});
+      // Only page A should survive; page B's sole passage is a near-duplicate.
+      expect(contents).toHaveLength(1);
+      expect(contents[0].url).toContain("/a");
+    });
+  },
+);
 
 describe("page read counters", () => {
   /** Counts what one call to `fetchPageContents` added, by outcome. */
@@ -814,4 +826,118 @@ describe("fetchPageContents", () => {
     // 1.5 MB cap over ~85 KB chunks: it stops long before an endless stream.
     expect(chunksSent).toBeLessThan(40);
   });
+});
+
+describe("dense passage fusion", () => {
+  const passages = [
+    `Oceans and ships. ${"Water covers much of the planet. ".repeat(8)}`,
+    `Cats pets sleep. ${"Animals need food and shelter. ".repeat(8)}`,
+    `Cats pets play. ${"Companions enjoy running outdoors. ".repeat(8)}`,
+  ];
+  const url = "https://example.com/animals";
+  const html = `<article>${passages.map((text) => `<p>${text}</p>`).join("")}</article>`;
+  const trimmed = passages.map((text) => text.trim());
+
+  it("does not score an empty pool", async () => {
+    expect(await selectPassages("cats", [], 6000)).toEqual([]);
+    expect(await fetchPageContents("cats", [])).toEqual([]);
+    expect(scorePassagesMock).not.toHaveBeenCalled();
+  });
+
+  it("fuses the production pool by original identity and returns the dense-assisted winner first", async () => {
+    respondWithHtml(html);
+    scorePassagesMock.mockResolvedValue([0.5, 0.1, 0.9]);
+
+    const contents = await fetchPageContents("cats pets", [url]);
+
+    expect(scorePassagesMock).toHaveBeenCalledExactlyOnceWith(
+      "cats pets",
+      trimmed,
+    );
+    expect(contents).toEqual([
+      { url, content: [trimmed[2], trimmed[1], trimmed[0]].join("\n") },
+    ]);
+    expect(await selectPassages("cats pets", trimmed, 6000)).toEqual([
+      trimmed[2],
+      trimmed[1],
+      trimmed[0],
+    ]);
+  });
+
+  it("preserves the exact lexical output when the model is unavailable or fails", async () => {
+    respondWithHtml(html);
+    const expected = [
+      { url, content: [trimmed[1], trimmed[2], trimmed[0]].join("\n") },
+    ];
+    expect(await fetchPageContents("cats pets", [url])).toEqual(expected);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      scorePassagesMock.mockRejectedValue(
+        new Error("private query, URL and passage"),
+      );
+      respondWithHtml(html);
+      expect(await fetchPageContents("cats pets", [url])).toEqual(expected);
+      expect(warn).toHaveBeenCalledExactlyOnceWith(
+        "Dense passage scoring failed; using lexical ranking.",
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("breaks equal fused scores by original index and equal dense scores deterministically", async () => {
+    scorePassagesMock.mockResolvedValue([1, 0]);
+    expect(await selectPassages("cats", ["oceans", "cats"], 100)).toEqual([
+      "oceans",
+      "cats",
+    ]);
+    scorePassagesMock.mockResolvedValue([0.5, 0.5]);
+    expect(await selectPassages("cats", ["oceans", "cats"], 100)).toEqual([
+      "oceans",
+      "cats",
+    ]);
+  });
+
+  it.each([256, 257])(
+    "bounds dense scoring over the combined %i-passage pool",
+    async (count) => {
+      const texts = Array.from(
+        { length: count },
+        (_, i) =>
+          `Passage ${i}. ${"Trees provide shade in warm weather. ".repeat(6)}`,
+      );
+      const halves = [texts.slice(0, 128), texts.slice(128)];
+      const urls = ["https://example.com/a", "https://example.com/b"];
+      const respond = () => {
+        for (const half of halves) {
+          fetchMock.mockResolvedValueOnce(
+            new Response(
+              `<article>${half.map((text) => `<p>${text}</p>`).join("")}</article>`,
+              { headers: { "content-type": "text/html" } },
+            ),
+          );
+        }
+      };
+      respond();
+      const lexical = await fetchPageContents("trees", urls);
+      scorePassagesMock
+        .mockClear()
+        .mockImplementation(async (_query, pool: string[]) =>
+          pool.map((_, i) => i),
+        );
+      respond();
+      const result = await fetchPageContents("trees", urls);
+      if (count === 256) {
+        expect(scorePassagesMock).toHaveBeenCalledExactlyOnceWith(
+          "trees",
+          texts.map((text) => text.trim()),
+        );
+        expect(result).not.toEqual(lexical);
+      } else {
+        expect(scorePassagesMock).not.toHaveBeenCalled();
+        expect(result).toEqual(lexical);
+      }
+      expect(result.every((page) => page.content.length <= 6000)).toBe(true);
+    },
+  );
 });
