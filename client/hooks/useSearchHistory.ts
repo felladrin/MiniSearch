@@ -25,6 +25,8 @@ interface UseSearchHistoryOptions {
 
 interface UseSearchHistoryReturn {
   recentSearches: SearchEntry[];
+  llmResponseCount: number;
+  chatMessageCount: number;
   filteredSearches: SearchEntry[];
   groupedSearches: Record<string, SearchEntry[]>;
   isLoading: boolean;
@@ -63,6 +65,8 @@ export function useSearchHistory(
   } = options;
 
   const [recentSearches, setRecentSearches] = useState<SearchEntry[]>([]);
+  const [llmResponseCount, setLlmResponseCount] = useState(0);
+  const [chatMessageCount, setChatMessageCount] = useState(0);
   const [filteredSearches, setFilteredSearches] = useState<SearchEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +86,13 @@ export function useSearchHistory(
       const searches = await getRecentSearches(
         enablePagination ? 1000 : limit * 2,
       );
+
+      const [llmCount, chatCount] = await Promise.all([
+        historyDatabase.llmResponses.count(),
+        historyDatabase.chatHistory.count(),
+      ]);
+      setLlmResponseCount(llmCount);
+      setChatMessageCount(chatCount);
 
       if (enablePagination) {
         setAllSearches(searches);
@@ -217,6 +228,8 @@ export function useSearchHistory(
       await clearAllHistory();
       setRecentSearches([]);
       setFilteredSearches([]);
+      setLlmResponseCount(0);
+      setChatMessageCount(0);
       addLogEntry("All search history cleared");
     } catch (err) {
       const errorMsg = `Failed to clear history: ${err}`;
@@ -320,6 +333,8 @@ export function useSearchHistory(
 
   return {
     recentSearches,
+    llmResponseCount,
+    chatMessageCount,
     filteredSearches,
     groupedSearches,
     isLoading,
