@@ -1,7 +1,7 @@
 import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, vi } from "vitest";
-import { useSearchHistory } from "../../hooks/useSearchHistory";
+import { useSearchHistory } from "@/hooks/useSearchHistory";
 import HistorySettings from "./HistorySettings";
 
 vi.mock("create-pubsub/react", () => ({
@@ -16,7 +16,7 @@ vi.mock("create-pubsub/react", () => ({
   ]),
 }));
 
-vi.mock("../../hooks/useSearchHistory", () => ({
+vi.mock("@/hooks/useSearchHistory", () => ({
   useSearchHistory: vi.fn(),
 }));
 
