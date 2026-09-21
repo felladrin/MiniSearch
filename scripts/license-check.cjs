@@ -12,6 +12,11 @@ const ALLOWED = new Set([
   "0BSD",
   "LGPL-2.1",
   "LGPL-3.0",
+  // MPL-2.0 is file-level copyleft; combining it with Apache-2.0 in one
+  // program is explicitly permitted by Mozilla's own FAQ (Q13,
+  // https://www.mozilla.org/en-US/MPL/2.0/FAQ/). Ships via vite's
+  // lightningcss binaries, unmodified.
+  "MPL-2.0",
 ]);
 
 // Each entry below was verified by hand against the LICENSE file shipped in

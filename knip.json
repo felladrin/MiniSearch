@@ -5,5 +5,9 @@
     "postcss-simple-vars",
     "globals"
   ],
-  "ignoreFiles": ["client/postcss.config.cjs", "vitest.integration.config.ts"]
+  "ignoreFiles": [
+    "client/postcss.config.cjs",
+    "vitest.integration.config.ts",
+    "scripts/npm-bundle-overlay.cjs"
+  ]
 }
