@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addSearchToHistory,
   clearAllHistory,
@@ -53,6 +53,12 @@ interface UseSearchHistoryReturn {
   goToPage: (page: number) => void;
 }
 
+/** A burst of keystrokes settles into a single fuzzy pass after this quiet period. */
+export const FILTER_DEBOUNCE_MS = 200;
+
+/** Background re-read cadence; the interval is the only periodic IndexedDB access. */
+export const REFRESH_INTERVAL_MS = 30_000;
+
 /** Search history with fuzzy filtering, date grouping, and optional pagination. */
 export function useSearchHistory(
   options: UseSearchHistoryOptions = {},
@@ -64,22 +70,29 @@ export function useSearchHistory(
     pageSize = 20,
   } = options;
 
-  const [recentSearches, setRecentSearches] = useState<SearchEntry[]>([]);
+  const [entries, setEntries] = useState<SearchEntry[]>([]);
   const [llmResponseCount, setLlmResponseCount] = useState(0);
   const [chatMessageCount, setChatMessageCount] = useState(0);
   const [filteredSearches, setFilteredSearches] = useState<SearchEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentQuery, setCurrentQuery] = useState("");
   const [lastFailedOperation, setLastFailedOperation] = useState<
     (() => Promise<void>) | null
   >(null);
 
   const [currentPage, setCurrentPage] = useState(0);
-  const [allSearches, setAllSearches] = useState<SearchEntry[]>([]);
+  const [settledQuery, setSettledQuery] = useState("");
+  const [matchedCount, setMatchedCount] = useState(0);
 
+  const isLoadingRef = useRef(true);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // The only function that reads IndexedDB. Its identity is stable while the
+  // user types: the query is deliberately absent from its dependencies, so a
+  // keystroke can never re-fire the mount effect or rebuild the interval.
   const refreshHistory = useCallback(async () => {
     try {
+      isLoadingRef.current = true;
       setIsLoading(true);
       setError(null);
 
@@ -93,71 +106,84 @@ export function useSearchHistory(
       ]);
       setLlmResponseCount(llmCount);
       setChatMessageCount(chatCount);
-
-      if (enablePagination) {
-        setAllSearches(searches);
-      } else {
-        setRecentSearches(searches);
-      }
-
-      if (currentQuery) {
-        const filtered = searchWithFuzzy(
-          searches,
-          currentQuery,
-          (search) => search.query,
-          enablePagination ? searches.length : limit,
-        ).map((result) => result.item);
-
-        if (enablePagination) {
-          const startIndex = currentPage * pageSize;
-          const endIndex = startIndex + pageSize;
-          setFilteredSearches(filtered.slice(startIndex, endIndex));
-        } else {
-          setFilteredSearches(filtered.slice(0, limit));
-        }
-      } else {
-        if (enablePagination) {
-          const startIndex = currentPage * pageSize;
-          const endIndex = startIndex + pageSize;
-          const pageResults = searches.slice(startIndex, endIndex);
-          setRecentSearches(pageResults);
-          setFilteredSearches(pageResults);
-        } else {
-          const results = searches.slice(0, limit);
-          setRecentSearches(results);
-          setFilteredSearches(results);
-        }
-      }
+      setEntries(searches);
     } catch (err) {
       const errorMsg = `Failed to load search history: ${err}`;
       setError(errorMsg);
       addLogEntry(errorMsg);
       setLastFailedOperation(() => refreshHistory);
     } finally {
+      isLoadingRef.current = false;
       setIsLoading(false);
     }
-  }, [limit, currentQuery, enablePagination, pageSize, currentPage]);
+  }, [limit, enablePagination]);
 
-  const searchHistory = useCallback(
-    (query: string) => {
-      setCurrentQuery(query);
+  // Typing only schedules a debounced settle of the query; it never reaches
+  // IndexedDB. The derive effect below does the filtering from memory.
+  const searchHistory = useCallback((query: string) => {
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      setSettledQuery(query);
+    }, FILTER_DEBOUNCE_MS);
+  }, []);
 
-      if (!query.trim()) {
-        setFilteredSearches(recentSearches);
-        return;
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current !== null) {
+        clearTimeout(debounceTimerRef.current);
       }
+    };
+  }, []);
 
-      const results = searchWithFuzzy(
-        recentSearches,
-        query,
-        (search) => search.query,
-        limit,
-      ).map((result) => result.item);
+  const recentSearches = useMemo(() => {
+    if (enablePagination) {
+      const startIndex = currentPage * pageSize;
+      return entries.slice(startIndex, startIndex + pageSize);
+    }
+    return entries.slice(0, limit);
+  }, [entries, enablePagination, currentPage, pageSize, limit]);
 
-      setFilteredSearches(results);
-    },
-    [recentSearches, limit],
-  );
+  // Re-filter the entries already held in memory whenever the settled query or
+  // the loaded entries change. Each settled query is a fresh full scan, never a
+  // narrowing of the previous keystroke's matches: this setup's per-length
+  // uFuzzy error rules let a match appear past its prefix ("wet" misses
+  // "weather", "weth" hits it), so narrowing would drop it forever.
+  useEffect(() => {
+    const query = settledQuery.trim();
+
+    if (!query) {
+      setFilteredSearches(recentSearches);
+      setMatchedCount(entries.length);
+      return;
+    }
+
+    const matched = searchWithFuzzy(
+      entries,
+      query,
+      (search) => search.query,
+      enablePagination ? entries.length : limit,
+    ).map((result) => result.item);
+
+    setMatchedCount(matched.length);
+
+    if (enablePagination) {
+      const startIndex = currentPage * pageSize;
+      setFilteredSearches(matched.slice(startIndex, startIndex + pageSize));
+    } else {
+      setFilteredSearches(matched.slice(0, limit));
+    }
+  }, [
+    settledQuery,
+    entries,
+    recentSearches,
+    enablePagination,
+    limit,
+    pageSize,
+    currentPage,
+  ]);
 
   const addToHistory = useCallback(
     async (
@@ -226,8 +252,9 @@ export function useSearchHistory(
   const clearAll = useCallback(async () => {
     try {
       await clearAllHistory();
-      setRecentSearches([]);
+      setEntries([]);
       setFilteredSearches([]);
+      setMatchedCount(0);
       setLlmResponseCount(0);
       setChatMessageCount(0);
       addLogEntry("All search history cleared");
@@ -268,17 +295,20 @@ export function useSearchHistory(
     refreshHistory();
   }, [refreshHistory]);
 
+  // Depends only on the stable refreshHistory: a keystroke never tears this
+  // interval down or rebuilds it. The in-flight guard lives in a ref so the
+  // loading state cannot re-trigger the effect either.
   useEffect(() => {
     const intervalId = setInterval(() => {
-      if (!isLoading) {
+      if (!isLoadingRef.current) {
         refreshHistory();
       }
-    }, 30000);
+    }, REFRESH_INTERVAL_MS);
 
     return () => {
       clearInterval(intervalId);
     };
-  }, [refreshHistory, isLoading]);
+  }, [refreshHistory]);
 
   const retryLastOperation = useCallback(async () => {
     if (lastFailedOperation) {
@@ -320,14 +350,7 @@ export function useSearchHistory(
     [enablePagination],
   );
 
-  const dataSource = currentQuery
-    ? filteredSearches
-    : enablePagination
-      ? allSearches
-      : recentSearches;
-  const totalPages = enablePagination
-    ? Math.ceil(dataSource.length / pageSize)
-    : 1;
+  const totalPages = enablePagination ? Math.ceil(matchedCount / pageSize) : 1;
   const hasNextPage = enablePagination && currentPage < totalPages - 1;
   const hasPreviousPage = enablePagination && currentPage > 0;
 
