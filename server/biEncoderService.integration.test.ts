@@ -179,9 +179,16 @@ describe("biEncoderService batched scoring (#2715)", () => {
   });
 
   it("runs one forward pass per length bucket, not one per passage", async () => {
-    const passages = Array.from({ length: 20 }, (_, i) =>
-      makePassage(5 + i * 12, i),
-    );
+    // Zigzag lengths with the sort's guarantee removed: bucket 1's last
+    // row (190 words) is longer than bucket 2's last row (25 words), so
+    // an unsorted pass sets bucket widths from those rows and they come
+    // out decreasing — the non-decreasing-width assertion below then
+    // fails. With the sort, widths are non-decreasing by construction.
+    const wordCounts = [
+      200, 10, 150, 5, 180, 20, 120, 8, 90, 160, 30, 110, 60, 140, 190, 170, 15,
+      130, 70, 25,
+    ];
+    const passages = wordCounts.map((n, i) => makePassage(n, i));
 
     // The typings expose `InferenceSession` as a factory interface and hide
     // the class prototype, but at runtime `run` is a prototype method, so a
@@ -204,16 +211,28 @@ describe("biEncoderService batched scoring (#2715)", () => {
     expect(runDims.length).toBe(expectedBuckets);
     expect(runDims.length).toBeLessThan(passages.length + 1);
 
-    // Every run really carries multiple rows, and the rows add up to the
-    // whole pool plus the query.
     let totalRows = 0;
     for (const dims of runDims) {
       expect(dims.length).toBe(2);
-      expect(dims[0]).toBeGreaterThan(1);
       expect(dims[0]).toBeLessThanOrEqual(BATCH_ROWS);
       totalRows += dims[0];
     }
     expect(totalRows).toBe(passages.length + 1);
+
+    // Every non-final bucket is full, so it really carries multiple rows.
+    // Only the final bucket may be short — with BATCH_ROWS of 10 or 20 a
+    // 21-row pool leaves it exactly one row, so the >1 check must not
+    // depend on the tuning knob.
+    for (let i = 0; i < runDims.length - 1; i++) {
+      expect(runDims[i][0]).toBeGreaterThan(1);
+    }
+
+    // Bucket widths are non-decreasing across runs: the sort by token
+    // length put the short rows first. Delete the `.sort()` in encodeBatch
+    // and this fails.
+    for (let i = 1; i < runDims.length; i++) {
+      expect(runDims[i][1]).toBeGreaterThanOrEqual(runDims[i - 1][1]);
+    }
   });
 
   it("keeps batched scores within 1e-5 of the per-text path", async () => {
@@ -242,9 +261,12 @@ describe("biEncoderService batched scoring (#2715)", () => {
       expect(Math.abs(batchedScores[i] - referenceScore)).toBeLessThan(1e-5);
     }
 
-    // Sanity: the fixture actually exercised the tolerance rather than
-    // comparing zeros.
-    expect(batchedScores.every((s) => Number.isFinite(s))).toBe(true);
+    // Sanity: the fixture actually exercised the comparison rather than
+    // matching an all-zero result — real magnitude and real spread. An
+    // all-zero or all-equal score vector fails here.
+    const maxAbsScore = Math.max(...batchedScores.map((s) => Math.abs(s)));
+    expect(maxAbsScore).toBeGreaterThan(0.1);
+    expect(new Set(batchedScores).size).toBeGreaterThan(1);
     expect(maxAbsDiff).toBeLessThan(1e-5);
   });
 

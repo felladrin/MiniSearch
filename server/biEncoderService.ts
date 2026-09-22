@@ -24,12 +24,14 @@ const MAX_SEQUENCE_LENGTH = 256;
 
 /**
  * Rows per batched forward pass. The old chunk of 64 wrapped one-text-per-call
- * runs and bought no concurrency; now that a call really carries its rows, the
- * attention score tensor scales with B — at B=64, L=256, 12 heads it is
- * ~192 MiB live, which thrashes cache (measured slower than the per-text
- * path). B=16 keeps it ~48 MiB and measured fastest on a 200-passage pool
- * on this host (x86_64, 32 cpus): 1.88x wall time and a 223ms worst
- * event-loop block against 1560ms for the per-text path.
+ * runs and bought no concurrency; now that a call really carries its rows, B
+ * trades padding waste and cache pressure against per-call setup. B=64 measured
+ * slower than the per-text path; the sweep cannot separate the two plausible
+ * causes — a 64-row bucket spans a wider length range, so padding waste
+ * grows, and at L=256 with 12 heads the attention score tensor alone is
+ * ~192 MiB live, which pressures cache. B=16 (~48 MiB) measured fastest on
+ * a 200-passage pool on this host (x86_64, 32 cpus): 1.88x wall time and a
+ * 223ms worst event-loop block against 1560ms for the per-text path.
  */
 export const BATCH_ROWS = 16;
 
@@ -54,6 +56,13 @@ let padTokenId: number | null = null;
  * states are bit-identical to encoding the text alone. (The cross-encoder is
  * dynamically quantized and cannot batch for that reason; see the note in
  * `rerankerService.ts`.)
+ *
+ * Buckets run one after another with a plain `await` — deliberately NOT a
+ * `Promise.all` across buckets. Each await hands the event loop a turn
+ * between buckets, which is where the block-length win comes from. Do not
+ * "optimize" the buckets back into a `Promise.all`: onnxruntime-node runs
+ * inference synchronously on the JS thread regardless, so it would add no
+ * concurrency while taking away those between-bucket turns.
  */
 async function encodeBatch(
   activeSession: InferenceSession,
@@ -62,10 +71,20 @@ async function encodeBatch(
   texts: string[],
 ): Promise<Float32Array[]> {
   const tokenized = texts
-    .map((text, index) => ({
-      index,
-      ids: loadedTokenizer.encode(text).ids.slice(0, MAX_SEQUENCE_LENGTH),
-    }))
+    .map((text, index) => {
+      const { ids, attention_mask } = loadedTokenizer.encode(text);
+      const slicedIds = ids.slice(0, MAX_SEQUENCE_LENGTH);
+      const slicedMask = attention_mask.slice(0, MAX_SEQUENCE_LENGTH);
+      // The real-token length comes from the mask's leading 1s, not from
+      // trusting every returned id as real. At @huggingface/tokenizers
+      // 0.2.0 the mask is all 1s, so this is a no-op today; it keeps the
+      // row correct if a future tokenizer pads or marks truncation in the
+      // mask (the cached tokenizer.json already declares a padding
+      // strategy with pad_id 1).
+      const firstPad = slicedMask.indexOf(0);
+      const realLength = firstPad === -1 ? slicedIds.length : firstPad;
+      return { index, ids: slicedIds.slice(0, realLength) };
+    })
     .sort((a, b) => a.ids.length - b.ids.length);
 
   const embeddings: Float32Array[] = new Array(texts.length);
@@ -101,16 +120,20 @@ async function encodeBatch(
 
     const hidden = last_hidden_state.data as Float32Array;
     const dim = last_hidden_state.dims[2];
+    // Take the row stride from the output tensor, not from the bucket
+    // length we asked for: same value today, but the pooling can never
+    // read the wrong row if the export's layout ever changes.
+    const seqStride = last_hidden_state.dims[1];
 
     for (let row = 0; row < rows.length; row++) {
-      // Right-padding keeps every real token inside `ids.length`, so pooling
-      // over that count never touches a pad. (Checking the mask here instead
-      // would have to compare against 0n: BigInt64Array entries are never
-      // `=== 0`.)
+      // Right-padding keeps every real token inside `ids.length`, so
+      // pooling over that count never touches a pad. (Checking the mask
+      // here instead would have to compare against 0n: BigInt64Array
+      // entries are never `=== 0`.)
       const rowLength = rows[row].ids.length;
       const pooled = new Float32Array(dim);
       for (let t = 0; t < rowLength; t++) {
-        const offset = (row * bucketLength + t) * dim;
+        const offset = (row * seqStride + t) * dim;
         for (let d = 0; d < dim; d++) {
           pooled[d] += hidden[offset + d];
         }
@@ -224,8 +247,10 @@ export async function scorePassages(
   const activePadTokenId = padTokenId;
 
   // The query rides in the same batched pass as the passages instead of
-  // running alone: it is short, lands in the shortest bucket after the
-  // length sort, and saves one forward pass.
+  // running alone, saving one forward pass. Its position in the result is
+  // guaranteed by the index-based restore inside encodeBatch
+  // (`embeddings[rows[row].index]`), not by where the length sort happens
+  // to place it, so it stays correct whatever the bucketing does.
   const [queryEmbedding, ...passageEmbeddings] = await encodeBatch(
     activeSession,
     loadedTokenizer,

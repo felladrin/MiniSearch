@@ -55,37 +55,46 @@ function createOnnxSession(modelRepo: string, modelPath: string) {
 }
 
 /**
- * Resolves the tokenizer's real pad token id from its config, or `null` when
- * the config declares no pad token at all — the reranker never pads, so a
- * missing pad must not fail its load. A pad token that is declared but cannot
- * be resolved raises instead: padding with an assumed id is wrong, because in
- * the XLM-RoBERTa exports id 0 is `<s>`, not `<pad>`, so a hardcoded 0
- * would inject BOS tokens at every pad position.
+ * Resolves the tokenizer's real pad token id from its config. Returns the
+ * resolved id, or `null` for anything it cannot cleanly resolve: no
+ * `pad_token` key, an empty value, a shape it does not understand, or a
+ * `token_to_id` miss. It never throws — this loader is shared, and a pad
+ * id it cannot read must not take a service down at boot. The caller that
+ * actually needs a pad id (the bi-encoder) decides what to do about null.
+ *
+ * Both serializations transformers emit are accepted: a plain string, and
+ * the AddedToken dict form (e.g. `{"content": "<pad>", "lstrip": false,
+ * "rstrip": false, "normalized": true}`), which the cached configs here
+ * already use for `mask_token`. Padding with an assumed id is never on
+ * the table: in the XLM-RoBERTa exports id 0 is `<s>`, not `<pad>`.
  */
 function resolvePadTokenId(
   tokenizer: Tokenizer,
   tokenizerConfig: { pad_token?: unknown },
-  modelRepo: string,
 ): number | null {
-  if (!tokenizerConfig || !Object.hasOwn(tokenizerConfig, "pad_token")) {
+  const padToken = tokenizerConfig?.pad_token;
+
+  let padTokenString: string | null = null;
+  if (typeof padToken === "string" && padToken.length > 0) {
+    padTokenString = padToken;
+  } else if (
+    typeof padToken === "object" &&
+    padToken !== null &&
+    typeof (padToken as { content?: unknown }).content === "string" &&
+    (padToken as { content: string }).content.length > 0
+  ) {
+    padTokenString = (padToken as { content: string }).content;
+  }
+  if (padTokenString === null) {
     return null;
   }
 
-  const padToken = tokenizerConfig.pad_token;
-  if (typeof padToken !== "string" || padToken.length === 0) {
-    throw new Error(
-      `tokenizer_config.json for ${modelRepo} declares a malformed pad_token`,
-    );
+  if (typeof tokenizer.token_to_id !== "function") {
+    return null;
   }
 
-  const padTokenId = tokenizer.token_to_id(padToken);
-  if (padTokenId === undefined) {
-    throw new Error(
-      `pad token "${padToken}" is missing from the vocabulary of ${modelRepo}`,
-    );
-  }
-
-  return padTokenId;
+  const padTokenId = tokenizer.token_to_id(padTokenString);
+  return padTokenId === undefined ? null : padTokenId;
 }
 
 /**
@@ -116,7 +125,7 @@ export async function loadOnnxModel(
     JSON.parse(fs.readFileSync(tokenizerPath, "utf8")),
     tokenizerConfig,
   );
-  const padTokenId = resolvePadTokenId(tokenizer, tokenizerConfig, modelRepo);
+  const padTokenId = resolvePadTokenId(tokenizer, tokenizerConfig);
   const session = await createOnnxSession(modelRepo, modelPath);
 
   return { session, tokenizer, padTokenId };
