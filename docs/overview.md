@@ -121,6 +121,8 @@ The `textGeneration` module orchestrates the entire search-to-response flow, man
 - **Content Processing**: Converts HTML results to plain text, strips emojis for cleaner output
 - **Lazy Thumbnail Loading**: The search response returns thumbnail URLs as SearXNG sent them; the client then loads each tile from `/thumbnail`, which applies the SSRF guard and serves from an in-process LRU, so a dead thumbnail host delays one tile instead of the whole grid
 
+None of this changes which engines answer. That is decided inside SearXNG, and which engines answer for the `general` category a text search asks for is decided by the pinned SearXNG build, so a thin result page is usually an engine problem rather than a resilience problem. `docs/configuration.md` covers replacing the SearXNG settings file when the container starts, which is how an operator widens the set or drops an engine that is blocked from their IP.
+
 ### Search Token Lifecycle
 
 CSRF protection uses a token the server owns for its lifetime:

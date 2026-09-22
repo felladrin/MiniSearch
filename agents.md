@@ -23,6 +23,7 @@ This is your navigation hub. Start here, follow the links, and return when you n
 
 ### Configuration & Setup
 - **`docs/configuration.md`** - Environment variables and settings reference
+- **`docs/configuration.md#tuning-the-search-engines`** - Replacing the SearXNG settings file at container start: engine selection, engines blocked from an IP, the `TMPDIR` requirement
 - **`docs/security.md`** - Access control, privacy, and security model
 
 ### Core Functionality
