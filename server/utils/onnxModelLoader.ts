@@ -55,27 +55,69 @@ function createOnnxSession(modelRepo: string, modelPath: string) {
 }
 
 /**
+ * Resolves the tokenizer's real pad token id from its config, or `null` when
+ * the config declares no pad token at all — the reranker never pads, so a
+ * missing pad must not fail its load. A pad token that is declared but cannot
+ * be resolved raises instead: padding with an assumed id is wrong, because in
+ * the XLM-RoBERTa exports id 0 is `<s>`, not `<pad>`, so a hardcoded 0
+ * would inject BOS tokens at every pad position.
+ */
+function resolvePadTokenId(
+  tokenizer: Tokenizer,
+  tokenizerConfig: { pad_token?: unknown },
+  modelRepo: string,
+): number | null {
+  if (!tokenizerConfig || !Object.hasOwn(tokenizerConfig, "pad_token")) {
+    return null;
+  }
+
+  const padToken = tokenizerConfig.pad_token;
+  if (typeof padToken !== "string" || padToken.length === 0) {
+    throw new Error(
+      `tokenizer_config.json for ${modelRepo} declares a malformed pad_token`,
+    );
+  }
+
+  const padTokenId = tokenizer.token_to_id(padToken);
+  if (padTokenId === undefined) {
+    throw new Error(
+      `pad token "${padToken}" is missing from the vocabulary of ${modelRepo}`,
+    );
+  }
+
+  return padTokenId;
+}
+
+/**
  * Downloads model files from a Hugging Face repo and returns a ready
- * inference session and tokenizer. The tokenizer files use the standard
- * Hugging Face names when not overridden.
+ * inference session, tokenizer, and the tokenizer's real pad token id. The
+ * tokenizer files use the standard Hugging Face names when not overridden.
  */
 export async function loadOnnxModel(
   modelRepo: string,
   modelFile: string,
   tokenizerFile = "tokenizer.json",
   tokenizerConfigFile = "tokenizer_config.json",
-): Promise<{ session: InferenceSession; tokenizer: Tokenizer }> {
+): Promise<{
+  session: InferenceSession;
+  tokenizer: Tokenizer;
+  padTokenId: number | null;
+}> {
   const [modelPath, tokenizerPath, tokenizerConfigPath] = await Promise.all([
     ensureModelFileExists(modelRepo, modelFile),
     ensureModelFileExists(modelRepo, tokenizerFile),
     ensureModelFileExists(modelRepo, tokenizerConfigFile),
   ]);
 
+  const tokenizerConfig = JSON.parse(
+    fs.readFileSync(tokenizerConfigPath, "utf8"),
+  ) as { pad_token?: unknown };
   const tokenizer = new Tokenizer(
     JSON.parse(fs.readFileSync(tokenizerPath, "utf8")),
-    JSON.parse(fs.readFileSync(tokenizerConfigPath, "utf8")),
+    tokenizerConfig,
   );
+  const padTokenId = resolvePadTokenId(tokenizer, tokenizerConfig, modelRepo);
   const session = await createOnnxSession(modelRepo, modelPath);
 
-  return { session, tokenizer };
+  return { session, tokenizer, padTokenId };
 }
