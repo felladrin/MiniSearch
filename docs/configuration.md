@@ -249,6 +249,77 @@ back to the `.env.example` defaults. See
 [Runtime Configuration](#runtime-configuration) for how those values reach the
 client.
 
+## Tuning the Search Engines
+
+The bundled SearXNG instance decides which engines answer a query. MiniSearch ships a thin overlay for it (`searxng-settings.yml`): it enables the JSON output format that `server/webSearchService.ts` consumes, and changes nothing else. The engine list is therefore whatever the pinned SearXNG build enables by default, and that list is short for the `general` category a text search asks for. In the current pin only three general engines are active (`brave`, `wikipedia`, `wikidata`), so one engine that is rate-limited or CAPTCHA-challenged from your server's IP thins every result page.
+
+SearXNG reads its settings when the container starts, so you can replace that file without rebuilding the image. SearXNG looks in two places, in this order:
+
+1. The file named by `SEARXNG_SETTINGS_PATH`.
+2. `/etc/searxng/settings.yml`.
+
+Option 1 is the one to prefer, because it leaves the image's own file untouched and lets your file be mounted read-only.
+
+```yaml
+# my-searxng-settings.yml
+use_default_settings: true
+
+server:
+  secret_key: "<your own random value>"
+
+search:
+  formats:
+    - json
+
+engines:
+  - name: mojeek
+    inactive: false
+  - name: startpage
+    inactive: false
+  - name: google
+    disabled: true
+```
+
+`use_default_settings: true` keeps the upstream engine list and merges your entries into it by engine name. `inactive: false` turns on an engine that ships switched off, `disabled: true` turns one off, and `search.formats: [json]` must stay, because it is how MiniSearch reads the response. The full vocabulary is in the [SearXNG settings docs](https://docs.searxng.org/admin/settings/settings.html).
+
+```bash
+docker run -p 7860:7860 \
+  -e SEARXNG_SETTINGS_PATH=/etc/searxng-custom/settings.yml \
+  -e TMPDIR=/home/node \
+  -v ./my-searxng-settings.yml:/etc/searxng-custom/settings.yml:ro \
+  ghcr.io/felladrin/minisearch
+```
+
+Three things about that command are required, not optional:
+
+- **The file must be readable by uid 1000.** The container runs as `node`, and a file readable only by its owner on the host is invisible to it.
+- **`secret_key` must be set to your own random value.** The image randomizes it at build time, so your file cannot reuse the placeholder.
+- **`TMPDIR` must point somewhere `node` can write.** SearXNG keeps its SQLite caches in its temp directory, and the published image ships those files owned by root. Changing `secret_key` makes SearXNG wipe and rebuild them at startup, which fails against a root-owned file and takes the search layer down before it listens: `sqlite3.OperationalError: attempt to write a readonly database`. Pointing `TMPDIR` at a writable directory (the app home above, or a volume) gives it a cache it can write. This is the one failure that looks like MiniSearch being broken rather than like a settings problem: the app server answers normally, `/healthz` on SearXNG never does, and every search returns 502.
+
+To check the override took effect, read the settings the running instance resolved, then run one search through SearXNG and look at which engines answered:
+
+```bash
+docker exec <container> /usr/local/searxng/searxng-venv/bin/python -c "
+import searx.settings_loader as sl
+settings, source = sl.load_settings()
+print(source)
+print([e['name'] for e in settings['engines'] if e.get('name') == 'mojeek'])
+"
+
+docker exec <container> /usr/local/searxng/searxng-venv/bin/python -c "
+import json, urllib.request
+from collections import Counter
+url = 'http://127.0.0.1:8888/search?q=hiking+near+lisbon&format=json&categories=general'
+data = json.load(urllib.request.urlopen(url, timeout=60))
+print(len(data.get('results', [])), dict(Counter(r.get('engine') for r in data.get('results', []))))
+print('unresponsive:', data.get('unresponsive_engines'))
+"
+```
+
+The second command is also how you find out which engines are failing from your IP before you change anything. In a run against the published image on 2026-09-22, the default settings returned 24 results for one query from a single engine, with two others reported CAPTCHA-challenged or crashed; the same query with `mojeek` switched on returned 39 results across three engines. Treat those as one measurement of one host, not as constants: the engine set that answers depends on your IP and on the day.
+
+Engine choice stays inside SearXNG. MiniSearch asks for one JSON document and reranks whatever comes back, so nothing in `server/webSearchService.ts` changes when you retune the engines, and the circuit breaker, the retries and the `unresponsive_engines` reporting keep working over the new set.
+
 ## Runtime Configuration
 
 Client-facing configuration (access keys, inference type, internal API settings) is resolved at runtime via the `/api/config` endpoint. The client fetches this endpoint on app initialization, so the published Docker image is fully configurable via environment variables at runtime - no rebuild needed.
