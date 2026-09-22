@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// `existsSync` is mocked so that if the read-from-file path ever comes back,
+// this file fails on the assertion below rather than on a missing mock.
 const mockExistsSync = vi.fn();
 const mockReadFileSync = vi.fn();
 const mockWriteFileSync = vi.fn();

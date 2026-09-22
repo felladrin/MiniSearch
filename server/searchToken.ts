@@ -13,6 +13,7 @@ function getSearchTokenFilePath() {
 }
 
 let processToken: string | null = null;
+let tokenFileWritten = false;
 
 /**
  * The search token this process verifies against, generated on first use and
@@ -52,6 +53,7 @@ export function regenerateSearchToken() {
     // behind by an earlier build would keep its old, world-readable
     // permissions.
     chmodSync(filePath, 0o600);
+    tokenFileWritten = true;
   } catch (error) {
     printMessage(
       `Could not write the search token file, serving with the in-memory token: ${error}`,
@@ -70,6 +72,11 @@ export function regenerateSearchToken() {
  */
 export function hasSearchTokenFileChanged() {
   if (processToken === null) return false;
+
+  // Nothing was ever recorded, so a read failure here says the temp directory
+  // is unwritable, which the write above already reported. Claiming another
+  // process rewrote the file would be the wrong story.
+  if (!tokenFileWritten) return false;
 
   try {
     return readFileSync(getSearchTokenFilePath(), "utf8") !== processToken;
