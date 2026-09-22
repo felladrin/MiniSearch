@@ -5,6 +5,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-09-22
 
+- Fixed the history filter re-reading the whole history window from IndexedDB on every keystroke; typing now re-filters the entries already loaded, with the search debounced.
 - Removed the dismissible "Tips" box from the settings menu. The features it pointed at are documented in the repository.
 
 ## 2026-09-21
