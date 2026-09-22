@@ -79,7 +79,8 @@ RUN chmod 644 $SEARXNG_SETTINGS_PATH && \
   /usr/local/searxng/searxng-venv/bin/pip install --no-build-isolation -e . && \
   /usr/local/searxng/searxng-venv/bin/pip uninstall -y wheel setuptools && \
   /usr/local/searxng/searxng-venv/bin/pip uninstall -y pip && \
-  /usr/local/searxng/searxng-venv/bin/python -c "import searx.webapp"
+  /usr/local/searxng/searxng-venv/bin/python -c "import searx.webapp" && \
+  rm -f /tmp/sxng_cache_*
 
 # The runtime never pip-installs, and pip itself vendors flagged copies of
 # msgpack and setuptools (`pip/_vendor/vendor.txt`) that no released pip
@@ -88,6 +89,15 @@ RUN chmod 644 $SEARXNG_SETTINGS_PATH && \
 # `pkg_resources`/`import pip` at the pinned commit comes up empty, and
 # the `import searx.webapp` build check above proves the package imports
 # after the removal. The editable install finder is plain importlib.
+
+# That same import also creates SearXNG's SQLite caches in the temp directory,
+# owned by root because the build runs as root. The container runs as `node`,
+# and SearXNG wipes and rebuilds those caches whenever `server.secret_key`
+# differs from the one written above, so shipping them makes an instance with
+# its own key die at startup with `attempt to write a readonly database`, with
+# no search and a container that still reports healthy (#2732). Clearing them
+# lets the running user create its own on first start; the `-shm` and `-wal`
+# sidecars go with them, or SQLite fails on those instead.
 
 # Create the app directory while still root and hand it to the app user:
 # the legacy (non-BuildKit) builder creates WORKDIR directories as root even
