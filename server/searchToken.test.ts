@@ -52,6 +52,25 @@ describe("searchToken", () => {
     expect(token).toBe(mockWriteFileSync.mock.calls[0][1]);
   });
 
+  it("should still serve a usable token when the file cannot be written", async () => {
+    // `getSearchToken()` runs inside the argon2 try in
+    // `verifyTokenAndRateLimit.ts`, so a throw out of the token module would
+    // read as a bad token and 401 every request with nothing in the log.
+    const accessError = Object.assign(new Error("EACCES: permission denied"), {
+      code: "EACCES",
+    });
+    mockWriteFileSync.mockImplementation(() => {
+      throw accessError;
+    });
+
+    const { getSearchToken } = await import("./searchToken");
+
+    const token = getSearchToken();
+
+    expect(token).toMatch(/^[0-9a-f]{64}$/);
+    expect(getSearchToken()).toBe(token);
+  });
+
   it("should keep the token it generated when the file changes", async () => {
     const { getSearchToken } = await import("./searchToken");
 

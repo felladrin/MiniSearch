@@ -127,8 +127,8 @@ None of this changes which engines answer. That is decided inside SearXNG, and w
 
 CSRF protection uses a token the server owns for its lifetime:
 
-1. **Generation**: `regenerateSearchToken()` writes a random token at build time, and on first use if the file is absent
-2. **Storage**: Server stores token file at `{os.tempdir()}/minisearch-token`, read once per process and held in memory from then on
+1. **Generation**: `regenerateSearchToken()` draws 32 random bytes on first use in a process and writes them to the token file; the file is a record, never read back as a source of truth
+2. **Storage**: The token is held in memory for the life of the process, and recorded at `{os.tempdir()}/minisearch-token` with `0600` permissions
 3. **Distribution**: Server serves the token to the client at runtime through `/api/config`, so a client always holds the token of the server answering it
 4. **Client Hashing**: Client hashes token before sending in requests (never sends raw token)
 5. **Verification**: Server compares request hash against the token it is holding

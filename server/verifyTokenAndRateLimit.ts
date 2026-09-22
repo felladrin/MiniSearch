@@ -135,7 +135,7 @@ function reportTokenFileChangeOnce() {
 
   hasReportedTokenFileChange = true;
   printMessage(
-    "Rejected a token that does not match this server's. The token file was rewritten after startup, so a client that took its token from another process keeps being rejected here until this server restarts.",
+    "Rejected a token that does not match this server's, and the token file no longer holds this process's token, so another process sharing this temp directory rewrote it. Each MiniSearch process generates its own token on first use, so a client that took its token from another process, or from before this one started, keeps being rejected here until it reloads.",
   );
 }
 

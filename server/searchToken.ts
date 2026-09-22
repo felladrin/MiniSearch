@@ -1,7 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
-import path from "node:path";
+import path, { basename } from "node:path";
+import debug from "debug";
 import temporaryDirectory from "temp-dir";
+
+const fileName = basename(import.meta.url);
+const printMessage = debug(fileName);
+printMessage.enabled = true;
 
 function getSearchTokenFilePath() {
   return path.resolve(temporaryDirectory, "minisearch-token");
@@ -32,13 +37,26 @@ export function getSearchToken() {
 }
 
 export function regenerateSearchToken() {
-  const filePath = getSearchTokenFilePath();
   const newToken = randomBytes(32).toString("hex");
-  writeFileSync(filePath, newToken, { mode: 0o600 });
-  // `mode` only applies when the file is created, so a token file left behind
-  // by an earlier build would keep its old, world-readable permissions.
-  chmodSync(filePath, 0o600);
   processToken = newToken;
+
+  // The token lives in memory; the file is a record, not a dependency. An
+  // unwritable temp directory must not take the server's auth down with it:
+  // `getSearchToken()` is called inside the argon2 try in
+  // `verifyTokenAndRateLimit.ts`, where a throw reads as a bad token, so
+  // every request would come back 401 with nothing in the log.
+  try {
+    const filePath = getSearchTokenFilePath();
+    writeFileSync(filePath, newToken, { mode: 0o600 });
+    // `mode` only applies when the file is created, so a token file left
+    // behind by an earlier build would keep its old, world-readable
+    // permissions.
+    chmodSync(filePath, 0o600);
+  } catch (error) {
+    printMessage(
+      `Could not write the search token file, serving with the in-memory token: ${error}`,
+    );
+  }
 
   return newToken;
 }

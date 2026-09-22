@@ -77,7 +77,7 @@ The full trust model lives in [`.github/SECURITY.md`](../.github/SECURITY.md) ("
 
 - Input validation on all endpoints
 - Sanitization of user-generated content
-- Search token generation: a per-build/per-startup token written to a temp file (`server/searchToken.ts`), using 32 bytes from the `node:crypto` CSPRNG, with the file restricted to its owner (`0600`)
+- Search token generation: a per-process token generated on first use and recorded in a temp file (`server/searchToken.ts`), using 32 bytes from the `node:crypto` CSPRNG, with the file restricted to its owner (`0600`)
 - HTTPS enforcement in production
 - Regular dependency updates via Renovate
 - **Argon2 Hashing**: Access keys hashed using argon2id for secure validation (not storage encryption)
@@ -88,7 +88,7 @@ The full trust model lives in [`.github/SECURITY.md`](../.github/SECURITY.md) ("
 
 | Module | Purpose |
 |--------|---------|
-| `server/searchToken.ts` | Reads/writes the CSRF token from `{tempdir}/minisearch-token` |
+| `server/searchToken.ts` | Generates the CSRF token per process and records it in `{tempdir}/minisearch-token` |
 | `server/verifiedTokens.ts` | In-memory `Set<string>` of verified session tokens |
 | `server/rejectedTokens.ts` | Bounded in-memory set of tokens that already failed a completed verification, so a replay skips the second argon2 check |
 | `server/searchesSinceLastRestart.ts` | In-memory counters for aggregate search outcomes (text/image search totals, and how often searches came back empty or were fully discarded), plus per-engine failure counts, reported on `/status`; records no query, URL, host, or per-search timestamp, and stores a failure kind classified by `server/webSearchService.ts` rather than SearXNG's reason string |
