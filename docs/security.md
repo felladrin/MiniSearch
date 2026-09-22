@@ -33,8 +33,8 @@ can reach the instance, so keep secrets out of that interface.
 
 Every HTTP request from client to backend carries a `token` query parameter for CSRF protection:
 
-1. **Token Generation**: On build/startup, `regenerateSearchToken()` writes a random token to `{os.tempdir()}/minisearch-token`, readable only by the user running the build (`0600`)
-2. **Client Distribution**: The server reads the file once, holds that token for the life of the process, and serves it as `searchToken` in `/api/config`
+1. **Token Generation**: On first use in a process, `regenerateSearchToken()` draws 32 random bytes and writes them to `{os.tempdir()}/minisearch-token` with `0600`. The file is never read back as a source of truth: a token that survives into a published image is one every container of that build shares, and anyone who pulls the image can read it out of the layer
+2. **Client Distribution**: The server holds the token it generated for the life of the process and serves it as `searchToken` in `/api/config`. Each process generates its own, so a restart or a second instance means a new token, which is why a bookmarked or shared search URL stops working and lands on the expired-link page
 3. **Per-Request Auth**: Client includes token as `?token=` parameter on all `/search/text`, `/search/images`, `/page-content`, `/thumbnail` and `/inference` requests
 4. **Server Verification**: `handleTokenVerification()` in `handleTokenVerification.ts` validates the token before proxying to SearXNG. The token hash's prefix (`$argon2id$v=19$m=512,t=16,p=1$`) is checked before `argon2Verify` runs, so a caller cannot embed inflated parameters to force multi-gigabyte allocations or excessive CPU work.
 5. **Session Tracking**: Validated tokens are stored in an in-memory `Set<string>` (`verifiedTokens.ts`) for session counting
@@ -77,7 +77,7 @@ The full trust model lives in [`.github/SECURITY.md`](../.github/SECURITY.md) ("
 
 - Input validation on all endpoints
 - Sanitization of user-generated content
-- Search token generation: a per-build/per-startup token written to a temp file (`server/searchToken.ts`), using 32 bytes from the `node:crypto` CSPRNG, with the file restricted to its owner (`0600`)
+- Search token generation: a per-process token generated on first use and recorded in a temp file (`server/searchToken.ts`), using 32 bytes from the `node:crypto` CSPRNG, with the file restricted to its owner (`0600`)
 - HTTPS enforcement in production
 - Regular dependency updates via Renovate
 - **Argon2 Hashing**: Access keys hashed using argon2id for secure validation (not storage encryption)
@@ -88,7 +88,7 @@ The full trust model lives in [`.github/SECURITY.md`](../.github/SECURITY.md) ("
 
 | Module | Purpose |
 |--------|---------|
-| `server/searchToken.ts` | Reads/writes the CSRF token from `{tempdir}/minisearch-token` |
+| `server/searchToken.ts` | Generates the CSRF token per process and records it in `{tempdir}/minisearch-token` |
 | `server/verifiedTokens.ts` | In-memory `Set<string>` of verified session tokens |
 | `server/rejectedTokens.ts` | Bounded in-memory set of tokens that already failed a completed verification, so a replay skips the second argon2 check |
 | `server/searchesSinceLastRestart.ts` | In-memory counters for aggregate search outcomes (text/image search totals, and how often searches came back empty or were fully discarded), plus per-engine failure counts, reported on `/status`; records no query, URL, host, or per-search timestamp, and stores a failure kind classified by `server/webSearchService.ts` rather than SearXNG's reason string |

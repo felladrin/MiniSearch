@@ -38,9 +38,10 @@ do not check the method at all: a `POST` to `/search/text` is served like a
 ### Search token
 
 The token is CSRF protection, not authorization: it proves a request came from
-a page this server served. `server/searchToken.ts` writes it at build time,
-reads it on first use and then holds it for the life of the process, and
-`/api/config` hands it out.
+a page this server served. `server/searchToken.ts` generates it on first use
+in each process and holds it for that process's life, and `/api/config` hands
+it out. It is not a build artifact: a token written during an image build
+would be shared by every container of that build.
 
 A client never sends the raw token. It hashes it with argon2id using the
 parameters in `shared/argon2Parameters.ts` (`m=512, t=16, p=1`, 32-byte output,
