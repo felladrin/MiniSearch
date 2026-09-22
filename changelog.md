@@ -3,6 +3,10 @@
 Notable changes, grouped by date, most recent first.
 
 
+## 2026-09-22
+
+- Removed the dismissible "Tips" box from the settings menu. The features it pointed at are documented in the repository.
+
 ## 2026-09-19
 
 - Added a per-host circuit breaker to the page reader: a host that refused the last three reads is skipped for five minutes, then probed with one read. Skipped reads are counted on /status under pageReads.skipped.skippedByBreaker.

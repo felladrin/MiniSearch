@@ -1,12 +1,8 @@
 import { MantineProvider } from "@mantine/core";
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { usePubSub } from "create-pubsub/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  menuExpandedAccordionsPubSub,
-  showFeatureTipsPubSub,
-} from "@/modules/pubSub";
+import { menuExpandedAccordionsPubSub } from "@/modules/pubSub";
 
 vi.mock("create-pubsub/react", () => ({
   usePubSub: vi.fn(),
@@ -38,38 +34,32 @@ vi.mock("@/components/Settings/HistorySettings", () => ({
 
 interface MenuState {
   expandedAccordions: string[];
-  showFeatureTips: boolean;
 }
 
 function createMenuState(overrides: Partial<MenuState> = {}): MenuState {
   return {
     expandedAccordions: [],
-    showFeatureTips: true,
     ...overrides,
   };
 }
 
 function mockMenuState(state: MenuState) {
-  const setShowFeatureTips = vi.fn();
   vi.mocked(usePubSub).mockImplementation((pubSub: unknown) => {
     if (pubSub === menuExpandedAccordionsPubSub)
       return [state.expandedAccordions, vi.fn()];
-    if (pubSub === showFeatureTipsPubSub)
-      return [state.showFeatureTips, setShowFeatureTips];
     throw new Error("MenuDrawer.test.tsx: unexpected pubSub in usePubSub mock");
   });
-  return { setShowFeatureTips };
 }
 
 async function renderMenuDrawer(state: MenuState) {
-  const handlers = mockMenuState(state);
+  mockMenuState(state);
   const MenuDrawer = (await import("./MenuDrawer")).default;
   const utils = render(
     <MantineProvider>
       <MenuDrawer opened onClose={vi.fn()} />
     </MantineProvider>,
   );
-  return { ...utils, ...handlers };
+  return utils;
 }
 
 describe("MenuDrawer", () => {
@@ -95,33 +85,5 @@ describe("MenuDrawer", () => {
       const control = screen.getByRole("button", { name: new RegExp(title) });
       expect(within(control).getByText(description)).toBeInTheDocument();
     }
-  });
-
-  it("shows the tips with the search URL when enabled", async () => {
-    await renderMenuDrawer(createMenuState({ showFeatureTips: true }));
-
-    expect(screen.getByText("Tips")).toBeInTheDocument();
-    expect(screen.getByText(/Search from anywhere/)).toBeInTheDocument();
-    expect(screen.getByText(/\/\?q=%s/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/use the speaker button on an answer/),
-    ).toBeInTheDocument();
-  });
-
-  it("hides the tips when showFeatureTips is false", async () => {
-    await renderMenuDrawer(createMenuState({ showFeatureTips: false }));
-
-    expect(screen.queryByText("Tips")).not.toBeInTheDocument();
-  });
-
-  it("persists the dismissal when the tips are closed", async () => {
-    const user = userEvent.setup();
-    const { setShowFeatureTips } = await renderMenuDrawer(
-      createMenuState({ showFeatureTips: true }),
-    );
-
-    await user.click(screen.getByRole("button", { name: "Dismiss tips" }));
-
-    expect(setShowFeatureTips).toHaveBeenCalledWith(false);
   });
 });
