@@ -251,7 +251,7 @@ client.
 
 ## Tuning the Search Engines
 
-The bundled SearXNG instance decides which engines answer a query. MiniSearch ships a thin overlay for it (`searxng-settings.yml`) that declares two things: the JSON output format that `server/webSearchService.ts` consumes, and a `secret_key` that the Dockerfile rewrites with a random value at build time. Everything else about the engine list comes from the pinned SearXNG build, and for the `general` category a text search asks for, that set is small. In the current pin three general engines are active (`brave`, `wikipedia`, `wikidata`), so one engine that is rate-limited or CAPTCHA-challenged from your server's IP thins every result page.
+The bundled SearXNG instance decides which engines answer a query. MiniSearch ships a thin overlay for it (`searxng-settings.yml`) that declares two things: the JSON output format that `server/webSearchService.ts` consumes, and a `secret_key` that the Dockerfile rewrites with a random value at build time. Everything else about the engine list comes from the pinned SearXNG build, so read the set from the running instance rather than from this page: the command below shows which engines answered and which came back unresponsive. Whatever that set turns out to be, one engine that is rate-limited or CAPTCHA-challenged from your server's IP thins every result page, because the other engines have to carry the query on their own.
 
 Diagnose before you change anything. `/status` needs no token and publishes `searches.unresponsiveEngines`, each engine classified `blocked`, `timeout` or `other`, and the server log prints the same names through the always-on `debug` in `server/webSearchService.ts`. See [Debugging Configuration](#debugging-configuration). To see the engine set itself, ask SearXNG directly, with the same parameters the app sends:
 
@@ -271,12 +271,15 @@ Image search asks for `categories=images,videos` instead, and the same switches 
 
 SearXNG reads its settings when the container starts, so you can replace that file without rebuilding the image. It looks at `SEARXNG_SETTINGS_PATH` first and at `/etc/searxng/settings.yml` otherwise. A `SEARXNG_SETTINGS_PATH` that points at a file which is not there is a hard failure rather than a fallthrough: SearXNG exits with `EnvironmentError: <path> not exists!`. Prefer that variable, because it leaves the image's own file untouched and lets your file be mounted read-only.
 
-The name is also a build `ARG` in the Dockerfile, where it only selects where the overlay is copied. A build arg does not survive into the container environment, so `--build-arg SEARXNG_SETTINGS_PATH=...` changes nothing at runtime, the same way nothing else in this image is configured at build time.
+The name is also a build `ARG` in the Dockerfile, where it only selects where the overlay is copied. A build arg does not survive into the container environment, so `--build-arg SEARXNG_SETTINGS_PATH=...` changes nothing at runtime; it only picks where the overlay is copied during the build.
 
-Two switches turn engines on, and they are not interchangeable:
+Two switches turn engines on, and they are not interchangeable: `disabled: false` is for an engine that ships `disabled: true`, and `inactive: false` is for one that ships `inactive: true`. Which one a given engine needs is written in the pinned upstream settings file inside the container:
 
-- `disabled: false` is for an engine that ships disabled, which is the case for `google`, `google images` and `bing` in the current pin.
-- `inactive: false` is for an engine that ships inactive, which is the case for `mojeek` and `startpage`.
+```bash
+docker exec <container> grep -A8 -E '^  - name: (mojeek|startpage|google)$' /usr/local/searxng/searxng-src/searx/settings.yml
+```
+
+Setting the other one fails silently. An engine left `inactive` is never loaded, and one left `disabled` is loaded but never queried, so it simply never shows up in results and nothing reports why. Both switches were measured against the published image: `google` with `disabled: false` returned 10 results, `mojeek` with `inactive: false` returned 9.
 
 ```yaml
 # my-searxng-settings.yml
@@ -324,10 +327,10 @@ services:
 Three things about that command are required, not optional:
 
 - **The file must be readable by uid 1000.** The container runs as `node`, and a file readable only by its owner on the host is invisible to it.
-- **`secret_key` must be set to your own random value.** The image randomizes it at build time, so your file cannot reuse the placeholder.
-- **`TMPDIR` must point somewhere `node` can write.** SearXNG keeps its SQLite caches in its temp directory, and the published image ships those files owned by root. Changing `secret_key` makes SearXNG wipe and rebuild them at startup, which fails against a root-owned file: `sqlite3.OperationalError: attempt to write a readonly database`. The app server keeps answering through that failure, so it reads as a broken MiniSearch rather than as a settings problem, and every search returns 502. This is a property of the current image, tracked in #2732; once the image stops shipping root-owned caches the requirement goes away.
+- **`secret_key` must be set to your own random value.** SearXNG refuses to start on the `ultrasecretkey` placeholder and logs `server.secret_key is not changed. Please use something else instead of ultrasecretkey.` The image's own file never carries the placeholder, because the Dockerfile replaces it at build time, but a file you write has to carry a real key.
+- **`TMPDIR` must point somewhere `node` can write.** SearXNG keeps its SQLite caches in its temp directory, and the published image ships those files owned by root. Changing `secret_key` makes SearXNG wipe and rebuild them at startup, which fails against a root-owned file: `sqlite3.OperationalError: attempt to write a readonly database`. The app server keeps answering through that failure, so it reads as a broken MiniSearch rather than as a settings problem, and every search returns 502. The wipe follows from your key differing from the one baked into the image, so copying that value out of `/etc/searxng/settings.yml` avoids it, but that means carrying a build-time secret in your own file and redoing it on every image update. This is a property of the current image, tracked in #2732; once the image stops shipping root-owned caches the requirement goes away.
 
-The traceback above will not show in `docker logs`. The container's CMD sends SearXNG's output to `/dev/null`, deliberately, so that the app server's log stays clean. To see it, run SearXNG in the foreground inside the container:
+The traceback above will not show in `docker logs`. The container's CMD sends SearXNG's output to `/dev/null`, deliberately, so that the app server's log stays clean. To see it, run SearXNG in the foreground inside the container, which is only possible once the original has failed: on a running instance the second process collides with the live one on `127.0.0.1:8888` and reports the address as already in use.
 
 ```bash
 docker exec <container> sh -c 'cd /usr/local/searxng/searxng-src && /usr/local/searxng/searxng-venv/bin/python -m searx.webapp'
@@ -349,7 +352,7 @@ Then run the query command from the top of this section again and compare which 
 
 Engine choice does not change the privacy posture. SearXNG still makes the request, from your server's address, so the engine sees the instance and not the user, and no query goes to any third party that SearXNG did not already talk to.
 
-Engine choice stays inside SearXNG. MiniSearch asks for one JSON document and reranks whatever comes back, so nothing in `server/webSearchService.ts` changes when you retune the engines, and the circuit breaker, the retries and the `unresponsive_engines` reporting keep working over the new set.
+None of this reaches MiniSearch's code. The app asks SearXNG for one JSON document and reranks whatever comes back, so nothing in `server/webSearchService.ts` changes when you retune the engines, and the circuit breaker, the retries and the `unresponsive_engines` reporting keep working over the new set.
 
 ## Runtime Configuration
 
