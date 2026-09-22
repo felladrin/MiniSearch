@@ -3,6 +3,13 @@
 Notable changes, grouped by date, most recent first.
 
 
+## 2026-09-21
+
+- Security: cleared every fixable high and critical vulnerability from the Docker image, covering the Debian base packages, npm's bundled dependency tree, SearXNG's vendored Python packages, and build-only dependencies that were shipping in the runtime image.
+- Answered a rejected or stripped search token with a readable page that links back to the app, when the browser asked for HTML.
+- Fixed page-content ranking to fuse dense bi-encoder scores with the lexical ranking instead of using lexical alone, so the passages selected for the prompt match the query better.
+- Fixed the "Clear all history" button to stay enabled when AI responses or chat messages remain even with no searches, and its confirmation now names all three things it deletes.
+
 ## 2026-09-19
 
 - Added a per-host circuit breaker to the page reader: a host that refused the last three reads is skipped for five minutes, then probed with one read. Skipped reads are counted on /status under pageReads.skipped.skippedByBreaker.
