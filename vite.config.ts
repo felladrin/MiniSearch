@@ -5,7 +5,7 @@ import viteReactPlugin from "@vitejs/plugin-react";
 import dotenv from "dotenv";
 import getGitCommitHash from "helper-git-hash";
 import { visualizer } from "rollup-plugin-visualizer";
-import { defineConfig } from "vite";
+import { defineConfig, type UserConfig } from "vite";
 import { biEncoderServiceHook } from "./server/biEncoderServiceHook.ts";
 import { cacheServerHook } from "./server/cacheServerHook.ts";
 import { compressionServerHook } from "./server/compressionServerHook.ts";
@@ -16,7 +16,6 @@ import { internalApiEndpointServerHook } from "./server/internalApiEndpointServe
 import { pageContentEndpointServerHook } from "./server/pageContentEndpointServerHook.ts";
 import { rerankerServiceHook } from "./server/rerankerServiceHook.ts";
 import { searchEndpointServerHook } from "./server/searchEndpointServerHook.ts";
-import { regenerateSearchToken } from "./server/searchToken.ts";
 import { statusEndpointServerHook } from "./server/statusEndpointServerHook.ts";
 import { thumbnailEndpointServerHook } from "./server/thumbnailEndpointServerHook.ts";
 import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook.ts";
@@ -26,9 +25,7 @@ dotenv.config({ path: [".env", ".env.example"], quiet: true });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export default defineConfig(({ command }) => {
-  if (command === "build") regenerateSearchToken();
-
+export default defineConfig((): UserConfig => {
   return {
     /**
      * Both workers are created with `type: "module"`, and the dictation model's

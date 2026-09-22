@@ -33,8 +33,8 @@ can reach the instance, so keep secrets out of that interface.
 
 Every HTTP request from client to backend carries a `token` query parameter for CSRF protection:
 
-1. **Token Generation**: On build/startup, `regenerateSearchToken()` writes a random token to `{os.tempdir()}/minisearch-token`, readable only by the user running the build (`0600`)
-2. **Client Distribution**: The server reads the file once, holds that token for the life of the process, and serves it as `searchToken` in `/api/config`
+1. **Token Generation**: On first use in a process, `regenerateSearchToken()` draws 32 random bytes and writes them to `{os.tempdir()}/minisearch-token` with `0600`. The file is never read back as a source of truth: a token that survives into a published image is one every container of that build shares, and anyone who pulls the image can read it out of the layer
+2. **Client Distribution**: The server holds the token it generated for the life of the process and serves it as `searchToken` in `/api/config`. Each process generates its own, so a restart or a second instance means a new token, which is why a bookmarked or shared search URL stops working and lands on the expired-link page
 3. **Per-Request Auth**: Client includes token as `?token=` parameter on all `/search/text`, `/search/images`, `/page-content`, `/thumbnail` and `/inference` requests
 4. **Server Verification**: `handleTokenVerification()` in `handleTokenVerification.ts` validates the token before proxying to SearXNG. The token hash's prefix (`$argon2id$v=19$m=512,t=16,p=1$`) is checked before `argon2Verify` runs, so a caller cannot embed inflated parameters to force multi-gigabyte allocations or excessive CPU work.
 5. **Session Tracking**: Validated tokens are stored in an in-memory `Set<string>` (`verifiedTokens.ts`) for session counting

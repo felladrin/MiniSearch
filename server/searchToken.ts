@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import temporaryDirectory from "temp-dir";
 
@@ -10,24 +10,25 @@ function getSearchTokenFilePath() {
 let processToken: string | null = null;
 
 /**
- * The shared search token, generated on first use and kept across restarts with
- * 0600 permissions.
+ * The search token this process verifies against, generated on first use and
+ * written with 0600 permissions.
  *
- * Read once and then held for the life of the process. Reading the file on
- * every request let anything that rewrote it re-key a running server: the
- * clients holding the previous token were rejected from that moment on, and so
- * was every new page load, because the token being handed out had been captured
- * when the server started. A server that keeps its own token instead can still
- * verify the clients it handed that token to.
+ * Never adopted from the file. A token that survives into a published image is
+ * one every container of that build shares, and anyone who pulls the image can
+ * read it out of the layer, so the file is a record for the operator and for
+ * `hasSearchTokenFileChanged`, not a source of truth.
+ *
+ * Held for the life of the process. Reading the file on every request let
+ * anything that rewrote it re-key a running server: the clients holding the
+ * previous token were rejected from that moment on, and so was every new page
+ * load, because the token being handed out had been captured when the server
+ * started. A server that keeps its own token instead can still verify the
+ * clients it handed that token to.
  */
 export function getSearchToken() {
   if (processToken !== null) return processToken;
 
-  if (!existsSync(getSearchTokenFilePath())) return regenerateSearchToken();
-
-  processToken = readFileSync(getSearchTokenFilePath(), "utf8");
-
-  return processToken;
+  return regenerateSearchToken();
 }
 
 export function regenerateSearchToken() {

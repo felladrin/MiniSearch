@@ -36,60 +36,47 @@ afterEach(() => {
 });
 
 describe("searchToken", () => {
-  it("should read existing token file when it exists", async () => {
+  it("should generate a fresh token instead of adopting one already in the file", async () => {
+    // The published image used to ship a token in the temp directory, and a
+    // container that read it shared one token with every other container built
+    // from that image, and with anyone who pulled the image and read the layer.
     mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue("existing-token-123");
+    mockReadFileSync.mockReturnValue("token-baked-into-the-image");
 
     const { getSearchToken } = await import("./searchToken");
     const token = getSearchToken();
 
-    expect(token).toBe("existing-token-123");
-    expect(mockExistsSync).toHaveBeenCalled();
-    expect(mockReadFileSync).toHaveBeenCalled();
-    expect(mockWriteFileSync).not.toHaveBeenCalled();
-  });
-
-  it("should generate a new token when file does not exist", async () => {
-    mockExistsSync.mockReturnValue(false);
-    mockWriteFileSync.mockReturnValue(undefined);
-
-    const { getSearchToken } = await import("./searchToken");
-
-    const token = getSearchToken();
-
-    expect(mockWriteFileSync).toHaveBeenCalled();
+    expect(token).not.toBe("token-baked-into-the-image");
+    expect(token).toMatch(/^[0-9a-f]{64}$/);
+    expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
     expect(token).toBe(mockWriteFileSync.mock.calls[0][1]);
   });
 
-  it("should keep the token it read at startup when the file changes", async () => {
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue("token-from-startup");
-
+  it("should keep the token it generated when the file changes", async () => {
     const { getSearchToken } = await import("./searchToken");
 
-    expect(getSearchToken()).toBe("token-from-startup");
+    const firstToken = getSearchToken();
 
     // Another process rewriting the file must not re-key this one: the clients
     // already holding the old token have no way of being told about a new one.
     mockReadFileSync.mockReturnValue("token-from-another-process");
 
-    expect(getSearchToken()).toBe("token-from-startup");
-    expect(mockReadFileSync).toHaveBeenCalledTimes(1);
+    expect(getSearchToken()).toBe(firstToken);
+    expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
   });
 
   it("should serve the new token after regenerating it", async () => {
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue("token-from-startup");
-    mockWriteFileSync.mockReturnValue(undefined);
-
     const { getSearchToken, regenerateSearchToken } = await import(
       "./searchToken"
     );
 
-    getSearchToken();
+    const firstToken = getSearchToken();
     regenerateSearchToken();
 
-    expect(getSearchToken()).toBe(mockWriteFileSync.mock.calls[0][1]);
+    expect(getSearchToken()).not.toBe(firstToken);
+    expect(getSearchToken()).toBe(
+      mockWriteFileSync.mock.calls[mockWriteFileSync.mock.calls.length - 1][1],
+    );
   });
 
   it("regenerateSearchToken should draw the token from a cryptographic source", async () => {
@@ -134,22 +121,17 @@ describe("hasSearchTokenFileChanged", () => {
   });
 
   it("should be false while the file still holds this process's token", async () => {
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue("token-from-startup");
-
     const { getSearchToken, hasSearchTokenFileChanged } = await import(
       "./searchToken"
     );
 
-    getSearchToken();
+    const token = getSearchToken();
+    mockReadFileSync.mockReturnValue(token);
 
     expect(hasSearchTokenFileChanged()).toBe(false);
   });
 
   it("should be true once another process rewrites the file", async () => {
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue("token-from-startup");
-
     const { getSearchToken, hasSearchTokenFileChanged } = await import(
       "./searchToken"
     );
@@ -161,9 +143,6 @@ describe("hasSearchTokenFileChanged", () => {
   });
 
   it("should be true when the file is gone", async () => {
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue("token-from-startup");
-
     const { getSearchToken, hasSearchTokenFileChanged } = await import(
       "./searchToken"
     );
