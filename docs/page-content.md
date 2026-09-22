@@ -104,7 +104,10 @@ The limit bounds inference work, not elapsed time. On an Apple M2 Pro CPU,
 ONNX Runtime 1.30.0 took 7.42–7.48 seconds for 256 passages, 15.07–15.20 seconds
 for 512, and 22.37–22.94 seconds for 768, with two warm runs per pool using
 roughly 1,083-character English passages near the model's 256-token limit.
-These are scoring-only measurements, not production latency guarantees.
+These are scoring-only measurements, not production latency guarantees. They
+predate the batched dense-scoring path added in #2715, which scores the same
+pool in length-bucketed forward passes and runs faster, so the 256-passage
+cap now overstates the cost and stays conservative.
 The browser's 20-second request timeout also includes page downloads, which
 can take up to 6 seconds; slower hosts and concurrent requests can still exceed
 it at 256 passages. Larger pools therefore retain lexical-only selection.
