@@ -304,7 +304,6 @@ engines:
 ```bash
 docker run -p 7860:7860 \
   -e SEARXNG_SETTINGS_PATH=/etc/searxng-custom/settings.yml \
-  -e TMPDIR=/home/node \
   -v "$(pwd)/my-searxng-settings.yml:/etc/searxng-custom/settings.yml:ro" \
   ghcr.io/felladrin/minisearch
 ```
@@ -319,18 +318,16 @@ services:
       - "7860:7860"
     environment:
       - SEARXNG_SETTINGS_PATH=/etc/searxng-custom/settings.yml
-      - TMPDIR=/home/node
     volumes:
       - ./my-searxng-settings.yml:/etc/searxng-custom/settings.yml:ro
 ```
 
-Three things about that command are required, not optional:
+Two things about that command are required, not optional:
 
 - **The file must be readable by uid 1000.** The container runs as `node`, and a file readable only by its owner on the host is invisible to it.
 - **`secret_key` must be set to your own random value.** SearXNG refuses to start on the `ultrasecretkey` placeholder and logs `server.secret_key is not changed. Please use something else instead of ultrasecretkey.` The image's own file never carries the placeholder, because the Dockerfile replaces it at build time, but a file you write has to carry a real key.
-- **`TMPDIR` must point somewhere `node` can write.** SearXNG keeps its SQLite caches in its temp directory, and the published image ships those files owned by root. Changing `secret_key` makes SearXNG wipe and rebuild them at startup, which fails against a root-owned file: `sqlite3.OperationalError: attempt to write a readonly database`. The app server keeps answering through that failure, so it reads as a broken MiniSearch rather than as a settings problem, and every search returns 502. The wipe follows from your key differing from the one baked into the image, so copying that value out of `/etc/searxng/settings.yml` avoids it, but that means carrying a build-time secret in your own file and redoing it on every image update. This is a property of the current image, tracked in #2732; once the image stops shipping root-owned caches the requirement goes away.
 
-The traceback above will not show in `docker logs`. The container's CMD sends SearXNG's output to `/dev/null`, deliberately, so that the app server's log stays clean. To see it, run SearXNG in the foreground inside the container, which is only possible once the original has failed: on a running instance the second process collides with the live one on `127.0.0.1:8888` and reports the address as already in use.
+A SearXNG startup failure will not show in `docker logs`. The container's CMD sends SearXNG's output to `/dev/null`, deliberately, so that the app server's log stays clean. To see it, run SearXNG in the foreground inside the container, which is only possible once the original has failed: on a running instance the second process collides with the live one on `127.0.0.1:8888` and reports the address as already in use.
 
 ```bash
 docker exec <container> sh -c 'cd /usr/local/searxng/searxng-src && /usr/local/searxng/searxng-venv/bin/python -m searx.webapp'
