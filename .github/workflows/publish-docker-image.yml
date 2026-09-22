@@ -95,9 +95,10 @@ jobs:
             exit 1
           fi
 
-          # A Release cut from a side branch is listed as the latest release and
-          # its generated notes are diffed against a tag from another line of
-          # history. This is the gate; the `enable={{is_default_branch}}` guard on
+          # A Release cut from a side branch is listed as the latest release
+          # and its release notes would resolve the previous version against
+          # a tag from another line of history. This is the gate; the
+          # `enable={{is_default_branch}}` guard on
           # the `latest` Docker tag below is the backstop behind it.
           if [[ $REF_NAME != "$DEFAULT_BRANCH" ]]; then
             echo "Releases are cut from '$DEFAULT_BRANCH' only; this run is on '$REF_NAME'." >&2
@@ -200,6 +201,8 @@ jobs:
       # so it is both what gets checked out and what the push is verified
       # against.
       EXPECTED_SHA: ${{ needs.build.outputs.commit }}
+      # owner/repo, for the links in the minimal Release body below.
+      REPOSITORY: ${{ github.repository }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout the released commit
@@ -288,6 +291,86 @@ jobs:
           # silently skipping a Release that was never made.
           if gh release view "$VERSION" >/dev/null 2>&1; then
             echo "GitHub Release '$VERSION' already exists; skipping creation."
+            exit 0
+          fi
+
+          # The notes come from changelog.md instead of --generate-notes:
+          # the auto-generated body lists every commit since the previous
+          # tag and hit GitHub's 125000-character limit on 2026.9.16.
+          # The body is every changelog line that was not in the changelog
+          # at the previous release's tag, kept under its section heading.
+          # A tree diff, not a date range: a bullet appended to an
+          # already-released date - the natural edit when a second change
+          # lands the same day as a morning release - still ships with the
+          # next release instead of being silently dropped. The previous
+          # version is the highest CalVer tag strictly below this one -
+          # the same pattern the build job validates - read from the
+          # remote because the checkout is shallow. Taking the highest tag
+          # overall would go empty when an older Release is repaired after
+          # a newer one has shipped.
+          calver='^[0-9]{4}\.[1-9][0-9]?\.[1-9][0-9]?(\.[1-9][0-9]*)?$'
+          # The lookup is three-valued: a failed `git ls-remote` must not
+          # read as "no previous release". The step runs under `bash -e`
+          # without pipefail, so the pipeline's status would be the last
+          # awk's 0 even when ls-remote dies; the failure is captured
+          # explicitly instead.
+          tags_listed=1
+          remote_tags=$(git ls-remote --tags origin) || tags_listed=0
+          prev_version=$(printf '%s\n' "$remote_tags" \
+            | awk '{ sub("refs/tags/", "", $2); print $2 }' \
+            | grep -v '\^{}' \
+            | grep -E "$calver" \
+            | sort -V \
+            | awk -v v="$VERSION" '$0 == v { exit } { last = $0 } END { print last }')
+
+          notes=""
+          if [[ -f changelog.md ]]; then
+            if [[ -z $prev_version ]]; then
+              if (( tags_listed )); then
+                # First release of the repository: the whole changelog is
+                # its notes. A failed lookup takes the thin fallback at
+                # the bottom instead: guessing "everything is new" on a
+                # network error would republish two years of changes that
+                # already shipped.
+                notes=$(awk '/^## / { keep = 1 } keep' changelog.md)
+              fi
+            elif git fetch --depth=1 --force origin "refs/tags/$prev_version:refs/tags/prev-release" >/dev/null 2>&1; then
+              if git show refs/tags/prev-release:changelog.md > "$RUNNER_TEMP/prev-changelog.md" 2>/dev/null && [[ -s "$RUNNER_TEMP/prev-changelog.md" ]]; then
+                notes=$(awk '
+                  NR == FNR { if ($0 !~ /^## / && $0 != "") prev[$0]; next }
+                  /^## / { if (kept && head != "") { print head; printf "%s", body } head = $0; body = ""; kept = 0; next }
+                  $0 == "" { body = body "\n"; next }
+                  { if (!($0 in prev)) { body = body $0 "\n"; kept = 1 } }
+                  END { if (kept && head != "") { print head; printf "%s", body } }
+                ' "$RUNNER_TEMP/prev-changelog.md" changelog.md)
+              else
+                # The previous tag had no changelog: everything in this
+                # one is new.
+                notes=$(awk '/^## / { keep = 1 } keep' changelog.md)
+              fi
+            fi
+            # A failed fetch leaves notes empty and the fallback below
+            # runs: guessing "everything is new" on a network error would
+            # republish changes that already shipped.
+          fi
+
+          if [[ -n ${notes//[[:space:]]/} ]]; then
+            gh release create "$VERSION" --title "$VERSION" --notes "$notes"
           else
-            gh release create "$VERSION" --generate-notes --title "$VERSION"
+            # A deterministic thin body, not --generate-notes: generated
+            # notes are exactly the call that 422'd on 2026.9.16, and
+            # they would fire when the changelog was forgotten, which is
+            # the long-gap many-commit case that made it too long. A thin
+            # Release is visible and repairable after the fact; a dead
+            # step with the tag already pushed is neither.
+            echo "No new changelog lines found for $VERSION; publishing a minimal Release body." >&2
+            if [[ -f changelog.md && -n $prev_version ]]; then
+              notes="Release $VERSION. See [changelog.md](https://github.com/$REPOSITORY/blob/$VERSION/changelog.md) for notable changes, and the [compare view](https://github.com/$REPOSITORY/compare/$prev_version...$VERSION) for the full commit list."
+            else
+              # Without a previous version or a changelog at this commit,
+              # neither link above would resolve; the commit list is the
+              # one page that always exists for the tag.
+              notes="Release $VERSION. See the [commit list](https://github.com/$REPOSITORY/commits/$VERSION)."
+            fi
+            gh release create "$VERSION" --title "$VERSION" --notes "$notes"
           fi
