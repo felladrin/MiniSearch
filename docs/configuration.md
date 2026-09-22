@@ -279,7 +279,7 @@ Two switches turn engines on, and they are not interchangeable: `disabled: false
 docker exec <container> grep -A8 -E '^  - name: (mojeek|startpage|google)$' /usr/local/searxng/searxng-src/searx/settings.yml
 ```
 
-Setting the other one fails silently. An engine left `inactive` is never loaded, and one left `disabled` is loaded but never queried, so it simply never shows up in results and nothing reports why. Both switches were measured against the published image: `google` with `disabled: false` returned 10 results, `mojeek` with `inactive: false` returned 9.
+Setting the other one fails silently. An engine left `inactive` is never loaded, and one left `disabled` is loaded but never queried, so it simply never shows up in results and nothing reports why. Both switches were measured against the published image: with `google` set to `disabled: false` it contributed 10 of the results in that run, and with `mojeek` set to `inactive: false` it contributed 9 in another. The run totals are further down this section.
 
 ```yaml
 # my-searxng-settings.yml
