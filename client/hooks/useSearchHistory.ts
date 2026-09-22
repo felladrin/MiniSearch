@@ -73,7 +73,6 @@ export function useSearchHistory(
   const [entries, setEntries] = useState<SearchEntry[]>([]);
   const [llmResponseCount, setLlmResponseCount] = useState(0);
   const [chatMessageCount, setChatMessageCount] = useState(0);
-  const [filteredSearches, setFilteredSearches] = useState<SearchEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFailedOperation, setLastFailedOperation] = useState<
@@ -82,7 +81,6 @@ export function useSearchHistory(
 
   const [currentPage, setCurrentPage] = useState(0);
   const [settledQuery, setSettledQuery] = useState("");
-  const [matchedCount, setMatchedCount] = useState(0);
 
   const isLoadingRef = useRef(true);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -119,11 +117,20 @@ export function useSearchHistory(
   }, [limit, enablePagination]);
 
   // Typing only schedules a debounced settle of the query; it never reaches
-  // IndexedDB. The derive effect below does the filtering from memory.
+  // IndexedDB. Clearing settles synchronously so the full list returns on the
+  // same paint and no timer is left pending (the drawer calls this with "" on
+  // mount).
   const searchHistory = useCallback((query: string) => {
     if (debounceTimerRef.current !== null) {
       clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
     }
+
+    if (!query.trim()) {
+      setSettledQuery("");
+      return;
+    }
+
     debounceTimerRef.current = setTimeout(() => {
       debounceTimerRef.current = null;
       setSettledQuery(query);
@@ -146,44 +153,38 @@ export function useSearchHistory(
     return entries.slice(0, limit);
   }, [entries, enablePagination, currentPage, pageSize, limit]);
 
-  // Re-filter the entries already held in memory whenever the settled query or
-  // the loaded entries change. Each settled query is a fresh full scan, never a
-  // narrowing of the previous keystroke's matches: this setup's per-length
-  // uFuzzy error rules let a match appear past its prefix ("wet" misses
-  // "weather", "weth" hits it), so narrowing would drop it forever.
-  useEffect(() => {
+  // Each settled query is a fresh full scan of the entries already held in
+  // memory, never a narrowing of the previous keystroke's matches: this setup's
+  // per-length uFuzzy error rules let a match appear past its prefix ("wet"
+  // misses "weather", "weth" hits it), so narrowing would drop it forever.
+  // Derived during render, so a delete/pin/refresh never shows a stale paint.
+  const matched = useMemo(() => {
     const query = settledQuery.trim();
-
-    if (!query) {
-      setFilteredSearches(recentSearches);
-      setMatchedCount(entries.length);
-      return;
-    }
-
-    const matched = searchWithFuzzy(
+    if (!query) return entries;
+    return searchWithFuzzy(
       entries,
       query,
       (search) => search.query,
       enablePagination ? entries.length : limit,
     ).map((result) => result.item);
+  }, [entries, settledQuery, enablePagination, limit]);
 
-    setMatchedCount(matched.length);
-
+  const filteredSearches = useMemo(() => {
     if (enablePagination) {
       const startIndex = currentPage * pageSize;
-      setFilteredSearches(matched.slice(startIndex, startIndex + pageSize));
-    } else {
-      setFilteredSearches(matched.slice(0, limit));
+      return matched.slice(startIndex, startIndex + pageSize);
     }
-  }, [
-    settledQuery,
-    entries,
-    recentSearches,
-    enablePagination,
-    limit,
-    pageSize,
-    currentPage,
-  ]);
+    return matched.slice(0, limit);
+  }, [matched, enablePagination, currentPage, pageSize, limit]);
+
+  const matchedCount = matched.length;
+
+  // A newly settled query starts paging from the top. The dependency is the
+  // event being reacted to, not a value the body reads.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset is keyed on the settled query changing
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [settledQuery]);
 
   const addToHistory = useCallback(
     async (
@@ -253,8 +254,6 @@ export function useSearchHistory(
     try {
       await clearAllHistory();
       setEntries([]);
-      setFilteredSearches([]);
-      setMatchedCount(0);
       setLlmResponseCount(0);
       setChatMessageCount(0);
       addLogEntry("All search history cleared");

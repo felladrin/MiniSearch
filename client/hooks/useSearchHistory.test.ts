@@ -63,6 +63,9 @@ beforeEach(async () => {
   await historyDatabase.chatHistory.clear();
   for (const query of SEEDED_QUERIES) {
     await addSearchToHistory(query, textResults);
+    // Distinct, deterministic timestamps so the orderBy(timestamp).reverse()
+    // read order never falls back to a tie resolved by Dexie internals.
+    vi.advanceTimersByTime(1000);
   }
 });
 
@@ -92,19 +95,36 @@ describe("useSearchHistory", () => {
     const readsAfterLoad = readSpy.mock.calls.length;
     expect(readsAfterLoad).toBe(1);
 
-    for (const query of ["w", "we", "wet", "weth"]) {
+    for (const query of ["w", "we", "wet", "weather"]) {
       act(() => result.current.searchHistory(query));
       await settle();
     }
 
     expect(readSpy).toHaveBeenCalledTimes(readsAfterLoad);
     // The filter did run: the settled query produced matches from memory.
+    // "weather" is a stable prefix that always matches, so this test does not
+    // depend on the uFuzzy narrowing trap.
     expect(queriesOf(result.current.filteredSearches)).toContain(
       "weather in lisbon",
     );
   });
 
   it("re-scans all in-memory entries per settled query instead of narrowing", async () => {
+    // Assert the uFuzzy premise directly against the seeded entries first, so
+    // a future @leeoniya/ufuzzy bump that changes the per-length error rules
+    // fails here, pointing at the premise, not at the hook.
+    const seeded = await historyDatabase.searches.toArray();
+    expect(
+      stringFormatters.searchWithFuzzy(seeded, "wet", (entry) => entry.query),
+    ).toHaveLength(0);
+    expect(
+      queriesOf(
+        stringFormatters
+          .searchWithFuzzy(seeded, "weth", (entry) => entry.query)
+          .map((result) => result.item),
+      ),
+    ).toContain("weather in lisbon");
+
     const { result } = renderHook(() => useSearchHistory({ limit: 100 }));
     await settle();
 
@@ -174,16 +194,42 @@ describe("useSearchHistory", () => {
     act(() => result.current.searchHistory("weth"));
     await settle();
     expect(readSpy).toHaveBeenCalledTimes(1);
+    expect(result.current.filteredSearches).toHaveLength(1);
+    expect(queriesOf(result.current.filteredSearches)).toContain(
+      "weather in lisbon",
+    );
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS + 50);
     });
     expect(readSpy).toHaveBeenCalledTimes(2);
+    // The active filter survives the background refresh: still one match,
+    // not the full unfiltered list.
+    expect(result.current.filteredSearches).toHaveLength(1);
+    expect(queriesOf(result.current.filteredSearches)).toContain(
+      "weather in lisbon",
+    );
+  });
+
+  it("clearing the filter settles immediately, without waiting for the debounce", async () => {
+    const { result } = renderHook(() => useSearchHistory({ limit: 100 }));
+    await settle();
+
+    act(() => result.current.searchHistory("weth"));
+    await settle();
+    expect(result.current.filteredSearches).toHaveLength(1);
+
+    // The drawer's clear button: the full list must return on the same tick,
+    // with no timer advance.
+    act(() => result.current.searchHistory(""));
+    expect(result.current.filteredSearches).toHaveLength(SEEDED_QUERIES.length);
   });
 
   it("paginates from memory: page changes and queries trigger no reads", async () => {
     await addSearchToHistory("wine tasting porto", textResults);
+    vi.advanceTimersByTime(1000);
     await addSearchToHistory("waterfall hike madeira", textResults);
+    vi.advanceTimersByTime(1000);
 
     const readSpy = vi.spyOn(historyModule, "getRecentSearches");
 
