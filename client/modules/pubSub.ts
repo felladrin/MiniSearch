@@ -169,17 +169,6 @@ export const menuExpandedAccordionsPubSub = createLocalStoragePubSub<string[]>(
   [],
 );
 
-/**
- * Whether the menu's dismissible feature-tips hint is still visible. Kept in
- * its own channel rather than `settings` because the settings forms snapshot
- * `settings` at mount and write the whole object back, which would resurrect
- * a dismissed flag.
- */
-export const showFeatureTipsPubSub = createLocalStoragePubSub(
-  "showFeatureTips",
-  true,
-);
-
 export const chatInputPubSub = createPubSub("");
 
 export const [updateChatInput] = chatInputPubSub;

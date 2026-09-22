@@ -1,9 +1,7 @@
 import {
   Accordion,
   ActionIcon,
-  Alert,
   Center,
-  Code,
   Drawer,
   type DrawerProps,
   FocusTrap,
@@ -15,16 +13,13 @@ import {
 } from "@mantine/core";
 import { useReducedMotion } from "@mantine/hooks";
 import { repository } from "@root/package.json";
-import { IconBrandGithub, IconBulb } from "@tabler/icons-react";
+import { IconBrandGithub } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import prettyMilliseconds from "pretty-ms";
 import HistorySettings from "@/components/Settings/HistorySettings";
 import { appName, appVersion } from "@/modules/appInfo";
 import { addLogEntry } from "@/modules/logEntries";
-import {
-  menuExpandedAccordionsPubSub,
-  showFeatureTipsPubSub,
-} from "@/modules/pubSub";
+import { menuExpandedAccordionsPubSub } from "@/modules/pubSub";
 import ActionsForm from "./ActionsForm";
 import AISettingsForm from "./AISettings/AISettingsForm";
 import InterfaceSettingsForm from "./InterfaceSettingsForm";
@@ -57,9 +52,6 @@ function ControlLabel({
 export default function MenuDrawer(drawerProps: DrawerProps) {
   const [menuExpandedAccordions, updateMenuExpandedAccordions] = usePubSub(
     menuExpandedAccordionsPubSub,
-  );
-  const [showFeatureTips, setShowFeatureTips] = usePubSub(
-    showFeatureTipsPubSub,
   );
   const shouldReduceMotion = useReducedMotion();
 
@@ -113,33 +105,6 @@ export default function MenuDrawer(drawerProps: DrawerProps) {
     >
       <FocusTrap.InitialFocus />
       <Drawer.Body>
-        {showFeatureTips && (
-          <Alert
-            // Override Mantine's default role="alert": this is an
-            // informational tips box, not an assertive alert.
-            role="note"
-            variant="light"
-            color="blue"
-            icon={<IconBulb size="1rem" />}
-            title="Tips"
-            withCloseButton
-            closeButtonLabel="Dismiss tips"
-            onClose={() => setShowFeatureTips(false)}
-            mb="md"
-          >
-            <Stack gap="xs">
-              <Text size="xs" lh="sm">
-                Search from anywhere: add{" "}
-                <Code>{`${self.location.origin}/?q=%s`}</Code> as your browser's
-                custom search engine.
-              </Text>
-              <Text size="xs" lh="sm">
-                Turn on AI Response, then use the speaker button on an answer to
-                hear it read aloud.
-              </Text>
-            </Stack>
-          </Alert>
-        )}
         <Accordion
           variant="separated"
           multiple

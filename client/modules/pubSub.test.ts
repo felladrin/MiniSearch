@@ -63,13 +63,12 @@ describe("PubSub localStorage persistence", () => {
   });
 
   it("falls back to the default and drops the value when the stored JSON has the wrong type", async () => {
-    localStorage.setItem("showFeatureTips", '"false"');
-    const { showFeatureTipsPubSub } = await import("./pubSub");
-    const [, , getTips] = showFeatureTipsPubSub;
-    expect(getTips()).toBe(true);
-    expect(localStorage.getItem("showFeatureTips")).toBeNull();
+    localStorage.setItem("lastSearchTokenHash", "123");
+    const { getLastSearchTokenHash } = await import("./pubSub");
+    expect(getLastSearchTokenHash()).toBe("");
+    expect(localStorage.getItem("lastSearchTokenHash")).toBeNull();
     expect(addLogEntry).toHaveBeenCalledWith(
-      "Discarded an unusable stored value for 'showFeatureTips'",
+      "Discarded an unusable stored value for 'lastSearchTokenHash'",
     );
   });
 
@@ -82,16 +81,5 @@ describe("PubSub localStorage persistence", () => {
     expect(addLogEntry).toHaveBeenCalledWith(
       "Discarded an unusable stored value for 'menuExpandedAccordions'",
     );
-  });
-
-  it("keeps a dismissed feature-tips flag across a reload", async () => {
-    const { showFeatureTipsPubSub } = await import("./pubSub");
-    const [dismissTips] = showFeatureTipsPubSub;
-    dismissTips(false);
-    expect(localStorage.getItem("showFeatureTips")).toBe("false");
-    vi.resetModules();
-    const reloaded = await import("./pubSub");
-    const [, , getTips] = reloaded.showFeatureTipsPubSub;
-    expect(getTips()).toBe(false);
   });
 });

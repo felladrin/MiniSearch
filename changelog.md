@@ -3,6 +3,10 @@
 Notable changes, grouped by date, most recent first.
 
 
+## 2026-09-22
+
+- Removed the dismissible "Tips" box from the settings menu. The features it pointed at are documented in the repository.
+
 ## 2026-09-21
 
 - Security: cleared every fixable high and critical vulnerability from the Docker image, covering the Debian base packages, npm's bundled dependency tree, SearXNG's vendored Python packages, and build-only dependencies that were shipping in the runtime image.
