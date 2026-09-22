@@ -38,6 +38,7 @@ const FETCH_TIMEOUT_MS = 5000;
 
 let cachedConfig: ServerConfig | null = null;
 let pendingFetch: Promise<ServerConfig> | null = null;
+let configGeneration = 0;
 
 async function fetchConfig(): Promise<ServerConfig> {
   const response = await fetch("/api/config", {
@@ -63,18 +64,40 @@ export async function getConfig(): Promise<ServerConfig> {
   if (cachedConfig) return cachedConfig;
 
   if (!pendingFetch) {
+    const generation = configGeneration;
     pendingFetch = fetchConfig().then(
       (config) => {
-        cachedConfig = config;
-        pendingFetch = null;
+        if (generation === configGeneration) {
+          cachedConfig = config;
+          pendingFetch = null;
+        }
         return config;
       },
       (error) => {
-        pendingFetch = null;
+        if (generation === configGeneration) pendingFetch = null;
         throw error;
       },
     );
   }
 
   return pendingFetch;
+}
+
+/**
+ * Drops the cached config so the next `getConfig` call goes back to
+ * /api/config.
+ *
+ * Each server process mints its own search token, so a restart leaves an open
+ * page holding a token the server never issued. The 401 handler in
+ * `search.ts` calls this before asking for the token again, which is the only
+ * way a page that is already loaded can find out the token rotated.
+ *
+ * A fetch that is already in flight was started against the values this call
+ * discards, so it is left to resolve its own callers without repopulating the
+ * cache behind them.
+ */
+export function invalidateConfig(): void {
+  cachedConfig = null;
+  pendingFetch = null;
+  configGeneration += 1;
 }

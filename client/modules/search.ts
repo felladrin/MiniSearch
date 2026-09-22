@@ -1,5 +1,6 @@
 import Dexie, { type Table } from "dexie";
 import { sha256 } from "hash-wasm";
+import { invalidateConfig } from "./config";
 import { addLogEntry } from "./logEntries";
 import { getSearchTokenHash } from "./searchTokenHash";
 import type { ImageSearchResults, TextSearchResults } from "./types";
@@ -185,6 +186,57 @@ async function executeCachedSearch<T extends SearchResults>(
       return { results: cachedData.results, stale: true };
     }
     throw error;
+  }
+}
+
+/** The status the server answers a search with when the token is not its own. */
+const UNAUTHORIZED_STATUS = 401;
+
+type SearchAttempt<T> =
+  | { ok: true; results: T }
+  | { ok: false; status: number };
+
+async function buildSearchUrl(
+  endpoint: "text" | "images",
+  query: string,
+  limit?: number,
+): Promise<URL> {
+  const searchUrl = new URL(`/search/${endpoint}`, self.location.origin);
+  searchUrl.searchParams.set("q", query);
+  searchUrl.searchParams.set("token", await getSearchTokenHash());
+  if (limit) searchUrl.searchParams.set("limit", limit.toString());
+  return searchUrl;
+}
+
+/**
+ * One request, with the timeout covering the body as well as the response, so
+ * a server that answers and then stalls mid-stream still aborts.
+ */
+async function attemptSearch<T>(searchUrl: URL): Promise<SearchAttempt<T>> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    CACHE_CONFIG.REQUEST_TIMEOUT,
+  );
+
+  try {
+    const response = await fetch(searchUrl.toString(), {
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return { ok: false, status: response.status };
+    }
+
+    try {
+      return { ok: true, results: (await response.json()) as T };
+    } catch (parseError) {
+      throw new Error(
+        `JSON parsing error: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+      );
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -402,33 +454,31 @@ const searchService = {
       );
     }
 
-    const searchUrl = new URL(`/search/${endpoint}`, self.location.origin);
-    searchUrl.searchParams.set("q", query);
-    searchUrl.searchParams.set("token", await getSearchTokenHash());
-    if (limit) searchUrl.searchParams.set("limit", limit.toString());
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      CACHE_CONFIG.REQUEST_TIMEOUT,
-    );
-
     try {
-      const response = await fetch(searchUrl.toString(), {
-        signal: controller.signal,
-      });
+      let attempt = await attemptSearch<T>(
+        await buildSearchUrl(endpoint, query, limit),
+      );
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      try {
-        return await response.json();
-      } catch (parseError) {
-        throw new Error(
-          `JSON parsing error: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+      // Every server process mints its own search token, so a restart leaves
+      // this page hashing one the server never issued. Drop the cached config,
+      // take the token the server is handing out now, and try once more. The
+      // retry runs once per request: a second rejection is a real one, and is
+      // reported as the failure it is.
+      if (!attempt.ok && attempt.status === UNAUTHORIZED_STATUS) {
+        addLogEntry(
+          "Search token was rejected; refreshing it and retrying the search",
+        );
+        invalidateConfig();
+        attempt = await attemptSearch<T>(
+          await buildSearchUrl(endpoint, query, limit),
         );
       }
+
+      if (!attempt.ok) {
+        throw new Error(`HTTP error! status: ${attempt.status}`);
+      }
+
+      return attempt.results;
     } catch (error) {
       if (error instanceof Error) {
         if (error.name === "AbortError") {
@@ -441,8 +491,6 @@ const searchService = {
         }
       }
       throw error;
-    } finally {
-      clearTimeout(timeoutId);
     }
   },
 

@@ -1,9 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { invalidateConfig } from "./config";
 import { addLogEntry } from "./logEntries";
 import * as searchModule from "./search";
+import { getSearchTokenHash } from "./searchTokenHash";
 
 vi.mock("./logEntries", () => ({
   addLogEntry: vi.fn(),
+}));
+
+vi.mock("./config", () => ({
+  invalidateConfig: vi.fn(),
 }));
 
 vi.mock("./searchTokenHash", () => ({
@@ -258,6 +264,83 @@ describe("Search Module", () => {
           "test",
         ),
       ).rejects.toThrow(expected);
+    });
+  });
+
+  // A restart, a second instance or a dev-server reload mints a new search
+  // token, and a tab opened before that keeps hashing the old one. These pin
+  // the recovery: the page takes the token the server is handing out now and
+  // tries again, once.
+  describe("Search Token Rotation", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockFetch.mockReset();
+    });
+
+    afterEach(() => {
+      // The token mock is module-level, so the queued one-shot values have to
+      // go back to the shared default for the describe blocks that follow.
+      vi.mocked(getSearchTokenHash).mockReset();
+      vi.mocked(getSearchTokenHash).mockResolvedValue("mock-token-hash");
+    });
+
+    it("refetches the config and retries once when the token is rejected", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      vi.mocked(getSearchTokenHash)
+        .mockResolvedValueOnce("stale-token-hash")
+        .mockResolvedValueOnce("fresh-token-hash");
+      mockFetch
+        .mockResolvedValueOnce({ ok: false, status: 401 })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: vi.fn().mockResolvedValue(mockResults),
+        });
+
+      await expect(
+        searchModule.searchServiceInstance.performSearch<string[][]>(
+          "text",
+          "test query",
+        ),
+      ).resolves.toEqual(mockResults);
+
+      expect(invalidateConfig).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch.mock.calls[0][0] as string).toContain(
+        "token=stale-token-hash",
+      );
+      expect(mockFetch.mock.calls[1][0] as string).toContain(
+        "token=fresh-token-hash",
+      );
+    });
+
+    it("reports a second rejection instead of retrying again", async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 401 });
+
+      await expect(
+        searchModule.searchServiceInstance.performSearch<string[][]>(
+          "text",
+          "test query",
+        ),
+      ).rejects.toThrow("HTTP error! status: 401");
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(invalidateConfig).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the token alone when the request fails for another reason", async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 500 });
+
+      await expect(
+        searchModule.searchServiceInstance.performSearch<string[][]>(
+          "text",
+          "test query",
+        ),
+      ).rejects.toThrow("HTTP error! status: 500");
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(invalidateConfig).not.toHaveBeenCalled();
     });
   });
 
