@@ -100,6 +100,24 @@ they are not truncated to a shortlist. An unloaded model (empty dense scores)
 or a scoring error also keeps lexical ranking. Errors log a fixed diagnostic
 without query, URL, passage text or model error details.
 
+Dense scoring runs in a worker thread (`server/biEncoderWorker.ts`), not on
+the server's main thread. `onnxruntime-node` runs inference synchronously on
+whichever JS thread calls it, so the pass used to stop the event loop for its
+whole duration and no other request could be served while one page-content read
+ranked its passages. `biEncoderService.ts` keeps its four functions and now
+only ships the query and the passages across, and takes `number[]` scores back;
+the model and the embeddings stay in the worker. On this host (x86_64, 32
+logical cores) a 200-passage pass blocked the main thread for 815 ms before the
+move and 1.5 ms after, for identical scores.
+
+The worker caps ONNX Runtime's intra-op threads at half the reported
+parallelism. The default sizes that pool from the logical core count and its
+threads spin before yielding, which oversubscribes every core: the same pass
+measured 31-38 ms of main-thread delay and 7.1 s of wall time at the default
+against 1-4 ms and 2.6 s when capped. The cross-encoder is untouched and still
+runs on the main thread, where it keeps its block to about 13 ms by refusing to
+batch.
+
 The limit bounds inference work, not elapsed time. On an Apple M2 Pro CPU,
 ONNX Runtime 1.30.0 took 7.42–7.48 seconds for 256 passages, 15.07–15.20 seconds
 for 512, and 22.37–22.94 seconds for 768, with two warm runs per pool using

@@ -7,16 +7,22 @@
  *   npx vitest run --config vitest.integration.config.ts biEncoder
  */
 
+import { monitorEventLoopDelay } from "node:perf_hooks";
+import { Worker } from "node:worker_threads";
 import type { Tokenizer } from "@huggingface/tokenizers";
-import { InferenceSession, Tensor } from "onnxruntime-node";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { type InferenceSession, Tensor } from "onnxruntime-node";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  BATCH_ROWS,
   getBiEncoderStatus,
   scorePassages,
   startBiEncoderService,
   stopBiEncoderService,
 } from "./biEncoderService";
+import {
+  BATCH_ROWS,
+  type BiEncoderRequest,
+  type BiEncoderResponse,
+} from "./biEncoderWorkerProtocol";
 import { loadOnnxModel } from "./utils/onnxModelLoader";
 
 const MODEL_HF_REPO =
@@ -178,63 +184,6 @@ describe("biEncoderService batched scoring (#2715)", () => {
     await refSession?.release();
   });
 
-  it("runs one forward pass per length bucket, not one per passage", async () => {
-    // Zigzag lengths with the sort's guarantee removed: bucket 1's last
-    // row (190 words) is longer than bucket 2's last row (25 words), so
-    // an unsorted pass sets bucket widths from those rows and they come
-    // out decreasing — the non-decreasing-width assertion below then
-    // fails. With the sort, widths are non-decreasing by construction.
-    const wordCounts = [
-      200, 10, 150, 5, 180, 20, 120, 8, 90, 160, 30, 110, 60, 140, 190, 170, 15,
-      130, 70, 25,
-    ];
-    const passages = wordCounts.map((n, i) => makePassage(n, i));
-
-    // The typings expose `InferenceSession` as a factory interface and hide
-    // the class prototype, but at runtime `run` is a prototype method, so a
-    // prototype spy intercepts the service's already-created session.
-    const sessionClass = InferenceSession as unknown as {
-      prototype: { run: InferenceSession["run"] };
-    };
-    const runSpy = vi.spyOn(sessionClass.prototype, "run");
-    await scorePassages("how do alpha bravo passages score", passages);
-    // Capture before mockRestore: restoring also resets the call history.
-    const runDims = runSpy.mock.calls.map(
-      ([feeds]) =>
-        (feeds as unknown as { input_ids: { dims: number[] } }).input_ids.dims,
-    );
-    runSpy.mockRestore();
-
-    // The query rides in the batch, so 21 rows go through ceil(21 / B)
-    // bucketed runs instead of 21 per-passage runs.
-    const expectedBuckets = Math.ceil((passages.length + 1) / BATCH_ROWS);
-    expect(runDims.length).toBe(expectedBuckets);
-    expect(runDims.length).toBeLessThan(passages.length + 1);
-
-    let totalRows = 0;
-    for (const dims of runDims) {
-      expect(dims.length).toBe(2);
-      expect(dims[0]).toBeLessThanOrEqual(BATCH_ROWS);
-      totalRows += dims[0];
-    }
-    expect(totalRows).toBe(passages.length + 1);
-
-    // Every non-final bucket is full, so it really carries multiple rows.
-    // Only the final bucket may be short — with BATCH_ROWS of 10 or 20 a
-    // 21-row pool leaves it exactly one row, so the >1 check must not
-    // depend on the tuning knob.
-    for (let i = 0; i < runDims.length - 1; i++) {
-      expect(runDims[i][0]).toBeGreaterThan(1);
-    }
-
-    // Bucket widths are non-decreasing across runs: the sort by token
-    // length put the short rows first. Delete the `.sort()` in encodeBatch
-    // and this fails.
-    for (let i = 1; i < runDims.length; i++) {
-      expect(runDims[i][1]).toBeGreaterThanOrEqual(runDims[i - 1][1]);
-    }
-  });
-
   it("keeps batched scores within 1e-5 of the per-text path", async () => {
     const wordCounts = [
       3, 8, 15, 40, 90, 150, 250, 400, 5, 20, 60, 120, 200, 300, 12, 35, 75,
@@ -308,5 +257,158 @@ describe("biEncoderService batched scoring (#2715)", () => {
       (len, i) => i === 0 || lengths[i - 1] <= len,
     );
     expect(isSorted).toBe(false);
+  });
+});
+
+/**
+ * Runs one scoring request against a worker of its own and returns its reply.
+ *
+ * The session lives in the worker now, so a `session.run` spy on this thread
+ * would see nothing. The worker reports the dims of each forward pass instead,
+ * which is what the bucketing assertions read.
+ */
+async function scoreInOwnWorker(
+  query: string,
+  passages: string[],
+): Promise<Extract<BiEncoderResponse, { type: "scores" }>> {
+  const worker = new Worker(new URL("./biEncoderWorker.ts", import.meta.url));
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      worker.once("message", (message: BiEncoderResponse) => {
+        if (message.type === "ready") resolve();
+        else reject(new Error(`Expected "ready", got "${message.type}"`));
+      });
+      worker.once("error", reject);
+    });
+
+    return await new Promise((resolve, reject) => {
+      worker.once("message", (message: BiEncoderResponse) => {
+        if (message.type === "scores") resolve(message);
+        else if (message.type === "failed") reject(new Error(message.message));
+      });
+      worker.once("error", reject);
+
+      const request: BiEncoderRequest = {
+        type: "score",
+        id: 1,
+        query,
+        passages,
+      };
+      worker.postMessage(request);
+    });
+  } finally {
+    await worker.terminate();
+  }
+}
+
+describe("biEncoderWorker bucketing (#2715, #2730)", () => {
+  it("runs one forward pass per length bucket, not one per passage", async () => {
+    // Zigzag lengths with the sort's guarantee removed: bucket 1's last
+    // row (190 words) is longer than bucket 2's last row (25 words), so
+    // an unsorted pass sets bucket widths from those rows and they come
+    // out decreasing — the non-decreasing-width assertion below then
+    // fails. With the sort, widths are non-decreasing by construction.
+    const wordCounts = [
+      200, 10, 150, 5, 180, 20, 120, 8, 90, 160, 30, 110, 60, 140, 190, 170, 15,
+      130, 70, 25,
+    ];
+    const passages = wordCounts.map((n, i) => makePassage(n, i));
+
+    const { scores, runDimensions } = await scoreInOwnWorker(
+      "how do alpha bravo passages score",
+      passages,
+    );
+
+    expect(scores).toHaveLength(passages.length);
+
+    // The query rides in the batch, so 21 rows go through ceil(21 / B)
+    // bucketed runs instead of 21 per-passage runs.
+    const expectedBuckets = Math.ceil((passages.length + 1) / BATCH_ROWS);
+    expect(runDimensions.length).toBe(expectedBuckets);
+    expect(runDimensions.length).toBeLessThan(passages.length + 1);
+
+    let totalRows = 0;
+    for (const dims of runDimensions) {
+      expect(dims.length).toBe(2);
+      expect(dims[0]).toBeLessThanOrEqual(BATCH_ROWS);
+      totalRows += dims[0];
+    }
+    expect(totalRows).toBe(passages.length + 1);
+
+    // Every non-final bucket is full, so it really carries multiple rows.
+    // Only the final bucket may be short — with BATCH_ROWS of 10 or 20 a
+    // 21-row pool leaves it exactly one row, so the >1 check must not
+    // depend on the tuning knob.
+    for (let i = 0; i < runDimensions.length - 1; i++) {
+      expect(runDimensions[i][0]).toBeGreaterThan(1);
+    }
+
+    // Bucket widths are non-decreasing across runs: the sort by token
+    // length put the short rows first. Delete the `.sort()` in encodeBatch
+    // and this fails.
+    for (let i = 1; i < runDimensions.length; i++) {
+      expect(runDimensions[i][1]).toBeGreaterThanOrEqual(
+        runDimensions[i - 1][1],
+      );
+    }
+  });
+});
+
+describe("biEncoderService main-thread cost (#2730)", () => {
+  beforeAll(async () => {
+    await startBiEncoderService();
+  });
+
+  afterAll(async () => {
+    await stopBiEncoderService();
+  });
+
+  /**
+   * The acceptance measurement from #2730. On the main thread the same pass
+   * blocked for ~815 ms (x86_64, 32 logical cores); with the session in the
+   * worker it measures ~1.5 ms. The bar is left at the issue's 20 ms so the
+   * test reports a regression rather than host-to-host noise.
+   */
+  it("keeps the main-thread event-loop block under 20 ms for a 200-passage pass", async () => {
+    const passages = Array.from({ length: 200 }, (_, i) =>
+      makePassage(5 + ((i * 37) % 300), i),
+    );
+    const query = "how do alpha bravo passages score";
+
+    // One untimed pass, so the worker's lazily allocated arenas are not
+    // charged to the measurement.
+    await scorePassages(query, passages.slice(0, 20));
+
+    const histogram = monitorEventLoopDelay({ resolution: 1 });
+    histogram.enable();
+    const scores = await scorePassages(query, passages);
+    histogram.disable();
+
+    expect(scores).toHaveLength(passages.length);
+    expect(histogram.max / 1e6).toBeLessThan(20);
+  });
+});
+
+describe("biEncoderService when the worker goes away (#2730)", () => {
+  it("answers in-flight scoring with empty scores and reports not ready", async () => {
+    await startBiEncoderService();
+    expect(await getBiEncoderStatus()).toBe(true);
+
+    const passages = Array.from({ length: 200 }, (_, i) =>
+      makePassage(5 + ((i * 37) % 300), i),
+    );
+    // Fired but not awaited: the worker is taken away underneath it. An
+    // unanswered request would hang the page-content read that made it, so
+    // it has to come back empty, which is the signal to rank lexically.
+    const pending = scorePassages(
+      "how do alpha bravo passages score",
+      passages,
+    );
+    await stopBiEncoderService();
+
+    await expect(pending).resolves.toEqual([]);
+    expect(await getBiEncoderStatus()).toBe(false);
+    expect(await scorePassages("query", ["one"])).toEqual([]);
   });
 });
