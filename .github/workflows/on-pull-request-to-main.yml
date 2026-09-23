@@ -9,3 +9,31 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/reusable-check-docker.yml
+  changelog-guard:
+    name: Changelog Guard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # fetch-depth 0 is what makes the base branch diffable: checkout's
+      # default depth of 1 fetches only the pull request's merge commit, and
+      # the full-history refspec (+refs/heads/*:refs/remotes/origin/*) is the
+      # one that creates origin/<base branch>.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Written to a file rather than piped into the guard: the step runs
+      # under `bash -e` without pipefail, so a failing `git diff` in a
+      # pipeline would hand the guard an empty list and pass silently.
+      - name: List the files this pull request changes
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git diff --name-only "origin/$BASE_REF...HEAD" > "$RUNNER_TEMP/changed-files.txt"
+          cat "$RUNNER_TEMP/changed-files.txt"
+      # No npm ci: the guard is plain Node with no dependencies.
+      - name: Require a changelog entry for a user-facing change
+        env:
+          CHANGELOG_GUARD_SKIP_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'skip-changelog') }}
+          CHANGELOG_GUARD_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: node scripts/changelog-guard.cjs < "$RUNNER_TEMP/changed-files.txt"
