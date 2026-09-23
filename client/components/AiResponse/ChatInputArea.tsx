@@ -1,13 +1,27 @@
 import { Button, Group, Textarea } from "@mantine/core";
 import { IconSend } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
+import DictationButton, {
+  dictationButtonWidth,
+} from "@/components/DictationButton";
 import {
   chatGenerationStatePubSub,
   chatInputPubSub,
   followUpQuestionPubSub,
+  getChatInput,
   isRestoringFromHistoryPubSub,
   suppressNextFollowUpPubSub,
 } from "@/modules/pubSub";
+
+/**
+ * Width of the send button, pinned rather than left to Mantine's padding: the
+ * field reserves this much room beside itself and the dictation button is
+ * offset by it, so a change in the button's intrinsic width would otherwise
+ * slide the two controls on top of each other.
+ */
+const sendButtonWidth = 54;
+/** Keeps the typed text off the dictation button. */
+const dictationGutter = 4;
 
 interface ChatInputAreaProps {
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -84,13 +98,24 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
         autosize
         minRows={1}
         maxRows={8}
-        style={{ flexGrow: 1, paddingRight: "50px" }}
+        style={{ flexGrow: 1, paddingRight: `${sendButtonWidth}px` }}
+        styles={{
+          input: { paddingRight: dictationButtonWidth + dictationGutter },
+        }}
+        disabled={isGenerating}
+      />
+      <DictationButton
+        getValue={getChatInput}
+        setValue={setInput}
+        labelScope="a follow-up question"
+        rightOffset={sendButtonWidth}
         disabled={isGenerating}
       />
       <Button
         aria-label="Send message"
         size="sm"
         variant="default"
+        w={sendButtonWidth}
         onClick={handleSendWithPlaceholder}
         loading={isGenerating}
         style={{

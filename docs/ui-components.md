@@ -101,9 +101,9 @@ App
 ├── AccessPage (if access keys enabled)
 └── MainPage
     ├── SearchForm
+    │   ├── DictationButton (floats inside the query field)
     │   ├── HistoryButton
     │   │   └── HistoryDrawer (lazy-loaded)
-    │   ├── DictationButton
     │   └── MenuButton
     │       └── MenuDrawer
     │           ├── AISettingsForm
@@ -124,6 +124,7 @@ App
             ├── ChatHeader
             ├── MessageList
             └── ChatInputArea
+                └── DictationButton (floats inside the follow-up field)
 ```
 
 ## Key Components
@@ -150,6 +151,10 @@ App
 - **Subscribes:** `queryPubSub`, `textSearchStatePubSub`
 - **Updates:** `queryPubSub` (on type), triggers `searchAndRespond()` (on submit)
 
+The query field is wrapped in its own `position: relative` element so
+`DictationButton` anchors to the field rather than to the form, and stays put
+when the row of buttons below the field changes height.
+
 **Logic:**
 ```typescript
 function SearchForm() {
@@ -170,6 +175,34 @@ function SearchForm() {
   );
 }
 ```
+
+### DictationButton (`client/components/DictationButton.tsx`)
+
+**Responsibility:** Fills a text field from the microphone
+
+Shared by `SearchForm` and `ChatInputArea`, which is why it sits at the top of
+`client/components/` rather than under one feature folder. It owns the whole
+dictation session: the engine choice, the microphone lifecycle, and the splice
+that appends each transcript without clobbering what the user typed meanwhile.
+
+**PubSub:**
+- **Subscribes:** `settingsPubSub` (`enableDictation`, `enableLocalDictationModel`)
+
+**Props:**
+
+| Prop | Role |
+|---|---|
+| `getValue` / `setValue` | Reads and replaces the field's content. The caller owns the field, so the button never touches the DOM itself |
+| `labelScope` | Names the field in the accessible labels, as the object of "Dictate" and "Stop dictating": `"the search query"`, `"a follow-up question"` |
+| `rightOffset` | Distance from the right edge of the positioned ancestor, for a field that already has a button at its edge |
+| `disabled` | Blocks a new session and stops one already running, for a field that has gone read-only |
+
+The button renders itself absolutely positioned, so each caller wraps its field
+in a `position: relative` element and reserves `dictationButtonWidth` of right
+padding on the input. It renders nothing when `enableDictation` is off or no
+engine can run, which is also why the setting and the disabled prop each stop a
+session of their own accord: returning `null` is not an unmount, so the cleanup
+effect never runs.
 
 ### SearchResultsSection (`client/components/Search/Results/`)
 
@@ -466,7 +499,7 @@ lock and no error.
 
 ## File Organization
 
-Most components are single `.tsx` files directly under their feature directory (e.g. `client/components/AiResponse/ChatInterface.tsx`). There is no `index.tsx` re-export convention. CSS Modules are used only where needed (currently just `ImageResultsList.module.css`). Tests, when present, are co-located as `ComponentName.test.tsx` alongside the component, but not every component has one.
+Most components are single `.tsx` files directly under their feature directory (e.g. `client/components/AiResponse/ChatInterface.tsx`); a component shared by two feature directories sits at the top of `client/components/` instead (currently just `DictationButton.tsx`). There is no `index.tsx` re-export convention. CSS Modules are used only where needed (currently just `ImageResultsList.module.css`). Tests, when present, are co-located as `ComponentName.test.tsx` alongside the component, but not every component has one.
 
 ## Related Topics
 

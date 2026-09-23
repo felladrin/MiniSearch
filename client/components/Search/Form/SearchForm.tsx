@@ -11,6 +11,9 @@ import {
   useState,
 } from "react";
 import { useLocation } from "wouter";
+import DictationButton, {
+  dictationButtonWidth,
+} from "@/components/DictationButton";
 import { useHistoryRestore } from "@/hooks/useHistoryRestore";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
 import { resetSearchRunId } from "@/modules/history";
@@ -28,7 +31,9 @@ import { getRandomQuerySuggestion } from "@/modules/querySuggestions";
 import { sleepUntilIdle } from "@/modules/sleep";
 import { searchAndRespond } from "@/modules/textGeneration";
 import HistoryButton from "../History/HistoryButton";
-import DictationButton from "./DictationButton";
+
+/** Keeps the query text off the dictation button that floats over it. */
+const dictationGutter = 4;
 
 function getUrlQuery() {
   return new URLSearchParams(window.location.search).get("q");
@@ -266,25 +271,33 @@ export default memo(function SearchForm({
       style={{ width: "100%", position: "relative" }}
     >
       <Stack gap="xs">
-        <Textarea
-          value={state.textAreaValue}
-          placeholder={
-            state.textAreaValue.length === 0 ? state.suggestedQuery : ""
-          }
-          ref={textAreaRef}
-          onKeyDown={handleKeyDown}
-          onChange={handleInputChange}
-          autosize
-          minRows={1}
-          maxRows={8}
-          autoFocus
-        />
+        {/* Anchored to the field rather than to the form, so the button keeps
+            its place when the button row below it changes height. */}
+        <div style={{ position: "relative" }}>
+          <Textarea
+            value={state.textAreaValue}
+            placeholder={
+              state.textAreaValue.length === 0 ? state.suggestedQuery : ""
+            }
+            ref={textAreaRef}
+            onKeyDown={handleKeyDown}
+            onChange={handleInputChange}
+            autosize
+            minRows={1}
+            maxRows={8}
+            autoFocus
+            styles={{
+              input: { paddingRight: dictationButtonWidth + dictationGutter },
+            }}
+          />
+          <DictationButton
+            getValue={getDictationBase}
+            setValue={setDictatedText}
+            labelScope="the search query"
+          />
+        </div>
         <Group gap="xs">
           <HistoryButton onSearchSelect={restoreSearch} />
-          <DictationButton
-            getText={getDictationBase}
-            setText={setDictatedText}
-          />
           {state.textAreaValue.length >= 1 && (
             <Button
               size="xs"

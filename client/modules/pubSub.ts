@@ -171,7 +171,7 @@ export const menuExpandedAccordionsPubSub = createLocalStoragePubSub<string[]>(
 
 export const chatInputPubSub = createPubSub("");
 
-export const [updateChatInput] = chatInputPubSub;
+export const [updateChatInput, , getChatInput] = chatInputPubSub;
 
 export const chatGenerationStatePubSub = createPubSub({
   isGeneratingResponse: false,

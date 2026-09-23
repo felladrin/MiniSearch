@@ -1,9 +1,9 @@
 import { MantineProvider } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useSyncExternalStore } from "react";
-import DictationButton from "@/components/Search/Form/DictationButton";
+import DictationButton from "@/components/DictationButton";
 import {
   DictationError,
   getDictationEngine,
@@ -41,10 +41,25 @@ vi.mock("create-pubsub/react", () => ({
   },
 }));
 
-function renderButton(getText = () => "", setText = (_text: string) => {}) {
+function renderButton({
+  getValue = () => "",
+  setValue = (_value: string) => {},
+  labelScope = "the search query",
+  disabled = false,
+}: {
+  getValue?: () => string;
+  setValue?: (value: string) => void;
+  labelScope?: string;
+  disabled?: boolean;
+} = {}) {
   return render(
     <MantineProvider>
-      <DictationButton getText={getText} setText={setText} />
+      <DictationButton
+        getValue={getValue}
+        setValue={setValue}
+        labelScope={labelScope}
+        disabled={disabled}
+      />
     </MantineProvider>,
   );
 }
@@ -150,6 +165,148 @@ it("switches to the recording state and stops on the second press", async () => 
   ).toHaveAttribute("aria-pressed", "false");
 });
 
+describe("the icon-only render", () => {
+  it("names the field it fills, so two of them are told apart", () => {
+    renderButton({ labelScope: "a follow-up question" });
+    expect(
+      screen.getByRole("button", { name: "Dictate a follow-up question" }),
+    ).toBeInTheDocument();
+  });
+
+  it("swaps the microphone for a stop icon while recording", async () => {
+    const user = userEvent.setup();
+    const { container } = renderButton();
+
+    expect(container.querySelector(".tabler-icon-microphone")).not.toBeNull();
+
+    await user.click(screen.getByRole("button"));
+
+    await waitFor(() =>
+      expect(
+        container.querySelector(".tabler-icon-player-stop-filled"),
+      ).not.toBeNull(),
+    );
+    // The state has to survive without color: an icon-only control that only
+    // turns red says nothing to a colorblind user.
+    expect(container.querySelector(".tabler-icon-microphone")).toBeNull();
+
+    // And the color still has to be there for everyone else. Mantine's
+    // `subtle` variant resolves `red` to `--mantine-color-red-light-color`,
+    // which is #fff5f5 in the dark scheme the app defaults to, so a subtle
+    // red button renders an all but white icon. `light` paints the red as a
+    // background instead and keeps it in both schemes.
+    expect(screen.getByRole("button")).toHaveAttribute("data-variant", "light");
+  });
+
+  it("stays subtle while idle, so it does not compete with the field", () => {
+    renderButton();
+    expect(screen.getByRole("button")).toHaveAttribute(
+      "data-variant",
+      "subtle",
+    );
+  });
+
+  it("keeps the download progress in the accessible name while it loads", async () => {
+    let release: ((session: { stop: () => Promise<void> }) => void) | undefined;
+    vi.mocked(startDictation).mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    renderButton();
+
+    await user.click(screen.getByRole("button"));
+
+    const { onProgress } = vi.mocked(startDictation).mock.calls[0][0];
+    act(() => onProgress?.(12_000_000, undefined));
+
+    // The button has no text of its own any more, so the progress has to
+    // reach a screen reader through the label or it reaches nobody.
+    await waitFor(() =>
+      expect(screen.getByRole("button")).toHaveAttribute(
+        "aria-label",
+        "Loading the dictation model 12 MB",
+      ),
+    );
+    expect(screen.getByRole("button")).toHaveAttribute(
+      "data-dictation-phase",
+      "loading",
+    );
+
+    release?.({ stop: stopFn });
+  });
+
+  it("shows the same wording in the tooltip as in the accessible name", async () => {
+    const user = userEvent.setup();
+    renderButton();
+
+    await user.hover(screen.getByRole("button"));
+
+    expect(
+      await screen.findByRole("tooltip", { name: "Dictate the search query" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not take the focus off the field it fills", async () => {
+    const user = userEvent.setup();
+    const { container } = renderButton();
+    const field = document.createElement("textarea");
+    container.appendChild(field);
+    field.focus();
+
+    await user.click(screen.getByRole("button"));
+
+    // A blur here drops the caret the transcript is appended next to, and on
+    // a phone it closes the on-screen keyboard mid-sentence.
+    expect(document.activeElement).toBe(field);
+  });
+});
+
+describe("the disabled prop", () => {
+  it("does not start a session while the field is disabled", async () => {
+    const user = userEvent.setup();
+    renderButton({ disabled: true });
+
+    const button = screen.getByRole("button", {
+      name: "Dictate the search query",
+    });
+    expect(button).toBeDisabled();
+
+    await user.click(button);
+
+    expect(startDictation).not.toHaveBeenCalled();
+  });
+
+  it("stops a running session when the field becomes disabled", async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderButton();
+
+    await user.click(screen.getByRole("button"));
+    await waitFor(() =>
+      expect(screen.getByRole("button")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
+    );
+
+    // Disabling only blocks the next press. Without the stop, the transcript
+    // keeps landing in a field the user can no longer correct.
+    rerender(
+      <MantineProvider>
+        <DictationButton
+          getValue={() => ""}
+          setValue={() => {}}
+          labelScope="the search query"
+          disabled
+        />
+      </MantineProvider>,
+    );
+
+    await waitFor(() => expect(stopFn).toHaveBeenCalledTimes(1));
+  });
+});
+
 it("shows a notification when microphone permission is denied", async () => {
   vi.mocked(startDictation).mockRejectedValue(
     new DictationError("permission", "Permission denied"),
@@ -173,8 +330,8 @@ it("shows a notification when microphone permission is denied", async () => {
 
 it("splices the transcript into the field without clobbering the base text", async () => {
   let value = "existing query";
-  const getText = () => value;
-  const setText = (text: string) => {
+  const getValue = () => value;
+  const setValue = (text: string) => {
     value = text;
   };
   let onTranscript: (text: string) => void = () => {};
@@ -185,7 +342,7 @@ it("splices the transcript into the field without clobbering the base text", asy
   });
 
   const user = userEvent.setup();
-  renderButton(getText, setText);
+  renderButton({ getValue, setValue });
 
   await user.click(
     screen.getByRole("button", { name: "Dictate the search query" }),

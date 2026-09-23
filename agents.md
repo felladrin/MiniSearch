@@ -91,6 +91,7 @@ Need to:
 - `server/rerankerService.ts` - Local result reranking
 
 ### UI Components
+- `client/components/DictationButton.tsx` - Microphone control shared by the search field and the chat follow-up field
 - `client/components/App/` - Application shell with error boundaries
 - `client/components/Search/Form/` - Search input and form
 - `client/components/Search/Results/` - Textual and graphical results display
