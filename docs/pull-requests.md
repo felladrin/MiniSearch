@@ -35,6 +35,28 @@ This comprehensive check includes:
 - **npm audit**: Dependency vulnerability scanning (fails on high/critical)
 - **Gitleaks**: Secret scanning across full git history (CI only)
 
+## Changelog Entries
+
+The GitHub Release body is built from `changelog.md`, not from GitHub's generated notes: the publish workflow takes every changelog line that was not there at the previous release tag, under its `## YYYY-MM-DD` heading. A change with no entry therefore ships with no mention in the Release.
+
+The `changelog-guard` job on every PR to `main` fails when the PR changes a user-facing path and does not touch `changelog.md`. The trigger paths are:
+
+- anything under `client/`, `server/`, or `shared/`
+- `Dockerfile`, `docker-compose.yml`, `docker-compose.production.yml`, `searxng-settings.yml`
+
+Add your entry to `changelog.md` under a `## YYYY-MM-DD` heading for today's date in UTC, most recent date first.
+
+Two ways out:
+
+- Add the `skip-changelog` label when the change touches a trigger path but is not notable for users - an internal refactor, a rename, a CI-only edit inside a trigger path.
+- Renovate and Dependabot PRs pass automatically. Renovate bumps the pinned SearXNG commit in the `Dockerfile` and cannot write an entry.
+
+Run the same check locally with `npm run changelog-guard`, passing the changed paths:
+
+```bash
+git diff --name-only origin/main...HEAD | npm run changelog-guard
+```
+
 ## Merge Philosophy
 
 In high-throughput agent environments:

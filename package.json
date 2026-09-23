@@ -30,6 +30,7 @@
     "eval": "vitest run --config vitest.eval.config.ts",
     "eval:retrieval": "vitest run --config vitest.eval.config.ts retrieval",
     "eval:answer": "vitest run --config vitest.eval.config.ts answer",
+    "changelog-guard": "node scripts/changelog-guard.cjs",
     "license-check": "node scripts/license-check.cjs",
     "native-module-check": "node scripts/native-module-integrity.cjs"
   },
