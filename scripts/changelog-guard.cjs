@@ -104,9 +104,40 @@ function evaluate({
   };
 }
 
+// fs.readFileSync(0) is not enough here. A writer that sets O_NONBLOCK on
+// its end of the pipe sets it on the shared open file description, so the
+// read fails with EAGAIN instead of waiting; every Go program does this, and
+// `gh pr view ... | node scripts/changelog-guard.cjs` is exactly that case.
+// EAGAIN means "nothing yet", so it is retried rather than treated as input.
 function readChangedFilesFromStdin() {
   if (process.stdin.isTTY) return [];
-  return fs.readFileSync(0, "utf8").split("\n");
+
+  const buffer = Buffer.alloc(64 * 1024);
+  const chunks = [];
+
+  while (true) {
+    let bytesRead;
+    try {
+      bytesRead = fs.readSync(0, buffer, 0, buffer.length, null);
+    } catch (error) {
+      if (error.code === "EAGAIN") {
+        sleepBriefly();
+        continue;
+      }
+      if (error.code === "EOF") break;
+      throw error;
+    }
+    if (bytesRead === 0) break;
+    chunks.push(buffer.subarray(0, bytesRead).toString("utf8"));
+  }
+
+  return chunks.join("").split("\n");
+}
+
+// Keeps the EAGAIN retry from becoming a busy loop, without a dependency and
+// without making the read asynchronous.
+function sleepBriefly() {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
 }
 
 function isTruthyFlag(value) {

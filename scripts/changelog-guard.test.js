@@ -31,6 +31,23 @@ function runGuard(args = [], { stdin, env } = {}) {
   }
 }
 
+// A shell pipeline, so the writer owns its end of the pipe. execFileSync's
+// `input` hands the script a file descriptor instead, which never reproduces
+// a writer that is slow or that marks the pipe non-blocking.
+function runPipeline(writerCommand) {
+  try {
+    const output = execFileSync(
+      "bash",
+      ["-c", `${writerCommand} | "$0" "$1"`, process.execPath, SCRIPT_PATH],
+      { cwd: REPO_ROOT, encoding: "utf8", stdio: "pipe" },
+    );
+    return { exitCode: 0, stdout: output };
+  } catch (error) {
+    if (error.signal) throw new Error(`Killed by ${error.signal}`);
+    return { exitCode: error.status ?? 1, stdout: error.stdout ?? "" };
+  }
+}
+
 describe("changelog-guard decision", () => {
   it("fails a user-facing change that carries no changelog entry", () => {
     const { ok, reason } = evaluate({
@@ -208,5 +225,27 @@ describe("changelog-guard command line", () => {
 
   it("exits 0 when nothing changed", () => {
     expect(runGuard([], { stdin: "" }).exitCode).toBe(0);
+  });
+
+  it("waits for a writer that has not produced anything yet", () => {
+    const { exitCode, stdout } = runPipeline(
+      `sleep 0.3; printf 'server/searchToken.ts\\n'`,
+    );
+    expect(exitCode).toBe(1);
+    expect(stdout).toContain("server/searchToken.ts");
+  });
+
+  it("reads a list larger than one read buffer", () => {
+    const paths = Array.from(
+      { length: 4000 },
+      (_, index) => `docs/file${index}.md`,
+    );
+    paths.push("client/index.tsx");
+    const input = `${paths.join("\n")}\n`;
+    expect(input.length).toBeGreaterThan(64 * 1024);
+
+    const { exitCode, stdout } = runGuard([], { stdin: input });
+    expect(exitCode).toBe(1);
+    expect(stdout).toContain("client/index.tsx");
   });
 });
