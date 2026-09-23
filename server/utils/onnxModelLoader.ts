@@ -23,6 +23,21 @@ export function createModelLogger(moduleName: string) {
   return printMessage;
 }
 
+/**
+ * Session knobs a caller may override. Left unset, ONNX Runtime picks its own
+ * defaults, which is what every caller but the bi-encoder worker wants.
+ */
+interface OnnxSessionOptions {
+  intraOpNumThreads?: number;
+}
+
+export interface LoadOnnxModelOptions {
+  /** Tokenizer file names, for a repo that does not use the standard ones. */
+  tokenizerFile?: string;
+  tokenizerConfigFile?: string;
+  sessionOptions?: OnnxSessionOptions;
+}
+
 function resolveModelPath(modelRepo: string, hfRepoFile: string) {
   return path.resolve(SERVER_DIR, "models", modelRepo, hfRepoFile);
 }
@@ -44,13 +59,22 @@ async function ensureModelFileExists(modelRepo: string, hfRepoFile: string) {
 // quiet: ONNX Runtime otherwise warns that it assigned shape operators to CPU,
 // which is expected and not actionable. The architecture is logged because it
 // selects the quantized kernel, which is the part that varies between hosts.
-function createOnnxSession(modelRepo: string, modelPath: string) {
+function createOnnxSession(
+  modelRepo: string,
+  modelPath: string,
+  sessionOptions: OnnxSessionOptions = {},
+) {
   printMessage(
-    `Creating CPU session for ${modelRepo} (arch: ${process.arch}, platform: ${process.platform})...`,
+    `Creating CPU session for ${modelRepo} (arch: ${process.arch}, platform: ${process.platform}${
+      sessionOptions.intraOpNumThreads === undefined
+        ? ""
+        : `, intra-op threads: ${sessionOptions.intraOpNumThreads}`
+    })...`,
   );
   return InferenceSession.create(modelPath, {
     executionProviders: ["cpu"],
     logSeverityLevel: 3,
+    ...sessionOptions,
   });
 }
 
@@ -105,8 +129,11 @@ function resolvePadTokenId(
 export async function loadOnnxModel(
   modelRepo: string,
   modelFile: string,
-  tokenizerFile = "tokenizer.json",
-  tokenizerConfigFile = "tokenizer_config.json",
+  {
+    tokenizerFile = "tokenizer.json",
+    tokenizerConfigFile = "tokenizer_config.json",
+    sessionOptions = {},
+  }: LoadOnnxModelOptions = {},
 ): Promise<{
   session: InferenceSession;
   tokenizer: Tokenizer;
@@ -126,7 +153,7 @@ export async function loadOnnxModel(
     tokenizerConfig,
   );
   const padTokenId = resolvePadTokenId(tokenizer, tokenizerConfig);
-  const session = await createOnnxSession(modelRepo, modelPath);
+  const session = await createOnnxSession(modelRepo, modelPath, sessionOptions);
 
   return { session, tokenizer, padTokenId };
 }
