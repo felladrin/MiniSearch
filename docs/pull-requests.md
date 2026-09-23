@@ -57,6 +57,8 @@ Run the same check locally with `npm run changelog-guard`, passing the changed p
 git diff --name-only origin/main...HEAD | npm run changelog-guard
 ```
 
+The three-dot diff compares merge bases, so before the branch has its first commit the list is empty and the check passes without looking at anything. Use the two-dot form against the working tree (`git diff --name-only origin/main`) when running the guard mid-development, before the work is committed.
+
 ## Merge Philosophy
 
 In high-throughput agent environments:

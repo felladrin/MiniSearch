@@ -82,6 +82,8 @@ A minimalist wrapper for IndexedDB used for client-side persistence. MiniSearch 
 - **SearchCacheDatabase**: Temporary cache with TTL-based expiration
 - **HistoryDatabase**: Long-term search history with retention policies
 
+Note the version mismatch trap: Dexie registers its schema at the declared version multiplied by ten (`.version(1)` stores IndexedDB version `10`). Raw `indexedDB.open("History", 1)` from devtools or test scripts throws `VersionError` against a database the app created. Open without a version argument and let Dexie own the schema, or the app will refuse to open the store it can no longer read.
+
 ### Vite Server Hooks
 
 Middleware registered via Vite plugin hooks (`configureServer`, `configurePreviewServer`). All server-side logic in MiniSearch is implemented as hooks:
