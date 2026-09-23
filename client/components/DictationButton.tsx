@@ -1,5 +1,6 @@
-import { Button } from "@mantine/core";
+import { ActionIcon, Loader, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
+import { IconMicrophone, IconPlayerStopFilled } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { settingsPubSub } from "@/modules/pubSub";
@@ -11,17 +12,33 @@ import {
   startDictation,
 } from "@/modules/speechToText";
 
+/**
+ * The button floats over the right end of the field it fills, so the field
+ * has to reserve this much room for it. Exported rather than repeated, so a
+ * size change here cannot leave a caller's text running underneath it.
+ */
+export const dictationButtonWidth = 34;
+
 interface DictationButtonProps {
-  /** Reads the current search field content, so dictation appends to it. */
-  getText: () => string;
-  /** Replaces the search field content with the text plus the transcript. */
-  setText: (text: string) => void;
+  /** Reads the current field content, so dictation appends to it. */
+  getValue: () => string;
+  /** Replaces the field content with the text plus the transcript. */
+  setValue: (value: string) => void;
+  /**
+   * Names the field in the accessible labels, as the object of "Dictate" and
+   * "Stop dictating": "the search query", "a follow-up question".
+   */
+  labelScope: string;
+  /** Distance from the right edge of the positioned ancestor, in pixels. */
+  rightOffset?: number;
+  /** Blocks a new session and stops one already running. */
+  disabled?: boolean;
 }
 
 type DictationPhase = "idle" | "loading" | "recording";
 
 /**
- * Splices the transcript into the search field without clobbering edits the
+ * Splices the transcript into the field without clobbering edits the
  * user makes while speaking: the previously inserted transcript is stripped
  * from the current value before the new one is appended.
  */
@@ -61,8 +78,11 @@ function formatDownloadProgress(
 }
 
 export default memo(function DictationButton({
-  getText,
-  setText,
+  getValue,
+  setValue,
+  labelScope,
+  rightOffset = 0,
+  disabled = false,
 }: DictationButtonProps) {
   const [settings] = usePubSub(settingsPubSub);
   const [phase, setPhase] = useState<DictationPhase>("idle");
@@ -75,12 +95,12 @@ export default memo(function DictationButton({
 
   const handleTranscript = useCallback(
     (transcript: string) => {
-      setText(
-        spliceTranscript(getText(), lastTranscriptRef.current, transcript),
+      setValue(
+        spliceTranscript(getValue(), lastTranscriptRef.current, transcript),
       );
       lastTranscriptRef.current = transcript;
     },
-    [getText, setText],
+    [getValue, setValue],
   );
 
   const stop = useCallback(async () => {
@@ -123,6 +143,16 @@ export default memo(function DictationButton({
     pressGenerationRef.current += 1;
     void stop();
   }, [settings.enableDictation, stop]);
+
+  useEffect(() => {
+    // Same reasoning as the setting above, for a field that goes read-only
+    // under a running session: disabling the button only blocks the next
+    // press, so without this the transcript keeps landing in a field the
+    // user can no longer correct, and the caller clears on its own schedule.
+    if (!disabled) return;
+    pressGenerationRef.current += 1;
+    void stop();
+  }, [disabled, stop]);
 
   /**
    * An upgrading profile's stored settings lack this key until `App` merges
@@ -208,25 +238,52 @@ export default memo(function DictationButton({
   const recording = phase === "recording";
   const percent = formatDownloadProgress(progress);
 
+  // One string for the tooltip and the accessible name, so the icon-only
+  // button never says one thing on screen and another to a screen reader.
+  // The download progress rides on it too: it is the only feedback the button
+  // has left now that it has no text of its own.
+  const label =
+    phase === "loading"
+      ? `Loading the dictation model${percent}`
+      : recording
+        ? `Stop dictating ${labelScope}`
+        : `Dictate ${labelScope}`;
+
   return (
-    <Button
-      size="xs"
-      variant={recording ? "light" : "default"}
-      color={recording ? "red" : "gray"}
-      onClick={handleClick}
-      aria-label={
-        recording
-          ? "Stop dictating the search query"
-          : "Dictate the search query"
-      }
-      aria-pressed={recording}
-      data-dictation-phase={phase}
-    >
-      {phase === "loading"
-        ? `Loading${percent}`
-        : recording
-          ? "Listening"
-          : "Dictate"}
-    </Button>
+    <Tooltip label={label} withArrow position="top">
+      <ActionIcon
+        size="lg"
+        variant={recording ? "light" : "subtle"}
+        color={recording ? "red" : "gray"}
+        onClick={handleClick}
+        // The button sits inside the field, so a press must not take the
+        // focus off it: the caret is where the user left it, and blurring
+        // mid-dictation loses both the selection and the on-screen keyboard.
+        onMouseDown={(event) => event.preventDefault()}
+        disabled={disabled}
+        aria-label={label}
+        aria-pressed={recording}
+        data-dictation-phase={phase}
+        style={{
+          position: "absolute",
+          right: rightOffset,
+          top: 0,
+          bottom: 0,
+          height: "100%",
+          width: dictationButtonWidth,
+        }}
+      >
+        {phase === "loading" ? (
+          <Loader size={16} color="gray" />
+        ) : recording ? (
+          // A shape change, not only the red: an icon-only control whose
+          // state is carried by color alone is unreadable to a colorblind
+          // user, and this one has no text left to fall back on.
+          <IconPlayerStopFilled size={16} />
+        ) : (
+          <IconMicrophone size={18} />
+        )}
+      </ActionIcon>
+    </Tooltip>
   );
 });

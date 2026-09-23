@@ -3,7 +3,7 @@
 ## Directory Layout
 
 - **`client/`**: Frontend React application
-  - **`components/`**: Feature-based UI components
+  - **`components/`**: Feature-based UI components, plus the few shared across features at its top level (`DictationButton.tsx`, the microphone control that fills both the search field and the follow-up field)
     - **`App/`**: Main application component with error boundaries
     - **`AiResponse/`**: AI response display and chat interface components
     - **`Analytics/`**: Search analytics and statistics components

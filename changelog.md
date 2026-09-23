@@ -5,6 +5,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-09-23
 
+- Moved the Dictate control inside the search field, as an icon button at its right edge, and gave the follow-up question box the same control, so dictating a follow-up no longer means typing it. It shows a microphone when idle, a red stop button while it listens, and the model download progress in its tooltip and its accessible name. Pressing it never takes the focus off the field, so the caret stays where it was and a phone keeps its on-screen keyboard open. In the chat box it is disabled rather than hidden while an answer is generating, and a session still running when generation starts is stopped instead of writing into a field that has gone read-only.
 - Moved the bi-encoder's dense passage scoring to a worker thread. `onnxruntime-node` runs inference synchronously on the calling thread, so a scoring pass stopped the server's event loop for its whole duration and nothing else could be served while it ran, including the concurrent /page-content reads that share the model. On a 200-passage pool the worst main-thread stall went from 815 ms to 1.5 ms, and the pass finished in 2.7 s instead of 6.1 s, with the scores byte-identical. A worker that fails to start or dies mid-request answers with empty scores, which the page reader already treats as "rank lexically".
 
 ## 2026-09-22

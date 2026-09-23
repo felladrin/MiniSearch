@@ -53,14 +53,16 @@ vi.mock("../../../modules/querySuggestions", () => ({
 
 /** Captures the props `SearchForm` hands the real dictation button. */
 let dictationProps: {
-  getText: () => string;
-  setText: (text: string) => void;
-} = { getText: () => "", setText: () => {} };
+  getValue: () => string;
+  setValue: (value: string) => void;
+  labelScope: string;
+} = { getValue: () => "", setValue: () => {}, labelScope: "" };
 
-vi.mock("./DictationButton", () => ({
+vi.mock("@/components/DictationButton", () => ({
+  dictationButtonWidth: 34,
   default: function DictationButtonProbe(props: typeof dictationProps) {
     dictationProps = props;
-    return null;
+    return <button type="button" data-testid="dictation-probe" />;
   },
 }));
 
@@ -131,23 +133,49 @@ describe("SearchForm component", () => {
     expect(searchAndRespond).toHaveBeenCalledTimes(1);
   });
 
+  it("floats the dictation button inside the field, not in the button row", async () => {
+    renderSearchForm("", vi.fn());
+    const textarea = await waitForPlaceholder();
+    const probe = screen.getByTestId("dictation-probe");
+
+    // The point of the change: the button is anchored to the field, so it
+    // cannot drift when the row of buttons below the field changes.
+    const fieldWrapper = probe.parentElement;
+    expect(fieldWrapper).toContainElement(textarea);
+    expect(fieldWrapper).toHaveStyle({ position: "relative" });
+
+    const buttonRow = screen
+      .getByRole("button", { name: /search/i })
+      .closest("div");
+    expect(buttonRow).not.toContainElement(probe);
+  });
+
+  it("names the search query in the dictation label", async () => {
+    renderSearchForm("", vi.fn());
+    await waitForPlaceholder();
+
+    // e2e/smoke.spec.ts anchors its Search-button lookup on this label also
+    // containing "search"; losing the word silently weakens that anchor.
+    expect(dictationProps.labelScope).toBe("the search query");
+  });
+
   it("reads back what dictation last wrote before the DOM catches up", async () => {
     renderSearchForm("", vi.fn());
     const textarea = await waitForPlaceholder();
-    const { getText, setText } = dictationProps;
+    const { getValue, setValue } = dictationProps;
 
     // The button strips the transcript it inserted last out of whatever it
     // reads back before appending the newer one. A read that misses the write
     // it just made makes that strip miss, and the whole transcript lands on
     // top of itself, once per pause.
-    setText("hello there");
-    expect(getText()).toBe("hello there");
+    setValue("hello there");
+    expect(getValue()).toBe("hello there");
 
     await act(async () => {});
     expect(textarea).toHaveValue("hello there");
 
     // Typing is the user's, so the field goes back to reading the DOM.
     await userEvent.type(textarea, " friend");
-    expect(getText()).toBe("hello there friend");
+    expect(getValue()).toBe("hello there friend");
   });
 });
