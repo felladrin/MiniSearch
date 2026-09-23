@@ -88,21 +88,32 @@ describe("changelog-guard decision", () => {
     expect(reason).toContain("skip-changelog");
   });
 
-  it("passes a Renovate pull request that only bumps the Dockerfile", () => {
-    const { ok } = evaluate({
+  // "renovate[bot]" is the REST shape, which the workflow reads.
+  // "app/renovate" is the GraphQL shape, which `gh pr view --json author`
+  // returns. Both pass, so changing where the author comes from cannot
+  // silently break the hatch.
+  it.each([
+    "renovate[bot]",
+    "dependabot[bot]",
+    "app/renovate",
+    "app/dependabot",
+  ])("passes a %s pull request that only bumps the Dockerfile", (login) => {
+    const { ok, reason } = evaluate({
       changedFiles: ["Dockerfile"],
-      authorLogin: "renovate[bot]",
+      authorLogin: login,
     });
     expect(ok).toBe(true);
+    expect(reason).toContain(login);
   });
 
-  it("passes a Dependabot pull request that only bumps the Dockerfile", () => {
-    const { ok } = evaluate({
-      changedFiles: ["Dockerfile"],
-      authorLogin: "dependabot[bot]",
-    });
-    expect(ok).toBe(true);
-  });
+  it.each(["renovate", "dependabot", "renovate-bot", "app/renovate-fork"])(
+    "does not treat %s as a bot login",
+    (login) => {
+      expect(
+        evaluate({ changedFiles: ["Dockerfile"], authorLogin: login }).ok,
+      ).toBe(false);
+    },
+  );
 
   it("fails a human pull request that changes the Dockerfile with no entry", () => {
     const { ok, reason } = evaluate({
@@ -195,6 +206,9 @@ describe("changelog-guard command line", () => {
 
   it("honours --author for a bot", () => {
     expect(runGuard(["Dockerfile", "--author", "renovate[bot]"]).exitCode).toBe(
+      0,
+    );
+    expect(runGuard(["Dockerfile", "--author", "app/renovate"]).exitCode).toBe(
       0,
     );
   });

@@ -28,7 +28,20 @@ const TRIGGER_FILES = new Set([
 // Renovate bumps the pinned SearXNG commit in the Dockerfile and cannot write
 // a changelog entry. Its merged pull requests here carry no labels at all, so
 // the label hatch alone would not cover them.
-const BOT_AUTHORS = new Set(["renovate[bot]", "dependabot[bot]"]);
+//
+// Both login shapes are listed because GitHub reports a bot under two names.
+// REST (github.event.pull_request.user.login, which the workflow reads, and
+// `gh api .../pulls/2707 -q .user.login`) answers "renovate[bot]". GraphQL,
+// and `gh pr view --json author` on top of it, answers "app/renovate". The
+// workflow uses the REST shape today; the other shape is here so that
+// sourcing the author differently later cannot silently fail every Renovate
+// Dockerfile bump.
+const BOT_AUTHORS = new Set([
+  "renovate[bot]",
+  "dependabot[bot]",
+  "app/renovate",
+  "app/dependabot",
+]);
 
 // Keeps the failure message readable when a pull request touches a whole tree.
 const MAX_LISTED_FILES = 10;
