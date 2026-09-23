@@ -42,6 +42,7 @@
 - Business logic separated into `client/modules/`
 - Proper TypeScript typing throughout with strict mode
 - React 19 patterns with function components (no React.FC)
+- Icon-only controls must carry state in shape as well as color. Mantine's `variant="subtle"` resolves a semantic color to its shade 0 (e.g. `red` to `#fff5f5`, nearly white) in dark mode, so a state that only swaps the color is invisible there; use `variant="light"` for a solid fill and a different icon per state, and keep an `aria-pressed` or `data-*` attribute so tests can assert the state
 
 ## Technology Integration
 
