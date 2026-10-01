@@ -58,7 +58,7 @@
     "@wllama/wllama": "3.6.1",
     "ai": "^7.0.0",
     "country-flag-icons": "^1.5.13",
-    "create-pubsub": "^2.0.0",
+    "create-pubsub": "^2.0.2",
     "debug": "^4.4.0",
     "dexie": "^4.0.11",
     "dotenv": "^18.0.0",
