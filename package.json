@@ -55,7 +55,7 @@
     "@tabler/icons-react": "^3.16.0",
     "@vitejs/plugin-basic-ssl": "^2.0.0",
     "@vitejs/plugin-react": "^6.0.0",
-    "@wllama/wllama": "3.6.1",
+    "@wllama/wllama": "3.8.1",
     "ai": "^7.0.0",
     "country-flag-icons": "^1.5.13",
     "create-pubsub": "^2.0.2",
