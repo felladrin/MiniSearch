@@ -7,11 +7,21 @@ name: Scan Docker Image
 on:
   schedule:
     - cron: "0 6 * * 1"
+  # A rebuild can ship the patched base packages days before the schedule
+  # notices, and an alert closes only when a later scan of this same analysis
+  # key stops reporting it. Without this, a fixed image keeps showing last
+  # week's findings on the code scanning page until the next Monday run.
+  workflow_run:
+    workflows: ["Publish Docker Image"]
+    types: [completed]
   workflow_dispatch:
 
 jobs:
   scan-published-image:
     name: Scan Published Image for Vulnerabilities
+    # A failed publish pushed no image, so `:latest` is still the previous one
+    # and scanning it would only re-report what is already open.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read

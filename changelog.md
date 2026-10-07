@@ -3,6 +3,11 @@
 Notable changes, grouped by date, most recent first.
 
 
+## 2026-10-07
+
+- Security: cleared the flagged copy of `postcss-selector-parser` that lives inside the npm the image ships. npm pins its own dependency tree exactly, so neither `npm install -g npm@latest` nor a dependency bump reaches a bundled copy, and the npm in the image still carried 7.1.4. This was the one of the image's three code scanning findings that no dependency bump could fix. The image's npm-bundle repair now lists that package among its targets, so the build replaces the bundled copy with the patched release and fails if any copy of that major line survives.
+
+
 ## 2026-09-23
 
 - Moved the Dictate control inside the search field, as an icon button at its right edge, and gave the follow-up question box the same control, so dictating a follow-up no longer means typing it. It shows a microphone when idle, a red stop button while it listens, and the model download progress in its tooltip and its accessible name. Pressing it never takes the focus off the field, so the caret stays where it was and a phone keeps its on-screen keyboard open. In the chat box it is disabled rather than hidden while an answer is generating, and a session still running when generation starts is stopped instead of writing into a field that has gone read-only.
