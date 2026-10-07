@@ -18,7 +18,13 @@ const path = require("node:path");
 
 const ROOT = "/usr/local/lib/node_modules";
 const SCRATCH = "/tmp/overlay/node_modules";
-const TARGETS = ["tar", "brace-expansion", "ip-address", "undici"];
+const TARGETS = [
+  "tar",
+  "brace-expansion",
+  "ip-address",
+  "undici",
+  "postcss-selector-parser",
+];
 
 let semver;
 try {
