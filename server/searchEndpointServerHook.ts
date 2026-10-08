@@ -1,5 +1,9 @@
 import type { PreviewServer, ViteDevServer } from "vite";
 import { z } from "zod";
+import {
+  fetchFallbackTextResults,
+  isSearchFallbackEnabled,
+} from "./fallbackSearchService.ts";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
 import { rankSearchResults } from "./rankSearchResults.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
@@ -9,6 +13,8 @@ import {
 } from "./rerankingSinceLastRestart.ts";
 import {
   incrementGraphicalSearchesSinceLastRestart,
+  incrementSearchesFailedOnFallback,
+  incrementSearchesServedByFallback,
   incrementTextualSearchesSinceLastRestart,
   recordSearchDuration,
   type SearchType,
@@ -119,14 +125,43 @@ export function searchEndpointServerHook<
       const isTextSearch = request.url?.startsWith("/search/text");
       const searchType = isTextSearch ? "text" : "images";
 
-      let searxngResults: TextResult[] | ImageResult[];
+      let searchResults: TextResult[] | ImageResult[] | null;
       const searchStartedAt = performance.now();
       try {
-        searxngResults = await fetchSearXNG(query, searchType, limit);
+        searchResults = await fetchSearXNG(query, searchType, limit);
         recordSearchDuration(searchType, performance.now() - searchStartedAt);
       } catch {
-        // SearXNG is unreachable: answer non-200 so the client can tell an
-        // outage apart from a search that genuinely has no results.
+        // SearXNG is unreachable. The operator may have switched on a second
+        // text source, which is consulted only here, after SearXNG has failed,
+        // and never for images: Parallel has no image search.
+        searchResults = null;
+
+        if (isTextSearch && isSearchFallbackEnabled()) {
+          try {
+            searchResults = await fetchFallbackTextResults(query, limit);
+            incrementSearchesServedByFallback();
+            console.log(
+              "SearXNG failed, served text results from the fallback search",
+            );
+          } catch (fallbackError) {
+            incrementSearchesFailedOnFallback();
+            // Fixed text plus the error's message, which by construction
+            // carries an HTTP status or a JSON-RPC code, never the query.
+            console.error(
+              `SearXNG failed, and the fallback search failed: ${
+                fallbackError instanceof Error
+                  ? fallbackError.message
+                  : String(fallbackError)
+              }`,
+            );
+          }
+        }
+      }
+
+      if (searchResults === null) {
+        // The fallback is off, is not offered for this search type, or failed
+        // itself: answer non-200 so the client can tell an outage apart from a
+        // search that genuinely has no results.
         response.statusCode = 502;
         response.setHeader("Content-Type", "application/json");
         response.end(JSON.stringify({ error: "Search service unavailable" }));
@@ -134,7 +169,7 @@ export function searchEndpointServerHook<
       }
 
       if (isTextSearch) {
-        const results = searxngResults as TextResult[];
+        const results = searchResults as TextResult[];
         const rankedResults = await handleRanking(
           query,
           searchType,
@@ -147,7 +182,7 @@ export function searchEndpointServerHook<
         response.setHeader("Content-Type", "application/json");
         response.end(JSON.stringify(rankedResults));
       } else {
-        const results = searxngResults as ImageResult[];
+        const results = searchResults as ImageResult[];
         const resultsText = results.map(
           ([title, url]) => [title?.slice(0, 100) || "", "", url] as TextResult,
         );

@@ -10,6 +10,8 @@ import { getRerankingStats } from "./rerankingSinceLastRestart.ts";
 import {
   getDegradedSearchTypes,
   getGraphicalSearchesSinceLastRestart,
+  getSearchesFailedOnFallback,
+  getSearchesServedByFallback,
   getSearchesWithAllResultsDiscardedSinceLastRestart,
   getSearchesWithoutResultsSinceLastRestart,
   getSearchesWithUnresponsiveEnginesSinceLastRestart,
@@ -83,6 +85,8 @@ export function statusEndpointServerHook<
         getSearchesWithUnresponsiveEnginesSinceLastRestart(),
       searchesWithAllResultsDiscarded:
         getSearchesWithAllResultsDiscardedSinceLastRestart(),
+      searchesServedByFallback: getSearchesServedByFallback(),
+      searchesFailedOnFallback: getSearchesFailedOnFallback(),
       biEncoderServiceStatus,
       rerankerServiceStatus,
       webSearchServiceStatus,

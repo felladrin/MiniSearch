@@ -67,6 +67,17 @@ describe("statusEndpointServerHook", () => {
     });
   });
 
+  it("publishes the two fallback counters as plain counts", async () => {
+    const status = await callStatus();
+
+    // Counts and nothing else: they say whether the second text source is
+    // pulling its weight, and say it without a query anywhere near it.
+    expect(status).toMatchObject({
+      searchesServedByFallback: expect.any(Number),
+      searchesFailedOnFallback: expect.any(Number),
+    });
+  });
+
   it("publishes the page-read circuit count beside the outcome counters", async () => {
     const status = await callStatus();
 

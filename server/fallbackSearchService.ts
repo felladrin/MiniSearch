@@ -95,6 +95,9 @@ export async function fetchFallbackTextResults(
     signal,
   });
   const sessionId = initializeResponse.headers.get("mcp-session-id");
+  // An unread body keeps undici's socket out of the pool until it is GC'd, so
+  // both outcomes have to discard it before they part ways with the response.
+  await initializeResponse.body?.cancel();
   if (!initializeResponse.ok || !sessionId) {
     throw new Error(
       `The fallback search endpoint did not open a session (status ${initializeResponse.status})`,
@@ -118,6 +121,7 @@ export async function fetchFallbackTextResults(
     }),
     signal,
   });
+  await initializedResponse.body?.cancel();
   if (!initializedResponse.ok) {
     throw new Error(
       `The fallback search endpoint rejected the initialized notification (status ${initializedResponse.status})`,

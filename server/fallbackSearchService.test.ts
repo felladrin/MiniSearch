@@ -20,11 +20,13 @@ function createMockResponse(
     ok = status === undefined ? true : status >= 200 && status < 300,
     headers = {},
     contentType = "application/json",
+    unreadBody = null,
   }: {
     ok?: boolean;
     status?: number;
     headers?: Record<string, string>;
     contentType?: string;
+    unreadBody?: { cancel: () => Promise<void> } | null;
   } = {},
 ): Response {
   const resolvedStatus = status ?? (ok ? 200 : 503);
@@ -39,7 +41,7 @@ function createMockResponse(
     clone: function () {
       return this;
     },
-    body: null,
+    body: unreadBody,
     bodyUsed: false,
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
     blob: () => Promise.resolve(new Blob()),
@@ -275,6 +277,47 @@ describe("the three requests", () => {
     expect(signals[0]).toBeInstanceOf(AbortSignal);
     expect(signals[1]).toBe(signals[0]);
     expect(signals[2]).toBe(signals[0]);
+  });
+
+  it("discards the unread bodies of the first two responses", async () => {
+    const cancelInitialize = vi.fn().mockResolvedValue(undefined);
+    const cancelInitialized = vi.fn().mockResolvedValue(undefined);
+    fetchMock
+      .mockResolvedValueOnce(
+        createMockResponse(INITIALIZE_REPLY, {
+          headers: { "mcp-session-id": SESSION_ID },
+          unreadBody: { cancel: cancelInitialize },
+        }),
+      )
+      .mockResolvedValueOnce(
+        createMockResponse(NOTIFICATION_ACCEPTED, {
+          status: 202,
+          unreadBody: { cancel: cancelInitialized },
+        }),
+      )
+      .mockResolvedValueOnce(createMockResponse(documentWith([])));
+
+    await fetchFallbackTextResults(QUERY, 10);
+
+    // An unread body keeps its socket out of the connection pool until it is
+    // collected, so the two replies nobody reads have to be dropped.
+    expect(cancelInitialize).toHaveBeenCalledTimes(1);
+    expect(cancelInitialized).toHaveBeenCalledTimes(1);
+  });
+
+  it("discards an unread body before throwing on a rejected initialize", async () => {
+    const cancelInitialize = vi.fn().mockResolvedValue(undefined);
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse("", {
+        status: 500,
+        unreadBody: { cancel: cancelInitialize },
+      }),
+    );
+
+    await expect(fetchFallbackTextResults(QUERY, 10)).rejects.toThrow(
+      "did not open a session (status 500)",
+    );
+    expect(cancelInitialize).toHaveBeenCalledTimes(1);
   });
 
   it("omits the Bearer header when no key is configured", async () => {

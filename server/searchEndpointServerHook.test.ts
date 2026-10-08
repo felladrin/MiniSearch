@@ -1,6 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("./fallbackSearchService", () => ({
+  fetchFallbackTextResults: vi.fn(),
+  isSearchFallbackEnabled: vi.fn(),
+}));
+
 vi.mock("./handleTokenVerification", () => ({
   handleTokenVerification: vi.fn(),
 }));
@@ -16,6 +21,8 @@ vi.mock("./rerankerService", () => ({
 vi.mock("./searchesSinceLastRestart", () => ({
   incrementTextualSearchesSinceLastRestart: vi.fn(),
   incrementGraphicalSearchesSinceLastRestart: vi.fn(),
+  incrementSearchesServedByFallback: vi.fn(),
+  incrementSearchesFailedOnFallback: vi.fn(),
   recordSearchDuration: vi.fn(),
 }));
 
@@ -23,12 +30,18 @@ vi.mock("./webSearchService", () => ({
   fetchSearXNG: vi.fn(),
 }));
 
+import {
+  fetchFallbackTextResults,
+  isSearchFallbackEnabled,
+} from "./fallbackSearchService";
 import { handleTokenVerification } from "./handleTokenVerification";
 import { rankSearchResults } from "./rankSearchResults";
 import { getRerankerStatus } from "./rerankerService";
 import { searchEndpointServerHook } from "./searchEndpointServerHook";
 import {
   incrementGraphicalSearchesSinceLastRestart,
+  incrementSearchesFailedOnFallback,
+  incrementSearchesServedByFallback,
   incrementTextualSearchesSinceLastRestart,
   recordSearchDuration,
 } from "./searchesSinceLastRestart";
@@ -75,6 +88,11 @@ describe("searchEndpointServerHook", () => {
       async (_query, _searchType, results) =>
         results.map(([title, content, url]) => [title, content, url, 0]),
     );
+    // Off unless a test switches it on, and answered with something rather
+    // than undefined so an unexpected call fails a visible assertion instead
+    // of poisoning the results below.
+    vi.mocked(isSearchFallbackEnabled).mockReturnValue(false);
+    vi.mocked(fetchFallbackTextResults).mockResolvedValue([]);
   });
 
   it("passes through requests that aren't under /search/", async () => {
@@ -424,6 +442,161 @@ describe("searchEndpointServerHook", () => {
       expect(response.end).toHaveBeenCalledWith(
         JSON.stringify({ error: "Search service unavailable" }),
       );
+    });
+
+    describe("text search fallback", () => {
+      const fallbackResults: [string, string, string][] = [
+        ["Fallback title", "Fallback snippet", "https://example.com/fallback"],
+      ];
+      const rankedFallbackResults: [string, string, string, number][] = [
+        [
+          "Fallback title",
+          "Fallback snippet",
+          "https://example.com/fallback",
+          0.7,
+        ],
+      ];
+
+      function failSearxng() {
+        vi.mocked(fetchSearXNG).mockRejectedValue(
+          new Error("SearXNG request failed with status 503"),
+        );
+      }
+
+      it("serves the fallback results through the normal text path", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        failSearxng();
+        vi.mocked(fetchFallbackTextResults).mockResolvedValue(fallbackResults);
+        vi.mocked(getRerankerStatus).mockResolvedValue(true);
+        vi.mocked(rankSearchResults).mockResolvedValue(rankedFallbackResults);
+
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+
+        await handler(
+          createRequest("/search/text?q=cats&token=abc"),
+          response,
+          vi.fn(),
+        );
+
+        expect(fetchFallbackTextResults).toHaveBeenCalledWith("cats", 30);
+        // Reranked exactly like SearXNG results, with the top ones preserved,
+        // and then answered by the one respond block the text path has.
+        expect(rankSearchResults).toHaveBeenCalledWith(
+          "cats",
+          "text",
+          fallbackResults,
+          true,
+        );
+        expect(incrementTextualSearchesSinceLastRestart).toHaveBeenCalledTimes(
+          1,
+        );
+        expect(incrementSearchesServedByFallback).toHaveBeenCalledTimes(1);
+        expect(incrementSearchesFailedOnFallback).not.toHaveBeenCalled();
+        // The duration metric is SearXNG's; the fallback's own latency is a
+        // different thing and would be misleading under the same average.
+        expect(recordSearchDuration).not.toHaveBeenCalled();
+        expect(response.statusCode).toBe(200);
+        expect(response.end).toHaveBeenCalledWith(
+          JSON.stringify(rankedFallbackResults),
+        );
+      });
+
+      it("answers 502 when the fallback fails too", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        failSearxng();
+        vi.mocked(fetchFallbackTextResults).mockRejectedValue(
+          new Error("The fallback search tool call failed with status 502"),
+        );
+
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+
+        await handler(
+          createRequest("/search/text?q=cats&token=abc"),
+          response,
+          vi.fn(),
+        );
+
+        expect(response.statusCode).toBe(502);
+        expect(response.end).toHaveBeenCalledWith(
+          JSON.stringify({ error: "Search service unavailable" }),
+        );
+        expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
+        expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
+        expect(recordSearchDuration).not.toHaveBeenCalled();
+
+        const logged = vi.mocked(console.error).mock.calls.flat().join(" ");
+        expect(logged).toContain(
+          "The fallback search tool call failed with status 502",
+        );
+        expect(logged).not.toContain("cats");
+      });
+
+      it("answers 502 without consulting the fallback when it is switched off", async () => {
+        failSearxng();
+
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+
+        await handler(
+          createRequest("/search/text?q=cats&token=abc"),
+          response,
+          vi.fn(),
+        );
+
+        expect(response.statusCode).toBe(502);
+        expect(response.end).toHaveBeenCalledWith(
+          JSON.stringify({ error: "Search service unavailable" }),
+        );
+        expect(fetchFallbackTextResults).not.toHaveBeenCalled();
+        expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
+        expect(incrementSearchesFailedOnFallback).not.toHaveBeenCalled();
+      });
+
+      it("never consults the fallback for an image search", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        failSearxng();
+
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+
+        await handler(
+          createRequest("/search/images?q=cats&token=abc"),
+          response,
+          vi.fn(),
+        );
+
+        expect(response.statusCode).toBe(502);
+        expect(response.end).toHaveBeenCalledWith(
+          JSON.stringify({ error: "Search service unavailable" }),
+        );
+        expect(fetchFallbackTextResults).not.toHaveBeenCalled();
+        expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
+        expect(incrementSearchesFailedOnFallback).not.toHaveBeenCalled();
+      });
+
+      it("never consults the fallback when SearXNG answers", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+
+        await handler(
+          createRequest("/search/text?q=cats&token=abc"),
+          response,
+          vi.fn(),
+        );
+
+        expect(response.statusCode).toBe(200);
+        expect(response.end).toHaveBeenCalledWith(
+          JSON.stringify(searxngResults),
+        );
+        expect(fetchFallbackTextResults).not.toHaveBeenCalled();
+        expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
+        expect(incrementSearchesFailedOnFallback).not.toHaveBeenCalled();
+      });
     });
   });
 
