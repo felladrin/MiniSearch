@@ -149,6 +149,7 @@ export async function fetchFallbackTextResults(
     signal,
   });
   if (!callResponse.ok) {
+    await callResponse.body?.cancel();
     throw new Error(
       `The fallback search tool call failed with status ${callResponse.status}`,
     );
