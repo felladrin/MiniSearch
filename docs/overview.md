@@ -247,6 +247,8 @@ The `/status` endpoint returns a JSON object:
 | `searchesWithoutResults` | number | Searches, text and image together, that SearXNG answered with zero results and no unresponsive engines |
 | `searchesWithUnresponsiveEngines` | number | Searches, text and image together, that came back with zero results and unresponsive engines, whether the retries were spent or an all-suspended set failed fast; one per search, not per attempt |
 | `searchesWithAllResultsDiscarded` | number | Text searches whose results were all dropped during processing |
+| `searchesServedByFallback` | number | Text searches answered by the fallback source after SearXNG failed |
+| `searchesFailedOnFallback` | number | Fallback searches that failed, plus searches where SearXNG's own retries had left too little of the search deadline for the fallback to be asked at all. A rising count is therefore not by itself a sign that the fallback provider is failing |
 | `biEncoderServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `rerankerServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `webSearchServiceStatus` | string | `"healthy"`, `"degraded"` or `"unhealthy"`, see below |
@@ -277,8 +279,8 @@ engines replied, so whatever was failing is not failing now.
 since neither sits behind a breaker and a failing one degrades a search instead
 of losing it.
 
-The three `searches...` counters are the aggregate form of the log lines that
-used to carry the query text. The log still names the unresponsive engines
+The first three `searches...` counters are the aggregate form of the log lines
+that used to carry the query text. The log still names the unresponsive engines
 behind an empty response and the size and type of a discarded batch; how often
 each happens is read from here instead. `searchesWithoutResults` counts only
 the searches that genuinely matched nothing, since an empty response naming

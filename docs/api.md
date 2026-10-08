@@ -171,12 +171,26 @@ Failures:
 | --- | --- | --- |
 | `400` | `{"error":"Missing query parameter"}` | `q` missing or blank |
 | `400` | `{"error":"Query parameter must not exceed 2000 characters"}` | `q` too long |
-| `502` | `{"error":"Search service unavailable"}` | SearXNG unreachable, so an outage is distinguishable from a search with no matches |
+| `502` | `{"error":"Search service unavailable"}` | SearXNG failed and the text-search fallback was off or failed too, so an outage is distinguishable from a search with no matches |
 | `500` | `{"error":"Internal server error"}` | Anything else |
+
+With `SEARCH_FALLBACK_ENABLED` on (see `docs/configuration.md`), a text search
+whose SearXNG attempt failed is retried against a second provider before this
+endpoint gives up. That attempt covers the whole exchange under one 15-second
+budget, and it is made only after SearXNG has failed: never while SearXNG
+answers, and never on an image search. It is skipped when less than two seconds
+of the search's own 25-second deadline remain, since an answer that late cannot
+reach the client before its 30-second timeout, and that skip answers the `502`
+above and counts as a fallback that failed. If the fallback answers with nothing
+usable, this endpoint responds `200` with `[]`, so the client shows the
+"No results found" alert rather than the "Text search unavailable" one; only a
+fallback that fails itself falls through to the same `502`.
 
 ### `GET /search/images`
 
-Same parameters and failures as `/search/text`. The hook claims the whole
+Same parameters and failures as `/search/text`, except that the text-search
+fallback above never applies here: an image search has no second source, so its
+`502` still means SearXNG failed. The hook claims the whole
 `/search/` prefix and treats every path that does not start with `/search/text`
 as an image search, so `/search/anything` is an image search.
 
@@ -340,6 +354,14 @@ way.
 Unauthenticated and not rate-limited: uptime, the counters accumulated since
 the last restart, and the health of the reranker, the bi-encoder and SearXNG.
 The field reference is the `/status` section of `docs/overview.md`.
+
+Two of those counters belong to the text-search fallback: `searchesServedByFallback`
+counts searches answered with fallback results, and `searchesFailedOnFallback`
+counts the other attempts: those the fallback itself failed, and those where
+SearXNG's retries had left so little of the 25-second search deadline that the
+fallback was never asked. A rising `searchesFailedOnFallback` is therefore not
+by itself a sign that the fallback provider is failing. Both are plain counts,
+and neither carries a query.
 
 Nothing in the response is per-user: queries, URLs and client addresses are
 never recorded, only aggregate outcomes

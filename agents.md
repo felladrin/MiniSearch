@@ -154,6 +154,7 @@ Need to:
 - `server/dictationModelServerHook.ts` - `/dictation-models/` endpoint: serves the pinned speech-to-text model files from the instance
 - `server/cacheServerHook.ts` - Cache-Control headers (preview server only)
 - `server/webSearchService.ts` - SearXNG integration with circuit breaker and retry logic
+- `server/fallbackSearchService.ts` - Second text-search source for when SearXNG fails and `SEARCH_FALLBACK_ENABLED` is on
 - `server/pageContentService.ts` - Reads result pages and extracts query-relevant passages
 - `server/pageReadHostBreaker.ts` - Per-host circuit breaker for page reads: skips a host that refused the last three reads, then probes it once
 - `server/utils/publicUrl.ts` - Blocks private and reserved addresses before a server-side fetch

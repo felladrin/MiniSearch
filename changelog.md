@@ -3,6 +3,11 @@
 Notable changes, grouped by date, most recent first.
 
 
+## 2026-10-08
+
+- Added an optional second source for text searches, so a SearXNG outage no longer has to end in a 502. It stays off unless `SEARCH_FALLBACK_ENABLED` is `true` or `1`, and flipping it takes a restart, since a process keeps the environment it was started with. When it is on, the second source is consulted only after SearXNG has failed (an HTTP error, a network error, every engine unresponsive, or an open circuit), under one 15-second budget for the whole exchange and under a 25-second deadline measured from the start of the search, and only for text searches: image searches still answer 502 as before. The query goes to `search.parallel.ai`, which sees the query text and this server's IP address, never the user's. A retry that comes back with nothing usable now answers HTTP 200 with no results, so the UI shows "No results found" rather than "Text search unavailable"; a retry that fails itself, or that the search deadline has left under two seconds for, falls through to the old 502. `SEARCH_FALLBACK_API_KEY` is optional and is sent as a Bearer token, which raises the provider's free-tier rate limits. `/status` gained `searchesServedByFallback` and `searchesFailedOnFallback`, plain counts that never carry a query, so you can see whether the second source is earning its place.
+
+
 ## 2026-10-07
 
 - Security: cleared the flagged copy of `postcss-selector-parser` that lives inside the npm the image ships. npm pins its own dependency tree exactly, so neither `npm install -g npm@latest` nor a dependency bump reaches a bundled copy, and the npm in the image still carried 7.1.4. This was the one of the image's three code scanning findings that no dependency bump could fix. The image's npm-bundle repair now lists that package among its targets, so the build replaces the bundled copy with the patched release and fails if any copy of that major line survives.
