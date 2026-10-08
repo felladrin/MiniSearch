@@ -171,7 +171,7 @@ pin and keeps the old rebinding residual.
 ## Threat Model
 
 - **Local Environment**: Assumes trusted local execution
-- **Network Requests**: All external requests go through SearXNG proxy, except the one a served text search makes to `search.parallel.ai`, which happens only when `SEARCH_FALLBACK_ENABLED` is on (off by default)
+- **Network Requests**: All external requests go through SearXNG proxy, except a text search whose SearXNG search failed, which goes to `search.parallel.ai`, and only when `SEARCH_FALLBACK_ENABLED` is on (off by default)
 - **AI Models**: Models run locally or through trusted providers
 - **Data Exfiltration**: Prevented by local-first architecture
 

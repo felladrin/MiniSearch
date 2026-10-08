@@ -502,6 +502,30 @@ describe("searchEndpointServerHook", () => {
         );
       });
 
+      it("answers 200 with an empty list when the fallback returns nothing usable", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        failSearxng();
+        vi.mocked(fetchFallbackTextResults).mockResolvedValue([]);
+
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+
+        await handler(
+          createRequest("/search/text?q=cats&token=abc"),
+          response,
+          vi.fn(),
+        );
+
+        // The endpoint answered, so this is a search with no results rather
+        // than an outage: the client shows the no-results alert, not the
+        // unavailable one, and the fallback still counts as served.
+        expect(response.statusCode).toBe(200);
+        expect(response.end).toHaveBeenCalledWith(JSON.stringify([]));
+        expect(incrementSearchesServedByFallback).toHaveBeenCalledTimes(1);
+        expect(incrementSearchesFailedOnFallback).not.toHaveBeenCalled();
+        expect(recordSearchDuration).not.toHaveBeenCalled();
+      });
+
       it("answers 502 when the fallback fails too", async () => {
         vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
         failSearxng();
