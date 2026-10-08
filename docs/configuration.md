@@ -91,7 +91,7 @@ These defaults are provided by `docker-compose.yml`/`docker-compose.production.y
 
 ### Search Fallback
 
-When SearXNG fails on a text search, the server can retry that search against a second provider, sending the query to `search.parallel.ai`. That provider documents the keyless tier as free for light use with lower rate limits, and recommends an API key for production use. `docker-compose.yml` passes only `HOST`, `PORT`, `BASIC_SSL` and `HMR_PORT` into the development container, so these two variables are not carried by the compose `environment` list; set them in `.env`, which `vite.config.ts` loads, inside the container as well as outside it.
+When SearXNG fails on a text search, the server can retry that search against a second provider, sending the query to `search.parallel.ai`. That provider documents the keyless tier as free for light use with lower rate limits, and recommends an API key for production use. `docker-compose.yml` passes only `HOST`, `PORT`, `BASIC_SSL` and `HMR_PORT` into the development container, so these two variables are not carried by the compose `environment` list; set them in `.env`, which `vite.config.ts` loads, inside the container as well as outside it. `vite.config.ts` reads `.env.example` after `.env`, so anything still set there acts as a default: the real `SEARCH_FALLBACK_API_KEY` belongs in `.env`, never in `.env.example`, which is committed.
 
 | Variable | Default | Description |
 |----------|---------|-------------|

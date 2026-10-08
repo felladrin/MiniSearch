@@ -282,6 +282,21 @@ describe("the three requests", () => {
     expect(signals[2]).toBe(signals[0]);
   });
 
+  it("hands the exchange the caller's budget, capped at its own", async () => {
+    mockExchange(documentWith([]));
+    mockExchange(documentWith([]));
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+
+    await fetchFallbackTextResults(QUERY, 10, 3_000);
+    await fetchFallbackTextResults(QUERY, 10, 20_000);
+
+    expect(timeoutSpy).toHaveBeenNthCalledWith(1, 3_000);
+    // A budget past the module's own 15 s is not passed on: the exchange still
+    // ends at the cap, so the caller cannot lend it more time than it allows.
+    // Restored by the afterEach below, along with every other mock.
+    expect(timeoutSpy).toHaveBeenNthCalledWith(2, 15_000);
+  });
+
   it("discards the unread bodies of the first two responses", async () => {
     const cancelInitialize = vi.fn().mockResolvedValue(undefined);
     const cancelInitialized = vi.fn().mockResolvedValue(undefined);

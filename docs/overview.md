@@ -248,7 +248,7 @@ The `/status` endpoint returns a JSON object:
 | `searchesWithUnresponsiveEngines` | number | Searches, text and image together, that came back with zero results and unresponsive engines, whether the retries were spent or an all-suspended set failed fast; one per search, not per attempt |
 | `searchesWithAllResultsDiscarded` | number | Text searches whose results were all dropped during processing |
 | `searchesServedByFallback` | number | Text searches answered by the fallback source after SearXNG failed |
-| `searchesFailedOnFallback` | number | Fallback searches that were consulted after SearXNG failed and failed themselves |
+| `searchesFailedOnFallback` | number | Fallback searches that failed, plus searches where SearXNG's own retries had left too little of the search deadline for the fallback to be asked at all. A rising count is therefore not by itself a sign that the fallback provider is failing |
 | `biEncoderServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `rerankerServiceStatus` | string | `"healthy"` or `"unhealthy"` |
 | `webSearchServiceStatus` | string | `"healthy"`, `"degraded"` or `"unhealthy"`, see below |

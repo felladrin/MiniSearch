@@ -357,8 +357,11 @@ The field reference is the `/status` section of `docs/overview.md`.
 
 Two of those counters belong to the text-search fallback: `searchesServedByFallback`
 counts searches answered with fallback results, and `searchesFailedOnFallback`
-counts fallbacks that were consulted and failed. Both are plain counts, taken
-only when the fallback was actually consulted, and neither carries a query.
+counts the other attempts: those the fallback itself failed, and those where
+SearXNG's retries had left so little of the 25-second search deadline that the
+fallback was never asked. A rising `searchesFailedOnFallback` is therefore not
+by itself a sign that the fallback provider is failing. Both are plain counts,
+and neither carries a query.
 
 Nothing in the response is per-user: queries, URLs and client addresses are
 never recorded, only aggregate outcomes
