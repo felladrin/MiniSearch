@@ -55,8 +55,10 @@ export function incrementSearchesWithAllResultsDiscardedSinceLastRestart() {
 
 // The fallback is only consulted after SearXNG has already failed, so these two
 // say whether the second source pulls its weight: served is a search the caller
-// got anyway, failed is one that ended as the 502 there was before it existed.
-// A search the fallback was never asked to cover lands in neither.
+// got anyway, failed is one that ended as the 502 there was before it existed,
+// including a search whose SearXNG retries left the deadline too little time to
+// ask the fallback at all. A search with the fallback off, or an image search,
+// lands in neither.
 let searchesServedByFallback = 0;
 let searchesFailedOnFallback = 0;
 
