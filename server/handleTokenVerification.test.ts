@@ -199,6 +199,7 @@ describe("handleTokenVerification", () => {
     expect(Object.keys(stats).sort()).toEqual([
       "authorized",
       "bySurface",
+      "distinctRejectedTokens",
       "limiter",
       "reasons",
       "rejectedRate",
