@@ -178,10 +178,13 @@ With `SEARCH_FALLBACK_ENABLED` on (see `docs/configuration.md`), a text search
 whose SearXNG attempt failed is retried against a second provider before this
 endpoint gives up. That attempt covers the whole exchange under one 15-second
 budget, and it is made only after SearXNG has failed: never while SearXNG
-answers, and never on an image search. If the fallback answers with nothing
+answers, and never on an image search. It is skipped when less than two seconds
+of the search's own 25-second deadline remain, since an answer that late cannot
+reach the client before its 30-second timeout, and that skip answers the `502`
+above and counts as a fallback that failed. If the fallback answers with nothing
 usable, this endpoint responds `200` with `[]`, so the client shows the
 "No results found" alert rather than the "Text search unavailable" one; only a
-fallback that fails itself falls through to the `502` above.
+fallback that fails itself falls through to the same `502`.
 
 ### `GET /search/images`
 

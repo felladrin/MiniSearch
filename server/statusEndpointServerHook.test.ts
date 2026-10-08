@@ -1,5 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it, vi } from "vitest";
+import {
+  incrementSearchesFailedOnFallback,
+  incrementSearchesServedByFallback,
+} from "./searchesSinceLastRestart.ts";
 import { statusEndpointServerHook } from "./statusEndpointServerHook.ts";
 
 // The health getters probe live services; this test is about the payload,
@@ -68,14 +72,23 @@ describe("statusEndpointServerHook", () => {
   });
 
   it("publishes the two fallback counters as plain counts", async () => {
+    const before = await callStatus();
+
+    incrementSearchesServedByFallback();
+    incrementSearchesFailedOnFallback();
+    incrementSearchesFailedOnFallback();
+
     const status = await callStatus();
 
-    // Counts and nothing else: they say whether the second text source is
-    // pulling its weight, and say it without a query anywhere near it.
-    expect(status).toMatchObject({
-      searchesServedByFallback: expect.any(Number),
-      searchesFailedOnFallback: expect.any(Number),
-    });
+    // Exact values rather than expect.any(Number), which a pair of swapped
+    // getters would satisfy too. The counters are module state that no test
+    // here resets, so the deltas are what each getter moved.
+    expect(status.searchesServedByFallback).toBe(
+      (before.searchesServedByFallback as number) + 1,
+    );
+    expect(status.searchesFailedOnFallback).toBe(
+      (before.searchesFailedOnFallback as number) + 2,
+    );
   });
 
   it("publishes the page-read circuit count beside the outcome counters", async () => {

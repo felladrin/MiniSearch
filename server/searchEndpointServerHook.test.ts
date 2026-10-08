@@ -469,6 +469,8 @@ describe("searchEndpointServerHook", () => {
         vi.mocked(fetchFallbackTextResults).mockResolvedValue(fallbackResults);
         vi.mocked(getRerankerStatus).mockResolvedValue(true);
         vi.mocked(rankSearchResults).mockResolvedValue(rankedFallbackResults);
+        // A search that has just started hands the fallback the whole budget.
+        vi.spyOn(performance, "now").mockReturnValue(0);
 
         const handler = getRegisteredHandler();
         const response = createResponse();
@@ -479,7 +481,11 @@ describe("searchEndpointServerHook", () => {
           vi.fn(),
         );
 
-        expect(fetchFallbackTextResults).toHaveBeenCalledWith("cats", 30);
+        expect(fetchFallbackTextResults).toHaveBeenCalledWith(
+          "cats",
+          30,
+          25_000,
+        );
         // Reranked exactly like SearXNG results, with the top ones preserved,
         // and then answered by the one respond block the text path has.
         expect(rankSearchResults).toHaveBeenCalledWith(
@@ -524,6 +530,70 @@ describe("searchEndpointServerHook", () => {
         expect(incrementSearchesServedByFallback).toHaveBeenCalledTimes(1);
         expect(incrementSearchesFailedOnFallback).not.toHaveBeenCalled();
         expect(recordSearchDuration).not.toHaveBeenCalled();
+      });
+
+      it("skips the fallback when the search deadline has already passed", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        failSearxng();
+        // 0 for the search's start, then past the 25 s deadline.
+        vi.spyOn(performance, "now")
+          .mockReturnValueOnce(0)
+          .mockReturnValue(25_001);
+
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+
+        await handler(
+          createRequest("/search/text?q=cats&token=abc"),
+          response,
+          vi.fn(),
+        );
+
+        // A fallback started now would answer after the client's own 30 s
+        // timeout, so it is never asked and the outage is reported the way it
+        // would have been with the feature off.
+        expect(fetchFallbackTextResults).not.toHaveBeenCalled();
+        expect(response.statusCode).toBe(502);
+        expect(response.end).toHaveBeenCalledWith(
+          JSON.stringify({ error: "Search service unavailable" }),
+        );
+        expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
+        expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
+        expect(recordSearchDuration).not.toHaveBeenCalled();
+
+        const logged = vi.mocked(console.error).mock.calls.flat().join(" ");
+        expect(logged).toContain(
+          "the search deadline left the fallback too little time",
+        );
+        expect(logged).not.toContain("cats");
+      });
+
+      it("hands the fallback the time left, not its own full budget", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        failSearxng();
+        vi.mocked(fetchFallbackTextResults).mockResolvedValue([]);
+        // 0 for the search's start, then 12 s in when SearXNG gives up.
+        vi.spyOn(performance, "now")
+          .mockReturnValueOnce(0)
+          .mockReturnValue(12_000);
+
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+
+        await handler(
+          createRequest("/search/text?q=cats&token=abc"),
+          response,
+          vi.fn(),
+        );
+
+        // 13 s are left of the 25 s deadline, which is under the fallback's
+        // own 15 s cap, so the search cannot outlive the client's patience.
+        expect(fetchFallbackTextResults).toHaveBeenCalledWith(
+          "cats",
+          30,
+          13_000,
+        );
+        expect(response.statusCode).toBe(200);
       });
 
       it("answers 502 when the fallback fails too", async () => {

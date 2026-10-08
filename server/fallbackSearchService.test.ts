@@ -53,6 +53,9 @@ function createMockResponse(
 
 const SESSION_ID = "session-from-step-one";
 const QUERY = "borogoves outgrabe mimsy-42";
+// The module's own cap on the exchange; every test that is not about the
+// caller's budget passes it as the budget.
+const FULL_BUDGET_MS = 15_000;
 
 const INITIALIZE_REPLY = JSON.stringify({
   jsonrpc: "2.0",
@@ -189,7 +192,7 @@ describe("the three requests", () => {
   it("runs initialize, the initialized notification and the tool call in order", async () => {
     mockExchange(documentWith([]));
 
-    await fetchFallbackTextResults(QUERY, 10);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(requestBody(0)).toEqual({
@@ -218,7 +221,7 @@ describe("the three requests", () => {
   it("carries the session id from step 1 onto steps 2 and 3, with the protocol version", async () => {
     mockExchange(documentWith([]));
 
-    await fetchFallbackTextResults(QUERY, 10);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     expect(requestHeaders(0)["Mcp-Session-Id"]).toBeUndefined();
     expect(requestHeaders(0)["MCP-Protocol-Version"]).toBeUndefined();
@@ -233,8 +236,8 @@ describe("the three requests", () => {
     mockExchange(documentWith([]));
     mockExchange(documentWith([]));
 
-    await fetchFallbackTextResults(QUERY, 10);
-    await fetchFallbackTextResults(QUERY, 10);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     const first = requestBody(2).params?.arguments?.session_id;
     const second = requestBody(5).params?.arguments?.session_id;
@@ -245,7 +248,7 @@ describe("the three requests", () => {
   it("sends the content type and accept header on every request", async () => {
     mockExchange(documentWith([]));
 
-    await fetchFallbackTextResults(QUERY, 10);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     for (let index = 0; index < 3; index++) {
       const headers = requestHeaders(index);
@@ -257,7 +260,7 @@ describe("the three requests", () => {
   it("never sends a model name", async () => {
     mockExchange(documentWith([]));
 
-    await fetchFallbackTextResults(QUERY, 10);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     const toolCall = JSON.stringify(fetchMock.mock.calls[2][1]?.body);
     expect(toolCall).not.toContain("model_name");
@@ -271,7 +274,7 @@ describe("the three requests", () => {
   it("bounds all three requests with one abort signal", async () => {
     mockExchange(documentWith([]));
 
-    await fetchFallbackTextResults(QUERY, 10);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     const signals = fetchMock.mock.calls.map(([, init]) => init?.signal);
     expect(signals[0]).toBeInstanceOf(AbortSignal);
@@ -297,7 +300,7 @@ describe("the three requests", () => {
       )
       .mockResolvedValueOnce(createMockResponse(documentWith([])));
 
-    await fetchFallbackTextResults(QUERY, 10);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     // An unread body keeps its socket out of the connection pool until it is
     // collected, so the two replies nobody reads have to be dropped.
@@ -314,16 +317,16 @@ describe("the three requests", () => {
       }),
     );
 
-    await expect(fetchFallbackTextResults(QUERY, 10)).rejects.toThrow(
-      "did not open a session (status 500)",
-    );
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("did not open a session (status 500)");
     expect(cancelInitialize).toHaveBeenCalledTimes(1);
   });
 
   it("omits the Bearer header when no key is configured", async () => {
     mockExchange(documentWith([]));
 
-    await fetchFallbackTextResults(QUERY, 10);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     for (let index = 0; index < 3; index++) {
       expect(requestHeaders(index).Authorization).toBeUndefined();
@@ -334,7 +337,7 @@ describe("the three requests", () => {
     process.env.SEARCH_FALLBACK_API_KEY = "sk-fallback-key";
     mockExchange(documentWith([]));
 
-    await fetchFallbackTextResults(QUERY, 10);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     for (let index = 0; index < 3; index++) {
       expect(requestHeaders(index).Authorization).toBe(
@@ -347,7 +350,7 @@ describe("the three requests", () => {
     process.env.SEARCH_FALLBACK_API_KEY = "   ";
     mockExchange(documentWith([]));
 
-    await fetchFallbackTextResults(QUERY, 10);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     expect(requestHeaders(0).Authorization).toBeUndefined();
   });
@@ -370,7 +373,7 @@ describe("reading the reply", () => {
       }),
     );
 
-    const results = await fetchFallbackTextResults(QUERY, 10);
+    const results = await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     expect(results).toHaveLength(1);
     expect(results[0][0]).toBe("JSON title");
@@ -391,7 +394,9 @@ describe("reading the reply", () => {
       { toolContentType: "text/event-stream" },
     );
 
-    await expect(fetchFallbackTextResults(QUERY, 10)).resolves.toEqual([]);
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).resolves.toEqual([]);
   });
 
   it("parses an SSE initialize reply", async () => {
@@ -400,20 +405,24 @@ describe("reading the reply", () => {
       initializeContentType: "text/event-stream",
     });
 
-    await expect(fetchFallbackTextResults(QUERY, 10)).resolves.toEqual([]);
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).resolves.toEqual([]);
   });
 
   it("returns an empty array when nothing usable comes back", async () => {
     mockExchange(documentWith([]));
 
-    await expect(fetchFallbackTextResults(QUERY, 10)).resolves.toEqual([]);
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).resolves.toEqual([]);
   });
 });
 
 describe("mapping a result", () => {
   const run = async (results: unknown[], limit = 10) => {
     mockExchange(documentWith(results));
-    return fetchFallbackTextResults(QUERY, limit);
+    return fetchFallbackTextResults(QUERY, limit, FULL_BUDGET_MS);
   };
 
   it("drops navigation crumbs and keeps the paragraph", async () => {
@@ -533,6 +542,23 @@ describe("mapping a result", () => {
     expect(results).toEqual([["Kept", EXCERPT, "https://example.com/kept"]]);
   });
 
+  it("drops a result whose url or title is not a string", async () => {
+    const results = await run([
+      { url: 42, title: "Number url", excerpts: [EXCERPT] },
+      { url: null, title: "Null url", excerpts: [EXCERPT] },
+      {
+        url: "https://example.com/number-title",
+        title: 7,
+        excerpts: [EXCERPT],
+      },
+      null,
+      { url: "https://example.com/kept", title: "Kept", excerpts: [EXCERPT] },
+    ]);
+
+    // One malformed entry must not take the rest of the search down with it.
+    expect(results).toEqual([["Kept", EXCERPT, "https://example.com/kept"]]);
+  });
+
   it("drops duplicate urls in the endpoint's order", async () => {
     const results = await run([
       { url: "https://example.com/dup", title: "First", excerpts: [EXCERPT] },
@@ -573,6 +599,7 @@ describe("mapping a result", () => {
 
 describe("failures", () => {
   it("throws when the tool call is not 2xx", async () => {
+    const cancel = vi.fn(async () => undefined);
     fetchMock.mockResolvedValueOnce(
       createMockResponse(INITIALIZE_REPLY, {
         headers: { "mcp-session-id": SESSION_ID },
@@ -581,19 +608,25 @@ describe("failures", () => {
     fetchMock.mockResolvedValueOnce(
       createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
     );
-    fetchMock.mockResolvedValueOnce(createMockResponse("bad", { status: 502 }));
-
-    await expect(fetchFallbackTextResults(QUERY, 10)).rejects.toThrow(
-      "The fallback search tool call failed with status 502",
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse("bad", { status: 502, unreadBody: { cancel } }),
     );
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("The fallback search tool call failed with status 502");
+    // An unread body keeps undici's socket out of the pool until it is
+    // garbage-collected, so the non-2xx path has to discard it like the two
+    // paths above it; dropping that line fails here.
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 
   it("throws when initialize does not open a session", async () => {
     fetchMock.mockResolvedValueOnce(createMockResponse(INITIALIZE_REPLY));
 
-    await expect(fetchFallbackTextResults(QUERY, 10)).rejects.toThrow(
-      "did not open a session (status 200)",
-    );
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("did not open a session (status 200)");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -616,9 +649,11 @@ describe("failures", () => {
       ),
     );
 
-    const rejection = await fetchFallbackTextResults(QUERY, 10).catch(
-      (error: unknown) => error,
-    );
+    const rejection = await fetchFallbackTextResults(
+      QUERY,
+      10,
+      FULL_BUDGET_MS,
+    ).catch((error: unknown) => error);
     // The whole message is fixed text plus the code: an upstream message is
     // free-form text from a third party and must not travel any further.
     expect(rejection).toBeInstanceOf(Error);
@@ -626,6 +661,39 @@ describe("failures", () => {
       "The fallback search endpoint returned a JSON-RPC error (code -32601)",
     );
     expect(String(rejection)).not.toContain("SECRET UPSTREAM TEXT");
+  });
+
+  it("keeps a non-numeric JSON-RPC code out of the message", async () => {
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse(INITIALIZE_REPLY, {
+        headers: { "mcp-session-id": SESSION_ID },
+      }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          error: { code: "SECRET", message: "SECRET UPSTREAM TEXT" },
+        }),
+      ),
+    );
+
+    const rejection = await fetchFallbackTextResults(
+      QUERY,
+      10,
+      FULL_BUDGET_MS,
+    ).catch((error: unknown) => error);
+    // A code is upstream data like the message is, so only a number may be
+    // carried into the thrown error.
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).toBe(
+      "The fallback search endpoint returned a JSON-RPC error",
+    );
+    expect(String(rejection)).not.toContain("SECRET");
   });
 
   it("throws when the result is marked as an error", async () => {
@@ -640,9 +708,9 @@ describe("failures", () => {
       }),
     );
 
-    await expect(fetchFallbackTextResults(QUERY, 10)).rejects.toThrow(
-      "reported the search as failed",
-    );
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("reported the search as failed");
   });
 
   it("throws when the tool output is not JSON", async () => {
@@ -654,17 +722,19 @@ describe("failures", () => {
       }),
     );
 
-    await expect(fetchFallbackTextResults(QUERY, 10)).rejects.toThrow(
-      "tool output that is not JSON",
-    );
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("tool output that is not JSON");
   });
 
   it("throws a fixed message when the reply itself is not JSON", async () => {
     mockExchange("<html>gateway</html>");
 
-    const rejection = await fetchFallbackTextResults(QUERY, 10).catch(
-      (error: unknown) => error,
-    );
+    const rejection = await fetchFallbackTextResults(
+      QUERY,
+      10,
+      FULL_BUDGET_MS,
+    ).catch((error: unknown) => error);
     // A raw SyntaxError quotes the offending body, which would put the
     // upstream response into the thrown error and then into the log.
     expect((rejection as Error).message).toBe(
@@ -676,17 +746,17 @@ describe("failures", () => {
   it("throws when the document has no results array", async () => {
     mockExchange(toolReply({ search_id: "search-1" }));
 
-    await expect(fetchFallbackTextResults(QUERY, 10)).rejects.toThrow(
-      "without a results array",
-    );
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("without a results array");
   });
 
   it("throws when the endpoint is unreachable", async () => {
     fetchMock.mockRejectedValue(new Error("Network failure"));
 
-    await expect(fetchFallbackTextResults(QUERY, 10)).rejects.toThrow(
-      "Network failure",
-    );
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("Network failure");
   });
 });
 
@@ -725,12 +795,14 @@ describe("privacy", () => {
       ]),
     );
 
-    await fetchFallbackTextResults(QUERY, 10);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     // Failure paths too: they carry a fixed line plus a status or an error
     // code, never the payload.
     fetchMock.mockResolvedValueOnce(createMockResponse("", { status: 500 }));
-    await expect(fetchFallbackTextResults(QUERY, 10)).rejects.toThrow();
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow();
 
     const output = logLines.join("\n");
     for (const form of [

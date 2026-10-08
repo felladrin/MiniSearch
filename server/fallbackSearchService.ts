@@ -25,7 +25,7 @@ const SESSION_ID = randomUUID();
 
 interface JsonRpcMessage {
   id?: number;
-  error?: { code?: number };
+  error?: { code?: unknown };
   result?: {
     isError?: boolean;
     content?: { type?: string; text?: string }[];
@@ -47,8 +47,8 @@ type TextualResult = [title: string, content: string, url: string];
 
 /**
  * Whether the operator opted into the second text-search source. Off unless
- * `SEARCH_FALLBACK_ENABLED` is `true` or `1`, read on every call so an operator
- * can flip it without a restart and so tests can toggle it.
+ * `SEARCH_FALLBACK_ENABLED` is `true` or `1`, read at call time so tests can
+ * toggle it.
  */
 export function isSearchFallbackEnabled(): boolean {
   const value = process.env.SEARCH_FALLBACK_ENABLED?.trim().toLowerCase();
@@ -60,6 +60,11 @@ export function isSearchFallbackEnabled(): boolean {
  * failed, and returns the same `[title, snippet, url]` tuples the SearXNG path
  * produces, so the caller can rank and render them unchanged.
  *
+ * `timeoutMs` is the time the caller can still afford, measured from its own
+ * start: the exchange is bounded by this and by the module's own cap, whichever
+ * is shorter, so a search that has already spent most of its budget on SearXNG
+ * cannot hang on here past the point where the client has given up.
+ *
  * Throws on any failure rather than returning what it managed to collect: the
  * caller has to decide between a degraded answer and the 502 it would have sent
  * anyway, and it has to be able to count the decision. An empty array is the
@@ -69,9 +74,10 @@ export function isSearchFallbackEnabled(): boolean {
 export async function fetchFallbackTextResults(
   query: string,
   limit: number,
+  timeoutMs: number,
 ): Promise<TextualResult[]> {
   const apiKey = process.env.SEARCH_FALLBACK_API_KEY?.trim();
-  const signal = AbortSignal.timeout(FALLBACK_TIMEOUT_MS);
+  const signal = AbortSignal.timeout(Math.min(FALLBACK_TIMEOUT_MS, timeoutMs));
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -187,11 +193,14 @@ async function readSearchDocument(
     );
   }
 
-  // Only the code: an upstream error message is free-form text from a third
-  // party, and it must never reach the log or a thrown error.
+  // Only a numeric code: an upstream error message is free-form text from a
+  // third party, and a non-numeric code is upstream data just the same, so
+  // neither may reach the log or a thrown error.
   if (reply.error) {
     throw new Error(
-      `The fallback search endpoint returned a JSON-RPC error (code ${reply.error.code})`,
+      typeof reply.error.code === "number"
+        ? `The fallback search endpoint returned a JSON-RPC error (code ${reply.error.code})`
+        : "The fallback search endpoint returned a JSON-RPC error",
     );
   }
 
@@ -277,9 +286,20 @@ function mapResults(
 
   for (const result of document.results) {
     if (mapped.length >= limit) break;
-    if (!result.url || seenUrls.has(result.url)) continue;
+    // Upstream data, so one malformed entry must not fail the whole search: a
+    // result that is not an object, or whose url or title is not a string, is
+    // skipped rather than left to throw on `.trim()`.
+    if (
+      !result ||
+      typeof result !== "object" ||
+      typeof result.url !== "string" ||
+      !result.url ||
+      seenUrls.has(result.url)
+    ) {
+      continue;
+    }
 
-    const title = result.title?.trim() ?? "";
+    const title = typeof result.title === "string" ? result.title.trim() : "";
     if (!title) continue;
 
     const snippet = buildSnippet(result.excerpts);

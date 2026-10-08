@@ -91,11 +91,11 @@ These defaults are provided by `docker-compose.yml`/`docker-compose.production.y
 
 ### Search Fallback
 
-When SearXNG fails on a text search, the server can retry that search against a second provider, sending the query to `search.parallel.ai`.
+When SearXNG fails on a text search, the server can retry that search against a second provider, sending the query to `search.parallel.ai`. That provider documents the keyless tier as free for light use with lower rate limits, and recommends an API key for production use. `docker-compose.yml` passes only `HOST`, `PORT`, `BASIC_SSL` and `HMR_PORT` into the development container, so these two variables are not carried by the compose `environment` list; set them in `.env`, which `vite.config.ts` loads, inside the container as well as outside it.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SEARCH_FALLBACK_ENABLED` | `false` | Serve text results from the fallback when SearXNG has failed (an HTTP error, a network error, every engine unresponsive, or an open circuit), under one 15-second budget for the whole exchange. Only `true` or `1` turns it on, and the variable is read on every request, so flipping it takes effect on the next search with no restart. Image searches never use it, and a fallback that returns nothing usable is still an HTTP 200 with no results rather than an outage |
+| `SEARCH_FALLBACK_ENABLED` | `false` | Serve text results from the fallback when SearXNG has failed (an HTTP error, a network error, every engine unresponsive, or an open circuit), under one 15-second budget for the whole exchange. Only `true` or `1` turns it on, and changing it takes a restart, since a process keeps the environment it was started with. Image searches never use it, and a fallback that returns nothing usable is still an HTTP 200 with no results rather than an outage |
 | `SEARCH_FALLBACK_API_KEY` | `''` | Optional API key for that provider, sent as a Bearer token. It raises the provider's free-tier rate limits; without it the fallback still works |
 
 ## Application Settings
