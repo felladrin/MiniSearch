@@ -47,7 +47,7 @@ export function getRejectedTokenCacheHits(): number {
 /**
  * How many distinct dead tokens the set holds, so `/status` can tell one stuck
  * client replaying a single token from many stale links, which the hit count
- * alone cannot. Capped by `MAX_REJECTED_TOKENS`, since evicted tokens leave it.
+ * alone cannot. Never exceeds `MAX_REJECTED_TOKENS`.
  */
 export function getRejectedTokenCount(): number {
   return rejectedTokens.size;
