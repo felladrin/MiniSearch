@@ -16,6 +16,18 @@ describe("rejectedTokens", () => {
     expect(isRejectedToken("b")).toBe(false);
   });
 
+  it("counts each distinct token once, however often it is recorded", async () => {
+    const { addRejectedToken, getRejectedTokenCount } = await import(
+      "./rejectedTokens"
+    );
+
+    addRejectedToken("a");
+    addRejectedToken("a");
+    addRejectedToken("b");
+
+    expect(getRejectedTokenCount()).toBe(2);
+  });
+
   it("evicts the oldest token once the cap is reached, so the set stays bounded", async () => {
     const { addRejectedToken, isRejectedToken, MAX_REJECTED_TOKENS } =
       await import("./rejectedTokens");

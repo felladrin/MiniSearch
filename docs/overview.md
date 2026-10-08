@@ -347,6 +347,7 @@ verification, the funnel `/search/text`, `/search/images`, `/page-content` and
 | `reasons.invalidToken` | number | A token that failed verification, which is what probing looks like |
 | `bySurface` | object | `authorized` and `rejected` per endpoint family: `search`, `pageContent`, `thumbnail`, `inference`, `other` |
 | `rejectedTokenCacheHits` | number | Rejections served from the rejected-token cache without a second argon2 verification |
+| `distinctRejectedTokens` | number | Distinct tokens the rejected-token cache holds, at most 1024. Only well-formed tokens that failed argon2 verification enter it; a token without the expected hash prefix is refused before that and never counted. A high `reasons.invalidToken` with a value of 1 here is one client replaying one dead token; a value that keeps growing is many stale links |
 | `limiter` | object | The shared limiter's `points` and `durationSeconds`, plus the separate `thumbnail` budget behind `/thumbnail`, without which a rejection count says nothing |
 
 `authorized` plus every entry of `reasons` sums to `requests`, and each half of
