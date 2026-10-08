@@ -89,6 +89,15 @@ These defaults are provided by `docker-compose.yml`/`docker-compose.production.y
 |----------|---------|-------------|
 | `DICTATION_MODELS_DIR` | `<system temp>/minisearch-dictation-models` | Directory where the server caches the speech-to-text model files it serves under `/dictation-models/`. The files are fetched once from the pinned upstream URL on the first request, verified against a pinned SHA-256, and reused after that. They land in a subdirectory named after the model release, so a later release cannot be served from an older cache. The default lives under the system temp directory, so a container re-downloads ~51 MB after a restart unless this points at a volume |
 
+### Search Fallback
+
+When SearXNG fails on a text search, the server can retry that search against a second provider, sending the query to `search.parallel.ai`.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SEARCH_FALLBACK_ENABLED` | `false` | Serve text results from the fallback when SearXNG has failed (an HTTP error, a network error, every engine unresponsive, or an open circuit), under one 15-second budget for the whole exchange. Only `true` or `1` turns it on, and the variable is read on every request, so flipping it takes effect on the next search with no restart. Image searches never use it, and a fallback that returns nothing usable is still an HTTP 200 with no results rather than an outage |
+| `SEARCH_FALLBACK_API_KEY` | `''` | Optional API key for that provider, sent as a Bearer token. It raises the provider's free-tier rate limits; without it the fallback still works |
+
 ## Application Settings
 
 Settings are stored in browser localStorage and can be changed via the Settings UI.

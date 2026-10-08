@@ -30,6 +30,11 @@ needed.
 | Reranker is not ready on an image search | Images still served, with the thumbnail URLs as SearXNG sent them | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranking throws on an image search | Images still served, with the thumbnail URLs as SearXNG sent them | `server/searchEndpointServerHook.test.ts` › graceful degradation |
 | Reranker returns a URL absent from the result set | That image is dropped | `server/searchEndpointServerHook.test.ts` › graceful degradation |
+| SearXNG is down and the text-search fallback answers | The fallback's results are ranked and served as HTTP 200 on the normal text path, `searchesServedByFallback` is incremented, and no search duration is recorded | `server/searchEndpointServerHook.test.ts` › graceful degradation › text search fallback |
+| SearXNG is down and the fallback fails too | HTTP 502 with a JSON error, `searchesFailedOnFallback` is incremented, and the log line carries the fallback's status code but never the query | `server/searchEndpointServerHook.test.ts` › graceful degradation › text search fallback |
+| SearXNG is down while the fallback is switched off | HTTP 502; the fallback is never consulted and neither fallback counter moves | `server/searchEndpointServerHook.test.ts` › graceful degradation › text search fallback |
+| SearXNG is down on an image search while the fallback is on | HTTP 502; the fallback is text-only, so it is never consulted and neither fallback counter moves | `server/searchEndpointServerHook.test.ts` › graceful degradation › text search fallback |
+| SearXNG answers while the fallback is on | HTTP 200 from SearXNG's results; the fallback is never consulted and neither fallback counter moves | `server/searchEndpointServerHook.test.ts` › graceful degradation › text search fallback |
 | Thumbnail host never answers | Request aborted after the timeout, `/thumbnail` answers HTTP 502 and the tile shows the host name | `server/thumbnailEndpointServerHook.test.ts` |
 | DNS lookup for a thumbnail never settles | Bounded by the same deadline as the fetch, `/thumbnail` answers HTTP 502 | `server/thumbnailEndpointServerHook.test.ts` |
 | Thumbnail URL resolves into a private range | Refused before any request, `/thumbnail` answers HTTP 403 | `server/thumbnailEndpointServerHook.test.ts` |
