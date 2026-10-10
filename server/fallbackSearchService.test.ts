@@ -448,7 +448,7 @@ describe("choosing the provider", () => {
     });
   });
 
-  it("sends no session headers when You.com opens no session", async () => {
+  it("sends the protocol version but no session id when You.com opens no session", async () => {
     process.env.SEARCH_FALLBACK_PROVIDERS = "youcom";
     mockExchange(youcomDocumentWith([]), { initializeSession: null });
 
@@ -458,8 +458,9 @@ describe("choosing the provider", () => {
     expect(requestBody(1).method).toBe("tools/call");
     for (const index of [0, 1]) {
       expect(requestHeaders(index)["Mcp-Session-Id"]).toBeUndefined();
-      expect(requestHeaders(index)["MCP-Protocol-Version"]).toBeUndefined();
     }
+    expect(requestHeaders(0)["MCP-Protocol-Version"]).toBeUndefined();
+    expect(requestHeaders(1)["MCP-Protocol-Version"]).toBe("2025-06-18");
   });
 
   it("acknowledges a session and carries it when You.com opens one", async () => {
@@ -1359,6 +1360,21 @@ describe("configuration", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("throws on a key with a control character inside, naming the variable and not the key", async () => {
+    process.env[YOUCOM_KEY_VARIABLE] = "youcom-test\nvalue";
+
+    expect(() => assertSearchFallbackConfiguration()).toThrow(
+      "SEARCH_FALLBACK_YOUCOM_API_KEY contains a control character; set it to the key alone.",
+    );
+    const error = (await fetchFallbackTextResults(
+      QUERY,
+      10,
+      FULL_BUDGET_MS,
+    ).catch((thrown: unknown) => thrown)) as Error;
+    expect(error.message).not.toContain("youcom-test");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("ignores a removed variable that is set to blank", () => {
     process.env[LEGACY_PROVIDER_VARIABLE] = "  ";
     process.env[LEGACY_KEY_VARIABLE] = "";
@@ -1505,6 +1521,16 @@ describe("the cascade", () => {
     ).resolves.toEqual([]);
   });
 
+  it("returns an empty array when one failed and the other answered empty", async () => {
+    orderParallelFirst();
+    fetchMock.mockResolvedValueOnce(createMockResponse("", { status: 500 }));
+    mockYoucom([]);
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).resolves.toEqual([]);
+  });
+
   it("returns an empty array when every provider answers empty", async () => {
     orderParallelFirst();
     mockExchange(documentWith([]));
@@ -1562,7 +1588,7 @@ describe("the cascade", () => {
     });
 
     await expect(fetchFallbackTextResults(QUERY, 10, 3_000)).rejects.toThrow(
-      "Every fallback search provider failed (parallel: Network failure)",
+      "No fallback search provider served the search (parallel: Network failure; not tried, the time budget ran out: youcom)",
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -1656,6 +1682,17 @@ describe("pausing a rate-limited provider", () => {
       expect(getFallbackProviderStats().parallel.pausedForMs).toBe(60_000);
       vi.setSystemTime(Date.now() + 60_000);
     }
+  });
+
+  it("clamps a past HTTP-date and gives an obsolete date format the default", async () => {
+    await hitRateLimit({
+      "retry-after": new Date(Date.now() - 60_000).toUTCString(),
+    });
+    expect(getFallbackProviderStats().parallel.pausedForMs).toBe(1_000);
+
+    vi.setSystemTime(Date.now() + 1_000);
+    await hitRateLimit({ "retry-after": "Thursday, 01-Jan-26 12:05:00 GMT" });
+    expect(getFallbackProviderStats().parallel.pausedForMs).toBe(60_000);
   });
 
   it("pauses on a 429 to the initialized notification and discards its body", async () => {

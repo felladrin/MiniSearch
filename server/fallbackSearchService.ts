@@ -172,8 +172,8 @@ export function isSearchFallbackEnabled(): boolean {
 
 /**
  * Checks the fallback configuration and throws on the first thing wrong with
- * it: a removed variable that is still set, an unknown provider name, or a
- * provider list with no names in it. Meant for server start, so a bad value
+ * it: a removed variable that is still set, an unknown provider name, a
+ * provider list with no names in it, or a key with a control character in it. Meant for server start, so a bad value
  * stops the server instead of failing every search that reaches the fallback.
  */
 export function assertSearchFallbackConfiguration(): void {
@@ -198,6 +198,19 @@ function readConfiguredProviders(): FallbackProvider[] {
             `${variable} is no longer read; set ${replacement} instead.`,
         )
         .join(" "),
+    );
+  }
+
+  // undici quotes an invalid header value in full in its error, so a key with
+  // a line break inside it would reach the log as `Bearer <key>`. Refused
+  // here, by variable name only, so it fails at start instead.
+  const keyWithControlCharacter = PROVIDERS.find(({ apiKeyVariable }) =>
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
+    /[\u0000-\u001f\u007f]/.test((process.env[apiKeyVariable] ?? "").trim()),
+  );
+  if (keyWithControlCharacter) {
+    throw new Error(
+      `${keyWithControlCharacter.apiKeyVariable} contains a control character; set it to the key alone.`,
     );
   }
 
@@ -280,20 +293,25 @@ export async function fetchFallbackTextResults(
   const candidates = shuffle(readConfiguredProviders());
 
   const failures: string[] = [];
+  const notTried: string[] = [];
   let answered = false;
 
   for (const [index, provider] of candidates.entries()) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      notTried.push(...candidates.slice(index).map(({ name }) => name));
+      break;
+    }
+
     // Checked again before every attempt, not once up front: another search
     // can pause a provider while this one waits on an earlier attempt, and a
-    // paused provider must not get a request.
+    // paused provider must not get a new exchange. An exchange already under
+    // way runs to its end, which costs at most two more requests.
     if (isPaused(provider.name)) {
       countFor(provider.name).skippedWhilePaused++;
       printMessage(`Fallback provider ${provider.name} skipped while paused.`);
       continue;
     }
-
-    const remainingMs = deadline - Date.now();
-    if (remainingMs <= 0) break;
     const eligibleCount = candidates
       .slice(index)
       .filter((candidate) => !isPaused(candidate.name)).length;
@@ -336,8 +354,12 @@ export async function fetchFallbackTextResults(
 
   if (answered) return [];
   if (failures.length > 0) {
+    // A provider the budget ran out before is named as such, so the log does
+    // not read as if it had been asked and failed.
     throw new Error(
-      `Every fallback search provider failed (${failures.join("; ")})`,
+      notTried.length > 0
+        ? `No fallback search provider served the search (${failures.join("; ")}; not tried, the time budget ran out: ${notTried.join(", ")})`
+        : `Every fallback search provider failed (${failures.join("; ")})`,
     );
   }
   throw new Error(
@@ -445,12 +467,12 @@ async function searchWithProvider(
     );
   }
 
-  const sessionHeaders = sessionId
-    ? {
-        "Mcp-Session-Id": sessionId,
-        "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
-      }
-    : undefined;
+  // The MCP transport spec requires the version header on every request after
+  // initialize, with or without a session; only the session id is optional.
+  const sessionHeaders = {
+    "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
+    ...(sessionId ? { "Mcp-Session-Id": sessionId } : {}),
+  };
 
   if (sessionId) {
     // A notification, so there is no reply body to read: the session is only
