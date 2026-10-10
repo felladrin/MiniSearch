@@ -1814,6 +1814,29 @@ describe("pausing a rate-limited provider", () => {
     });
   });
 
+  it("does not count a paused provider as skipped once the budget is spent", async () => {
+    listProviders(undefined);
+    const random = orderYoucomFirst();
+    fetchMock.mockResolvedValueOnce(rateLimited({ "retry-after": "600" }));
+    mockExchange(
+      documentWith([
+        { url: "https://example.com/p", title: "P", excerpts: [EXCERPT] },
+      ]),
+    );
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    random.mockReturnValue(0.99);
+    fetchMock.mockImplementationOnce(async () => {
+      vi.setSystemTime(Date.now() + FULL_BUDGET_MS);
+      throw new Error("Network failure");
+    });
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("not tried, the time budget ran out: youcom");
+    expect(getFallbackProviderStats().youcom.skippedWhilePaused).toBe(0);
+  });
+
   it("throws without a request when every provider is paused", async () => {
     listProviders(undefined);
     orderParallelFirst();

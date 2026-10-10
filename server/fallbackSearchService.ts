@@ -173,8 +173,9 @@ export function isSearchFallbackEnabled(): boolean {
 /**
  * Checks the fallback configuration and throws on the first thing wrong with
  * it: a removed variable that is still set, an unknown provider name, a
- * provider list with no names in it, or a key with a control character in it. Meant for server start, so a bad value
- * stops the server instead of failing every search that reaches the fallback.
+ * provider list with no names in it, or a key with a control character in it.
+ * Meant for server start, so a bad value stops the server instead of failing
+ * every search that reaches the fallback.
  */
 export function assertSearchFallbackConfiguration(): void {
   readConfiguredProviders();
@@ -423,8 +424,9 @@ async function rejectIfRateLimited(response: Response): Promise<void> {
  * Runs one provider's MCP exchange: initialize, the initialized notification
  * when the endpoint opened a session, and the tool call. The session is
  * optional: with no session id on the initialize reply the endpoint is
- * stateless, so the notification and the session headers are skipped, since
- * there is no session to acknowledge.
+ * stateless, so the notification and the session id are skipped, since there
+ * is no session to acknowledge. The protocol version still goes on every
+ * request after initialize.
  */
 async function searchWithProvider(
   provider: FallbackProvider,
@@ -469,7 +471,7 @@ async function searchWithProvider(
 
   // The MCP transport spec requires the version header on every request after
   // initialize, with or without a session; only the session id is optional.
-  const sessionHeaders = {
+  const postInitializeHeaders = {
     "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
     ...(sessionId ? { "Mcp-Session-Id": sessionId } : {}),
   };
@@ -480,7 +482,7 @@ async function searchWithProvider(
     // acknowledgement.
     const initializedResponse = await fetch(endpointUrl, {
       method: "POST",
-      headers: { ...headers, ...sessionHeaders },
+      headers: { ...headers, ...postInitializeHeaders },
       body: JSON.stringify({
         jsonrpc: "2.0",
         method: "notifications/initialized",
@@ -498,7 +500,7 @@ async function searchWithProvider(
 
   const callResponse = await fetch(endpointUrl, {
     method: "POST",
-    headers: { ...headers, ...sessionHeaders },
+    headers: { ...headers, ...postInitializeHeaders },
     body: JSON.stringify({
       jsonrpc: "2.0",
       id: 2,
