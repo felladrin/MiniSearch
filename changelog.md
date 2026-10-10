@@ -3,6 +3,11 @@
 Notable changes, grouped by date, most recent first.
 
 
+## 2026-10-10
+
+- The second text-search source can now be You.com as well as Parallel: `SEARCH_FALLBACK_PROVIDER` selects between them, `parallel` by default and `youcom` to send the fallback to You.com's MCP endpoint. Everything else about the fallback is unchanged — off unless `SEARCH_FALLBACK_ENABLED` is on, consulted only after SearXNG has failed, under the same budgets and counted by the same `/status` counters — and so is the privacy position: the query goes to whichever provider is selected, which sees the query text and this server's IP address, never the user's. You.com answers the same JSON-RPC exchange but keeps the session optional: with no session id on the initialize reply the exchange is stateless, so the initialized notification and the session headers are skipped, and a future You.com that does open a session is handled by the same branch the Parallel path takes. `SEARCH_FALLBACK_API_KEY` keeps its meaning — optional, a Bearer token that raises the provider's rate limits — and with no key set the You.com path calls the keyless `profile=free` endpoint, so the fallback needs no key at all. You.com's results carry a plain description per result, used as the snippet as-is, and query-relevant highlights, which take over only when the description is empty, through the same filter the Parallel path applies to its excerpts.
+
+
 ## 2026-10-08
 
 - `/status` now reports `authorization.distinctRejectedTokens`, the number of distinct dead tokens the server has cached and keeps refusing. A steady stream of invalid-token rejections with a value of 1 there is one client replaying one stale token, not many old search links, which the existing counters could not tell apart.

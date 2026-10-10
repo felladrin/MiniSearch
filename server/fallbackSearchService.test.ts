@@ -83,6 +83,20 @@ function documentWith(results: unknown[]): string {
   return toolReply({ search_id: "search-1", results });
 }
 
+// You.com's reply wraps its web results one level deeper, under
+// `results.web`, and each result carries a description and, when the query
+// matched the page, query-relevant highlights.
+function youcomDocumentWith(web: unknown[]): string {
+  return toolReply({ results: { web } });
+}
+
+const PARALLEL_URL = "https://search.parallel.ai/mcp";
+const YOUCOM_KEYLESS_URL = "https://api.you.com/mcp?profile=free";
+const YOUCOM_AUTHENTICATED_URL = "https://api.you.com/mcp";
+
+const DESCRIPTION =
+  "A plain description that You.com returns for a page that matched the query, long enough to read as a summary.";
+
 const EXCERPT =
   "The opening sentence of a very long excerpt that has to survive the filter. alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike november oscar papa quebec";
 
@@ -93,10 +107,12 @@ let fetchMock: MockedFunction<typeof fetch>;
 
 const originalEnabled = process.env.SEARCH_FALLBACK_ENABLED;
 const originalApiKey = process.env.SEARCH_FALLBACK_API_KEY;
+const originalProvider = process.env.SEARCH_FALLBACK_PROVIDER;
 
 beforeEach(() => {
   delete process.env.SEARCH_FALLBACK_ENABLED;
   delete process.env.SEARCH_FALLBACK_API_KEY;
+  delete process.env.SEARCH_FALLBACK_PROVIDER;
   originalFetch = global.fetch;
   fetchMock = vi.fn() as unknown as MockedFunction<typeof fetch>;
   global.fetch = fetchMock;
@@ -108,35 +124,45 @@ afterEach(() => {
   else process.env.SEARCH_FALLBACK_ENABLED = originalEnabled;
   if (originalApiKey === undefined) delete process.env.SEARCH_FALLBACK_API_KEY;
   else process.env.SEARCH_FALLBACK_API_KEY = originalApiKey;
+  if (originalProvider === undefined)
+    delete process.env.SEARCH_FALLBACK_PROVIDER;
+  else process.env.SEARCH_FALLBACK_PROVIDER = originalProvider;
   vi.restoreAllMocks();
 });
 
-/** Answers the three requests in order with the given tool-call reply. */
+/** Answers the requests in order with the given tool-call reply. */
 function mockExchange(
   toolBody: string,
   {
     initializeBody = INITIALIZE_REPLY,
     initializeContentType = "application/json",
     toolContentType = "application/json",
+    initializeSession = SESSION_ID,
   }: {
     initializeBody?: string;
     initializeContentType?: string;
     toolContentType?: string;
+    initializeSession?: string | null;
   } = {},
 ) {
-  fetchMock
-    .mockResolvedValueOnce(
-      createMockResponse(initializeBody, {
-        contentType: initializeContentType,
-        headers: { "mcp-session-id": SESSION_ID },
-      }),
-    )
-    .mockResolvedValueOnce(
+  fetchMock.mockResolvedValueOnce(
+    createMockResponse(initializeBody, {
+      contentType: initializeContentType,
+      headers: initializeSession ? { "mcp-session-id": initializeSession } : {},
+    }),
+  );
+
+  // A stateless initialize answers no session, so the initialized
+  // notification never goes out and the tool call follows at once.
+  if (initializeSession) {
+    fetchMock.mockResolvedValueOnce(
       createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
-    )
-    .mockResolvedValueOnce(
-      createMockResponse(toolBody, { contentType: toolContentType }),
     );
+  }
+
+  fetchMock.mockResolvedValueOnce(
+    createMockResponse(toolBody, { contentType: toolContentType }),
+  );
 }
 
 function requestBody(index: number): {
@@ -368,6 +394,331 @@ describe("the three requests", () => {
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     expect(requestHeaders(0).Authorization).toBeUndefined();
+  });
+});
+
+describe("choosing the provider", () => {
+  it("runs the Parallel exchange by default", async () => {
+    mockExchange(documentWith([]));
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const [requestUrl] of fetchMock.mock.calls) {
+      expect(String(requestUrl)).toBe(PARALLEL_URL);
+    }
+    expect(requestBody(2).params?.name).toBe("web_search");
+  });
+
+  it("runs the You.com exchange when SEARCH_FALLBACK_PROVIDER is youcom", async () => {
+    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    mockExchange(youcomDocumentWith([]), { initializeSession: null });
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [requestUrl] of fetchMock.mock.calls) {
+      expect(String(requestUrl)).toBe(YOUCOM_KEYLESS_URL);
+    }
+    expect(requestBody(1).params?.name).toBe("you-search");
+    expect(requestBody(1).params?.arguments).toEqual({
+      query: QUERY,
+      count: 10,
+    });
+  });
+
+  it("keeps Parallel for any other provider value", async () => {
+    process.env.SEARCH_FALLBACK_PROVIDER = " Unrecognized ";
+    mockExchange(documentWith([]));
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(String(fetchMock.mock.calls[0][0])).toBe(PARALLEL_URL);
+    expect(requestBody(2).params?.name).toBe("web_search");
+  });
+
+  it("sends no session headers when You.com opens no session", async () => {
+    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    mockExchange(youcomDocumentWith([]), { initializeSession: null });
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(requestBody(1).method).toBe("tools/call");
+    for (const index of [0, 1]) {
+      expect(requestHeaders(index)["Mcp-Session-Id"]).toBeUndefined();
+      expect(requestHeaders(index)["MCP-Protocol-Version"]).toBeUndefined();
+    }
+  });
+
+  it("acknowledges a session and carries it when You.com opens one", async () => {
+    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    mockExchange(youcomDocumentWith([]));
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(requestBody(1).method).toBe("notifications/initialized");
+    for (const index of [1, 2]) {
+      expect(requestHeaders(index)["Mcp-Session-Id"]).toBe(SESSION_ID);
+    }
+  });
+
+  it("uses You.com's authenticated endpoint and the Bearer key when a key is set", async () => {
+    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    process.env.SEARCH_FALLBACK_API_KEY = "***";
+    mockExchange(youcomDocumentWith([]), { initializeSession: null });
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    for (const [requestUrl] of fetchMock.mock.calls) {
+      expect(String(requestUrl)).toBe(YOUCOM_AUTHENTICATED_URL);
+    }
+    for (const index of [0, 1]) {
+      expect(requestHeaders(index).Authorization).toBe("Bearer ***");
+    }
+  });
+});
+
+describe("mapping You.com results", () => {
+  const runYoucom = async (web: unknown[], limit = 10) => {
+    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    mockExchange(youcomDocumentWith(web), { initializeSession: null });
+    return fetchFallbackTextResults(QUERY, limit, FULL_BUDGET_MS);
+  };
+
+  it("uses the description as the snippet, collapsed to one line", async () => {
+    const results = await runYoucom([
+      {
+        url: "https://example.com/described",
+        title: "Described",
+        description: "A description with\n\nnewlines and   extra spaces in it.",
+      },
+    ]);
+
+    expect(results).toEqual([
+      [
+        "Described",
+        "A description with newlines and extra spaces in it.",
+        "https://example.com/described",
+      ],
+    ]);
+  });
+
+  it("truncates a long description at a word boundary", async () => {
+    const description = `${EXCERPT} ${LONG_EXCERPT}`;
+    expect(description.length).toBeGreaterThan(400);
+
+    const results = await runYoucom([
+      {
+        url: "https://example.com/long",
+        title: "Long",
+        description,
+      },
+    ]);
+
+    const snippet = results[0][1];
+    expect(snippet.endsWith("…")).toBe(true);
+    expect(snippet.length).toBeLessThanOrEqual(400);
+    const kept = snippet.slice(0, -1);
+    // The kept text is a prefix of the collapsed source, and the source
+    // continues with a space, so the cut landed between two words rather
+    // than inside one.
+    expect(description.startsWith(kept)).toBe(true);
+    expect(description[kept.length]).toBe(" ");
+  });
+
+  it("keeps a short description that the excerpt length filter would drop", async () => {
+    const results = await runYoucom([
+      {
+        url: "https://example.com/terse",
+        title: "Terse",
+        description: "Terse.",
+      },
+    ]);
+
+    expect(results).toEqual([["Terse", "Terse.", "https://example.com/terse"]]);
+  });
+
+  it("falls back to the highlights when the description is empty or null", async () => {
+    const results = await runYoucom([
+      {
+        url: "https://example.com/empty",
+        title: "Empty",
+        description: "",
+        contents: { highlights: ["Skip to main content", EXCERPT] },
+      },
+      {
+        url: "https://example.com/null",
+        title: "Null",
+        description: null,
+        contents: { highlights: [EXCERPT] },
+      },
+    ]);
+
+    expect(results).toEqual([
+      ["Empty", EXCERPT, "https://example.com/empty"],
+      ["Null", EXCERPT, "https://example.com/null"],
+    ]);
+  });
+
+  it("drops a result with no url, a null or empty title, or no snippet", async () => {
+    const results = await runYoucom([
+      { title: "No url", description: DESCRIPTION },
+      {
+        url: "https://example.com/null-title",
+        title: null,
+        description: DESCRIPTION,
+      },
+      {
+        url: "https://example.com/empty-title",
+        title: "   ",
+        description: DESCRIPTION,
+      },
+      {
+        url: "https://example.com/no-snippet",
+        title: "No snippet",
+        description: "",
+      },
+      {
+        url: "https://example.com/crumb-only",
+        title: "Crumb only",
+        description: "",
+        contents: { highlights: ["Skip to main content"] },
+      },
+      {
+        url: "https://example.com/kept",
+        title: "Kept",
+        description: DESCRIPTION,
+      },
+    ]);
+
+    expect(results).toEqual([
+      ["Kept", DESCRIPTION, "https://example.com/kept"],
+    ]);
+  });
+
+  it("drops a result whose url or title is not a string", async () => {
+    const results = await runYoucom([
+      { url: 42, title: "Number url", description: DESCRIPTION },
+      { url: null, title: "Null url", description: DESCRIPTION },
+      {
+        url: "https://example.com/number-title",
+        title: 7,
+        description: DESCRIPTION,
+      },
+      null,
+      {
+        url: "https://example.com/kept",
+        title: "Kept",
+        description: DESCRIPTION,
+      },
+    ]);
+
+    // One malformed entry must not take the rest of the search down with it.
+    expect(results).toEqual([
+      ["Kept", DESCRIPTION, "https://example.com/kept"],
+    ]);
+  });
+
+  it("drops duplicate urls in the endpoint's order", async () => {
+    const results = await runYoucom([
+      {
+        url: "https://example.com/dup",
+        title: "First",
+        description: DESCRIPTION,
+      },
+      {
+        url: "https://example.com/other",
+        title: "Second",
+        description: DESCRIPTION,
+      },
+      {
+        url: "https://example.com/dup",
+        title: "Third",
+        description: DESCRIPTION,
+      },
+    ]);
+
+    expect(results.map(([title]) => title)).toEqual(["First", "Second"]);
+  });
+
+  it("keeps the endpoint's relevance order and applies the limit", async () => {
+    const results = await runYoucom(
+      [
+        {
+          url: "https://example.com/1",
+          title: "One",
+          description: DESCRIPTION,
+        },
+        {
+          url: "https://example.com/2",
+          title: "Two",
+          description: DESCRIPTION,
+        },
+        {
+          url: "https://example.com/3",
+          title: "Three",
+          description: DESCRIPTION,
+        },
+      ],
+      2,
+    );
+
+    expect(results.map(([title]) => title)).toEqual(["One", "Two"]);
+  });
+
+  it("throws when the document has no web results array", async () => {
+    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    mockExchange(toolReply({ results: {} }), { initializeSession: null });
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("without a web results array");
+  });
+
+  it("reads the id-matched reply out of an SSE stream that carries a notification first", async () => {
+    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    mockExchange(
+      `${sseReply(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          method: "notifications/message",
+          params: {
+            level: "info",
+            data: `Search successful for query: ${QUERY} - 20 web results`,
+          },
+        }),
+      )}${sseReply(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          result: {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  results: {
+                    web: [
+                      {
+                        url: "https://example.com/sse",
+                        title: "SSE",
+                        description: DESCRIPTION,
+                      },
+                    ],
+                  },
+                }),
+              },
+            ],
+          },
+        }),
+      )}`,
+      { initializeSession: null, toolContentType: "text/event-stream" },
+    );
+
+    const results = await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(results).toEqual([["SSE", DESCRIPTION, "https://example.com/sse"]]);
   });
 });
 
@@ -613,6 +964,23 @@ describe("mapping a result", () => {
 });
 
 describe("failures", () => {
+  it("throws when the You.com initialize request fails", async () => {
+    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    const cancel = vi.fn(async () => undefined);
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse("", { status: 500, unreadBody: { cancel } }),
+    );
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("did not answer the initialize request (status 500)");
+    // An unread body keeps undici's socket out of the pool until it is
+    // garbage-collected, so the non-2xx path has to discard it; dropping
+    // that line fails here.
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("throws when the tool call is not 2xx", async () => {
     const cancel = vi.fn(async () => undefined);
     fetchMock.mockResolvedValueOnce(
@@ -827,6 +1195,37 @@ describe("privacy", () => {
       "PRIVATE RESPONSE TITLE",
       "PRIVATE RESPONSE EXCERPT",
       "sk-fallback-key",
+    ]) {
+      expect(output).not.toContain(form);
+    }
+    expect(logLines.length).toBeGreaterThan(0);
+  });
+
+  it("never writes the You.com query, the API key or the response text to the log", async () => {
+    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    process.env.SEARCH_FALLBACK_API_KEY = "youcom-fallback-key";
+    mockExchange(
+      youcomDocumentWith([
+        {
+          url: "https://example.com/private",
+          title: "PRIVATE RESPONSE TITLE",
+          description: "PRIVATE RESPONSE DESCRIPTION",
+        },
+      ]),
+      { initializeSession: null },
+    );
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    // The stream the endpoint answers with carries the query inside a
+    // notification before the reply, so this also covers that path: none of
+    // it may reach the log, only the counts do.
+    const output = logLines.join("\n");
+    for (const form of [
+      QUERY,
+      "PRIVATE RESPONSE TITLE",
+      "PRIVATE RESPONSE DESCRIPTION",
+      "youcom-fallback-key",
     ]) {
       expect(output).not.toContain(form);
     }
