@@ -2,6 +2,7 @@ import prettyMilliseconds from "pretty-ms";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { getAuthorizationStats } from "./authorizationSinceLastRestart.ts";
 import { getBiEncoderStatus } from "./biEncoderService.ts";
+import { getFallbackProviderStats } from "./fallbackSearchService.ts";
 import { getInferenceStats } from "./inferencesSinceLastRestart.ts";
 import { getPageReadCircuitStats } from "./pageReadHostBreaker.ts";
 import { getPageReadStats } from "./pageReadsSinceLastRestart.ts";
@@ -102,6 +103,7 @@ export function statusEndpointServerHook<
         ...getSearchCircuitStats(),
         degradedSearchTypes: getDegradedSearchTypes(),
         unresponsiveEngines: getUnresponsiveEngineStats(),
+        fallbackProviders: getFallbackProviderStats(),
       },
       reranker: getRerankingStats(),
       thumbnails: getThumbnailStats(),

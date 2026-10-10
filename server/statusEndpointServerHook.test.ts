@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it, vi } from "vitest";
+import { getFallbackProviderStats } from "./fallbackSearchService.ts";
 import {
   incrementSearchesFailedOnFallback,
   incrementSearchesServedByFallback,
@@ -89,6 +90,19 @@ describe("statusEndpointServerHook", () => {
     expect(status.searchesFailedOnFallback).toBe(
       (before.searchesFailedOnFallback as number) + 2,
     );
+  });
+
+  it("publishes the per-provider fallback counters under searches", async () => {
+    const status = await callStatus();
+
+    expect(status.searches).toMatchObject({
+      fallbackProviders: getFallbackProviderStats(),
+    });
+    expect(
+      Object.keys(
+        (status.searches as { fallbackProviders: object }).fallbackProviders,
+      ),
+    ).toEqual(["parallel", "youcom"]);
   });
 
   it("publishes the page-read circuit count beside the outcome counters", async () => {
