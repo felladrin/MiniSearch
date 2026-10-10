@@ -8,10 +8,6 @@ import {
   type MockedFunction,
   vi,
 } from "vitest";
-import {
-  fetchFallbackTextResults,
-  isSearchFallbackEnabled,
-} from "./fallbackSearchService";
 
 function createMockResponse(
   body: string,
@@ -105,28 +101,51 @@ const LONG_EXCERPT = `${EXCERPT} romeo sierra tango uniform victor whiskey xray 
 let originalFetch: typeof fetch;
 let fetchMock: MockedFunction<typeof fetch>;
 
-const originalEnabled = process.env.SEARCH_FALLBACK_ENABLED;
-const originalApiKey = process.env.SEARCH_FALLBACK_API_KEY;
-const originalProvider = process.env.SEARCH_FALLBACK_PROVIDER;
+type FallbackModule = typeof import("./fallbackSearchService");
+let fetchFallbackTextResults: FallbackModule["fetchFallbackTextResults"];
+let isSearchFallbackEnabled: FallbackModule["isSearchFallbackEnabled"];
+let assertSearchFallbackConfiguration: FallbackModule["assertSearchFallbackConfiguration"];
+let getFallbackProviderStats: FallbackModule["getFallbackProviderStats"];
 
-beforeEach(() => {
-  delete process.env.SEARCH_FALLBACK_ENABLED;
-  delete process.env.SEARCH_FALLBACK_API_KEY;
-  delete process.env.SEARCH_FALLBACK_PROVIDER;
+const FALLBACK_VARIABLES = [
+  "SEARCH_FALLBACK_ENABLED",
+  "SEARCH_FALLBACK_PROVIDERS",
+  "SEARCH_FALLBACK_PARALLEL_API_KEY",
+  "SEARCH_FALLBACK_YOUCOM_API_KEY",
+  "SEARCH_FALLBACK_PROVIDER",
+  "SEARCH_FALLBACK_API_KEY",
+] as const;
+const originalVariables = Object.fromEntries(
+  FALLBACK_VARIABLES.map((name) => [name, process.env[name]]),
+);
+
+beforeEach(async () => {
+  for (const name of FALLBACK_VARIABLES) delete process.env[name];
+  // Pinned to one provider so the tests below that are about one exchange
+  // run it alone, without the shuffle; the cascade tests clear it.
+  process.env.SEARCH_FALLBACK_PROVIDERS = "parallel";
   originalFetch = global.fetch;
   fetchMock = vi.fn() as unknown as MockedFunction<typeof fetch>;
   global.fetch = fetchMock;
+  // A fresh module per test: pauses and counters are process state, and one
+  // test's 429 must not leave a provider boxed for the next.
+  vi.resetModules();
+  ({
+    fetchFallbackTextResults,
+    isSearchFallbackEnabled,
+    assertSearchFallbackConfiguration,
+    getFallbackProviderStats,
+  } = await import("./fallbackSearchService"));
 });
 
 afterEach(() => {
   global.fetch = originalFetch;
-  if (originalEnabled === undefined) delete process.env.SEARCH_FALLBACK_ENABLED;
-  else process.env.SEARCH_FALLBACK_ENABLED = originalEnabled;
-  if (originalApiKey === undefined) delete process.env.SEARCH_FALLBACK_API_KEY;
-  else process.env.SEARCH_FALLBACK_API_KEY = originalApiKey;
-  if (originalProvider === undefined)
-    delete process.env.SEARCH_FALLBACK_PROVIDER;
-  else process.env.SEARCH_FALLBACK_PROVIDER = originalProvider;
+  for (const name of FALLBACK_VARIABLES) {
+    const original = originalVariables[name];
+    if (original === undefined) delete process.env[name];
+    else process.env[name] = original;
+  }
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -311,6 +330,8 @@ describe("the three requests", () => {
   it("hands the exchange the caller's budget, capped at its own", async () => {
     mockExchange(documentWith([]));
     mockExchange(documentWith([]));
+    // A frozen clock, so the remaining budget is exactly what was passed in.
+    vi.useFakeTimers({ toFake: ["Date"] });
     const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
 
     await fetchFallbackTextResults(QUERY, 10, 3_000);
@@ -360,7 +381,7 @@ describe("the three requests", () => {
 
     await expect(
       fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
-    ).rejects.toThrow("did not open a session (status 500)");
+    ).rejects.toThrow("did not answer the initialize request (status 500)");
     expect(cancelInitialize).toHaveBeenCalledTimes(1);
   });
 
@@ -375,7 +396,7 @@ describe("the three requests", () => {
   });
 
   it("sends the Bearer header on every request when a key is configured", async () => {
-    process.env.SEARCH_FALLBACK_API_KEY = "sk-fallback-key";
+    process.env.SEARCH_FALLBACK_PARALLEL_API_KEY = "sk-fallback-key";
     mockExchange(documentWith([]));
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
@@ -388,7 +409,7 @@ describe("the three requests", () => {
   });
 
   it("treats a whitespace-only key as no key", async () => {
-    process.env.SEARCH_FALLBACK_API_KEY = "   ";
+    process.env.SEARCH_FALLBACK_PARALLEL_API_KEY = "   ";
     mockExchange(documentWith([]));
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
@@ -410,8 +431,8 @@ describe("choosing the provider", () => {
     expect(requestBody(2).params?.name).toBe("web_search");
   });
 
-  it("runs the You.com exchange when SEARCH_FALLBACK_PROVIDER is youcom", async () => {
-    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+  it("runs the You.com exchange when SEARCH_FALLBACK_PROVIDERS lists youcom", async () => {
+    process.env.SEARCH_FALLBACK_PROVIDERS = "youcom";
     mockExchange(youcomDocumentWith([]), { initializeSession: null });
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
@@ -427,18 +448,8 @@ describe("choosing the provider", () => {
     });
   });
 
-  it("keeps Parallel for any other provider value", async () => {
-    process.env.SEARCH_FALLBACK_PROVIDER = " Unrecognized ";
-    mockExchange(documentWith([]));
-
-    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
-
-    expect(String(fetchMock.mock.calls[0][0])).toBe(PARALLEL_URL);
-    expect(requestBody(2).params?.name).toBe("web_search");
-  });
-
   it("sends no session headers when You.com opens no session", async () => {
-    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    process.env.SEARCH_FALLBACK_PROVIDERS = "youcom";
     mockExchange(youcomDocumentWith([]), { initializeSession: null });
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
@@ -452,7 +463,7 @@ describe("choosing the provider", () => {
   });
 
   it("acknowledges a session and carries it when You.com opens one", async () => {
-    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    process.env.SEARCH_FALLBACK_PROVIDERS = "youcom";
     mockExchange(youcomDocumentWith([]));
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
@@ -465,8 +476,8 @@ describe("choosing the provider", () => {
   });
 
   it("uses You.com's authenticated endpoint and the Bearer key when a key is set", async () => {
-    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
-    process.env.SEARCH_FALLBACK_API_KEY = "***";
+    process.env.SEARCH_FALLBACK_PROVIDERS = "youcom";
+    process.env.SEARCH_FALLBACK_YOUCOM_API_KEY = "***";
     mockExchange(youcomDocumentWith([]), { initializeSession: null });
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
@@ -482,7 +493,7 @@ describe("choosing the provider", () => {
 
 describe("mapping You.com results", () => {
   const runYoucom = async (web: unknown[], limit = 10) => {
-    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    process.env.SEARCH_FALLBACK_PROVIDERS = "youcom";
     mockExchange(youcomDocumentWith(web), { initializeSession: null });
     return fetchFallbackTextResults(QUERY, limit, FULL_BUDGET_MS);
   };
@@ -669,7 +680,7 @@ describe("mapping You.com results", () => {
   });
 
   it("throws when the document has no web results array", async () => {
-    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    process.env.SEARCH_FALLBACK_PROVIDERS = "youcom";
     mockExchange(toolReply({ results: {} }), { initializeSession: null });
 
     await expect(
@@ -678,7 +689,7 @@ describe("mapping You.com results", () => {
   });
 
   it("reads the id-matched reply out of an SSE stream that carries a notification first", async () => {
-    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    process.env.SEARCH_FALLBACK_PROVIDERS = "youcom";
     mockExchange(
       `${sseReply(
         JSON.stringify({
@@ -965,7 +976,7 @@ describe("mapping a result", () => {
 
 describe("failures", () => {
   it("throws when the You.com initialize request fails", async () => {
-    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
+    process.env.SEARCH_FALLBACK_PROVIDERS = "youcom";
     const cancel = vi.fn(async () => undefined);
     fetchMock.mockResolvedValueOnce(
       createMockResponse("", { status: 500, unreadBody: { cancel } }),
@@ -1004,13 +1015,16 @@ describe("failures", () => {
     expect(cancel).toHaveBeenCalledTimes(1);
   });
 
-  it("throws when initialize does not open a session", async () => {
-    fetchMock.mockResolvedValueOnce(createMockResponse(INITIALIZE_REPLY));
+  it("skips the notification when Parallel opens no session", async () => {
+    mockExchange(documentWith([]), { initializeSession: null });
 
-    await expect(
-      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
-    ).rejects.toThrow("did not open a session (status 200)");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    // The session is optional for every provider: with none opened, the tool
+    // call follows initialize directly and carries no session headers.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(requestBody(1).method).toBe("tools/call");
+    expect(requestHeaders(1)["Mcp-Session-Id"]).toBeUndefined();
   });
 
   it("throws on a JSON-RPC error and keeps the endpoint's message out of it", async () => {
@@ -1041,7 +1055,7 @@ describe("failures", () => {
     // free-form text from a third party and must not travel any further.
     expect(rejection).toBeInstanceOf(Error);
     expect((rejection as Error).message).toBe(
-      "The fallback search endpoint returned a JSON-RPC error (code -32601)",
+      "Every fallback search provider failed (parallel: The fallback search endpoint returned a JSON-RPC error (code -32601))",
     );
     expect(String(rejection)).not.toContain("SECRET UPSTREAM TEXT");
   });
@@ -1074,7 +1088,7 @@ describe("failures", () => {
     // carried into the thrown error.
     expect(rejection).toBeInstanceOf(Error);
     expect((rejection as Error).message).toBe(
-      "The fallback search endpoint returned a JSON-RPC error",
+      "Every fallback search provider failed (parallel: The fallback search endpoint returned a JSON-RPC error)",
     );
     expect(String(rejection)).not.toContain("SECRET");
   });
@@ -1121,7 +1135,7 @@ describe("failures", () => {
     // A raw SyntaxError quotes the offending body, which would put the
     // upstream response into the thrown error and then into the log.
     expect((rejection as Error).message).toBe(
-      "The fallback search endpoint sent a reply that is not JSON",
+      "Every fallback search provider failed (parallel: The fallback search endpoint sent a reply that is not JSON)",
     );
     expect(String(rejection)).not.toContain("<html>");
   });
@@ -1165,7 +1179,7 @@ describe("privacy", () => {
   });
 
   it("never writes the query, the API key or the response text to the log", async () => {
-    process.env.SEARCH_FALLBACK_API_KEY = "sk-fallback-key";
+    process.env.SEARCH_FALLBACK_PARALLEL_API_KEY = "sk-fallback-key";
     mockExchange(
       documentWith([
         {
@@ -1202,8 +1216,8 @@ describe("privacy", () => {
   });
 
   it("never writes the You.com query, the API key or the response text to the log", async () => {
-    process.env.SEARCH_FALLBACK_PROVIDER = "youcom";
-    process.env.SEARCH_FALLBACK_API_KEY = "youcom-fallback-key";
+    process.env.SEARCH_FALLBACK_PROVIDERS = "youcom";
+    process.env.SEARCH_FALLBACK_YOUCOM_API_KEY = "youcom-fallback-key";
     mockExchange(
       youcomDocumentWith([
         {
@@ -1230,5 +1244,569 @@ describe("privacy", () => {
       expect(output).not.toContain(form);
     }
     expect(logLines.length).toBeGreaterThan(0);
+  });
+});
+
+// Indexed by name rather than dotted, so each variable is spelled once.
+const PROVIDERS_VARIABLE = "SEARCH_FALLBACK_PROVIDERS";
+const PARALLEL_KEY_VARIABLE = "SEARCH_FALLBACK_PARALLEL_API_KEY";
+const YOUCOM_KEY_VARIABLE = "SEARCH_FALLBACK_YOUCOM_API_KEY";
+const LEGACY_PROVIDER_VARIABLE = "SEARCH_FALLBACK_PROVIDER";
+const LEGACY_KEY_VARIABLE = "SEARCH_FALLBACK_API_KEY";
+
+function listProviders(value: string | undefined) {
+  if (value === undefined) delete process.env[PROVIDERS_VARIABLE];
+  else process.env[PROVIDERS_VARIABLE] = value;
+}
+
+// Fisher-Yates over the two built-in providers draws once: 0 swaps them,
+// anything near 1 keeps the table's order.
+function orderYoucomFirst() {
+  return vi.spyOn(Math, "random").mockReturnValue(0);
+}
+
+function orderParallelFirst() {
+  return vi.spyOn(Math, "random").mockReturnValue(0.99);
+}
+
+function mockYoucom(web: unknown[]) {
+  mockExchange(youcomDocumentWith(web), { initializeSession: null });
+}
+
+function requestUrls(): string[] {
+  return fetchMock.mock.calls.map(([requestUrl]) => String(requestUrl));
+}
+
+function rateLimited(headers: Record<string, string> = {}) {
+  return createMockResponse("", { status: 429, headers });
+}
+
+const SERVED_RESULT = {
+  url: "https://example.com/served",
+  title: "Served",
+  description: DESCRIPTION,
+};
+
+describe("configuration", () => {
+  it("tries every built-in provider when the list is unset", async () => {
+    listProviders(undefined);
+    orderParallelFirst();
+    mockExchange(documentWith([]));
+    mockYoucom([]);
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(new Set(requestUrls())).toEqual(
+      new Set([PARALLEL_URL, YOUCOM_KEYLESS_URL]),
+    );
+  });
+
+  it("tries only the listed providers, trimmed, lowercased and without empty items", async () => {
+    listProviders(" YouCom ,, ");
+    mockYoucom([]);
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(requestUrls()).toEqual([YOUCOM_KEYLESS_URL, YOUCOM_KEYLESS_URL]);
+    expect(() => assertSearchFallbackConfiguration()).not.toThrow();
+  });
+
+  it("throws on an unknown provider name, naming it and the valid ones", async () => {
+    listProviders("parallel, Bing");
+
+    expect(() => assertSearchFallbackConfiguration()).toThrow(
+      "SEARCH_FALLBACK_PROVIDERS has unknown provider names: bing; valid names: parallel, youcom.",
+    );
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("unknown provider names: bing");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("throws on a list with no names in it", () => {
+    listProviders(",");
+
+    expect(() => assertSearchFallbackConfiguration()).toThrow(
+      "SEARCH_FALLBACK_PROVIDERS lists no provider",
+    );
+  });
+
+  it("throws when the removed SEARCH_FALLBACK_PROVIDER is set, naming its replacement", () => {
+    process.env[LEGACY_PROVIDER_VARIABLE] = "youcom";
+
+    expect(() => assertSearchFallbackConfiguration()).toThrow(
+      "SEARCH_FALLBACK_PROVIDER is no longer read; set SEARCH_FALLBACK_PROVIDERS instead.",
+    );
+  });
+
+  it("throws when the removed SEARCH_FALLBACK_API_KEY is set, naming both replacements and not the key", async () => {
+    process.env[LEGACY_KEY_VARIABLE] = "legacy-test-value";
+
+    const error = (() => {
+      try {
+        assertSearchFallbackConfiguration();
+      } catch (thrown) {
+        return thrown as Error;
+      }
+    })();
+
+    expect(error?.message).toBe(
+      "SEARCH_FALLBACK_API_KEY is no longer read; set SEARCH_FALLBACK_PARALLEL_API_KEY or SEARCH_FALLBACK_YOUCOM_API_KEY instead.",
+    );
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("SEARCH_FALLBACK_API_KEY is no longer read");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("ignores a removed variable that is set to blank", () => {
+    process.env[LEGACY_PROVIDER_VARIABLE] = "  ";
+    process.env[LEGACY_KEY_VARIABLE] = "";
+
+    expect(() => assertSearchFallbackConfiguration()).not.toThrow();
+  });
+
+  it("gives each provider its own key, endpoint and Bearer header", async () => {
+    listProviders(undefined);
+    process.env[PARALLEL_KEY_VARIABLE] = "parallel-test-value";
+    orderParallelFirst();
+    mockExchange(documentWith([]));
+    mockYoucom([]);
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    // Parallel's three requests carry its key; You.com, with no key of its
+    // own, stays on the keyless profile and is never sent Parallel's.
+    expect(requestUrls()).toEqual([
+      PARALLEL_URL,
+      PARALLEL_URL,
+      PARALLEL_URL,
+      YOUCOM_KEYLESS_URL,
+      YOUCOM_KEYLESS_URL,
+    ]);
+    for (const index of [0, 1, 2]) {
+      expect(requestHeaders(index).Authorization).toBe(
+        "Bearer parallel-test-value",
+      );
+    }
+    for (const index of [3, 4]) {
+      expect(requestHeaders(index).Authorization).toBeUndefined();
+    }
+  });
+
+  it("switches You.com to its authenticated endpoint with its own key only", async () => {
+    listProviders(undefined);
+    process.env[YOUCOM_KEY_VARIABLE] = "youcom-test-value";
+    orderYoucomFirst();
+    mockYoucom([]);
+    mockExchange(documentWith([]));
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(requestUrls().slice(0, 2)).toEqual([
+      YOUCOM_AUTHENTICATED_URL,
+      YOUCOM_AUTHENTICATED_URL,
+    ]);
+    expect(requestHeaders(0).Authorization).toBe("Bearer youcom-test-value");
+    expect(requestHeaders(2).Authorization).toBeUndefined();
+  });
+});
+
+describe("the cascade", () => {
+  beforeEach(() => {
+    listProviders(undefined);
+  });
+
+  it("tries the providers in the order the shuffle draws", async () => {
+    const random = orderYoucomFirst();
+    mockYoucom([SERVED_RESULT]);
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(random).toHaveBeenCalled();
+    expect(requestUrls()).toEqual([YOUCOM_KEYLESS_URL, YOUCOM_KEYLESS_URL]);
+
+    fetchMock.mockReset();
+    random.mockReturnValue(0.99);
+    mockExchange(
+      documentWith([
+        { url: "https://example.com/p", title: "P", excerpts: [EXCERPT] },
+      ]),
+    );
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(requestUrls()[0]).toBe(PARALLEL_URL);
+  });
+
+  it("moves on to the next provider when the first throws", async () => {
+    orderParallelFirst();
+    fetchMock.mockResolvedValueOnce(createMockResponse("", { status: 500 }));
+    mockYoucom([SERVED_RESULT]);
+
+    const results = await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(results).toEqual([
+      ["Served", DESCRIPTION, "https://example.com/served"],
+    ]);
+    expect(getFallbackProviderStats()).toMatchObject({
+      parallel: { served: 0, empty: 0, failed: 1 },
+      youcom: { served: 1, empty: 0, failed: 0 },
+    });
+  });
+
+  it("moves on to the next provider when the first answers empty", async () => {
+    orderParallelFirst();
+    mockExchange(documentWith([]));
+    mockYoucom([SERVED_RESULT]);
+
+    const results = await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(results).toHaveLength(1);
+    expect(getFallbackProviderStats()).toMatchObject({
+      parallel: { served: 0, empty: 1, failed: 0 },
+      youcom: { served: 1, empty: 0, failed: 0 },
+    });
+  });
+
+  it("stops at the first provider that serves", async () => {
+    orderYoucomFirst();
+    mockYoucom([SERVED_RESULT]);
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    expect(requestUrls()).not.toContain(PARALLEL_URL);
+  });
+
+  it("throws one error naming every provider when all of them fail, without the query", async () => {
+    orderParallelFirst();
+    fetchMock.mockResolvedValueOnce(createMockResponse("", { status: 500 }));
+    fetchMock.mockResolvedValueOnce(createMockResponse("", { status: 503 }));
+
+    const error = (await fetchFallbackTextResults(
+      QUERY,
+      10,
+      FULL_BUDGET_MS,
+    ).catch((thrown: unknown) => thrown)) as Error;
+
+    expect(error.message).toBe(
+      "Every fallback search provider failed (parallel: The fallback search endpoint did not answer the initialize request (status 500); youcom: The fallback search endpoint did not answer the initialize request (status 503))",
+    );
+    expect(error.message).not.toContain(QUERY);
+  });
+
+  it("returns an empty array when one answered empty and the other failed", async () => {
+    orderParallelFirst();
+    mockExchange(documentWith([]));
+    fetchMock.mockResolvedValueOnce(createMockResponse("", { status: 500 }));
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).resolves.toEqual([]);
+  });
+
+  it("returns an empty array when every provider answers empty", async () => {
+    orderParallelFirst();
+    mockExchange(documentWith([]));
+    mockYoucom([]);
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).resolves.toEqual([]);
+    expect(getFallbackProviderStats()).toMatchObject({
+      parallel: { empty: 1 },
+      youcom: { empty: 1 },
+    });
+  });
+
+  it("gives each attempt an equal share of what is left of the budget", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(1_000_000);
+    orderParallelFirst();
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    // The first provider spends a second before it fails, so the second one
+    // gets what is left, not a share computed at the start.
+    fetchMock.mockImplementationOnce(async () => {
+      vi.setSystemTime(1_001_000);
+      throw new Error("Network failure");
+    });
+    mockYoucom([SERVED_RESULT]);
+
+    await fetchFallbackTextResults(QUERY, 10, 3_000);
+
+    expect(timeoutSpy.mock.calls).toEqual([[1_500], [2_000]]);
+  });
+
+  it("splits the module's own cap when the caller offers more", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    orderParallelFirst();
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    mockExchange(
+      documentWith([
+        { url: "https://example.com/p", title: "P", excerpts: [EXCERPT] },
+      ]),
+    );
+
+    await fetchFallbackTextResults(QUERY, 10, 60_000);
+
+    expect(timeoutSpy.mock.calls).toEqual([[7_500]]);
+  });
+
+  it("does not start a provider once the budget is spent", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(1_000_000);
+    orderParallelFirst();
+    fetchMock.mockImplementationOnce(async () => {
+      vi.setSystemTime(1_005_000);
+      throw new Error("Network failure");
+    });
+
+    await expect(fetchFallbackTextResults(QUERY, 10, 3_000)).rejects.toThrow(
+      "Every fallback search provider failed (parallel: Network failure)",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("pausing a rate-limited provider", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // On a whole second, so an HTTP-date Retry-After lands on an exact delta.
+    vi.setSystemTime(Date.UTC(2026, 0, 1, 12, 0, 0));
+  });
+
+  async function hitRateLimit(headers: Record<string, string> = {}) {
+    fetchMock.mockResolvedValueOnce(rateLimited(headers));
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("rate-limited the request (status 429)");
+  }
+
+  it("pauses for the seconds Retry-After asks, skips without a request, and tries again after", async () => {
+    await hitRateLimit({ "retry-after": "120" });
+    expect(getFallbackProviderStats().parallel).toMatchObject({
+      failed: 1,
+      rateLimited: 1,
+      pausedForMs: 120_000,
+    });
+
+    fetchMock.mockClear();
+    vi.setSystemTime(Date.now() + 119_000);
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("No fallback search provider could be tried");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(getFallbackProviderStats().parallel).toMatchObject({
+      skippedWhilePaused: 1,
+      pausedForMs: 1_000,
+    });
+
+    vi.setSystemTime(Date.now() + 1_000);
+    mockExchange(
+      documentWith([
+        { url: "https://example.com/p", title: "P", excerpts: [EXCERPT] },
+      ]),
+    );
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).resolves.toHaveLength(1);
+    expect(getFallbackProviderStats().parallel.pausedForMs).toBe(0);
+  });
+
+  it("reads an HTTP-date Retry-After on the tool call", async () => {
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse(INITIALIZE_REPLY, {
+        headers: { "mcp-session-id": SESSION_ID },
+      }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
+    );
+    const cancel = vi.fn(async () => undefined);
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse("", {
+        status: 429,
+        headers: {
+          "retry-after": new Date(Date.now() + 300_000).toUTCString(),
+        },
+        unreadBody: { cancel },
+      }),
+    );
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("status 429");
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(getFallbackProviderStats().parallel.pausedForMs).toBe(300_000);
+  });
+
+  it("pauses for a minute when Retry-After is missing or unreadable", async () => {
+    await hitRateLimit();
+    expect(getFallbackProviderStats().parallel.pausedForMs).toBe(60_000);
+
+    vi.setSystemTime(Date.now() + 60_000);
+    await hitRateLimit({ "retry-after": "soon" });
+    expect(getFallbackProviderStats().parallel.pausedForMs).toBe(60_000);
+  });
+
+  it("pauses for a minute when Retry-After is a string Date.parse would read as a past date", async () => {
+    for (const value of ["1.5", "-1", "abc 5"]) {
+      await hitRateLimit({ "retry-after": value });
+      expect(getFallbackProviderStats().parallel.pausedForMs).toBe(60_000);
+      vi.setSystemTime(Date.now() + 60_000);
+    }
+  });
+
+  it("pauses on a 429 to the initialized notification and discards its body", async () => {
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse(INITIALIZE_REPLY, {
+        headers: { "mcp-session-id": SESSION_ID },
+      }),
+    );
+    const cancel = vi.fn(async () => undefined);
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse("", {
+        status: 429,
+        headers: { "retry-after": "45" },
+        unreadBody: { cancel },
+      }),
+    );
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("status 429");
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(getFallbackProviderStats().parallel).toMatchObject({
+      rateLimited: 1,
+      pausedForMs: 45_000,
+    });
+  });
+
+  it("skips a provider that a concurrent search paused while this one was waiting", async () => {
+    listProviders(undefined);
+    orderParallelFirst();
+    // Parallel's attempt is still in flight when another search, pinned to
+    // You.com, gets a 429 there and pauses it.
+    fetchMock.mockImplementationOnce(async () => {
+      listProviders("youcom");
+      await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS).catch(
+        () => undefined,
+      );
+      throw new Error("Network failure");
+    });
+    fetchMock.mockResolvedValueOnce(rateLimited({ "retry-after": "3600" }));
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow(
+      "Every fallback search provider failed (parallel: Network failure)",
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(getFallbackProviderStats().youcom).toMatchObject({
+      rateLimited: 1,
+      skippedWhilePaused: 1,
+      pausedForMs: 3_600_000,
+    });
+  });
+
+  it("never shortens a longer pause that a concurrent search set", async () => {
+    // The first search's request is in flight when a second one gets a 429
+    // asking for an hour; the first then gets its own 429 asking for a second.
+    fetchMock.mockImplementationOnce(async () => {
+      await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS).catch(
+        () => undefined,
+      );
+      return rateLimited({ "retry-after": "1" });
+    });
+    fetchMock.mockResolvedValueOnce(rateLimited({ "retry-after": "3600" }));
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("status 429");
+
+    expect(getFallbackProviderStats().parallel.pausedForMs).toBe(3_600_000);
+  });
+
+  it("splits the budget only among the providers that are not paused", async () => {
+    listProviders("youcom");
+    await hitRateLimit();
+
+    listProviders(undefined);
+    orderParallelFirst();
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    mockExchange(
+      documentWith([
+        { url: "https://example.com/p", title: "P", excerpts: [EXCERPT] },
+      ]),
+    );
+
+    await fetchFallbackTextResults(QUERY, 10, 3_000);
+
+    expect(timeoutSpy.mock.calls).toEqual([[3_000]]);
+  });
+
+  it("clamps the pause to an hour at most and a second at least", async () => {
+    await hitRateLimit({ "retry-after": "86400" });
+    expect(getFallbackProviderStats().parallel.pausedForMs).toBe(3_600_000);
+
+    vi.setSystemTime(Date.now() + 3_600_000);
+    await hitRateLimit({ "retry-after": "0" });
+    expect(getFallbackProviderStats().parallel.pausedForMs).toBe(1_000);
+  });
+
+  it("skips only the paused provider and goes straight to the next", async () => {
+    listProviders(undefined);
+    orderParallelFirst();
+    fetchMock.mockResolvedValueOnce(rateLimited({ "retry-after": "30" }));
+    mockYoucom([SERVED_RESULT]);
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    fetchMock.mockClear();
+    mockYoucom([SERVED_RESULT]);
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).resolves.toHaveLength(1);
+
+    expect(requestUrls()).toEqual([YOUCOM_KEYLESS_URL, YOUCOM_KEYLESS_URL]);
+    expect(getFallbackProviderStats()).toMatchObject({
+      parallel: { failed: 1, rateLimited: 1, skippedWhilePaused: 1 },
+      youcom: { served: 2 },
+    });
+  });
+
+  it("throws without a request when every provider is paused", async () => {
+    listProviders(undefined);
+    orderParallelFirst();
+    fetchMock.mockResolvedValueOnce(rateLimited());
+    fetchMock.mockResolvedValueOnce(rateLimited());
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("Every fallback search provider failed");
+
+    fetchMock.mockClear();
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("No fallback search provider could be tried");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("getFallbackProviderStats", () => {
+  it("starts every built-in provider at zero", () => {
+    const zero = {
+      served: 0,
+      empty: 0,
+      failed: 0,
+      rateLimited: 0,
+      skippedWhilePaused: 0,
+      pausedForMs: 0,
+    };
+    expect(getFallbackProviderStats()).toEqual({
+      parallel: zero,
+      youcom: zero,
+    });
   });
 });

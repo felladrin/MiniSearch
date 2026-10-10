@@ -175,16 +175,23 @@ Failures:
 | `500` | `{"error":"Internal server error"}` | Anything else |
 
 With `SEARCH_FALLBACK_ENABLED` on (see `docs/configuration.md`), a text search
-whose SearXNG attempt failed is retried against a second provider before this
-endpoint gives up. That attempt covers the whole exchange under one 15-second
-budget, and it is made only after SearXNG has failed: never while SearXNG
-answers, and never on an image search. It is skipped when less than two seconds
-of the search's own 25-second deadline remain, since an answer that late cannot
-reach the client before its 30-second timeout, and that skip answers the `502`
-above and counts as a fallback that failed. If the fallback answers with nothing
-usable, this endpoint responds `200` with `[]`, so the client shows the
-"No results found" alert rather than the "Text search unavailable" one; only a
-fallback that fails itself falls through to the same `502`.
+whose SearXNG attempt failed is retried against the configured fallback
+providers before this endpoint gives up. They are tried one after the other, in
+a random order on every search, until one returns results; a provider that
+answers with nothing usable or fails hands the search to the next. The whole
+cascade runs under one 15-second budget, or what is left of the search's own
+deadline when that is shorter, and each attempt gets the remaining budget
+divided by the number of providers still untried and not paused. A provider
+paused after a `429` is skipped without a request. The cascade runs only after SearXNG has
+failed: never while SearXNG answers, and never on an image search. It is
+skipped when less than two seconds of the search's own 25-second deadline
+remain, since an answer that late cannot reach the client before its 30-second
+timeout, and that skip answers the `502` above and counts as a fallback that
+failed. If at least one provider answers with nothing usable and none returns
+results, this endpoint responds `200` with `[]`, so the client shows the
+"No results found" alert rather than the "Text search unavailable" one; only
+when every provider tried fails, or none could be tried at all, does the
+search fall through to the same `502`.
 
 ### `GET /search/images`
 
@@ -360,8 +367,17 @@ counts searches answered with fallback results, and `searchesFailedOnFallback`
 counts the other attempts: those the fallback itself failed, and those where
 SearXNG's retries had left so little of the 25-second search deadline that the
 fallback was never asked. A rising `searchesFailedOnFallback` is therefore not
-by itself a sign that the fallback provider is failing. Both are plain counts,
+by itself a sign that the fallback providers are failing. Both are plain counts,
 and neither carries a query.
+
+`searches.fallbackProviders` breaks the cascade down per provider name. Each
+entry counts the attempts that provider `served` with results, answered
+`empty`, or `failed`, the subset of those failures that were a `429`
+(`rateLimited`, also counted in `failed`), and the searches that skipped it
+while it was paused (`skippedWhilePaused`); `pausedForMs` is
+the time left on its current pause, or `0` when it is not paused. The names are
+configured infrastructure, not anything a user typed, and no field carries a
+query or a provider's error text.
 
 Nothing in the response is per-user: queries, URLs and client addresses are
 never recorded, only aggregate outcomes

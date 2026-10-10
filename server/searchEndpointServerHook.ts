@@ -1,6 +1,7 @@
 import type { PreviewServer, ViteDevServer } from "vite";
 import { z } from "zod";
 import {
+  assertSearchFallbackConfiguration,
   fetchFallbackTextResults,
   isSearchFallbackEnabled,
 } from "./fallbackSearchService.ts";
@@ -100,6 +101,10 @@ async function handleRanking(
 export function searchEndpointServerHook<
   T extends ViteDevServer | PreviewServer,
 >(server: T) {
+  // At registration rather than per search: a misconfigured fallback has to
+  // stop the server at start, not surface as a 502 during the next outage.
+  if (isSearchFallbackEnabled()) assertSearchFallbackConfiguration();
+
   server.middlewares.use(async (request, response, next) => {
     if (!request.url?.startsWith("/search/")) return next();
 
@@ -141,7 +146,7 @@ export function searchEndpointServerHook<
       } catch {
         // SearXNG is unreachable. The operator may have switched on a second
         // text source, which is consulted only here, after SearXNG has failed,
-        // and never for images: Parallel has no image search.
+        // and never for images: no fallback provider has image search.
         searchResults = null;
 
         if (isTextSearch && isSearchFallbackEnabled()) {

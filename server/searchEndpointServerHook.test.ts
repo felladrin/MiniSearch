@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./fallbackSearchService", () => ({
+  assertSearchFallbackConfiguration: vi.fn(),
   fetchFallbackTextResults: vi.fn(),
   isSearchFallbackEnabled: vi.fn(),
 }));
@@ -31,6 +32,7 @@ vi.mock("./webSearchService", () => ({
 }));
 
 import {
+  assertSearchFallbackConfiguration,
   fetchFallbackTextResults,
   isSearchFallbackEnabled,
 } from "./fallbackSearchService";
@@ -93,6 +95,28 @@ describe("searchEndpointServerHook", () => {
     // of poisoning the results below.
     vi.mocked(isSearchFallbackEnabled).mockReturnValue(false);
     vi.mocked(fetchFallbackTextResults).mockResolvedValue([]);
+  });
+
+  it("checks the fallback configuration at registration only when the fallback is on", () => {
+    getRegisteredHandler();
+    expect(assertSearchFallbackConfiguration).not.toHaveBeenCalled();
+
+    vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+    getRegisteredHandler();
+    expect(assertSearchFallbackConfiguration).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses to register when the fallback configuration is invalid", () => {
+    vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+    vi.mocked(assertSearchFallbackConfiguration).mockImplementationOnce(() => {
+      throw new Error("SEARCH_FALLBACK_PROVIDERS lists no provider");
+    });
+
+    // Thrown out of the hook itself, so the server stops at start rather
+    // than answering 502 during the next SearXNG outage.
+    expect(() => getRegisteredHandler()).toThrow(
+      "SEARCH_FALLBACK_PROVIDERS lists no provider",
+    );
   });
 
   it("passes through requests that aren't under /search/", async () => {
