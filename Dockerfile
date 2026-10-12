@@ -2,7 +2,7 @@ FROM node:lts-slim
 
 # Renovate keeps this pin current via the customManager in renovate.json,
 # whose regex matches this exact line: keep the quoted 40-character form.
-ARG SEARXNG_COMMIT_SHA="d48c4b555421e824342c51d68482dd0898e54d0f"
+ARG SEARXNG_COMMIT_SHA="ad46ebd7d87666edb5f116c5b274b47f689ac6cd"
 
 ENV PORT=7860
 EXPOSE $PORT
