@@ -3,6 +3,11 @@
 Notable changes, grouped by date, most recent first.
 
 
+## 2026-10-15
+
+- Links to the app now carry a real social preview: a 1200×630 Open Graph card in the brand blue, with the magnifier mark, the wordmark, the tagline and a "No API key • No accounts • In-browser AI" pill. The client serves it from `/og-image.png` and the index page's `og:image`/`og:image:width`/`og:image:height` and `twitter:card`/`twitter:image` metadata point at it, so X/Twitter, LinkedIn, Slack and Discord render a preview card instead of a bare title.
+
+
 ## 2026-10-10
 
 - The text-search fallback now cascades over Parallel and You.com instead of asking a single provider. On each search the configured providers are tried in a random order, one after the other, until one returns results, under the same 15-second budget, which is split across the providers still untried and not paused so a hanging one cannot starve the rest. A provider that answers HTTP 429 is paused until its `Retry-After` and skipped meanwhile, as You.com's acceptable use policy asks. A single search can now reach more than one provider; each sees the query text and this server's IP address, never the user's. `SEARCH_FALLBACK_PROVIDERS` picks the providers (all of them when empty), and `SEARCH_FALLBACK_PARALLEL_API_KEY` and `SEARCH_FALLBACK_YOUCOM_API_KEY` hold the optional keys. `SEARCH_FALLBACK_PROVIDER` and `SEARCH_FALLBACK_API_KEY` are removed: if either is still set while the fallback is enabled, the server stops at start with an error naming the replacement, and so does a provider key with a control character inside it. `/status` gained per-provider counters under `searches.fallbackProviders`.
