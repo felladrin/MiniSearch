@@ -75,7 +75,7 @@
     "postcss": "^8.5.25",
     "postcss-preset-mantine": "^1.17.0",
     "postcss-simple-vars": "^7.0.1",
-    "pretty-ms": "^9.1.0",
+    "pretty-ms": "^10.0.0",
     "rate-limiter-flexible": "^11.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
