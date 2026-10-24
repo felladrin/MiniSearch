@@ -22,10 +22,10 @@ once the full answer has rendered.
 
 ## Result
 
-| Build | Long tasks in the streaming window | Total main-thread time blocked | Longest single task |
-| --- | --- | --- | --- |
-| `main` (before) | 30, 31, 31, 32, 32 | 2008, 2050, 2143, 2149, 2207 ms | 108–186 ms |
-| All seven fixes merged (after) | 0, 0, 1, 1, 1 | 0, 0, 51, 52, 52 ms | ≤ 52 ms |
+| Build                          | Long tasks in the streaming window | Total main-thread time blocked  | Longest single task |
+| ------------------------------ | ---------------------------------- | ------------------------------- | ------------------- |
+| `main` (before)                | 30, 31, 31, 32, 32                 | 2008, 2050, 2143, 2149, 2207 ms | 108–186 ms          |
+| All seven fixes merged (after) | 0, 0, 1, 1, 1                      | 0, 0, 51, 52, 52 ms             | ≤ 52 ms             |
 
 Roughly **2.1 seconds of blocking main-thread work per streamed answer is gone**, and the worst
 single task drops from ~160–190 ms to at or below the 50 ms long-task reporting threshold — i.e.
@@ -33,13 +33,13 @@ after the change there is effectively nothing left to report.
 
 ## What removed what
 
-| Long task on `main` | Removed by |
-| --- | --- |
-| Full-markdown re-parse on every throttled frame (12 Hz), growing with the answer | `perf/memoized-markdown-blocks` — top-level blocks are memoized, so a frame that only extends the last block re-renders that block |
-| Shiki loading from `shiki/bundle/full` for the first code block | `perf/shiki-lazy-language-subset` — web subset, and a language outside it degrades without a load attempt |
+| Long task on `main`                                                                        | Removed by                                                                                                                                   |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Full-markdown re-parse on every throttled frame (12 Hz), growing with the answer           | `perf/memoized-markdown-blocks` — top-level blocks are memoized, so a frame that only extends the last block re-renders that block           |
+| Shiki loading from `shiki/bundle/full` for the first code block                            | `perf/shiki-lazy-language-subset` — web subset, and a language outside it degrades without a load attempt                                    |
 | One `resize` listener per citation link, each reading `scrollWidth` and calling `setState` | `perf/shared-resize-observer-citation-links` — one shared `ResizeObserver`, and the expand animates `transform`/`opacity` instead of `width` |
-| `gptTokenizer.encode()` over every full page body at the search-to-generation handoff | `perf/page-excerpt-tokenization-worker` — the tokenization runs in a worker, with a synchronous fallback |
-| Re-encoding the whole joined candidate per iteration in the rolling summary | `perf/incremental-rolling-summary-tokens` — each part encoded once, running count kept |
+| `gptTokenizer.encode()` over every full page body at the search-to-generation handoff      | `perf/page-excerpt-tokenization-worker` — the tokenization runs in a worker, with a synchronous fallback                                     |
+| Re-encoding the whole joined candidate per iteration in the rolling summary                | `perf/incremental-rolling-summary-tokens` — each part encoded once, running count kept                                                       |
 
 ## Reproducing
 

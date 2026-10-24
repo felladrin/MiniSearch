@@ -31,6 +31,29 @@ interface StatsData {
   recentActivity: SearchEntry[];
 }
 
+function MetricCard({
+  title,
+  value,
+  compact,
+}: {
+  title: string;
+  value: string | number;
+  compact: boolean;
+}) {
+  return (
+    <Card withBorder p={compact ? "sm" : "md"}>
+      <Stack gap="xs" align="flex-start">
+        <Text size="xs" tt="uppercase" fw={700} c="dimmed">
+          {title}
+        </Text>
+        <Text fw={700} size={compact ? "lg" : "xl"}>
+          {value}
+        </Text>
+      </Stack>
+    </Card>
+  );
+}
+
 export default function SearchStats({
   period = "week",
   compact = false,
@@ -175,38 +198,23 @@ export default function SearchStats({
     );
   }
 
-  function MetricCard({
-    title,
-    value,
-  }: {
-    title: string;
-    value: string | number;
-  }) {
-    return (
-      <Card withBorder p={compact ? "sm" : "md"}>
-        <Stack gap="xs" align="flex-start">
-          <Text size="xs" tt="uppercase" fw={700} c="dimmed">
-            {title}
-          </Text>
-          <Text fw={700} size={compact ? "lg" : "xl"}>
-            {value}
-          </Text>
-        </Stack>
-      </Card>
-    );
-  }
-
   return (
     <Stack gap={compact ? "sm" : "md"}>
       <SimpleGrid cols={compact ? 2 : { base: 1, sm: 2, lg: 4 }}>
         <MetricCard
           title="Total Searches"
           value={stats.totalSearches.toLocaleString()}
+          compact={compact}
         />
-        <MetricCard title="Daily Average" value={stats.avgPerDay} />
+        <MetricCard
+          title="Daily Average"
+          value={stats.avgPerDay}
+          compact={compact}
+        />
         <MetricCard
           title="Most Active Hour"
           value={formatHour(stats.mostActiveHour)}
+          compact={compact}
         />
         <MetricCard
           title="Last Search"
@@ -215,6 +223,7 @@ export default function SearchStats({
               ? formatRelativeTime(stats.recentActivity[0].timestamp)
               : "Never"
           }
+          compact={compact}
         />
       </SimpleGrid>
 

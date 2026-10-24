@@ -59,11 +59,11 @@ Development mode overrides the container command to run `npm install && npm run 
 
 ### Port Configuration
 
-| Port | Service | Variable | Notes |
-|------|---------|----------|-------|
-| 7860 | Node.js (Vite) | `PORT` | Main application (both dev and production) |
-| 7861 | HMR | `HMR_PORT` | Vite HMR server (development only) |
-| 8888 | SearXNG | - | Internal metasearch engine (not exposed) |
+| Port | Service        | Variable   | Notes                                      |
+| ---- | -------------- | ---------- | ------------------------------------------ |
+| 7860 | Node.js (Vite) | `PORT`     | Main application (both dev and production) |
+| 7861 | HMR            | `HMR_PORT` | Vite HMR server (development only)         |
+| 8888 | SearXNG        | -          | Internal metasearch engine (not exposed)   |
 
 ## First Configuration
 
@@ -117,16 +117,19 @@ Access at `http://localhost:7860`
 ## Verification
 
 ### Test Search
+
 1. Enter any query in the search box
 2. Press Enter or click Search
 3. Results should appear within 2-5 seconds
 
 ### Test AI Response
+
 1. Toggle "Enable AI Response" in Settings
 2. Search for "What is quantum computing?"
 3. After search results load, an AI-generated response should appear with citations
 
 ### Test Chat
+
 1. After getting an AI response
 2. Type a follow-up question like "Tell me more"
 3. The AI should respond using conversation context
@@ -134,12 +137,14 @@ Access at `http://localhost:7860`
 ## Common Issues
 
 ### Issue: Search returns no results
+
 **Solution**: Verify SearXNG is running. Check container logs:
 ```bash
 docker compose logs searxng
 ```
 
 ### Issue: AI response never loads
+
 **Solution**: Check browser console for errors. Common causes:
 - WebGPU not supported (app will automatically fall back to Wllama)
 - Model download blocked by firewall or CORS
@@ -148,13 +153,15 @@ docker compose logs searxng
 - Try switching inference types in Settings
 
 ### Issue: Access key not working
+
 **Solution**: Ensure `ACCESS_KEYS` is set in `.env` file and containers were rebuilt with `--build` flag.
 
 ### Issue: Port already in use
+
 **Solution**: Change ports in `docker-compose.yml`:
 ```yaml
 ports:
-  - "7862:7861"  # Use 7862 instead of 7860 (HMR port)
+  - "7862:7861" # Use 7862 instead of 7860 (HMR port)
 ```
 
 ## Next Steps

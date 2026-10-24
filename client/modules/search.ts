@@ -76,7 +76,7 @@ const cacheMetrics = {
       return maxValue;
     }
     const newValue = current + increment;
-    return newValue > maxValue ? maxValue : newValue;
+    return Math.min(newValue, maxValue);
   },
 };
 

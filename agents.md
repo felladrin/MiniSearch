@@ -17,16 +17,19 @@ This is your navigation hub. Start here, follow the links, and return when you n
 ## Repository Map
 
 ### Getting Started
+
 - **`docs/quick-start.md`** - Installation, first run, verification
 - **`docs/overview.md`** - System architecture and data flow
 - **`docs/project-structure.md`** - Directory layout and component organization
 
 ### Configuration & Setup
+
 - **`docs/configuration.md`** - Environment variables and settings reference
 - **`docs/configuration.md#tuning-the-search-engines`** - Replacing the SearXNG settings file at container start: engine selection, engines blocked from an IP, the `TMPDIR` requirement
 - **`docs/security.md`** - Access control, privacy, and security model
 
 ### Core Functionality
+
 - **`docs/api.md`** - HTTP endpoint reference: parameters, responses, and error codes
 - **`docs/ai-integration.md`** - AI inference types (Wllama, OpenAI, AI Horde, Internal)
 - **`docs/ui-components.md`** - Component architecture and PubSub patterns
@@ -37,6 +40,7 @@ This is your navigation hub. Start here, follow the links, and return when you n
 - **`docs/glossary.md`** - Codebase-specific terms and domain concepts
 
 ### Development
+
 - **`docs/development-commands.md`** - Docker, npm, and testing commands
 - **`docs/failure-injection.md`** - Graceful-degradation test matrix
 - **`docs/coding-conventions.md`** - Style guide and patterns
@@ -72,11 +76,13 @@ Need to:
 ## Key Files Reference
 
 ### Entry Points
+
 - `client/index.tsx` - React app initialization
 - `vite.config.ts` - Vite dev server with hooks
 - `Dockerfile` - Single-stage container build
 
 ### Business Logic Modules
+
 - `client/modules/search.ts` - Search orchestration and caching
 - `client/modules/textGeneration.ts` - AI response flow
 - `client/modules/pubSub.ts` - All PubSub channels
@@ -84,6 +90,7 @@ Need to:
 - `client/modules/history.ts` - Search history database
 
 ### Server-Side Modules
+
 - `server/searchEndpointServerHook.ts` - `/search` endpoints
 - `server/pageContentEndpointServerHook.ts` - `/page-content` endpoint
 - `server/internalApiEndpointServerHook.ts` - `/inference` proxy
@@ -91,6 +98,7 @@ Need to:
 - `server/rerankerService.ts` - Local result reranking
 
 ### UI Components
+
 - `client/components/DictationButton.tsx` - Microphone control shared by the search field and the chat follow-up field
 - `client/components/App/` - Application shell with error boundaries
 - `client/components/Search/Form/` - Search input and form
@@ -105,6 +113,7 @@ Need to:
 - `client/components/Settings/HistorySettings.tsx` - History configuration UI
 
 ### Client Modules
+
 - `client/modules/pubSub.ts` - All PubSub channels for state management
 - `client/modules/search.ts` - Search orchestration and IndexedDB caching
 - `client/modules/textGeneration.ts` - AI response generation and chat handling
@@ -142,6 +151,7 @@ Need to:
 - `client/modules/types.ts` - Shared TypeScript type definitions
 
 ### Server Modules
+
 - `server/searchEndpointServerHook.ts` - `/search/text` and `/search/images` endpoints
 - `server/thumbnailEndpointServerHook.ts` - `/thumbnail` endpoint: one search-result thumbnail at a time, token-gated, with an in-process LRU in front of the upstream host
 - `server/internalApiEndpointServerHook.ts` - `/inference` proxy to self-hosted API
@@ -168,6 +178,7 @@ Need to:
 - `server/downloadFileFromHuggingFaceRepository.ts` - Downloads model files from HuggingFace
 
 ### Hooks
+
 - `client/hooks/useSearchHistory.ts` - Search history management from IndexedDB
 - `client/hooks/useHistoryRestore.ts` - Restores full search state from history
 - `client/hooks/useDrawerState.ts` - Drawer open/close state with logging
@@ -176,26 +187,31 @@ Need to:
 ## Common Tasks Quick Reference
 
 ### Add a new AI model
+
 1. Add to `client/modules/wllama.ts`
 2. Update `docs/ai-integration.md`
 3. Update `docs/configuration.md` defaults
 
 ### Add a new setting
+
 1. Add to `client/modules/settings.ts` default object
 2. Add UI in `client/components/Pages/Main/Menu/`
 3. Update `docs/configuration.md` settings table
 
 ### Modify search behavior
+
 1. Edit `client/modules/search.ts`
 2. Update `server/webSearchService.ts` if server-side changes needed
 3. Check `server/rerankerService.ts` if reranking affected
 
 ### Fix UI state issues
+
 1. Check PubSub channels in `client/modules/pubSub.ts`
 2. Verify component subscriptions in `docs/ui-components.md`
 3. Ensure proper state updates in business logic modules
 
 ### Analyze test coverage
+
 1. Run `npm run test:coverage` to generate reports
 2. Check `coverage/coverage-summary.json` for quick metrics
 3. See `docs/development-commands.md` for full coverage analysis guide
@@ -221,11 +237,11 @@ This runs:
 
 The project is split across three TypeScript configs, and the default one covers less than its name suggests:
 
-| Config | Covers |
-| --- | --- |
-| `tsconfig.json` | `client`, `shared`, `test` |
+| Config               | Covers                                                              |
+| -------------------- | ------------------------------------------------------------------- |
+| `tsconfig.json`      | `client`, `shared`, `test`                                          |
 | `tsconfig.node.json` | `vite.config.ts`, `server`, `shared`, `e2e`, `playwright.config.ts` |
-| `tsconfig.eval.json` | `eval`, `shared` |
+| `tsconfig.eval.json` | `eval`, `shared`                                                    |
 
 So `npx tsc --noEmit` reports success while type errors sit in `server/` or `eval/`, and CI then fails on a change that looked clean locally. Only `npm run lint` runs all three configs. Never treat a bare `tsc` as a green typecheck.
 

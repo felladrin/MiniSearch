@@ -10,8 +10,8 @@ passages that match the query into the prompt.
 
 One switch controls the feature, and it is on by default:
 
-| Switch | Who sets it | What it does |
-|---|---|---|
+| Switch                | Who sets it                 | What it does                                            |
+| --------------------- | --------------------------- | ------------------------------------------------------- |
 | **Read Page Content** | The user, under AI Settings | Whether this browser reads the pages behind its results |
 
 The endpoint is always available; the user toggle decides whether each browser
@@ -145,12 +145,12 @@ the passage about how long cats sleep.
 The interface is in English; the searches are not. Ranking therefore avoids
 anything written for one language:
 
-| Concern | How it is handled | Why not the obvious thing |
-| --- | --- | --- |
-| Word boundaries | `Intl.Segmenter`, word granularity | `[^\p{L}\p{N}]+` cut Brahmic scripts and Thai at every combining vowel mark and dropped the marks, and it finds no boundary at all in Chinese, Japanese or Thai, which write none: a whole sentence arrived as one token that matched nothing, scoring fell through to document order, and the page's own navigation won |
-| Sentence boundaries | `Intl.Segmenter`, sentence granularity | `[.!?]` never matches `。`, `！`, `？` or `।`, so long CJK and Indic blocks were cut at an arbitrary character mid-sentence |
-| Uninformative words | Inverse document frequency over the pooled passages of all pages read for the search | A stop-word list only covers the language it was written in. A term found in most passages of a pool cannot say which passage to quote, in any language, and this needs no word list and no language detection |
-| Inflection | A query term and a page word match when one is a prefix of the other, from 3 characters and within 3 | Stripping `-ing`, `-es`, `-s` is English morphology applied to every language: it turned the Portuguese `mães` into `mã` and never matched `mãe` |
+| Concern             | How it is handled                                                                                    | Why not the obvious thing                                                                                                                                                                                                                                                                                                |
+| ------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Word boundaries     | `Intl.Segmenter`, word granularity                                                                   | `[^\p{L}\p{N}]+` cut Brahmic scripts and Thai at every combining vowel mark and dropped the marks, and it finds no boundary at all in Chinese, Japanese or Thai, which write none: a whole sentence arrived as one token that matched nothing, scoring fell through to document order, and the page's own navigation won |
+| Sentence boundaries | `Intl.Segmenter`, sentence granularity                                                               | `[.!?]` never matches `。`, `！`, `？` or `।`, so long CJK and Indic blocks were cut at an arbitrary character mid-sentence                                                                                                                                                                                              |
+| Uninformative words | Inverse document frequency over the pooled passages of all pages read for the search                 | A stop-word list only covers the language it was written in. A term found in most passages of a pool cannot say which passage to quote, in any language, and this needs no word list and no language detection                                                                                                           |
+| Inflection          | A query term and a page word match when one is a prefix of the other, from 3 characters and within 3 | Stripping `-ing`, `-es`, `-s` is English morphology applied to every language: it turned the Portuguese `mães` into `mã` and never matched `mãe`                                                                                                                                                                         |
 
 Both segmenters are script-driven, so the locale is left unset and the result
 is the same on every host.
@@ -188,22 +188,22 @@ anything.
 
 ## Budgets and Limits
 
-| Limit | Value | Where |
-| --- | --- | --- |
-| Pages read per search | 6 | `searchResultsToConsider`, mirrored by `MAX_URLS` in the endpoint |
-| Per-page deadline, redirects included | 6 s | `REQUEST_TIMEOUT_MS` |
-| Redirects followed | 3, each re-validated | `MAX_REDIRECTS` |
-| Refusals before a host is skipped | 3 in a row | `failureThreshold` in `server/pageReadHostBreaker.ts` |
-| How long a skipped host stays skipped | 5 minutes, then one probe read | `resetTimeout` in `server/pageReadHostBreaker.ts` |
-| Body read per page | 1.5 MB | `MAX_RESPONSE_BYTES` |
-| Excerpt cap per URL | 6,000 characters | `MAX_PAGE_CHARS`, `selectPassagesAcrossPages` |
-| Global excerpt budget | `MAX_PAGE_CHARS × pages` | `fetchPageContents` |
-| Near-duplicate threshold | 0.9 Jaccard | `JACCARD_THRESHOLD` |
-| Minimum usable text | 200 characters | `MIN_USEFUL_CHARS` |
-| Passage size | 180-1,200 characters | `MIN_PASSAGE_CHARS`, `MAX_PASSAGE_CHARS` |
-| Excerpt share of the context | 35% | `pageContentTokenBudgetRatio` |
-| Context assumed | `openAiContextLength` on the OpenAI-compatible backend, 4,096 elsewhere | `getPageContentTokenBudget` |
-| Whole-request timeout (client) | 20 s | `REQUEST_TIMEOUT` in `client/modules/pageContent.ts` |
+| Limit                                 | Value                                                                   | Where                                                             |
+| ------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Pages read per search                 | 6                                                                       | `searchResultsToConsider`, mirrored by `MAX_URLS` in the endpoint |
+| Per-page deadline, redirects included | 6 s                                                                     | `REQUEST_TIMEOUT_MS`                                              |
+| Redirects followed                    | 3, each re-validated                                                    | `MAX_REDIRECTS`                                                   |
+| Refusals before a host is skipped     | 3 in a row                                                              | `failureThreshold` in `server/pageReadHostBreaker.ts`             |
+| How long a skipped host stays skipped | 5 minutes, then one probe read                                          | `resetTimeout` in `server/pageReadHostBreaker.ts`                 |
+| Body read per page                    | 1.5 MB                                                                  | `MAX_RESPONSE_BYTES`                                              |
+| Excerpt cap per URL                   | 6,000 characters                                                        | `MAX_PAGE_CHARS`, `selectPassagesAcrossPages`                     |
+| Global excerpt budget                 | `MAX_PAGE_CHARS × pages`                                                | `fetchPageContents`                                               |
+| Near-duplicate threshold              | 0.9 Jaccard                                                             | `JACCARD_THRESHOLD`                                               |
+| Minimum usable text                   | 200 characters                                                          | `MIN_USEFUL_CHARS`                                                |
+| Passage size                          | 180-1,200 characters                                                    | `MIN_PASSAGE_CHARS`, `MAX_PASSAGE_CHARS`                          |
+| Excerpt share of the context          | 35%                                                                     | `pageContentTokenBudgetRatio`                                     |
+| Context assumed                       | `openAiContextLength` on the OpenAI-compatible backend, 4,096 elsewhere | `getPageContentTokenBudget`                                       |
+| Whole-request timeout (client)        | 20 s                                                                    | `REQUEST_TIMEOUT` in `client/modules/pageContent.ts`              |
 
 The token budget is shared across pages, served shortest-first: a page that
 needs less than its share leaves the rest to the others, and only pages that
@@ -327,21 +327,21 @@ under `pageReads` on `/status` and reset by a restart. Every one of them is
 attached to a constant in the table above, so the question they answer is "is
 this limit set where it should be", not "who read what":
 
-| Counter | The question it settles |
-| --- | --- |
-| `readRate` | Is the feature worth its latency at all |
-| `averageReadMs` | Is a 6 s deadline generous or stingy |
-| `skipped.timedOut` | How much is being lost to that deadline |
-| `skipped.tooLittleText` | Is the 200-character floor discarding real pages, or is the extractor missing their text |
-| `skipped.notADocument` | Are useful content types being turned away |
-| `skipped.blocked` | Are callers aiming at private space, deliberately or otherwise |
-| `skipped.httpForbidden` | How often bot walls or rate limits turn the instance away (401, 403, 429) |
-| `skipped.httpNotFound` | How often results point to dead links (404, 410) |
-| `skipped.httpOtherError` | How often hosts return other non-ok HTTP statuses |
-| `skipped.skippedByBreaker` | How many reads the host breaker saved, which is what its five-minute window is worth |
-| `circuitOpens` | How often a host was boxed, across every host: thirty skips can be one host boxed for a window or thirty hosts boxed once, and those move the threshold in different directions |
-| `bodiesTruncated` | Is the 1.5 MB body cap biting |
-| `excerptKeptRate` | How much of a page the per-URL cap and dedup keep |
+| Counter                    | The question it settles                                                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `readRate`                 | Is the feature worth its latency at all                                                                                                                                         |
+| `averageReadMs`            | Is a 6 s deadline generous or stingy                                                                                                                                            |
+| `skipped.timedOut`         | How much is being lost to that deadline                                                                                                                                         |
+| `skipped.tooLittleText`    | Is the 200-character floor discarding real pages, or is the extractor missing their text                                                                                        |
+| `skipped.notADocument`     | Are useful content types being turned away                                                                                                                                      |
+| `skipped.blocked`          | Are callers aiming at private space, deliberately or otherwise                                                                                                                  |
+| `skipped.httpForbidden`    | How often bot walls or rate limits turn the instance away (401, 403, 429)                                                                                                       |
+| `skipped.httpNotFound`     | How often results point to dead links (404, 410)                                                                                                                                |
+| `skipped.httpOtherError`   | How often hosts return other non-ok HTTP statuses                                                                                                                               |
+| `skipped.skippedByBreaker` | How many reads the host breaker saved, which is what its five-minute window is worth                                                                                            |
+| `circuitOpens`             | How often a host was boxed, across every host: thirty skips can be one host boxed for a window or thirty hosts boxed once, and those move the threshold in different directions |
+| `bodiesTruncated`          | Is the 1.5 MB body cap biting                                                                                                                                                   |
+| `excerptKeptRate`          | How much of a page the per-URL cap and dedup keep                                                                                                                               |
 
 A counter can only be read in aggregate, so a single search cannot be recovered
 from it. The weakest point is an instance nobody else is using, where one search
@@ -353,21 +353,21 @@ failed, never which pages or what was asked.
 Every failure degrades to the snippet-only prompt, which is what the answer was
 grounded on before:
 
-| Failure | Result |
-| --- | --- |
-| Host resolves privately, or the scheme is not HTTP | That page is skipped, no request is made (`blocked`) |
-| Page times out or redirects fail | That page is skipped (`timedOut`, `redirectLimit`, `failed`) |
-| Page is not an HTML/PDF document | That page is skipped (`notADocument`) |
-| Bot wall, rate limit, or auth required (401, 403, 429) | That page is skipped (`httpForbidden`) |
-| Dead link (404, 410) | That page is skipped (`httpNotFound`) |
-| Other HTTP error (5xx, other non-ok status) | That page is skipped (`httpOtherError`) |
-| Host refused the last three reads | That page is skipped without a request for five minutes, then one read probes the host (`skippedByBreaker`) |
-| Page yields less than 200 characters | That page is skipped (`tooLittleText`) |
-| `/page-content` fails or times out | Answer falls back to snippets |
-| Setting turned off, or AI responses off | No page is ever read |
-| A newer search starts while pages are still being read | The late result is dropped instead of grounding the new answer |
-| Every passage on a page duplicates passages that ranked higher in the pooled order | That page keeps its snippet-only line; no empty excerpt block is emitted |
-| | The pooled ranking uses a per-passage position prior, so a later result can keep a paragraph the higher-ranked one carries further down its page. |
+| Failure                                                                            | Result                                                                                                                                            |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Host resolves privately, or the scheme is not HTTP                                 | That page is skipped, no request is made (`blocked`)                                                                                              |
+| Page times out or redirects fail                                                   | That page is skipped (`timedOut`, `redirectLimit`, `failed`)                                                                                      |
+| Page is not an HTML/PDF document                                                   | That page is skipped (`notADocument`)                                                                                                             |
+| Bot wall, rate limit, or auth required (401, 403, 429)                             | That page is skipped (`httpForbidden`)                                                                                                            |
+| Dead link (404, 410)                                                               | That page is skipped (`httpNotFound`)                                                                                                             |
+| Other HTTP error (5xx, other non-ok status)                                        | That page is skipped (`httpOtherError`)                                                                                                           |
+| Host refused the last three reads                                                  | That page is skipped without a request for five minutes, then one read probes the host (`skippedByBreaker`)                                       |
+| Page yields less than 200 characters                                               | That page is skipped (`tooLittleText`)                                                                                                            |
+| `/page-content` fails or times out                                                 | Answer falls back to snippets                                                                                                                     |
+| Setting turned off, or AI responses off                                            | No page is ever read                                                                                                                              |
+| A newer search starts while pages are still being read                             | The late result is dropped instead of grounding the new answer                                                                                    |
+| Every passage on a page duplicates passages that ranked higher in the pooled order | That page keeps its snippet-only line; no empty excerpt block is emitted                                                                          |
+|                                                                                    | The pooled ranking uses a per-passage position prior, so a later result can keep a paragraph the higher-ranked one carries further down its page. |
 
 ## Related Topics
 

@@ -3,7 +3,6 @@
 ## Tech Stack
 
 React 19 + TypeScript + Mantine UI v9 (`@mantine/core`, `@mantine/hooks`, `@mantine/form`, `@mantine/notifications`, `@mantine/code-highlight`, `@mantine/carousel`)
-
 - **Build Tool**: Vite 8
 - **Linting/Formatting**: Biome 2
 - **Testing**: Vitest 5 + Testing Library

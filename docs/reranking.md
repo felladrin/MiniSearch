@@ -6,19 +6,18 @@ MiniSearch optionally reranks search results using a cross-encoder model running
 
 The reranking subsystem consists of four components:
 
-| Component | File | Responsibility |
-|-----------|------|----------------|
-| Service Manager | `server/rerankerService.ts` | Readiness state, reranking inference |
-| Model Loading | `server/utils/onnxModelLoader.ts` | Shared model download, tokenizer loading, and session creation (used by both the reranker and the bi-encoder) |
-| Ranking Logic | `server/rankSearchResults.ts` | Score-based filtering and result reordering |
-| Server Hook | `server/rerankerServiceHook.ts` | Startup/shutdown coordination with Vite server |
+| Component       | File                              | Responsibility                                                                                                |
+| --------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Service Manager | `server/rerankerService.ts`       | Readiness state, reranking inference                                                                          |
+| Model Loading   | `server/utils/onnxModelLoader.ts` | Shared model download, tokenizer loading, and session creation (used by both the reranker and the bi-encoder) |
+| Ranking Logic   | `server/rankSearchResults.ts`     | Score-based filtering and result reordering                                                                   |
+| Server Hook     | `server/rerankerServiceHook.ts`   | Startup/shutdown coordination with Vite server                                                                |
 
 ## Service Lifecycle
 
 ### Startup
 
 The `rerankerServiceHook` starts the reranker during server initialization:
-
 1. Downloads the model and tokenizer from HuggingFace if not present (`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`)
 2. Creates an ONNX Runtime inference session
 3. Performs a warmup inference (`query: "test"`, `documents: ["test document"]`) to ensure the graph is initialized
@@ -40,12 +39,12 @@ The session is created with `["cpu"]`, with no configuration to set, and there i
 
 The reranker ships as a dynamically quantized graph, and the WebGPU provider has no kernels for its integer matmuls. It registers happily and then hands every one of them back to the CPU, paying a round trip each time: 812ms against 172ms of the same work, with scores drifting by as much as 1.15 and reordering results. The bi-encoder is fp32 and was not benchmarked on accelerators, but inherits the CPU-only choice.
 
-| Provider | Availability in the Node binding | Notes |
-|----------|----------------------------------|-------|
-| `cpu` | Everywhere | The only provider used |
-| `webgpu` | Windows, Linux x64, macOS | Not used: no integer-matmul kernels, so a quantized graph runs ~4.7x slower than on CPU and its scores drift |
-| `cuda` | Linux x64 (CUDA v12) | Not used: the binaries are not bundled, and would need `npm install onnxruntime-node --onnxruntime-node-install=cuda12` |
-| `coreml` | macOS | Not used: slower than CPU for this model's dynamic shapes |
+| Provider | Availability in the Node binding | Notes                                                                                                                   |
+| -------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `cpu`    | Everywhere                       | The only provider used                                                                                                  |
+| `webgpu` | Windows, Linux x64, macOS        | Not used: no integer-matmul kernels, so a quantized graph runs ~4.7x slower than on CPU and its scores drift            |
+| `cuda`   | Linux x64 (CUDA v12)             | Not used: the binaries are not bundled, and would need `npm install onnxruntime-node --onnxruntime-node-install=cuda12` |
+| `coreml` | macOS                            | Not used: slower than CPU for this model's dynamic shapes                                                               |
 
 ### One Document per Call
 
@@ -80,7 +79,6 @@ Documents are sent to the reranker whole. Truncation happens by tokens inside th
 ### Scoring and Filtering
 
 The reranker returns the classifier's raw relevance logit for each document. Scores are deliberately not passed through a sigmoid, because the filter below is calibrated against the raw scale. Results are then filtered using a two-stage statistical approach:
-
 1. **Score Normalization**: Scores are shifted to positive range by adding the absolute value of the minimum score
 2. **Standard Deviation Filter**: Results below `mean - kStandardDeviationFactor * standardDeviation` are filtered out
    - `kStandardDeviationFactor = 0.3`
@@ -92,7 +90,6 @@ This filter is invariant to linear rescaling of the scores, since both the score
 ### Preserve Top Results Mode
 
 When `preserveTopResults = true`, the ranking algorithm:
-
 1. Keeps the original top result (first from SearXNG) at position 1
 2. Filters remaining results by score
 3. Takes up to 9 next-best results, sorted by reranker score
@@ -116,15 +113,15 @@ Reranking is applied to both text and image search results. For image results, t
 
 ## Model Details
 
-| Property | Value |
-|----------|-------|
-| Model | mmarco-mMiniLMv2-L12-H384-v1 |
-| Format | ONNX, dynamically quantized (`onnx/model_quint8_avx2.onnx`, 119MB) |
-| HuggingFace Repo | cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 |
-| Type | Cross-encoder reranker (XLM-RoBERTa, one relevance logit) |
-| Size | 12 layers, 118M parameters, of which 96M are the 250k-token vocabulary |
-| Max sequence length | 512 tokens, the model's own limit, enforced via `MAX_SEQUENCE_LENGTH` |
-| Storage | `server/models/cross-encoder/mmarco-mMiniLMv2-L12-H384-v1/` |
+| Property            | Value                                                                  |
+| ------------------- | ---------------------------------------------------------------------- |
+| Model               | mmarco-mMiniLMv2-L12-H384-v1                                           |
+| Format              | ONNX, dynamically quantized (`onnx/model_quint8_avx2.onnx`, 119MB)     |
+| HuggingFace Repo    | cross-encoder/mmarco-mMiniLMv2-L12-H384-v1                             |
+| Type                | Cross-encoder reranker (XLM-RoBERTa, one relevance logit)              |
+| Size                | 12 layers, 118M parameters, of which 96M are the 250k-token vocabulary |
+| Max sequence length | 512 tokens, the model's own limit, enforced via `MAX_SEQUENCE_LENGTH`  |
+| Storage             | `server/models/cross-encoder/mmarco-mMiniLMv2-L12-H384-v1/`            |
 
 It is trained on mMARCO, the machine-translated multilingual MS MARCO, and is genuinely multilingual: a 250k-token sentencepiece vocabulary shared across languages, which is also where most of the parameter count goes.
 
@@ -150,15 +147,15 @@ npx vitest run --config vitest.integration.config.ts
 
 ## Error Handling
 
-| Scenario | Behavior |
-|----------|----------|
-| Reranker not ready | Falls back to unranked SearXNG results |
-| Model fails to load | Logged by the hook; reranker stays unready and search returns unranked results |
-| Cached file of the wrong size | Logged, then downloaded again before the session is created |
-| Download shorter than the reported size | Throws before anything is written, so the cache keeps no partial file |
-| HuggingFace unreachable with a warm cache | Metadata failure is logged and the cached files are used unchanged |
-| Empty documents array | Returns empty array without running inference |
-| Unicode sanitization needed | Logs warning, continues with sanitized input |
+| Scenario                                  | Behavior                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------ |
+| Reranker not ready                        | Falls back to unranked SearXNG results                                         |
+| Model fails to load                       | Logged by the hook; reranker stays unready and search returns unranked results |
+| Cached file of the wrong size             | Logged, then downloaded again before the session is created                    |
+| Download shorter than the reported size   | Throws before anything is written, so the cache keeps no partial file          |
+| HuggingFace unreachable with a warm cache | Metadata failure is logged and the cached files are used unchanged             |
+| Empty documents array                     | Returns empty array without running inference                                  |
+| Unicode sanitization needed               | Logs warning, continues with sanitized input                                   |
 
 ## Observability
 
@@ -184,8 +181,20 @@ taking 20 ms produce:
     "skippedUnhealthy": 0,
     "failed": 0,
     "byType": {
-      "text": { "reranks": 2, "averageMs": 200, "considered": 20, "kept": 5, "keptRate": 25 },
-      "images": { "reranks": 1, "averageMs": 20, "considered": 2, "kept": 2, "keptRate": 100 }
+      "text": {
+        "reranks": 2,
+        "averageMs": 200,
+        "considered": 20,
+        "kept": 5,
+        "keptRate": 25
+      },
+      "images": {
+        "reranks": 1,
+        "averageMs": 20,
+        "considered": 2,
+        "kept": 2,
+        "keptRate": 100
+      }
     }
   }
 }

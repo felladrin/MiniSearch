@@ -7,7 +7,6 @@ Codebase-specific terms, jargon, and domain concepts used in MiniSearch.
 ### Search Token & Hash
 
 A security mechanism used to authorize communication between the client and the internal search/AI endpoints.
-
 - **Search Token**: A random string held by the running server, served to the client at runtime through `/api/config`. Used to verify that requests to the server come from a client that server handed the token to.
 - **Search Token Hash**: To avoid exposing the raw token in all requests, the client generates a hash of the token. Managed via the `lastSearchTokenHashPubSub` channel.
 - **Verification**: The server verifies these tokens to prevent unauthorized access to the search API. Stored in `server/verifiedTokens.ts` as an in-memory `Set<string>`.
@@ -16,17 +15,16 @@ A security mechanism used to authorize communication between the client and the 
 
 MiniSearch supports multiple backends for Large Language Model (LLM) inference, configured via `inferenceType` in the application settings.
 
-| Type | Description | Implementation |
-|------|-------------|----------------|
-| `browser` | Local inference using WASM (Wllama) | Client-side, privacy-preserving |
-| `openai` | Connection to any OpenAI-compatible external API | Requires API key |
-| `horde` | Crowdsourced inference via the AI Horde network | Distributed, anonymous or authenticated |
-| `internal` | Server-side proxy using pre-configured credentials | API key hidden from client |
+| Type       | Description                                        | Implementation                          |
+| ---------- | -------------------------------------------------- | --------------------------------------- |
+| `browser`  | Local inference using WASM (Wllama)                | Client-side, privacy-preserving         |
+| `openai`   | Connection to any OpenAI-compatible external API   | Requires API key                        |
+| `horde`    | Crowdsourced inference via the AI Horde network    | Distributed, anonymous or authenticated |
+| `internal` | Server-side proxy using pre-configured credentials | API key hidden from client              |
 
 ### PubSub (State Management)
 
 Instead of a heavy state management library like Redux, MiniSearch uses a minimalist Publish-Subscribe pattern powered by the `create-pubsub` library.
-
 - **Data Flow**: Components subscribe to "channels" (e.g., `queryPubSub`, `responsePubSub`)
 - **Tuple Pattern**: Each channel is a 3-element tuple: `[update, subscribe, get]`
 - **Persistence**: Some channels use `createLocalStoragePubSub` to automatically sync state with `localStorage`
@@ -35,7 +33,6 @@ Instead of a heavy state management library like Redux, MiniSearch uses a minima
 ### Reranker
 
 A secondary search stage that takes initial results from SearXNG and re-orders them based on relevance to the query using a multilingual cross-encoder model (`mmarco-mMiniLMv2-L12-H384-v1`) running in-process via ONNX Runtime.
-
 - **Implementation**: Loads the model's ONNX export with `onnxruntime-node`; no child process
 - **Health Check**: Polls `/health` endpoint via `getRerankerStatus`
 - **Scoring**: Results filtered using standard deviation thresholds (`kStandardDeviationFactor = 0.3`)
@@ -44,7 +41,6 @@ A secondary search stage that takes initial results from SearXNG and re-orders t
 ### Wllama
 
 A WebAssembly (WASM) based integration of `llama.cpp` for running LLMs on the CPU in the browser.
-
 - **Initialization**: Loads models from HuggingFace using `initializeWllama`
 - **Warmup**: Includes a warmup phase with a single token completion using `n_threads: 1`
 - **OPFS**: Uses the Origin Private File System via Wllama's cache manager to store model shards locally
@@ -53,7 +49,6 @@ A WebAssembly (WASM) based integration of `llama.cpp` for running LLMs on the CP
 ### AI Horde
 
 A crowdsourced distributed cluster of workers providing AI inference. MiniSearch integrates with it using a polling strategy against the `/generate/text/status` endpoint.
-
 - **Kudos**: Virtual currency used by the Horde. Default anonymous key is `0000000000`
 - **Polling**: Requests sent to async API, status checked periodically until completion
 - **Cancellation**: Can abort generation via `DELETE` on the status endpoint
@@ -61,7 +56,6 @@ A crowdsourced distributed cluster of workers providing AI inference. MiniSearch
 ### Conversation Memory & Rolling Summary
 
 A mechanism to handle long chats that exceed the LLM context window.
-
 - **Summarization**: When older messages are dropped, `createLlmSummary` asks the LLM to condense them under a limit of 800 tokens
 - **Extractive Fallback**: If LLM summarization fails, `summarizeDroppedMessages` uses a token-counting extractive approach
 - **Token Budget**: Computed based on `openAiContextLength` setting and current message count
@@ -88,16 +82,16 @@ Note the version mismatch trap: Dexie registers its schema at the declared versi
 
 Middleware registered via Vite plugin hooks (`configureServer`, `configurePreviewServer`). All server-side logic in MiniSearch is implemented as hooks:
 
-| Hook | Purpose |
-|------|---------|
-| `compressionServerHook` | gzip/brotli compression |
-| `crossOriginServerHook` | COOP/COEP headers for SharedArrayBuffer |
-| `searchEndpointServerHook` | `/search/text` and `/search/images` endpoints |
-| `statusEndpointServerHook` | `/status` health check |
-| `cacheServerHook` | Cache-Control headers |
-| `validateAccessKeyServerHook` | Access key validation |
-| `internalApiEndpointServerHook` | `/inference` proxy |
-| `rerankerServiceHook` | Reranker model lifecycle management |
+| Hook                            | Purpose                                       |
+| ------------------------------- | --------------------------------------------- |
+| `compressionServerHook`         | gzip/brotli compression                       |
+| `crossOriginServerHook`         | COOP/COEP headers for SharedArrayBuffer       |
+| `searchEndpointServerHook`      | `/search/text` and `/search/images` endpoints |
+| `statusEndpointServerHook`      | `/status` health check                        |
+| `cacheServerHook`               | Cache-Control headers                         |
+| `validateAccessKeyServerHook`   | Access key validation                         |
+| `internalApiEndpointServerHook` | `/inference` proxy                            |
+| `rerankerServiceHook`           | Reranker model lifecycle management           |
 
 ### Circuit Breaker
 
@@ -115,30 +109,30 @@ A password hashing algorithm used for access key validation. Client hashes the a
 
 ### SearchCacheDatabase Schema
 
-| Store | Primary Key | Indexed Field | Entry Type |
-|-------|-------------|---------------|------------|
-| `textSearchHistory` | key (hash) | timestamp | TextSearchCache |
-| `imageSearchHistory` | key (hash) | timestamp | ImageSearchCache |
+| Store                | Primary Key | Indexed Field | Entry Type       |
+| -------------------- | ----------- | ------------- | ---------------- |
+| `textSearchHistory`  | key (hash)  | timestamp     | TextSearchCache  |
+| `imageSearchHistory` | key (hash)  | timestamp     | ImageSearchCache |
 
 ### HistoryDatabase Schema
 
-| Table | Purpose |
-|-------|---------|
-| `searches` | Canonical log of each query with hydrated results payloads |
-| `llmResponses` | AI answers tied to their originating search run |
-| `chatHistory` | Chronological chat turns scoped by `conversationId` |
+| Table          | Purpose                                                    |
+| -------------- | ---------------------------------------------------------- |
+| `searches`     | Canonical log of each query with hydrated results payloads |
+| `llmResponses` | AI answers tied to their originating search run            |
+| `chatHistory`  | Chronological chat turns scoped by `conversationId`        |
 
 ### PubSub Channel Types
 
-| Channel | Data Type | Persistence |
-|---------|-----------|-------------|
-| `queryPubSub` | `string` | Memory |
-| `responsePubSub` | `string` | Memory (throttled) |
-| `settingsPubSub` | `Settings` | localStorage |
-| `textSearchResultsPubSub` | `TextSearchResults` | Memory |
-| `textGenerationStatePubSub` | `TextGenerationState` | Memory |
-| `chatMessagesPubSub` | `ChatMessage[]` | Memory |
-| `conversationSummaryPubSub` | `{id, summary}` | Memory |
+| Channel                     | Data Type             | Persistence        |
+| --------------------------- | --------------------- | ------------------ |
+| `queryPubSub`               | `string`              | Memory             |
+| `responsePubSub`            | `string`              | Memory (throttled) |
+| `settingsPubSub`            | `Settings`            | localStorage       |
+| `textSearchResultsPubSub`   | `TextSearchResults`   | Memory             |
+| `textGenerationStatePubSub` | `TextGenerationState` | Memory             |
+| `chatMessagesPubSub`        | `ChatMessage[]`       | Memory             |
+| `conversationSummaryPubSub` | `{id, summary}`       | Memory             |
 
 ## Related Topics
 
