@@ -1,11 +1,12 @@
 # Search History System
 
 ## Overview
+
 MiniSearch keeps a local-first record of every search so agents can resurface text results, image results, and generated responses without hitting remote services again. All persistence lives inside the browser via Dexie/IndexedDB and is never synced to external servers, preserving the privacy posture of the app.
 
 ## Data Model and Storage
-The `HistoryDatabase` Dexie instance stores three related tables:
 
+The `HistoryDatabase` Dexie instance stores three related tables:
 1. `searches` – canonical log of each query plus hydrated results payloads (text, image, run metadata, source, pin state).
 2. `llmResponses` – snapshot of every AI answer tied to its originating search run, enabling restoration of the assistant output.
 3. `chatHistory` – chronological record of chat turns (user/assistant roles) scoped by `conversationId` (the `searchRunId`).
@@ -13,8 +14,8 @@ The `HistoryDatabase` Dexie instance stores three related tables:
 All three tables share a `searchRunId` foreign key so restoring a specific run can bring back the search results, saved AI response, and chat transcript atomically.
 
 ## Cleanup Guarantees
-To keep IndexedDB lean, inserts trigger `performCleanup()`, which enforces:
 
+To keep IndexedDB lean, inserts trigger `performCleanup()`, which enforces:
 - **Retention window** – non-pinned entries older than `historyRetentionDays` are deleted in batches of 100.
 - **Max entries** – if the total exceeds `historyMaxEntries`, the oldest unpinned rows past the limit are removed.
 - **Pin protection** – pinned entries are skipped by both retention and max-entry sweeps.
@@ -22,8 +23,8 @@ To keep IndexedDB lean, inserts trigger `performCleanup()`, which enforces:
 Cleanup is gated by `historyAutoCleanup`, so advanced users can opt out. These knobs come from the settings store and can be updated at runtime.
 
 ## Hook API
-`useSearchHistory` exposes the canonical API surface for components:
 
+`useSearchHistory` exposes the canonical API surface for components:
 - Fetches recent searches (optionally paginated) and exposes filtered/grouped views.
 - Provides fuzzy search, pin toggling, delete/clear operations, and error retry helpers.
 - Keeps derived state such as grouped sections (Today/Yesterday/etc.) in sync with the settings flag `historyGroupByDate`.
@@ -32,14 +33,17 @@ Cleanup is gated by `historyAutoCleanup`, so advanced users can opt out. These k
 Because the hook writes via Dexie directly, any component can call `addSearchToHistory` to persist new runs immediately after text or image searches resolve.
 
 ## UI Surfaces
+
 - **History Drawer** – wraps the hook data in a drawer with filtering, pin/delete affordances, grouped stacks, and an Analytics tab powered by `SearchStats` in compact mode. The drawer guards against disabled history settings and mirrors the hook filtered list in real time.
 - **History Button** – lazy-loads the drawer and logs open/close events for observability.
 - **History Restore** – the `useHistoryRestore` hook recreates full search state (query string, search results, AI response, and chat transcript) when a user replays an entry.
 
 ## Settings Surface
+
 `HistorySettings` wires Mantine form controls to the settings pub/sub so users can toggle history, adjust retention/max entries, and clear all rows (with confirmation + toast feedback). It relies on the same hook to know when the table is empty before enabling destructive actions.
 
 ## Analytics Integration
+
 The History Drawer Analytics tab renders the compact `SearchStats` cards scoped to `period="all"`, giving total searches, daily averages, and most active hours pulled from the same IndexedDB data. Keeping analytics co-located ensures the metrics share the hook filtering and cleanup guarantees.
 
 ## Search Cache System
@@ -47,19 +51,19 @@ The History Drawer Analytics tab renders the compact `SearchStats` cards scoped 
 Alongside the history database, MiniSearch uses a separate `SearchCacheDatabase` for temporary result caching:
 
 **Schema:**
-| Store | Key | Index | Entry Type |
-|-------|-----|-------|------------|
-| `textSearchHistory` | hashed query | timestamp | `TextSearchCache` |
+| Store                | Key          | Index     | Entry Type         |
+| -------------------- | ------------ | --------- | ------------------ |
+| `textSearchHistory`  | hashed query | timestamp | `TextSearchCache`  |
 | `imageSearchHistory` | hashed query | timestamp | `ImageSearchCache` |
 
 **Configuration:**
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| TTL | 15 minutes | Freshness window: a hit inside it skips the network |
-| MAX_STALE_RETENTION | 24 hours | How long an expired entry is kept, so a failed live search can serve it flagged stale |
-| MAX_ENTRIES | 100 | Maximum cached queries per store |
-| PRUNE_INTERVAL | 10 writes | Cache writes between LRU prune passes |
-| REQUEST_TIMEOUT | 30,000 ms | Search request timeout |
+| Parameter           | Value      | Description                                                                           |
+| ------------------- | ---------- | ------------------------------------------------------------------------------------- |
+| TTL                 | 15 minutes | Freshness window: a hit inside it skips the network                                   |
+| MAX_STALE_RETENTION | 24 hours   | How long an expired entry is kept, so a failed live search can serve it flagged stale |
+| MAX_ENTRIES         | 100        | Maximum cached queries per store                                                      |
+| PRUNE_INTERVAL      | 10 writes  | Cache writes between LRU prune passes                                                 |
+| REQUEST_TIMEOUT     | 30,000 ms  | Search request timeout                                                                |
 
 **Performance Metrics:** The `cacheMetrics` object tracks hits/misses per search type and logs hit rates every 10 operations. Query hashing produces deterministic cache keys for reliable lookups.
 
@@ -67,12 +71,12 @@ Alongside the history database, MiniSearch uses a separate `SearchCacheDatabase`
 
 Lightweight state persisted via `createLocalStoragePubSub`:
 
-| Key | Type | Default | Purpose |
-|-----|------|---------|---------|
-| `settings` | `Settings` | `defaultSettings` | App configuration |
-| `querySuggestions` | `string[]` | `[]` | Search suggestion pool |
-| `lastSearchTokenHash` | `string` | `""` | Cached security token hash |
-| `menuExpandedAccordions` | `string[]` | `[]` | Menu UI state |
+| Key                      | Type       | Default           | Purpose                    |
+| ------------------------ | ---------- | ----------------- | -------------------------- |
+| `settings`               | `Settings` | `defaultSettings` | App configuration          |
+| `querySuggestions`       | `string[]` | `[]`              | Search suggestion pool     |
+| `lastSearchTokenHash`    | `string`   | `""`              | Cached security token hash |
+| `menuExpandedAccordions` | `string[]` | `[]`              | Menu UI state              |
 
 ## Performance Measurement
 

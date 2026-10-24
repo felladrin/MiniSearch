@@ -33,7 +33,6 @@ MiniSearch integrates multiple technology stacks within a unified deployment con
 ## Application Entry Points
 
 The application has three primary entry points:
-
 1. **Browser Entry**: `client/index.tsx` initializes the React application, mounting the root component and setting up error boundaries.
 
 2. **Server Entry**: `vite.config.ts` configures the Vite development and preview servers, registering server hooks for search and inference endpoints.
@@ -43,7 +42,6 @@ The application has three primary entry points:
 ## Multi-Service Container Architecture
 
 The Docker container runs three services concurrently:
-
 - **SearXNG** - Privacy-focused metasearch engine
 - **ONNX Runtime** - In-process inference for result reranking
 - **Node.js application** - Main application server
@@ -59,7 +57,6 @@ PubSub channels are created using the create-pubsub package and provide type-saf
 ## Data Persistence Strategy
 
 MiniSearch employs a dual-layer persistence approach:
-
 - **IndexedDB** - Local storage for search history, settings, cached results, and saved AI transcripts
 - **TTL-based caching** - 15-minute freshness cache for search results to minimize API calls, with a 24-hour stale retention as a fallback when the live search fails
 
@@ -114,7 +111,6 @@ The `textGeneration` module orchestrates the entire search-to-response flow, man
 ### Web Search Service Reliability
 
 `server/webSearchService.ts` implements resilience patterns for SearXNG integration:
-
 - **Circuit Breaker**: Opens after 5 consecutive failures, blocking requests for 60 seconds before attempting reset
 - **Retry Logic**: Exponential backoff for HTTP 500 errors, up to 3 retries
 - **Fail-Fast on Suspending Engines**: An empty response in which every unresponsive engine is under a long suspension (CAPTCHA, rate limit, access denied; SearXNG suspends them for an hour to a day) throws on the first attempt instead of spending the retry budget, which it could not possibly outlast. Transient engine errors (timeouts, server API errors) keep the full retry budget.
@@ -126,7 +122,6 @@ None of this changes which engines answer. That is decided inside SearXNG, and w
 ### Search Token Lifecycle
 
 CSRF protection uses a token the server owns for its lifetime:
-
 1. **Generation**: `regenerateSearchToken()` draws 32 random bytes on first use in a process and writes them to the token file; the file is a record, never read back as a source of truth
 2. **Storage**: The token is held in memory for the life of the process, and recorded at `{os.tempdir()}/minisearch-token` with `0600` permissions
 3. **Distribution**: Server serves the token to the client at runtime through `/api/config`, so a client always holds the token of the server answering it
@@ -144,7 +139,6 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 ### State Machine Transitions
 
 **Text Generation States:**
-
 - `idle` - No active generation
 - `awaitingModelDownloadAllowance` - Waiting for user consent to download a browser model
 - `loadingModel` - Downloading or initializing the browser (Wllama) model
@@ -156,7 +150,6 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 - `failed` - Error occurred
 
 **Search States:**
-
 - `idle` - No active search
 - `running` - Search in progress
 - `completed` - Results received
@@ -174,10 +167,10 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 
 Streaming LLM output produces token-by-token state changes that would overwhelm React's rendering pipeline. Two channels apply throttling via `throttleit`:
 
-| Channel | Throttle Interval | Purpose |
-|---------|-------------------|---------|
-| `responsePubSub` | ~83ms (12/sec) | AI response text streaming |
-| `reasoningContentPubSub` | ~83ms (12/sec) | Reasoning/thinking content streaming |
+| Channel                  | Throttle Interval | Purpose                              |
+| ------------------------ | ----------------- | ------------------------------------ |
+| `responsePubSub`         | ~83ms (12/sec)    | AI response text streaming           |
+| `reasoningContentPubSub` | ~83ms (12/sec)    | Reasoning/thinking content streaming |
 
 Callers write tokens directly to `updateResponse` or `updateReasoningContent` without awareness of internal throttling.
 
@@ -185,11 +178,11 @@ Callers write tokens directly to `updateResponse` or `updateReasoningContent` wi
 
 Three channels register built-in side-effect subscribers at module load time for automatic logging:
 
-| Channel | Side Effect |
-| --------- | ------------- |
+| Channel                     | Side Effect                              |
+| --------------------------- | ---------------------------------------- |
 | `textGenerationStatePubSub` | Logs state transitions via `addLogEntry` |
-| `textSearchStatePubSub` | Logs state transitions via `addLogEntry` |
-| `imageSearchStatePubSub` | Logs state transitions via `addLogEntry` |
+| `textSearchStatePubSub`     | Logs state transitions via `addLogEntry` |
+| `imageSearchStatePubSub`    | Logs state transitions via `addLogEntry` |
 
 ## Build and Deployment Pipeline
 
@@ -199,20 +192,19 @@ The build pipeline uses Biome for linting and formatting, TypeScript for type ch
 
 MiniSearch implements all server-side logic as Vite plugin hooks. Each hook registers middleware on Vite's HTTP server, working identically in both dev (`vite`) and production preview (`vite preview`) modes. Hooks are declared in `vite.config.ts` and registered via `configureServer`/`configurePreviewServer` callbacks.
 
-| Hook | File | Purpose |
-| ------ | ------ | --------- |
-| `compressionServerHook` | `server/compressionServerHook.ts` | gzip/brotli compression for all responses |
-| `crossOriginServerHook` | `server/crossOriginServerHook.ts` | COOP/COEP headers for SharedArrayBuffer |
-| `searchEndpointServerHook` | `server/searchEndpointServerHook.ts` | `/search/text` and `/search/images` endpoints proxied to SearXNG |
+| Hook                            | File                                      | Purpose                                                               |
+| ------------------------------- | ----------------------------------------- | --------------------------------------------------------------------- |
+| `compressionServerHook`         | `server/compressionServerHook.ts`         | gzip/brotli compression for all responses                             |
+| `crossOriginServerHook`         | `server/crossOriginServerHook.ts`         | COOP/COEP headers for SharedArrayBuffer                               |
+| `searchEndpointServerHook`      | `server/searchEndpointServerHook.ts`      | `/search/text` and `/search/images` endpoints proxied to SearXNG      |
 | `pageContentEndpointServerHook` | `server/pageContentEndpointServerHook.ts` | `/page-content` endpoint that reads result pages for answer grounding |
-| `statusEndpointServerHook` | `server/statusEndpointServerHook.ts` | `/status` health check endpoint |
-| `cacheServerHook` | `server/cacheServerHook.ts` | Cache-Control headers (preview only) |
-| `validateAccessKeyServerHook` | `server/validateAccessKeyServerHook.ts` | Access key validation endpoint |
-| `internalApiEndpointServerHook` | `server/internalApiEndpointServerHook.ts` | `/inference` proxy to self-hosted API |
-| `rerankerServiceHook` | `server/rerankerServiceHook.ts` | Reranker model lifecycle management for result reranking |
+| `statusEndpointServerHook`      | `server/statusEndpointServerHook.ts`      | `/status` health check endpoint                                       |
+| `cacheServerHook`               | `server/cacheServerHook.ts`               | Cache-Control headers (preview only)                                  |
+| `validateAccessKeyServerHook`   | `server/validateAccessKeyServerHook.ts`   | Access key validation endpoint                                        |
+| `internalApiEndpointServerHook` | `server/internalApiEndpointServerHook.ts` | `/inference` proxy to self-hosted API                                 |
+| `rerankerServiceHook`           | `server/rerankerServiceHook.ts`           | Reranker model lifecycle management for result reranking              |
 
 Key server-side modules:
-
 - **`server/webSearchService.ts`**: Integrates with SearXNG at `http://127.0.0.1:8888`. Implements a circuit breaker (opens after 5 failures, resets after 60s) and retry logic (up to 3 retries with exponential backoff, for 500s and for empty responses naming transiently unresponsive engines; an all-suspended set fails fast on the first attempt, since SearXNG suspensions last an hour to a day).
 - **`server/pageContentService.ts`**: Reads result pages for answer grounding: SSRF-guarded fetches with a byte cap, readable-text extraction, and query-relevant passage selection. Reads run under a per-host circuit breaker (`server/pageReadHostBreaker.ts`) that skips a host for 5 minutes after 3 refusals in a row, then probes it with one read.
 - **`server/searchToken.ts`**: Manages a token at `{os.tempdir()}/minisearch-token` used for CSRF protection on search requests.
@@ -224,42 +216,42 @@ Key server-side modules:
 
 The `cacheServerHook` sets Cache-Control headers on every response:
 
-| Path Pattern | Cache-Control Header | Rationale |
-| --- | --- | --- |
-| `/assets/*` | `public, max-age=31536000, immutable` | Content-hashed filenames never change |
-| `/` or `*.html` | `no-cache` | HTML must always check for updates |
-| Everything else | `public, max-age=86400, must-revalidate` | 24-hour cache with revalidation |
+| Path Pattern    | Cache-Control Header                     | Rationale                             |
+| --------------- | ---------------------------------------- | ------------------------------------- |
+| `/assets/*`     | `public, max-age=31536000, immutable`    | Content-hashed filenames never change |
+| `/` or `*.html` | `no-cache`                               | HTML must always check for updates    |
+| Everything else | `public, max-age=86400, must-revalidate` | 24-hour cache with revalidation       |
 
 ### Status Endpoint
 
 The `/status` endpoint returns a JSON object:
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `uptime` | string | Human-readable server uptime, measured from `startedAt` |
-| `startedAt` | string | ISO timestamp of the server start; all the "since last restart" counters below are measured from this moment |
-| `sessions` | number | Distinct verified sessions since last restart, which the two per-session averages below divide by |
-| `activeSessions` | number | Sessions still in the cache, dropped after 30 idle minutes |
-| `textualSearches` | number | Text search count since last restart |
-| `graphicalSearches` | number | Image search count since last restart |
-| `averageTextualSearchesPerSession` | number | Text searches / sessions ratio |
-| `averageGraphicalSearchesPerSession` | number | Image searches / sessions ratio |
-| `searchesWithoutResults` | number | Searches, text and image together, that SearXNG answered with zero results and no unresponsive engines |
-| `searchesWithUnresponsiveEngines` | number | Searches, text and image together, that came back with zero results and unresponsive engines, whether the retries were spent or an all-suspended set failed fast; one per search, not per attempt |
-| `searchesWithAllResultsDiscarded` | number | Text searches whose results were all dropped during processing |
-| `searchesServedByFallback` | number | Text searches answered by the fallback source after SearXNG failed |
-| `searchesFailedOnFallback` | number | Fallback searches that failed, plus searches where SearXNG's own retries had left too little of the search deadline for the fallback to be asked at all. A rising count is therefore not by itself a sign that the fallback providers are failing |
-| `biEncoderServiceStatus` | string | `"healthy"` or `"unhealthy"` |
-| `rerankerServiceStatus` | string | `"healthy"` or `"unhealthy"` |
-| `webSearchServiceStatus` | string | `"healthy"`, `"degraded"` or `"unhealthy"`, see below |
-| `pageReads` | object | Page-reading counters since last restart, see below |
-| `authorization` | object | Token and rate-limit outcomes since last restart, see below |
-| `inference` | object | AI answer counters since last restart, see below |
-| `searches` | object | Search timing, circuit state and per-engine failures, see below |
-| `reranker` | object | Reranking cost and effect, see below |
-| `thumbnails` | object | `/thumbnail` request outcomes, see below |
-| `build.timestamp` | string | ISO 8601 build time |
-| `build.gitCommit` | string | Short Git commit hash |
+| Field                                | Type   | Description                                                                                                                                                                                                                                       |
+| ------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uptime`                             | string | Human-readable server uptime, measured from `startedAt`                                                                                                                                                                                           |
+| `startedAt`                          | string | ISO timestamp of the server start; all the "since last restart" counters below are measured from this moment                                                                                                                                      |
+| `sessions`                           | number | Distinct verified sessions since last restart, which the two per-session averages below divide by                                                                                                                                                 |
+| `activeSessions`                     | number | Sessions still in the cache, dropped after 30 idle minutes                                                                                                                                                                                        |
+| `textualSearches`                    | number | Text search count since last restart                                                                                                                                                                                                              |
+| `graphicalSearches`                  | number | Image search count since last restart                                                                                                                                                                                                             |
+| `averageTextualSearchesPerSession`   | number | Text searches / sessions ratio                                                                                                                                                                                                                    |
+| `averageGraphicalSearchesPerSession` | number | Image searches / sessions ratio                                                                                                                                                                                                                   |
+| `searchesWithoutResults`             | number | Searches, text and image together, that SearXNG answered with zero results and no unresponsive engines                                                                                                                                            |
+| `searchesWithUnresponsiveEngines`    | number | Searches, text and image together, that came back with zero results and unresponsive engines, whether the retries were spent or an all-suspended set failed fast; one per search, not per attempt                                                 |
+| `searchesWithAllResultsDiscarded`    | number | Text searches whose results were all dropped during processing                                                                                                                                                                                    |
+| `searchesServedByFallback`           | number | Text searches answered by the fallback source after SearXNG failed                                                                                                                                                                                |
+| `searchesFailedOnFallback`           | number | Fallback searches that failed, plus searches where SearXNG's own retries had left too little of the search deadline for the fallback to be asked at all. A rising count is therefore not by itself a sign that the fallback providers are failing |
+| `biEncoderServiceStatus`             | string | `"healthy"` or `"unhealthy"`                                                                                                                                                                                                                      |
+| `rerankerServiceStatus`              | string | `"healthy"` or `"unhealthy"`                                                                                                                                                                                                                      |
+| `webSearchServiceStatus`             | string | `"healthy"`, `"degraded"` or `"unhealthy"`, see below                                                                                                                                                                                             |
+| `pageReads`                          | object | Page-reading counters since last restart, see below                                                                                                                                                                                               |
+| `authorization`                      | object | Token and rate-limit outcomes since last restart, see below                                                                                                                                                                                       |
+| `inference`                          | object | AI answer counters since last restart, see below                                                                                                                                                                                                  |
+| `searches`                           | object | Search timing, circuit state and per-engine failures, see below                                                                                                                                                                                   |
+| `reranker`                           | object | Reranking cost and effect, see below                                                                                                                                                                                                              |
+| `thumbnails`                         | object | `/thumbnail` request outcomes, see below                                                                                                                                                                                                          |
+| `build.timestamp`                    | string | ISO 8601 build time                                                                                                                                                                                                                               |
+| `build.gitCommit`                    | string | Short Git commit hash                                                                                                                                                                                                                             |
 
 `webSearchServiceStatus` answers whether searches can be served, which
 SearXNG's `/healthz` alone does not: an open circuit fails every search without
@@ -301,27 +293,27 @@ loaded is a later, per-tile failure, handled when the client fetches it from
 is attached to a constant that someone will want to move, which is the reason it
 is counted at all (see `docs/page-content.md`):
 
-| Field | Type | Tunes |
-| --- | --- | --- |
-| `requested` | number | Nothing; the denominator for the rest |
-| `read` | number | Nothing; how often the feature contributed anything |
-| `readRate` | number | Nothing; `read` as a percentage of `requested` |
-| `averageReadMs` | number | `REQUEST_TIMEOUT_MS`, including the reads that hit it |
-| `bodiesTruncated` | number | `MAX_RESPONSE_BYTES` |
-| `excerptKeptRate` | number | `MAX_PAGE_CHARS` and the 0.9 dedup threshold, as the share of pooled passages that survive |
-| `circuitOpens` | number | `failureThreshold` on the page-read host breaker: how often a host was boxed, summed over every host, since no host is named |
-| `skipped.blocked` | number | The SSRF guard, and how often callers aim at private space |
-| `skipped.skippedByBreaker` | number | `resetTimeout` on the host breaker: reads refused on the server because the host had refused the last three, which is what the box saved |
-| `skipped.notADocument` | number | `READABLE_CONTENT_TYPES` |
-| `skipped.httpForbidden` | number | Bot walls and rate limits (401, 403, 429) |
-| `skipped.httpNotFound` | number | Dead links (404, 410) |
-| `skipped.httpOtherError` | number | Other non-ok HTTP statuses |
-| `skipped.redirectLimit` | number | `MAX_REDIRECTS` |
-| `skipped.timedOut` | number | `REQUEST_TIMEOUT_MS` |
-| `skipped.tooLittleText` | number | `MIN_USEFUL_CHARS`, and the extractor's selectors |
-| `skipped.failed` | number | Nothing; the residue worth watching for a pattern |
-| `grounding.requests` | number | Nothing; the denominator for the two below |
-| `grounding.withContent` | number | Nothing; requests where at least one page yielded text |
+| Field                      | Type   | Tunes                                                                                                                                                            |
+| -------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `requested`                | number | Nothing; the denominator for the rest                                                                                                                            |
+| `read`                     | number | Nothing; how often the feature contributed anything                                                                                                              |
+| `readRate`                 | number | Nothing; `read` as a percentage of `requested`                                                                                                                   |
+| `averageReadMs`            | number | `REQUEST_TIMEOUT_MS`, including the reads that hit it                                                                                                            |
+| `bodiesTruncated`          | number | `MAX_RESPONSE_BYTES`                                                                                                                                             |
+| `excerptKeptRate`          | number | `MAX_PAGE_CHARS` and the 0.9 dedup threshold, as the share of pooled passages that survive                                                                       |
+| `circuitOpens`             | number | `failureThreshold` on the page-read host breaker: how often a host was boxed, summed over every host, since no host is named                                     |
+| `skipped.blocked`          | number | The SSRF guard, and how often callers aim at private space                                                                                                       |
+| `skipped.skippedByBreaker` | number | `resetTimeout` on the host breaker: reads refused on the server because the host had refused the last three, which is what the box saved                         |
+| `skipped.notADocument`     | number | `READABLE_CONTENT_TYPES`                                                                                                                                         |
+| `skipped.httpForbidden`    | number | Bot walls and rate limits (401, 403, 429)                                                                                                                        |
+| `skipped.httpNotFound`     | number | Dead links (404, 410)                                                                                                                                            |
+| `skipped.httpOtherError`   | number | Other non-ok HTTP statuses                                                                                                                                       |
+| `skipped.redirectLimit`    | number | `MAX_REDIRECTS`                                                                                                                                                  |
+| `skipped.timedOut`         | number | `REQUEST_TIMEOUT_MS`                                                                                                                                             |
+| `skipped.tooLittleText`    | number | `MIN_USEFUL_CHARS`, and the extractor's selectors                                                                                                                |
+| `skipped.failed`           | number | Nothing; the residue worth watching for a pattern                                                                                                                |
+| `grounding.requests`       | number | Nothing; the denominator for the two below                                                                                                                       |
+| `grounding.withContent`    | number | Nothing; requests where at least one page yielded text                                                                                                           |
 | `grounding.withoutContent` | number | The budgets and timeouts above, read per request instead of per page: six pages at a 50% read rate can be three fully grounded answers or six half-grounded ones |
 
 `read` plus every `skipped` entry sums to `requested`, so a page that goes
@@ -337,18 +329,18 @@ nobody asked for an answer, not that nothing could be read.
 verification, the funnel `/search/text`, `/search/images`, `/page-content` and
 `/inference` all pass through:
 
-| Field | Type | Says |
-| --- | --- | --- |
-| `requests` | number | Requests that reached verification; the denominator for the rest |
-| `authorized` | number | Requests that passed it |
-| `rejectedRate` | number | Rejections as a percentage of `requests` |
-| `reasons.rateLimited` | number | Refused by the limiter before anything else ran |
-| `reasons.missingToken` | number | No token on the request, which is what an outdated client looks like |
-| `reasons.invalidToken` | number | A token that failed verification, which is what probing looks like |
-| `bySurface` | object | `authorized` and `rejected` per endpoint family: `search`, `pageContent`, `thumbnail`, `inference`, `other` |
-| `rejectedTokenCacheHits` | number | Rejections served from the rejected-token cache without a second argon2 verification |
+| Field                    | Type   | Says                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `requests`               | number | Requests that reached verification; the denominator for the rest                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `authorized`             | number | Requests that passed it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `rejectedRate`           | number | Rejections as a percentage of `requests`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `reasons.rateLimited`    | number | Refused by the limiter before anything else ran                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `reasons.missingToken`   | number | No token on the request, which is what an outdated client looks like                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `reasons.invalidToken`   | number | A token that failed verification, which is what probing looks like                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `bySurface`              | object | `authorized` and `rejected` per endpoint family: `search`, `pageContent`, `thumbnail`, `inference`, `other`                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `rejectedTokenCacheHits` | number | Rejections served from the rejected-token cache without a second argon2 verification                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `distinctRejectedTokens` | number | Distinct tokens the rejected-token cache holds, at most 1024. Only well-formed tokens that failed argon2 verification enter it; a token without the expected hash prefix is refused before that and never counted. A high `reasons.invalidToken` with a value of 1 here is one client replaying one dead token. A value that keeps growing is either many stale links or one caller sending fresh junk hashes, which the limiter caps per IP. The set only empties on a restart and evicts its oldest entry when full, so a value of 1024 means 1024 or more |
-| `limiter` | object | The shared limiter's `points` and `durationSeconds`, plus the separate `thumbnail` budget behind `/thumbnail`, without which a rejection count says nothing |
+| `limiter`                | object | The shared limiter's `points` and `durationSeconds`, plus the separate `thumbnail` budget behind `/thumbnail`, without which a rejection count says nothing                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 `authorized` plus every entry of `reasons` sums to `requests`, and each half of
 `bySurface` sums to its side of that, on the same principle as `pageReads`.
@@ -368,27 +360,27 @@ pays for it running out.
 `/inference`. Nothing about the conversation is kept, so the questions it can
 answer are about the upstream and about the wait, not about what was asked:
 
-| Field | Type | Says |
-| --- | --- | --- |
-| `requests` | number | Requests that passed token verification; the denominator for the rest |
-| `streamed` | number | Answers that finished normally |
-| `streamedRate` | number | `streamed` as a percentage of `requests` |
-| `averageTimeToFirstTokenMs` | number | The wait the user actually feels, over the answers that produced a token |
-| `averageDurationMs` | number | Whole-request duration over every outcome, so a 2 ms rejected body and a 25 s answer land in the same average |
-| `averageAttempts` | number | Models tried, over the requests that reached the model loop; above 1 means the pool is carrying failures |
-| `modelFallbacks` | number | Times a retry moved to another model |
-| `modelsRefetched` | number | Times the model pool was re-listed mid-retry |
-| `streamsEndedWithoutFinish` | number | Attempts whose stream closed with no finish part, counted per attempt because the retry can still succeed |
-| `failed.failedBeforeFirstToken` | number | Every model failed before a token was sent, answered 503 |
-| `failed.failedMidStream` | number | The answer broke after content was already sent, so no retry was possible |
-| `failed.abandoned` | number | The client was gone before or during the answer; the only outcome with no response to observe it by |
-| `failed.badRequest` | number | Body too large, unparsable, or failing the schema |
-| `failed.notConfigured` | number | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` or its key is missing |
-| `failed.modelListUnavailable` | number | The upstream's model list could not be fetched |
-| `failed.noModelAvailable` | number | The list was fetched and held nothing usable |
-| `failed.internalError` | number | Anything the handler did not expect |
-| `failed.unclassified` | number | Should always be zero; a non-zero value means a path stopped reporting its outcome |
-| `byModel` | object | `attempted`, `streamed`, `failed` and `abandoned` per model id, which is how a dead member of the pool becomes visible. `attempted` equals the other three added up |
+| Field                           | Type   | Says                                                                                                                                                                |
+| ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `requests`                      | number | Requests that passed token verification; the denominator for the rest                                                                                               |
+| `streamed`                      | number | Answers that finished normally                                                                                                                                      |
+| `streamedRate`                  | number | `streamed` as a percentage of `requests`                                                                                                                            |
+| `averageTimeToFirstTokenMs`     | number | The wait the user actually feels, over the answers that produced a token                                                                                            |
+| `averageDurationMs`             | number | Whole-request duration over every outcome, so a 2 ms rejected body and a 25 s answer land in the same average                                                       |
+| `averageAttempts`               | number | Models tried, over the requests that reached the model loop; above 1 means the pool is carrying failures                                                            |
+| `modelFallbacks`                | number | Times a retry moved to another model                                                                                                                                |
+| `modelsRefetched`               | number | Times the model pool was re-listed mid-retry                                                                                                                        |
+| `streamsEndedWithoutFinish`     | number | Attempts whose stream closed with no finish part, counted per attempt because the retry can still succeed                                                           |
+| `failed.failedBeforeFirstToken` | number | Every model failed before a token was sent, answered 503                                                                                                            |
+| `failed.failedMidStream`        | number | The answer broke after content was already sent, so no retry was possible                                                                                           |
+| `failed.abandoned`              | number | The client was gone before or during the answer; the only outcome with no response to observe it by                                                                 |
+| `failed.badRequest`             | number | Body too large, unparsable, or failing the schema                                                                                                                   |
+| `failed.notConfigured`          | number | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` or its key is missing                                                                                                     |
+| `failed.modelListUnavailable`   | number | The upstream's model list could not be fetched                                                                                                                      |
+| `failed.noModelAvailable`       | number | The list was fetched and held nothing usable                                                                                                                        |
+| `failed.internalError`          | number | Anything the handler did not expect                                                                                                                                 |
+| `failed.unclassified`           | number | Should always be zero; a non-zero value means a path stopped reporting its outcome                                                                                  |
+| `byModel`                       | object | `attempted`, `streamed`, `failed` and `abandoned` per model id, which is how a dead member of the pool becomes visible. `attempted` equals the other three added up |
 
 `streamed` plus every `failed` entry sums to `requests`. A request refused at
 token verification is not counted here, since `authorization` above already
@@ -412,27 +404,27 @@ nothing new.
 in the search path. Each row names the constant it is there to move, the same
 way `pageReads` does:
 
-| Field | Type | Tunes |
-| --- | --- | --- |
-| `searches.averageTextualMs` | number | The 30 s client timeout in `client/modules/search.ts`. Over the text searches SearXNG answered, so a failed or short-circuited one is not in it, and up to 7 s of retry backoff is |
-| `searches.averageGraphicalMs` | number | The same, for image searches |
-| `reranker.considered` | number | Nothing; results handed to the score filter, the denominator for `keptRate` |
-| `reranker.kept` | number | Nothing; results that survived it |
-| `searches.circuitState` | string | Nothing; whether searches are being short-circuited right now |
-| `searches.degradedSearchTypes` | array | Nothing; which of `text` and `images` is currently flagged, so a `degraded` verdict says which engine pool it is about. Empty when the half-open circuit is what triggered the verdict, which `circuitState` in the same object names |
-| `searches.circuitOpens` | number | `failureThreshold` and `resetTimeout` on the SearXNG breaker: each opening is a minute of serving no searches at all |
-| `searches.unresponsiveEngines` | object | Nothing; `failures` and `lastFailure` per engine name, which is how one engine timing out is told apart from every engine being CAPTCHA-blocked. `lastFailure` is `blocked` (a CAPTCHA, a rate limit or an access denial), `timeout` or `other`, never SearXNG's own wording, which is free-form text from an upstream engine and does not belong on an endpoint that needs no token. Counted on the searches `searchesWithUnresponsiveEngines` counts, so a search that recovered on a retry is not in it |
-| `searches.fallbackProviders` | object | Whether each fallback provider earns its place, and whether one needs an API key: per provider name, `served`, `empty`, `failed`, `rateLimited` (answered `429`, and also counted in `failed`) and `skippedWhilePaused` counts, plus `pausedForMs`, the time left on its current `429` pause (`0` when not paused). A steady `rateLimited` count on a keyless provider is the cue to set its key (see `docs/configuration.md`). Provider names are configured infrastructure, not user input |
-| `reranker.reranks` | number | Nothing; the denominator for the rest |
-| `reranker.averageMs` | number | Whether reranking or SearXNG is what users wait for, and so whether to rerank a shortlist instead of all 30 results. Over `reranks`, covering the filtering and sorting as well as the model |
-| `reranker.keptRate` | number | `kStandardDeviationFactor`: near 100% means the filter is not filtering. Text and image reranks are pooled, and the two run through different paths, so this moves with the traffic mix as well as with the threshold |
-| `reranker.byType.text`, `reranker.byType.images` | object | Each reports `reranks`, `averageMs`, `considered`, `kept` and `keptRate` for its search type; see `docs/reranking.md`. The existing top-level values remain combined totals |
-| `reranker.fallbackApplied` | number | `minPercentageFallback`: a large share means the deviation threshold is emptying batches the fallback then has to rescue |
-| `reranker.skippedUnhealthy` | number | Nothing; searches served in SearXNG's own order because the model was not loaded |
-| `reranker.failed` | number | Nothing; the same, because reranking threw |
-| `thumbnails.requested` | number | Nothing; the denominator for the two below; every verified `/thumbnail` request, cache hits included. Before the endpoint existed this counted image results in a search response, so the served share cannot be trended across that deploy |
-| `thumbnails.dropped` | number | Every request that did not serve a tile: timeout, a non-raster or empty answer, or an address the guard refused (`MAX_THUMBNAIL_BYTES` is not one of these, a capped body is truncated and served): each is a tile the user saw as a placeholder |
-| `thumbnails.blocked` | number | The SSRF guard, as the share of thumbnails whose host is in private space or does not resolve |
+| Field                                            | Type   | Tunes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `searches.averageTextualMs`                      | number | The 30 s client timeout in `client/modules/search.ts`. Over the text searches SearXNG answered, so a failed or short-circuited one is not in it, and up to 7 s of retry backoff is                                                                                                                                                                                                                                                                                                                         |
+| `searches.averageGraphicalMs`                    | number | The same, for image searches                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `reranker.considered`                            | number | Nothing; results handed to the score filter, the denominator for `keptRate`                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `reranker.kept`                                  | number | Nothing; results that survived it                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `searches.circuitState`                          | string | Nothing; whether searches are being short-circuited right now                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `searches.degradedSearchTypes`                   | array  | Nothing; which of `text` and `images` is currently flagged, so a `degraded` verdict says which engine pool it is about. Empty when the half-open circuit is what triggered the verdict, which `circuitState` in the same object names                                                                                                                                                                                                                                                                      |
+| `searches.circuitOpens`                          | number | `failureThreshold` and `resetTimeout` on the SearXNG breaker: each opening is a minute of serving no searches at all                                                                                                                                                                                                                                                                                                                                                                                       |
+| `searches.unresponsiveEngines`                   | object | Nothing; `failures` and `lastFailure` per engine name, which is how one engine timing out is told apart from every engine being CAPTCHA-blocked. `lastFailure` is `blocked` (a CAPTCHA, a rate limit or an access denial), `timeout` or `other`, never SearXNG's own wording, which is free-form text from an upstream engine and does not belong on an endpoint that needs no token. Counted on the searches `searchesWithUnresponsiveEngines` counts, so a search that recovered on a retry is not in it |
+| `searches.fallbackProviders`                     | object | Whether each fallback provider earns its place, and whether one needs an API key: per provider name, `served`, `empty`, `failed`, `rateLimited` (answered `429`, and also counted in `failed`) and `skippedWhilePaused` counts, plus `pausedForMs`, the time left on its current `429` pause (`0` when not paused). A steady `rateLimited` count on a keyless provider is the cue to set its key (see `docs/configuration.md`). Provider names are configured infrastructure, not user input               |
+| `reranker.reranks`                               | number | Nothing; the denominator for the rest                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `reranker.averageMs`                             | number | Whether reranking or SearXNG is what users wait for, and so whether to rerank a shortlist instead of all 30 results. Over `reranks`, covering the filtering and sorting as well as the model                                                                                                                                                                                                                                                                                                               |
+| `reranker.keptRate`                              | number | `kStandardDeviationFactor`: near 100% means the filter is not filtering. Text and image reranks are pooled, and the two run through different paths, so this moves with the traffic mix as well as with the threshold                                                                                                                                                                                                                                                                                      |
+| `reranker.byType.text`, `reranker.byType.images` | object | Each reports `reranks`, `averageMs`, `considered`, `kept` and `keptRate` for its search type; see `docs/reranking.md`. The existing top-level values remain combined totals                                                                                                                                                                                                                                                                                                                                |
+| `reranker.fallbackApplied`                       | number | `minPercentageFallback`: a large share means the deviation threshold is emptying batches the fallback then has to rescue                                                                                                                                                                                                                                                                                                                                                                                   |
+| `reranker.skippedUnhealthy`                      | number | Nothing; searches served in SearXNG's own order because the model was not loaded                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `reranker.failed`                                | number | Nothing; the same, because reranking threw                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `thumbnails.requested`                           | number | Nothing; the denominator for the two below; every verified `/thumbnail` request, cache hits included. Before the endpoint existed this counted image results in a search response, so the served share cannot be trended across that deploy                                                                                                                                                                                                                                                                |
+| `thumbnails.dropped`                             | number | Every request that did not serve a tile: timeout, a non-raster or empty answer, or an address the guard refused (`MAX_THUMBNAIL_BYTES` is not one of these, a capped body is truncated and served): each is a tile the user saw as a placeholder                                                                                                                                                                                                                                                           |
+| `thumbnails.blocked`                             | number | The SSRF guard, as the share of thumbnails whose host is in private space or does not resolve                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 `thumbnails.dropped` includes the blocked ones, so `requested` minus `dropped`
 is what reached the client.
@@ -444,22 +436,20 @@ MiniSearch uses a multi-layered client-side persistence strategy:
 ### IndexedDB Databases
 
 Two separate Dexie databases handle different persistence needs:
-
 1. **SearchCacheDatabase** (`client/modules/search.ts`): Temporary cache for search results with TTL-based expiration. Table schema:
    - `textSearchHistory`: Keyed by hashed query, indexed by timestamp
    - `imageSearchHistory`: Keyed by hashed query, indexed by timestamp
    - Cache config:
 
-| Constant | Value | Description |
-| ---------- | ------- | ------------- |
-| TTL | 15 minutes | Freshness window: a hit inside it skips the network |
-| MAX_STALE_RETENTION | 24 hours | How long an expired entry is kept, so a failed live search can still serve it flagged stale |
-| MAX_ENTRIES | 100 | Maximum cached queries per store |
-| ENABLED | true | Global cache toggle |
-| PRUNE_INTERVAL | 10 | Cache writes between LRU prune passes |
-| METRICS_LOG_INTERVAL | 10 | Operations between hit-rate log entries |
-| REQUEST_TIMEOUT | 30,000 ms | Fetch timeout |
-
+| Constant             | Value      | Description                                                                                 |
+| -------------------- | ---------- | ------------------------------------------------------------------------------------------- |
+| TTL                  | 15 minutes | Freshness window: a hit inside it skips the network                                         |
+| MAX_STALE_RETENTION  | 24 hours   | How long an expired entry is kept, so a failed live search can still serve it flagged stale |
+| MAX_ENTRIES          | 100        | Maximum cached queries per store                                                            |
+| ENABLED              | true       | Global cache toggle                                                                         |
+| PRUNE_INTERVAL       | 10         | Cache writes between LRU prune passes                                                       |
+| METRICS_LOG_INTERVAL | 10         | Operations between hit-rate log entries                                                     |
+| REQUEST_TIMEOUT      | 30,000 ms  | Fetch timeout                                                                               |
 - Query hashing: djb2 XOR Murmur algorithm for cache key generation
 - Management operations: `cleanExpiredCache`, `pruneCache`, `ensureIntegrity`
 - Performance monitoring: `cacheMetrics` tracks hit/miss rates for text and image searches
@@ -473,7 +463,6 @@ Two separate Dexie databases handle different persistence needs:
 ### localStorage Persistence
 
 Lightweight state persisted across sessions via `createLocalStoragePubSub` pattern:
-
 - `settings`: Application preferences (inference type, model, UI options)
 - `querySuggestions`: Shuffled search suggestion pool
 - `lastSearchTokenHash`: Cached security token hash

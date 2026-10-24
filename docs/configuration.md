@@ -6,10 +6,10 @@ All configuration is done via environment variables. Create a `.env` file in the
 
 ### Access Control
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ACCESS_KEYS` | `''` | Comma-separated list of valid access keys (e.g., `'key1,key2,key3'`) |
-| `ACCESS_KEY_TIMEOUT_HOURS` | `24` | Hours to cache validated keys in browser. Set to `0` to require validation on every request |
+| Variable                   | Default | Description                                                                                 |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------------- |
+| `ACCESS_KEYS`              | `''`    | Comma-separated list of valid access keys (e.g., `'key1,key2,key3'`)                        |
+| `ACCESS_KEY_TIMEOUT_HOURS` | `24`    | Hours to cache validated keys in browser. Set to `0` to require validation on every request |
 
 **Example:**
 ```bash
@@ -21,8 +21,8 @@ ACCESS_KEY_TIMEOUT_HOURS="24"
 
 Configure default models for different inference types:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable                  | Default           | Description                                                                  |
+| ------------------------- | ----------------- | ---------------------------------------------------------------------------- |
 | `WLLAMA_DEFAULT_MODEL_ID` | `littlelamb-290m` | Default Wllama model ID (used for both WebGPU-accelerated and CPU inference) |
 
 ### Server Model Request Configuration
@@ -32,27 +32,27 @@ optional environment variables. Integer values are parsed as decimal numbers,
 and temperature and top-p values are parsed as floating-point numbers. An empty
 value uses the corresponding default.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MODEL_MAX_RETRIES` | `5` | Maximum number of retries for a model request |
-| `MODEL_BASE_BACKOFF_MS` | `100` | Initial retry backoff in milliseconds |
-| `MODEL_MAX_BACKOFF_MS` | `5000` | Maximum retry backoff in milliseconds |
-| `MODEL_REQUEST_TIMEOUT_MS` | `30000` | Model request timeout in milliseconds |
-| `MODEL_MAX_CONCURRENT_REQUESTS` | `10` | Maximum number of simultaneous model requests |
-| `MODEL_DEFAULT_MAX_TOKENS` | `2048` | Default maximum number of generated tokens |
-| `MODEL_TEMPERATURE` | `0.7` | Model sampling temperature |
-| `MODEL_TOP_P` | `0.9` | Model nucleus-sampling probability |
+| Variable                        | Default | Description                                   |
+| ------------------------------- | ------- | --------------------------------------------- |
+| `MODEL_MAX_RETRIES`             | `5`     | Maximum number of retries for a model request |
+| `MODEL_BASE_BACKOFF_MS`         | `100`   | Initial retry backoff in milliseconds         |
+| `MODEL_MAX_BACKOFF_MS`          | `5000`  | Maximum retry backoff in milliseconds         |
+| `MODEL_REQUEST_TIMEOUT_MS`      | `30000` | Model request timeout in milliseconds         |
+| `MODEL_MAX_CONCURRENT_REQUESTS` | `10`    | Maximum number of simultaneous model requests |
+| `MODEL_DEFAULT_MAX_TOKENS`      | `2048`  | Default maximum number of generated tokens    |
+| `MODEL_TEMPERATURE`             | `0.7`   | Model sampling temperature                    |
+| `MODEL_TOP_P`                   | `0.9`   | Model nucleus-sampling probability            |
 
 ### Internal API Configuration
 
 For self-hosted OpenAI-compatible APIs:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` | `''` | Base URL of your API (e.g., `https://api.internal.company.com/v1`) |
-| `INTERNAL_OPENAI_COMPATIBLE_API_KEY` | `''` | API key for authentication |
-| `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` | `''` | Model ID to use (auto-detected if empty) |
-| `INTERNAL_OPENAI_COMPATIBLE_API_NAME` | `Internal API` | Display name shown in UI |
+| Variable                                  | Default        | Description                                                        |
+| ----------------------------------------- | -------------- | ------------------------------------------------------------------ |
+| `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` | `''`           | Base URL of your API (e.g., `https://api.internal.company.com/v1`) |
+| `INTERNAL_OPENAI_COMPATIBLE_API_KEY`      | `''`           | API key for authentication                                         |
+| `INTERNAL_OPENAI_COMPATIBLE_API_MODEL`    | `''`           | Model ID to use (auto-detected if empty)                           |
+| `INTERNAL_OPENAI_COMPATIBLE_API_NAME`     | `Internal API` | Display name shown in UI                                           |
 
 **Example:**
 ```bash
@@ -64,46 +64,45 @@ INTERNAL_OPENAI_COMPATIBLE_API_NAME="Company LLM"
 
 ### Default Behavior
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable                 | Default   | Description                                                          |
+| ------------------------ | --------- | -------------------------------------------------------------------- |
 | `DEFAULT_INFERENCE_TYPE` | `browser` | Default AI inference type (`browser`, `openai`, `horde`, `internal`) |
 
 ### Server Configuration
 
 These variables control the Vite development/preview server behavior:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `HOST` | `0.0.0.0` | Host address for the Vite server to bind to |
-| `PORT` | `7860` | Port number for the main server |
-| `HMR_PORT` | `7861` | Port for Hot Module Replacement during development |
-| `ALLOWED_HOSTS` | `true` | Comma-separated list of allowed hostnames for the preview server |
-| `BASIC_SSL` | `false` | Enable basic SSL for HTTPS support during development |
-| `TRUST_PROXY` | `false` | Trust `X-Forwarded-For`/`X-Real-IP` for the per-client rate-limit key. Enable **only** behind a reverse proxy that sets the rightmost `X-Forwarded-For` entry. Leave off when the instance is exposed directly - otherwise clients could forge the header to evade rate limiting. |
+| Variable        | Default   | Description                                                                                                                                                                                                                                                                       |
+| --------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HOST`          | `0.0.0.0` | Host address for the Vite server to bind to                                                                                                                                                                                                                                       |
+| `PORT`          | `7860`    | Port number for the main server                                                                                                                                                                                                                                                   |
+| `HMR_PORT`      | `7861`    | Port for Hot Module Replacement during development                                                                                                                                                                                                                                |
+| `ALLOWED_HOSTS` | `true`    | Comma-separated list of allowed hostnames for the preview server                                                                                                                                                                                                                  |
+| `BASIC_SSL`     | `false`   | Enable basic SSL for HTTPS support during development                                                                                                                                                                                                                             |
+| `TRUST_PROXY`   | `false`   | Trust `X-Forwarded-For`/`X-Real-IP` for the per-client rate-limit key. Enable **only** behind a reverse proxy that sets the rightmost `X-Forwarded-For` entry. Leave off when the instance is exposed directly - otherwise clients could forge the header to evade rate limiting. |
 
 These defaults are provided by `docker-compose.yml`/`docker-compose.production.yml` (e.g. `PORT=${PORT:-7860}`), not by the application itself - `vite.config.ts` reads these variables with no fallback, so when running directly via `npm run dev`/`vite preview` without Docker, unset variables fall through to Vite's own built-in defaults.
 
 ### Dictation
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable               | Default                                     | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DICTATION_MODELS_DIR` | `<system temp>/minisearch-dictation-models` | Directory where the server caches the speech-to-text model files it serves under `/dictation-models/`. The files are fetched once from the pinned upstream URL on the first request, verified against a pinned SHA-256, and reused after that. They land in a subdirectory named after the model release, so a later release cannot be served from an older cache. The default lives under the system temp directory, so a container re-downloads ~51 MB after a restart unless this points at a volume |
 
 ### Search Fallback
 
 When SearXNG fails on a text search, the server can retry that search against second providers: `search.parallel.ai` (Parallel) and You.com's MCP endpoint (`https://api.you.com/mcp`). Every configured provider takes part. On each search they are put in a random order, and each is tried in turn until one returns results; a provider that answers with nothing usable, or fails, hands the search to the next one. The whole cascade shares one 15-second budget, and each attempt gets the remaining budget divided by the number of providers still untried and not paused, so a provider that hangs cannot use up the time the others need. A single search can therefore reach more than one provider, one after the other. `docker-compose.yml` passes only `HOST`, `PORT`, `BASIC_SSL` and `HMR_PORT` into the development container, so these variables are not carried by the compose `environment` list; set them in `.env`, which `vite.config.ts` loads, inside the container as well as outside it. `vite.config.ts` reads `.env.example` after `.env`, so anything still set there acts as a default: the real API keys belong in `.env`, never in `.env.example`, which is committed.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SEARCH_FALLBACK_ENABLED` | `false` | Serve text results from the fallback providers when SearXNG has failed (an HTTP error, a network error, every engine unresponsive, or an open circuit), under one 15-second budget for the whole cascade. Only `true` or `1` turns it on, and changing it takes a restart, since a process keeps the environment it was started with. Image searches never use it, and a fallback that returns nothing usable is still an HTTP 200 with no results rather than an outage |
-| `SEARCH_FALLBACK_PROVIDERS` | `''` (all providers) | Comma-separated list of the providers to try: `parallel`, `youcom`, or both. Names are trimmed and lowercased, and empty items are ignored. Unset or empty means every built-in provider. With `SEARCH_FALLBACK_ENABLED` on, an unknown name, or a list with no names at all (such as `,`), stops the server at start with an error that names the valid values |
-| `SEARCH_FALLBACK_PARALLEL_API_KEY` | `''` | Optional API key for Parallel, sent as a Bearer token. Without it the fallback calls Parallel's keyless tier. With `SEARCH_FALLBACK_ENABLED` on, a key with a control character inside it (such as a pasted line break) stops the server at start, since the HTTP client would quote it in its error |
-| `SEARCH_FALLBACK_YOUCOM_API_KEY` | `''` | Optional API key for You.com, sent as a Bearer token. Without it the fallback calls the keyless `https://api.you.com/mcp?profile=free` endpoint. A key with a control character inside it stops the server at start, like the Parallel key |
+| Variable                           | Default              | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SEARCH_FALLBACK_ENABLED`          | `false`              | Serve text results from the fallback providers when SearXNG has failed (an HTTP error, a network error, every engine unresponsive, or an open circuit), under one 15-second budget for the whole cascade. Only `true` or `1` turns it on, and changing it takes a restart, since a process keeps the environment it was started with. Image searches never use it, and a fallback that returns nothing usable is still an HTTP 200 with no results rather than an outage |
+| `SEARCH_FALLBACK_PROVIDERS`        | `''` (all providers) | Comma-separated list of the providers to try: `parallel`, `youcom`, or both. Names are trimmed and lowercased, and empty items are ignored. Unset or empty means every built-in provider. With `SEARCH_FALLBACK_ENABLED` on, an unknown name, or a list with no names at all (such as `,`), stops the server at start with an error that names the valid values                                                                                                          |
+| `SEARCH_FALLBACK_PARALLEL_API_KEY` | `''`                 | Optional API key for Parallel, sent as a Bearer token. Without it the fallback calls Parallel's keyless tier. With `SEARCH_FALLBACK_ENABLED` on, a key with a control character inside it (such as a pasted line break) stops the server at start, since the HTTP client would quote it in its error                                                                                                                                                                     |
+| `SEARCH_FALLBACK_YOUCOM_API_KEY`   | `''`                 | Optional API key for You.com, sent as a Bearer token. Without it the fallback calls the keyless `https://api.you.com/mcp?profile=free` endpoint. A key with a control character inside it stops the server at start, like the Parallel key                                                                                                                                                                                                                               |
 
 `SEARCH_FALLBACK_PROVIDER` and `SEARCH_FALLBACK_API_KEY` are gone. If either is still set to a non-empty value while `SEARCH_FALLBACK_ENABLED` is on, the server stops at start with an error that names the variable to use instead, so an upgrade cannot silently drop a key: move the key to `SEARCH_FALLBACK_PARALLEL_API_KEY` or `SEARCH_FALLBACK_YOUCOM_API_KEY`, and the provider choice to `SEARCH_FALLBACK_PROVIDERS`.
 
 Each provider has its own terms, and each operator is responsible for following them:
-
 - **Parallel**: Parallel describes its keyless tier as for exploration and light use, and asks for an account and an API key for production use ([docs.parallel.ai](https://docs.parallel.ai/integrations/mcp/search-mcp)).
 - **You.com**: the keyless `profile=free` endpoint allows 100 queries per day ([you.com](https://you.com/docs/build-with-agents/mcp-server)). Its API acceptable use policy asks integrations to honor 429 responses ([you.com](https://you.com/acceptable-use-policy-may-2026)).
 
@@ -115,33 +114,33 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 
 ### Core Settings
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `enableAiResponse` | boolean | `false` | Enable AI-generated responses for searches |
-| `showEnableAiResponsePrompt` | boolean | `true` | Show prompt to enable AI response on first use |
-| `enableImageSearch` | boolean | `true` | Include image results in searches |
-| `enableTextSearch` | boolean | `true` | Include text results in searches |
-| `searchResultsLimit` | number | `15` | Maximum search results to fetch |
-| `systemPrompt` | string | (template) | Custom system prompt template for AI |
-| `enterToSubmit` | boolean | `true` | Press Enter to submit query (vs Shift+Enter for new line) |
-| `enableAiResponseScrolling` | boolean | `true` | Auto-scroll AI response as it generates |
-| `enableNotificationOnAiComplete` | boolean | `false` | Show a browser notification when AI response generation finishes |
-| `enablePageContentFetch` | boolean | `true` | Read the pages behind the top results and ground the answer on their text instead of on snippets alone. |
+| Setting                          | Type    | Default    | Description                                                                                             |
+| -------------------------------- | ------- | ---------- | ------------------------------------------------------------------------------------------------------- |
+| `enableAiResponse`               | boolean | `false`    | Enable AI-generated responses for searches                                                              |
+| `showEnableAiResponsePrompt`     | boolean | `true`     | Show prompt to enable AI response on first use                                                          |
+| `enableImageSearch`              | boolean | `true`     | Include image results in searches                                                                       |
+| `enableTextSearch`               | boolean | `true`     | Include text results in searches                                                                        |
+| `searchResultsLimit`             | number  | `15`       | Maximum search results to fetch                                                                         |
+| `systemPrompt`                   | string  | (template) | Custom system prompt template for AI                                                                    |
+| `enterToSubmit`                  | boolean | `true`     | Press Enter to submit query (vs Shift+Enter for new line)                                               |
+| `enableAiResponseScrolling`      | boolean | `true`     | Auto-scroll AI response as it generates                                                                 |
+| `enableNotificationOnAiComplete` | boolean | `false`    | Show a browser notification when AI response generation finishes                                        |
+| `enablePageContentFetch`         | boolean | `true`     | Read the pages behind the top results and ground the answer on their text instead of on snippets alone. |
 
 ### Inference Settings
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `inferenceType` | enum | `'browser'` | AI provider: `browser`, `openai`, `horde`, `internal` |
-| `cpuThreads` | number | (auto) | Number of CPU threads for inference (Wllama), defaults to half the logical processors (`navigator.hardwareConcurrency / 2`), minimum 1 |
-| `allowAiModelDownload` | boolean | `false` | Allow automatic AI model downloads |
-| `wllamaModelId` | string | `WLLAMA_DEFAULT_MODEL_ID` env var | Default Wllama model ID |
-| `hordeApiKey` | string | `'0000000000'` | AI Horde API key (default is anonymous) |
-| `hordeModel` | string | `''` | Specific AI Horde model to request |
-| `openAiApiBaseUrl` | string | `''` | Base URL for the OpenAI-compatible API |
-| `openAiApiKey` | string | `''` | API key for the OpenAI-compatible API |
-| `openAiApiModel` | string | `''` | Model identifier for the OpenAI-compatible API |
-| `openAiContextLength` | number | `4096` | Context window size for OpenAI-compatible models, sent as `max_tokens` |
+| Setting                | Type    | Default                           | Description                                                                                                                            |
+| ---------------------- | ------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `inferenceType`        | enum    | `'browser'`                       | AI provider: `browser`, `openai`, `horde`, `internal`                                                                                  |
+| `cpuThreads`           | number  | (auto)                            | Number of CPU threads for inference (Wllama), defaults to half the logical processors (`navigator.hardwareConcurrency / 2`), minimum 1 |
+| `allowAiModelDownload` | boolean | `false`                           | Allow automatic AI model downloads                                                                                                     |
+| `wllamaModelId`        | string  | `WLLAMA_DEFAULT_MODEL_ID` env var | Default Wllama model ID                                                                                                                |
+| `hordeApiKey`          | string  | `'0000000000'`                    | AI Horde API key (default is anonymous)                                                                                                |
+| `hordeModel`           | string  | `''`                              | Specific AI Horde model to request                                                                                                     |
+| `openAiApiBaseUrl`     | string  | `''`                              | Base URL for the OpenAI-compatible API                                                                                                 |
+| `openAiApiKey`         | string  | `''`                              | API key for the OpenAI-compatible API                                                                                                  |
+| `openAiApiModel`       | string  | `''`                              | Model identifier for the OpenAI-compatible API                                                                                         |
+| `openAiContextLength`  | number  | `4096`                            | Context window size for OpenAI-compatible models, sent as `max_tokens`                                                                 |
 
 ### Model Selection
 
@@ -163,13 +162,13 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 
 ### History Settings
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `enableHistory` | boolean | `true` | Enable search history persistence |
-| `historyRetentionDays` | number | `30` | Days to keep search history |
-| `historyMaxEntries` | number | `1000` | Maximum history entries before cleanup |
-| `historyAutoCleanup` | boolean | `true` | Automatically clean old history entries |
-| `historyGroupByDate` | boolean | `true` | Group history entries by date in UI |
+| Setting                | Type    | Default | Description                             |
+| ---------------------- | ------- | ------- | --------------------------------------- |
+| `enableHistory`        | boolean | `true`  | Enable search history persistence       |
+| `historyRetentionDays` | number  | `30`    | Days to keep search history             |
+| `historyMaxEntries`    | number  | `1000`  | Maximum history entries before cleanup  |
+| `historyAutoCleanup`   | boolean | `true`  | Automatically clean old history entries |
+| `historyGroupByDate`   | boolean | `true`  | Group history entries by date in UI     |
 
 ### System Prompt Configuration
 
@@ -204,14 +203,14 @@ Search results:
 
 ### Privacy Settings
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `selectedVoiceId` | string | `""` | Voice for reading answers aloud. `piper:<voice>` picks a local neural voice, `system:<voiceURI>` an OS voice, and `""` picks one automatically for the browser language. The Voice settings panel lists only the voices of the selected engine, and switching that engine resets this to `""`. A bare value stored by an earlier version is read as an OS voice whenever the system engine runs; with the local engine it is ignored in favor of a language match |
-| `textToSpeechEngine` | `"local" \| "system"` | `"local"` | Which engine reads answers aloud, and which set of voices the Voice settings panel lists. `"system"` also overrides a local voice picked above, and stops the voice list from being fetched, so it never contacts a third-party host. A profile that had picked an OS voice before this setting existed starts on `"system"`, so the upgrade does not replace that choice with a model download |
-| `enableDictation` | boolean | `true` | Shows the microphone button inside the search field and the chat follow-up field, which fills whichever one it sits in while the user speaks. Turning this off hides the button and loads nothing. The button is also hidden outside a secure context, so an instance served over plain HTTP on a LAN will not show it: no browser grants microphone access there |
-| `enableLocalDictationModel` | boolean | `true` only when the browser's primary language is English | Whether the dictation button prefers the on-device Moonshine model, which understands English only. With it off, the button uses the browser's built-in `SpeechRecognition`, which handles other languages but may send the audio to the browser vendor. The preference reorders the two engines and never removes one: on browsers without `SpeechRecognition` the on-device model is used regardless. The default is derived from `navigator.language` at first load, so a non-English browser starts on the built-in recognizer with no model download; the Voice settings panel can flip it either way |
-| `reasoningStartMarker` | string | `"<think>"` | Marker for start of reasoning content |
-| `reasoningEndMarker` | string | `"</think>"` | Marker for end of reasoning content |
+| Setting                     | Type                  | Default                                                    | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------------- | --------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `selectedVoiceId`           | string                | `""`                                                       | Voice for reading answers aloud. `piper:<voice>` picks a local neural voice, `system:<voiceURI>` an OS voice, and `""` picks one automatically for the browser language. The Voice settings panel lists only the voices of the selected engine, and switching that engine resets this to `""`. A bare value stored by an earlier version is read as an OS voice whenever the system engine runs; with the local engine it is ignored in favor of a language match                                                                                                                                          |
+| `textToSpeechEngine`        | `"local" \| "system"` | `"local"`                                                  | Which engine reads answers aloud, and which set of voices the Voice settings panel lists. `"system"` also overrides a local voice picked above, and stops the voice list from being fetched, so it never contacts a third-party host. A profile that had picked an OS voice before this setting existed starts on `"system"`, so the upgrade does not replace that choice with a model download                                                                                                                                                                                                            |
+| `enableDictation`           | boolean               | `true`                                                     | Shows the microphone button inside the search field and the chat follow-up field, which fills whichever one it sits in while the user speaks. Turning this off hides the button and loads nothing. The button is also hidden outside a secure context, so an instance served over plain HTTP on a LAN will not show it: no browser grants microphone access there                                                                                                                                                                                                                                          |
+| `enableLocalDictationModel` | boolean               | `true` only when the browser's primary language is English | Whether the dictation button prefers the on-device Moonshine model, which understands English only. With it off, the button uses the browser's built-in `SpeechRecognition`, which handles other languages but may send the audio to the browser vendor. The preference reorders the two engines and never removes one: on browsers without `SpeechRecognition` the on-device model is used regardless. The default is derived from `navigator.language` at first load, so a non-English browser starts on the built-in recognizer with no model download; the Voice settings panel can flip it either way |
+| `reasoningStartMarker`      | string                | `"<think>"`                                                | Marker for start of reasoning content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `reasoningEndMarker`        | string                | `"</think>"`                                               | Marker for end of reasoning content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ## Docker Configuration
 
@@ -232,7 +231,7 @@ services:
       dockerfile: Dockerfile
       context: .
     volumes:
-      - .:/home/node/app/  # Live code mounting
+      - .:/home/node/app/ # Live code mounting
     command:
       [
         "(cd /usr/local/searxng/searxng-src && /usr/local/searxng/searxng-venv/bin/python -m searx.webapp > /tmp/searxng.log 2>&1) & (npm install && npm run dev)",
@@ -246,8 +245,8 @@ Same structure but without volume mounts and with pre-built assets.
 ### Dockerfile Environment
 
 The Dockerfile sets up a single runtime stage:
-   - Node.js LTS
-   - Python 3 + SearXNG
+- Node.js LTS
+- Python 3 + SearXNG
 
 The app runs under the `node` user, with the app directory at `/home/node/app`. The production image starts the app with `npm start -- --host` (i.e. `vite preview`), not `npm run dev`.
 
@@ -343,7 +342,6 @@ services:
 ```
 
 Two things about that command are required, not optional:
-
 - **The file must be readable by uid 1000.** The container runs as `node`, and a file readable only by its owner on the host is invisible to it.
 - **`secret_key` must be set to your own random value.** SearXNG refuses to start on the `ultrasecretkey` placeholder and logs `server.secret_key is not changed. Please use something else instead of ultrasecretkey.` The image's own file never carries the placeholder, because the Dockerfile replaces it at build time, but a file you write has to carry a real key.
 
@@ -391,16 +389,16 @@ Client-facing configuration (access keys, inference type, internal API settings)
 
 ### Build-Time vs Runtime Configuration
 
-| Value | Resolved At | Notes |
-|-------|-------------|-------|
-| `VITE_BUILD_DATE_TIME` | Build time | Epoch milliseconds when the build occurred |
-| `VITE_COMMIT_SHORT_HASH` | Build time | Git commit hash at build time (if available) |
-| `ACCESS_KEYS` | Runtime | Read from `/api/config` |
-| `ACCESS_KEY_TIMEOUT_HOURS` | Runtime | Read from `/api/config` |
-| `WLLAMA_DEFAULT_MODEL_ID` | Runtime | Read from `/api/config` |
-| `INTERNAL_OPENAI_COMPATIBLE_API_*` | Runtime | Read from `/api/config` (except `API_KEY` which is server-only) |
-| `DEFAULT_INFERENCE_TYPE` | Runtime | Read from `/api/config` |
-| Search token | Runtime | Read from `/api/config`, so a reload picks up the token of whichever server answers |
+| Value                              | Resolved At | Notes                                                                               |
+| ---------------------------------- | ----------- | ----------------------------------------------------------------------------------- |
+| `VITE_BUILD_DATE_TIME`             | Build time  | Epoch milliseconds when the build occurred                                          |
+| `VITE_COMMIT_SHORT_HASH`           | Build time  | Git commit hash at build time (if available)                                        |
+| `ACCESS_KEYS`                      | Runtime     | Read from `/api/config`                                                             |
+| `ACCESS_KEY_TIMEOUT_HOURS`         | Runtime     | Read from `/api/config`                                                             |
+| `WLLAMA_DEFAULT_MODEL_ID`          | Runtime     | Read from `/api/config`                                                             |
+| `INTERNAL_OPENAI_COMPATIBLE_API_*` | Runtime     | Read from `/api/config` (except `API_KEY` which is server-only)                     |
+| `DEFAULT_INFERENCE_TYPE`           | Runtime     | Read from `/api/config`                                                             |
+| Search token                       | Runtime     | Read from `/api/config`, so a reload picks up the token of whichever server answers |
 
 ### Security Considerations
 
@@ -447,8 +445,8 @@ MiniSearch logs internal events to an in-app log panel (see the Logs section of 
 Check effective configuration:
 ```typescript
 // In browser console
-console.log('Settings:', JSON.parse(localStorage.getItem('settings') || '{}'));
-console.log('Server config:', await fetch('/api/config').then(r => r.json()));
+console.log("Settings:", JSON.parse(localStorage.getItem("settings") || "{}"));
+console.log("Server config:", await fetch("/api/config").then((r) => r.json()));
 ```
 
 ## Related Topics

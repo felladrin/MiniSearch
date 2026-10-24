@@ -4,12 +4,12 @@ MiniSearch supports four AI inference backends, each with different trade-offs b
 
 ## Inference Types Overview
 
-| Type | Privacy | Speed | Setup | Best For |
-|------|---------|-------|-------|----------|
-| **Browser** (Wllama) | Maximum (no data leaves device) | Fast (WebGPU) / Slow (CPU) | None | Personal use, privacy-critical scenarios |
-| **OpenAI** | Low (data sent to OpenAI) | Very Fast | API Key | Maximum quality, convenience |
-| **AI Horde** | Medium (distributed volunteers) | Variable | Anonymous | Free GPU access, no setup |
-| **Internal** | High (your infrastructure) | Depends on hardware | Self-hosted API | Teams, compliance requirements |
+| Type                 | Privacy                         | Speed                      | Setup           | Best For                                 |
+| -------------------- | ------------------------------- | -------------------------- | --------------- | ---------------------------------------- |
+| **Browser** (Wllama) | Maximum (no data leaves device) | Fast (WebGPU) / Slow (CPU) | None            | Personal use, privacy-critical scenarios |
+| **OpenAI**           | Low (data sent to OpenAI)       | Very Fast                  | API Key         | Maximum quality, convenience             |
+| **AI Horde**         | Medium (distributed volunteers) | Variable                   | Anonymous       | Free GPU access, no setup                |
+| **Internal**         | High (your infrastructure)      | Depends on hardware        | Self-hosted API | Teams, compliance requirements           |
 
 ## Browser-Based Inference
 
@@ -232,17 +232,17 @@ Save to history database
 
 `textGenerationStatePubSub` drives the AI response UI through these states:
 
-| State | Description |
-|-------|-------------|
-| `idle` | No response yet, waiting for user input |
+| State                            | Description                                                                                                 |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `idle`                           | No response yet, waiting for user input                                                                     |
 | `awaitingModelDownloadAllowance` | Browser inference only: waiting for user consent to download the model (when `allowAiModelDownload` is off) |
-| `loadingModel` | Downloading/loading the AI model (browser inference only) |
-| `awaitingSearchResults` | Waiting for search results before generating |
-| `preparingToGenerate` | Search results ready, request being sent to the inference backend |
-| `generating` | Streaming response tokens |
-| `interrupted` | User clicked Stop; generation aborts without overwriting the partial response |
-| `completed` | Full response received |
-| `failed` | Error occurred during generation |
+| `loadingModel`                   | Downloading/loading the AI model (browser inference only)                                                   |
+| `awaitingSearchResults`          | Waiting for search results before generating                                                                |
+| `preparingToGenerate`            | Search results ready, request being sent to the inference backend                                           |
+| `generating`                     | Streaming response tokens                                                                                   |
+| `interrupted`                    | User clicked Stop; generation aborts without overwriting the partial response                               |
+| `completed`                      | Full response received                                                                                      |
+| `failed`                         | Error occurred during generation                                                                            |
 
 For non-browser inference types (`openai`, `internal`, `horde`), the state skips `loadingModel` and `awaitingModelDownloadAllowance`, going from `awaitingSearchResults` straight to `preparingToGenerate` then `generating` or `failed`.
 
@@ -283,7 +283,6 @@ For browser inference, the system first loads the model from HuggingFace with a 
 ### Rolling Summaries
 
 When conversation exceeds token budget:
-
 1. **Detect Overflow:** Current tokens > 3072
 2. **Generate Summary:** Call LLM with 800-token limit
 3. **Store Summary:** Save in conversationSummaryPubSub
@@ -300,10 +299,10 @@ and user intent. Be concise but informative.
 
 The "Listen to response" button reads the answer aloud. Two engines back it:
 
-| Engine | Setting value | Voice source | Works offline |
-| --- | --- | --- | --- |
+| Engine       | Setting value     | Voice source                                                               | Works offline                                                                                                         |
+| ------------ | ----------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Local neural | `local` (default) | Piper (VITS) models run in the browser through `@diffusionstudio/vits-web` | No: only the voice model is stored in OPFS, so the voice index, the ONNX runtime and the phonemizer are fetched again |
-| System | `system` | `speechSynthesis`, whatever the OS provides | Yes |
+| System       | `system`          | `speechSynthesis`, whatever the OS provides                                | Yes                                                                                                                   |
 
 ### Flow
 
@@ -384,18 +383,22 @@ Wllama models are sharded (split into chunks):
 ## Best Practices
 
 ### For Privacy-Critical Use
+
 - Use Browser inference (Wllama)
 - Set `historyRetentionDays: 0` (no persistence)
 
 ### For Maximum Quality
+
 - Use OpenAI GPT-4 or Internal API with large model
 - Adjust temperature: 0.5-0.7 for factual, 0.8-1.0 for creative
 
 ### For Cost Efficiency
+
 - Use AI Horde (free) or Browser inference - Wllama (one-time download)
 - Limit `inferenceMaxTokens: 2048`
 
 ### For Teams/Enterprise
+
 - Deploy Internal API with vLLM
 - Set `ACCESS_KEYS` for access control
 - Enable server-side logging

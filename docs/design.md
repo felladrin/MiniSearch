@@ -11,6 +11,7 @@
 ## Design Principles
 
 ### User Interface
+
 - Minimal visual clutter with Mantine v9 components
 - Clear hierarchy and information architecture
 - Keyboard-first navigation with comprehensive shortcuts
@@ -19,6 +20,7 @@
 - Dark mode by default (via Mantine's `MantineProvider`)
 
 ### Performance
+
 - Lazy loading for routes and components with React.lazy()
 - Optimized bundle size using Vite 8 build optimizations
 - Efficient state management with create-pubsub
@@ -27,6 +29,7 @@
 - Bundle analysis with rollup-plugin-visualizer
 
 ### Accessibility
+
 - WCAG-aligned where implemented
 - Screen reader support
 - Keyboard navigation
@@ -47,12 +50,14 @@
 ## Technology Integration
 
 ### AI & Search
+
 - Multiple inference engines: Wllama (WebGPU or CPU), OpenAI-compatible APIs
 - Privacy-first local processing when possible
 - SearXNG integration for web search
 - Graceful fallbacks for unsupported browsers
 
 ### Development Experience
+
 - Hot Module Replacement with Vite
 - Biome for consistent formatting and linting
 - Comprehensive testing with Vitest and Testing Library

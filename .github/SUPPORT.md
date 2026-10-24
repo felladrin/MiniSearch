@@ -7,7 +7,6 @@ If you need help with MiniSearch, these are the best support channels.
 ### GitHub Discussions
 
 For questions, feature requests, and general discussion, use [GitHub Discussions](https://github.com/felladrin/MiniSearch/discussions). This is the best place to:
-
 - Ask how to configure MiniSearch for your use case
 - Request new features
 - Share ideas and feedback

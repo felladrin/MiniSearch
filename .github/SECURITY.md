@@ -5,9 +5,9 @@
 Only the latest version of MiniSearch receives security updates.
 
 | Version | Supported |
-|---------|------------|
-| Latest  | ✅         |
-| Older   | ❌         |
+| ------- | --------- |
+| Latest  | ✅        |
+| Older   | ❌        |
 
 ## Reporting a Vulnerability
 
@@ -88,13 +88,13 @@ A few of MiniSearch's dependencies ship native code or WebAssembly rather than a
 
 ### Inventory
 
-| Module | Type | Where it runs | Why it is trusted |
-| --- | --- | --- | --- |
-| `onnxruntime-node` | Native (Node addon) | Server-side reranker, CPU only | Microsoft-published ONNX Runtime; exact pin; its install script is **denied** (see below), so nothing is fetched at install time |
-| `@wllama/wllama` | WebAssembly | Browser inference | Published wllama project; exact pin; no install script |
-| `@huggingface/tokenizers` | Native (Node addon) | Server-side tokenization | Hugging Face-published; exact pin; no install script |
-| `hash-wasm` | WebAssembly | argon2id hashing (browser and server) | Widely-used, audited WASM hash library; exact pin; no install script |
-| `@moonshine-ai/moonshine-wasm` | WebAssembly | Browser dictation | Exact pin; no install script |
+| Module                         | Type                | Where it runs                         | Why it is trusted                                                                                                                |
+| ------------------------------ | ------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `onnxruntime-node`             | Native (Node addon) | Server-side reranker, CPU only        | Microsoft-published ONNX Runtime; exact pin; its install script is **denied** (see below), so nothing is fetched at install time |
+| `@wllama/wllama`               | WebAssembly         | Browser inference                     | Published wllama project; exact pin; no install script                                                                           |
+| `@huggingface/tokenizers`      | Native (Node addon) | Server-side tokenization              | Hugging Face-published; exact pin; no install script                                                                             |
+| `hash-wasm`                    | WebAssembly         | argon2id hashing (browser and server) | Widely-used, audited WASM hash library; exact pin; no install script                                                             |
+| `@moonshine-ai/moonshine-wasm` | WebAssembly         | Browser dictation                     | Exact pin; no install script                                                                                                     |
 
 ### What is verified at install
 
@@ -118,7 +118,6 @@ A few of MiniSearch's dependencies ship native code or WebAssembly rather than a
 ### Approving a new install script
 
 Under `strict-allow-scripts`, any package that ships an install script without a recorded decision fails the install. To unblock it, a maintainer must:
-
 1. Read the script first (`npm view <pkg> scripts`, or the unpacked tarball) and decide whether it is acceptable.
 2. Record the decision: `npm approve-scripts <pkg>` writes a version-pinned `"<name>@<version>": true` entry to `package.json#allowScripts` (`allow-scripts-pin` is on); `npm deny-scripts <pkg>` writes `"<name>": false`, denying every version of the package.
 3. Update the decision list above in the same PR, with the reasoning.

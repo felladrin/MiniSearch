@@ -11,17 +11,17 @@ documented here because the owner of an instance can reach them, and because
 reading middleware should not be the only way to learn what a request has to
 carry.
 
-| Method | Path | Token | Rate limit | Purpose |
-| --- | --- | --- | --- | --- |
-| `GET` | `/search/text` | required | shared | Text results from SearXNG, reranked |
-| `GET` | `/search/images` | required | shared | Image results from SearXNG, reranked |
-| `GET` | `/page-content` | required | shared | Readable text from result pages, for answer grounding |
-| `GET` | `/thumbnail` | required | own budget | One image-result thumbnail, fetched server-side |
-| `POST` | `/inference` | required | shared | Streaming chat completion from the internal API |
-| `GET` | `/status` | none | none | Uptime, counters, and service health |
-| `GET` | `/api/config` | none | none | Runtime client configuration, including the search token |
-| `POST` | `/api/validate-access-key` | none | shared | Access key check |
-| `GET` | `/dictation-models/<version>/<file>` | none | none | Speech-to-text model files, served from the instance |
+| Method | Path                                 | Token    | Rate limit | Purpose                                                  |
+| ------ | ------------------------------------ | -------- | ---------- | -------------------------------------------------------- |
+| `GET`  | `/search/text`                       | required | shared     | Text results from SearXNG, reranked                      |
+| `GET`  | `/search/images`                     | required | shared     | Image results from SearXNG, reranked                     |
+| `GET`  | `/page-content`                      | required | shared     | Readable text from result pages, for answer grounding    |
+| `GET`  | `/thumbnail`                         | required | own budget | One image-result thumbnail, fetched server-side          |
+| `POST` | `/inference`                         | required | shared     | Streaming chat completion from the internal API          |
+| `GET`  | `/status`                            | none     | none       | Uptime, counters, and service health                     |
+| `GET`  | `/api/config`                        | none     | none       | Runtime client configuration, including the search token |
+| `POST` | `/api/validate-access-key`           | none     | shared     | Access key check                                         |
+| `GET`  | `/dictation-models/<version>/<file>` | none     | none       | Speech-to-text model files, served from the instance     |
 
 A path that matches no hook falls through to Vite's static handler, which is
 also what a method mismatch does on `/api/config` and `/api/validate-access-key`:
@@ -66,11 +66,11 @@ unauthenticated caller still costs a rate-limit point. The exception is
 those two rejections need no token and spend no rate-limit point. The failures
 below are the same on every token-gated endpoint:
 
-| Status | Body | When |
-| --- | --- | --- |
-| `429` | `{"error":"Too many requests."}` | The bucket for this client is empty |
-| `400` | `{"error":"Missing token."}` | No `token` parameter |
-| `401` | `{"error":"Invalid token."}` | The hash does not verify against this server's token |
+| Status | Body                             | When                                                 |
+| ------ | -------------------------------- | ---------------------------------------------------- |
+| `429`  | `{"error":"Too many requests."}` | The bucket for this client is empty                  |
+| `400`  | `{"error":"Missing token."}`     | No `token` parameter                                 |
+| `401`  | `{"error":"Invalid token."}`     | The hash does not verify against this server's token |
 
 A 401 that persists across reloads usually means two processes hold different
 tokens: the server logs that once, on the way out.
@@ -101,10 +101,10 @@ front of it.
 `server/verifyTokenAndRateLimit.ts` keeps two in-memory buckets, both keyed by
 client IP:
 
-| Bucket | Budget | Consumed by |
-| --- | --- | --- |
-| shared | 10 requests / 10 s | `/search/text`, `/search/images`, `/page-content`, `/inference`, `/api/validate-access-key` |
-| thumbnail | 60 requests / 10 s | `/thumbnail` |
+| Bucket    | Budget             | Consumed by                                                                                 |
+| --------- | ------------------ | ------------------------------------------------------------------------------------------- |
+| shared    | 10 requests / 10 s | `/search/text`, `/search/images`, `/page-content`, `/inference`, `/api/validate-access-key` |
+| thumbnail | 60 requests / 10 s | `/thumbnail`                                                                                |
 
 `/thumbnail` has its own budget because one image search fans out into up to 30
 tile loads, which would otherwise consume a user's whole search budget. The
@@ -122,18 +122,16 @@ identity.
 
 Query parameters:
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `q` | yes | Search query, trimmed, 1 to 2000 characters |
-| `token` | yes | Search token hash |
-| `limit` | no | How many of SearXNG's results to consider, default and maximum 30; a value that is not a positive integer falls back to the default. SearXNG is not sent this number: it caps a single SearXNG response after duplicate URLs are dropped, and the score filter below can return fewer |
+| Name    | Required | Description                                                                                                                                                                                                                                                                           |
+| ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `q`     | yes      | Search query, trimmed, 1 to 2000 characters                                                                                                                                                                                                                                           |
+| `token` | yes      | Search token hash                                                                                                                                                                                                                                                                     |
+| `limit` | no       | How many of SearXNG's results to consider, default and maximum 30; a value that is not a positive integer falls back to the default. SearXNG is not sent this number: it caps a single SearXNG response after duplicate URLs are dropped, and the score filter below can return fewer |
 
 Responds with a JSON array of tuples, in the order the client renders them:
 
 ```json
-[
-  ["Result title", "Snippet text", "https://example.com/page", 3.7]
-]
+[["Result title", "Snippet text", "https://example.com/page", 3.7]]
 ```
 
 Between SearXNG and the response the server drops duplicate URLs, keeps the
@@ -167,12 +165,12 @@ optional.
 
 Failures:
 
-| Status | Body | When |
-| --- | --- | --- |
-| `400` | `{"error":"Missing query parameter"}` | `q` missing or blank |
-| `400` | `{"error":"Query parameter must not exceed 2000 characters"}` | `q` too long |
-| `502` | `{"error":"Search service unavailable"}` | SearXNG failed and the text-search fallback was off or failed too, so an outage is distinguishable from a search with no matches |
-| `500` | `{"error":"Internal server error"}` | Anything else |
+| Status | Body                                                          | When                                                                                                                             |
+| ------ | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | `{"error":"Missing query parameter"}`                         | `q` missing or blank                                                                                                             |
+| `400`  | `{"error":"Query parameter must not exceed 2000 characters"}` | `q` too long                                                                                                                     |
+| `502`  | `{"error":"Search service unavailable"}`                      | SearXNG failed and the text-search fallback was off or failed too, so an outage is distinguishable from a search with no matches |
+| `500`  | `{"error":"Internal server error"}`                           | Anything else                                                                                                                    |
 
 With `SEARCH_FALLBACK_ENABLED` on (see `docs/configuration.md`), a text search
 whose SearXNG attempt failed is retried against the configured fallback
@@ -236,11 +234,11 @@ is SSRF-guarded, byte-capped and timed out per page
 
 The path is matched exactly, so `/page-content/anything` falls through.
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `q` | yes | Query the passages are ranked against, 1 to 2000 characters |
-| `token` | yes | Search token hash |
-| `url` | yes | Page to read, `http` or `https`, up to 2048 characters. Repeat for more; at most 6 per request, counted before duplicates are removed, so 7 URLs are refused even when two of them are the same |
+| Name    | Required | Description                                                                                                                                                                                     |
+| ------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `q`     | yes      | Query the passages are ranked against, 1 to 2000 characters                                                                                                                                     |
+| `token` | yes      | Search token hash                                                                                                                                                                               |
+| `url`   | yes      | Page to read, `http` or `https`, up to 2048 characters. Repeat for more; at most 6 per request, counted before duplicates are removed, so 7 URLs are refused even when two of them are the same |
 
 Responds with an object keyed by URL:
 
@@ -266,10 +264,10 @@ answered `Invalid URL parameter`, the same as any other unusable URL.
 Fetches one image-result thumbnail server-side, so the browser never requests a
 search-result URL directly.
 
-| Name | Required | Description |
-| --- | --- | --- |
-| `u` | yes | Thumbnail URL, up to 2048 characters |
-| `token` | yes | Search token hash |
+| Name    | Required | Description                          |
+| ------- | -------- | ------------------------------------ |
+| `u`     | yes      | Thumbnail URL, up to 2048 characters |
+| `token` | yes      | Search token hash                    |
 
 A hit responds with the image bytes and the upstream's content type, restricted
 to `image/avif`, `image/bmp`, `image/gif`, `image/jpeg`, `image/png`,
@@ -282,13 +280,13 @@ The fetch is bounded by a 3 s deadline covering DNS and every hop, at most 3
 redirects, each of them re-validated, and 500 KB of body. Successful fetches are
 held in an in-process LRU (100 entries, 50 MB); failures never are.
 
-| Status | Body | When |
-| --- | --- | --- |
-| `400` | `{"error":"Missing thumbnail URL"}` | `u` missing |
-| `400` | `{"error":"Thumbnail URL too long"}` | `u` over 2048 characters |
-| `403` | `{"error":"Refusing to fetch a thumbnail from a non-public or unresolvable address"}` | The host is in private space, does not resolve, or `u` is not a parseable `http`/`https` URL. `/page-content` answers `400` for that last case; this endpoint does not distinguish it |
-| `502` | `{"error":"Thumbnail could not be fetched"}` | Upstream failed, timed out, redirected more than 3 times, answered with a type outside the list, or sent an empty body |
-| `500` | `{"error":"Internal server error"}` | Anything the hook itself threw, caught so Vite's connect stack does not see an unhandled rejection |
+| Status | Body                                                                                  | When                                                                                                                                                                                  |
+| ------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | `{"error":"Missing thumbnail URL"}`                                                   | `u` missing                                                                                                                                                                           |
+| `400`  | `{"error":"Thumbnail URL too long"}`                                                  | `u` over 2048 characters                                                                                                                                                              |
+| `403`  | `{"error":"Refusing to fetch a thumbnail from a non-public or unresolvable address"}` | The host is in private space, does not resolve, or `u` is not a parseable `http`/`https` URL. `/page-content` answers `400` for that last case; this endpoint does not distinguish it |
+| `502`  | `{"error":"Thumbnail could not be fetched"}`                                          | Upstream failed, timed out, redirected more than 3 times, answered with a type outside the list, or sent an empty body                                                                |
+| `500`  | `{"error":"Internal server error"}`                                                   | Anything the hook itself threw, caught so Vite's connect stack does not see an unhandled rejection                                                                                    |
 
 Error responses carry `Cache-Control: no-store`, since neither a refusal nor an
 upstream failure is a stable property of the URL.
@@ -341,17 +339,17 @@ and `Connection: keep-alive`.
 
 Failures before the stream starts:
 
-| Status | Body | When |
-| --- | --- | --- |
-| `405` | `{"error":"Method Not Allowed"}` | Not a `POST`; the response carries `Allow: POST`. Checked before the token, so it needs no token and spends no rate-limit point |
-| `415` | `{"error":"Unsupported Media Type"}` | `Content-Type` is not JSON; also checked before the token |
-| `400` | `{"error":"Invalid request body"}` or `{"error":"Invalid request body: <field> <message>"}` | Unparseable or schema-invalid body |
-| `413` | `{"error":"Request body too large"}` | Body over 1 MiB |
-| `500` | `{"error":"OpenAI API configuration is missing"}` | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` or `_API_KEY` unset |
-| `500` | `{"error":"Failed to fetch available models"}` | No model configured and the provider's listing failed |
-| `500` | `{"error":"No model available"}` | The listing succeeded but was empty |
-| `503` | `{"error":"Service unavailable - all models failed","lastError":"..."}` | Every attempt failed before the first token |
-| `500` | `{"error":"Internal server error","message":"..."}` | Anything else the hook threw |
+| Status | Body                                                                                        | When                                                                                                                            |
+| ------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `405`  | `{"error":"Method Not Allowed"}`                                                            | Not a `POST`; the response carries `Allow: POST`. Checked before the token, so it needs no token and spends no rate-limit point |
+| `415`  | `{"error":"Unsupported Media Type"}`                                                        | `Content-Type` is not JSON; also checked before the token                                                                       |
+| `400`  | `{"error":"Invalid request body"}` or `{"error":"Invalid request body: <field> <message>"}` | Unparseable or schema-invalid body                                                                                              |
+| `413`  | `{"error":"Request body too large"}`                                                        | Body over 1 MiB                                                                                                                 |
+| `500`  | `{"error":"OpenAI API configuration is missing"}`                                           | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` or `_API_KEY` unset                                                                   |
+| `500`  | `{"error":"Failed to fetch available models"}`                                              | No model configured and the provider's listing failed                                                                           |
+| `500`  | `{"error":"No model available"}`                                                            | The listing succeeded but was empty                                                                                             |
+| `503`  | `{"error":"Service unavailable - all models failed","lastError":"..."}`                     | Every attempt failed before the first token                                                                                     |
+| `500`  | `{"error":"Internal server error","message":"..."}`                                         | Anything else the hook threw                                                                                                    |
 
 ### `GET /status`
 
@@ -425,11 +423,11 @@ The body is capped at 4 KiB, which one encoded hash is nowhere near. Past that
 the answer is a `413` sent while the caller is still uploading, so it carries
 `Connection: close` and the socket is dropped once it has flushed.
 
-| Status | Body | When |
-| --- | --- | --- |
-| `429` | `{"error":"Too many requests."}` | Rate limited, kept distinct from a wrong key so the UI can say "try again" |
-| `400` | `{"valid":false,"error":"Invalid request"}` | Body is not JSON |
-| `413` | `{"error":"Request body too large"}` | Body over 4 KiB |
+| Status | Body                                        | When                                                                       |
+| ------ | ------------------------------------------- | -------------------------------------------------------------------------- |
+| `429`  | `{"error":"Too many requests."}`            | Rate limited, kept distinct from a wrong key so the UI can say "try again" |
+| `400`  | `{"valid":false,"error":"Invalid request"}` | Body is not JSON                                                           |
+| `413`  | `{"error":"Request body too large"}`        | Body over 4 KiB                                                            |
 
 ### `GET /dictation-models/<version>/<file>`
 
@@ -449,10 +447,10 @@ named after the version. Concurrent first requests share one transfer. Responses
 are streamed and carry `Cache-Control: public, max-age=31536000, immutable`,
 which the version segment makes safe.
 
-| Status | Body | When |
-| --- | --- | --- |
-| `404` | `Unknown dictation model file` | The filename is not one of the seven |
-| `502` | `Could not serve <file>: <reason>` | The upstream failed, sent no body, exceeded the 64 MiB cap, or the bytes did not match the pinned digest |
+| Status | Body                               | When                                                                                                     |
+| ------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `404`  | `Unknown dictation model file`     | The filename is not one of the seven                                                                     |
+| `502`  | `Could not serve <file>: <reason>` | The upstream failed, sent no body, exceeded the 64 MiB cap, or the bytes did not match the pinned digest |
 
 A failure once the body has started cannot be reported, because the headers are
 already gone; the response is ended rather than having an error appended to a

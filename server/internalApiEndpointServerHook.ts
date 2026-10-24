@@ -158,7 +158,6 @@ export function internalApiEndpointServerHook<
       let outcome: InferenceOutcome = "unclassified";
 
       try {
-        let rawRequestBody: unknown;
         const maxBodyBytes = 1024 * 1024;
         const body = await new Promise<
           | { status: "ok"; value: unknown }
@@ -221,7 +220,7 @@ export function internalApiEndpointServerHook<
           sendJsonError(response, 400, { error: "Invalid request body" });
           return;
         }
-        rawRequestBody = body.value;
+        const rawRequestBody = body.value;
 
         const parsedRequestBody =
           chatCompletionRequestSchema.safeParse(rawRequestBody);

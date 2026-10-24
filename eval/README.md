@@ -6,7 +6,6 @@ has two parts, both driven by a single fixed golden set (`goldenSet.ts`).
 
 Some of it runs in the default `npm test` suite (and so in CI); the rest is a
 local signal:
-
 - `metrics.test.ts`, `goldenSet.test.ts`, `promptConstruction.test.ts` run in
   the default suite: pure math, golden-set structure, and prompt construction.
   No model, no API key.
@@ -20,7 +19,6 @@ change, not an absolute quality score.
 ## The golden set
 
 `goldenSet.ts` is a fixed, hand-curated list of queries. Each entry has:
-
 - `query`: the search query.
 - `results`: realistic candidate results (title, snippet, url), mixed
   relevant and irrelevant, the way a real search engine returns them.

@@ -8,11 +8,11 @@ MiniSearch uses a **PubSub-based reactive architecture**. Components subscribe t
 
 Each PubSub channel is a three-element tuple returned by `createPubSub`:
 
-| Index | Name | Role |
-|-------|------|------|
-| `[0]` | `update*` | Setter — publishes a new value to all subscribers |
+| Index | Name                                       | Role                                                    |
+| ----- | ------------------------------------------ | ------------------------------------------------------- |
+| `[0]` | `update*`                                  | Setter — publishes a new value to all subscribers       |
 | `[1]` | `onValueChange` / `subscribe*` / `listen*` | Subscription registration — receives every future value |
-| `[2]` | `get*` | Getter — reads the current value synchronously |
+| `[2]` | `get*`                                     | Getter — reads the current value synchronously          |
 
 These are destructured at module level in `pubSub.ts` and exported under descriptive names (e.g., `updateTextGenerationState`, `listenToSettingsChanges`, `getQuery`).
 
@@ -21,7 +21,7 @@ These are destructured at module level in `pubSub.ts` and exported under descrip
 const query = usePubSub(queryPubSub);
 
 // Any module can update state
-updateQuery('new query');
+updateQuery("new query");
 
 // All subscribers automatically re-render
 ```
@@ -35,7 +35,6 @@ updateQuery('new query');
 ### localStorage Persistence
 
 Some state must survive page reloads. The `createLocalStoragePubSub` helper wraps `createPubSub` with two behaviors:
-
 1. **Hydration** — On first call, reads existing value from `localStorage` via `localStorage.getItem(key)`. If a stored JSON string is found, it is parsed and used as the initial value; otherwise the default value is used
 2. **Persistence** — A subscriber is immediately registered on the inner PubSub that calls `localStorage.setItem` with the JSON-serialized new value on every state change
 
@@ -45,10 +44,10 @@ Channels using this pattern: `settingsPubSub`, `querySuggestionsPubSub`, `lastSe
 
 Streaming LLM output produces token-by-token state changes that would overwhelm React's rendering pipeline. Two channels apply `throttle` from `throttleit` to cap subscriber notification rate to ~12 updates/sec (83.3ms interval):
 
-| Export | Raw Updater | Throttle Interval |
-|--------|-------------|-------------------|
-| `updateResponse` | `responsePubSub[0]` | 1000 / 12 ms |
-| `updateReasoningContent` | `reasoningContentPubSub[0]` | 1000 / 12 ms |
+| Export                   | Raw Updater                 | Throttle Interval |
+| ------------------------ | --------------------------- | ----------------- |
+| `updateResponse`         | `responsePubSub[0]`         | 1000 / 12 ms      |
+| `updateReasoningContent` | `reasoningContentPubSub[0]` | 1000 / 12 ms      |
 
 Callers write streaming token output directly to these exports without awareness of internal throttling.
 
@@ -56,43 +55,43 @@ Callers write streaming token output directly to these exports without awareness
 
 Three channels register built-in side-effect subscribers at module load time, independently of any React component lifecycle, for automatic logging via `addLogEntry`:
 
-| Channel | Side Effect |
-|---------|-------------|
+| Channel                     | Side Effect            |
+| --------------------------- | ---------------------- |
 | `textGenerationStatePubSub` | Logs state transitions |
-| `textSearchStatePubSub` | Logs state transitions |
-| `imageSearchStatePubSub` | Logs state transitions |
+| `textSearchStatePubSub`     | Logs state transitions |
+| `imageSearchStatePubSub`    | Logs state transitions |
 
 ## PubSub Channel Reference
 
 All state channels are defined in `client/modules/pubSub.ts`:
 
-| Channel | Type | Description | Primary Consumers |
-|---------|------|-------------|-------------------|
-| `queryPubSub` | `string` | Current search query | SearchForm, SearchButton |
-| `responsePubSub` | `string` | AI response content (throttled: 12/sec) | AiResponseSection |
-| `textToSpeechStatePubSub` | `TextToSpeechState` | Whether an answer is being read aloud: `"idle" \| "speaking"` | AiResponseContent |
-| `reasoningContentPubSub` | `string` | AI reasoning/thinking content (throttled: 12/sec) | AiResponseSection |
-| `settingsPubSub` | `Settings` | Application settings | SettingsForm, various components |
-| `textSearchResultsPubSub` | `TextSearchResults` | Text search results | SearchResultsSection |
-| `llmTextSearchResultsPubSub` | `TextSearchResults` | LLM-reranked text results | Internal use |
-| `imageSearchResultsPubSub` | `ImageSearchResults` | Image search results | ImageResultsSection |
-| `textSearchStatePubSub` | `SearchState` | Text search state: `"idle" \| "running" \| "failed" \| "completed"` | SearchResultsSection, LoadingIndicators |
-| `textSearchStalePubSub` | `boolean` | Whether the text results on screen came from the cache because the live search failed | TextSearchResults |
-| `imageSearchStatePubSub` | `SearchState` | Image search state: `"idle" \| "running" \| "failed" \| "completed"` | ImageResultsSection |
-| `textGenerationStatePubSub` | `TextGenerationState` | AI generation state | AiResponseSection, StatusIndicators |
-| `modelLoadingProgressPubSub` | `number` | Model download progress (0-100) | AiResponseSection |
-| `modelSizeInMegabytesPubSub` | `number` | Model size in MB for progress calc | AiResponseSection |
-| `chatMessagesPubSub` | `ChatMessage[]` | Chat conversation | ChatInterface |
-| `chatInputPubSub` | `string` | Current chat input content | ChatInputArea |
-| `chatGenerationStatePubSub` | `{isGeneratingResponse, isGeneratingFollowUpQuestion}` | Chat generation states. Each flag has one owner: the send and regenerate handlers write `isGeneratingResponse`, `regenerateFollowUpQuestion` writes `isGeneratingFollowUpQuestion`, and every writer merges `getChatGenerationState()` so a concurrent flow is not clobbered. A boolean cannot represent two follow-up calls at once, so each carries an invocation token, and a completion that is no longer the current one writes nothing. Unmounting is the exception to the merge: it replaces both flags outright, bumps the token, and stops the response writers touching the channel at all, so an orphaned flow cannot write into the instance that replaced it | ChatInterface |
-| `conversationSummaryPubSub` | `{id, summary}` | Rolling conversation summary | TextGeneration module |
-| `followUpQuestionPubSub` | `string` | Generated follow-up question | AiResponseSection |
-| `suppressNextFollowUpPubSub` | `boolean` | Flag to skip next follow-up | FollowUpQuestions module |
-| `isRestoringFromHistoryPubSub` | `boolean` | History restoration in progress | SearchForm, components |
-| `menuExpandedAccordionsPubSub` | `string[]` | Expanded menu accordion IDs | MenuDrawer |
-| `querySuggestionsPubSub` | `string[]` | Query suggestions history | SearchForm |
-| `lastSearchTokenHashPubSub` | `string` | Hash of last search token | Security/validation |
-| `logEntriesPubSub` | `LogEntry[]` | Application log entries | LogsModal, ShowLogsButton |
+| Channel                        | Type                                                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Primary Consumers                       |
+| ------------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `queryPubSub`                  | `string`                                               | Current search query                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | SearchForm, SearchButton                |
+| `responsePubSub`               | `string`                                               | AI response content (throttled: 12/sec)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | AiResponseSection                       |
+| `textToSpeechStatePubSub`      | `TextToSpeechState`                                    | Whether an answer is being read aloud: `"idle" \| "speaking"`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | AiResponseContent                       |
+| `reasoningContentPubSub`       | `string`                                               | AI reasoning/thinking content (throttled: 12/sec)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | AiResponseSection                       |
+| `settingsPubSub`               | `Settings`                                             | Application settings                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | SettingsForm, various components        |
+| `textSearchResultsPubSub`      | `TextSearchResults`                                    | Text search results                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | SearchResultsSection                    |
+| `llmTextSearchResultsPubSub`   | `TextSearchResults`                                    | LLM-reranked text results                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Internal use                            |
+| `imageSearchResultsPubSub`     | `ImageSearchResults`                                   | Image search results                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | ImageResultsSection                     |
+| `textSearchStatePubSub`        | `SearchState`                                          | Text search state: `"idle" \| "running" \| "failed" \| "completed"`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | SearchResultsSection, LoadingIndicators |
+| `textSearchStalePubSub`        | `boolean`                                              | Whether the text results on screen came from the cache because the live search failed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | TextSearchResults                       |
+| `imageSearchStatePubSub`       | `SearchState`                                          | Image search state: `"idle" \| "running" \| "failed" \| "completed"`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | ImageResultsSection                     |
+| `textGenerationStatePubSub`    | `TextGenerationState`                                  | AI generation state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | AiResponseSection, StatusIndicators     |
+| `modelLoadingProgressPubSub`   | `number`                                               | Model download progress (0-100)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | AiResponseSection                       |
+| `modelSizeInMegabytesPubSub`   | `number`                                               | Model size in MB for progress calc                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | AiResponseSection                       |
+| `chatMessagesPubSub`           | `ChatMessage[]`                                        | Chat conversation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | ChatInterface                           |
+| `chatInputPubSub`              | `string`                                               | Current chat input content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | ChatInputArea                           |
+| `chatGenerationStatePubSub`    | `{isGeneratingResponse, isGeneratingFollowUpQuestion}` | Chat generation states. Each flag has one owner: the send and regenerate handlers write `isGeneratingResponse`, `regenerateFollowUpQuestion` writes `isGeneratingFollowUpQuestion`, and every writer merges `getChatGenerationState()` so a concurrent flow is not clobbered. A boolean cannot represent two follow-up calls at once, so each carries an invocation token, and a completion that is no longer the current one writes nothing. Unmounting is the exception to the merge: it replaces both flags outright, bumps the token, and stops the response writers touching the channel at all, so an orphaned flow cannot write into the instance that replaced it | ChatInterface                           |
+| `conversationSummaryPubSub`    | `{id, summary}`                                        | Rolling conversation summary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | TextGeneration module                   |
+| `followUpQuestionPubSub`       | `string`                                               | Generated follow-up question                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | AiResponseSection                       |
+| `suppressNextFollowUpPubSub`   | `boolean`                                              | Flag to skip next follow-up                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | FollowUpQuestions module                |
+| `isRestoringFromHistoryPubSub` | `boolean`                                              | History restoration in progress                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | SearchForm, components                  |
+| `menuExpandedAccordionsPubSub` | `string[]`                                             | Expanded menu accordion IDs                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | MenuDrawer                              |
+| `querySuggestionsPubSub`       | `string[]`                                             | Query suggestions history                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | SearchForm                              |
+| `lastSearchTokenHashPubSub`    | `string`                                               | Hash of last search token                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Security/validation                     |
+| `logEntriesPubSub`             | `LogEntry[]`                                           | Application log entries                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | LogsModal, ShowLogsButton               |
 
 ## Component Hierarchy
 
@@ -190,12 +189,12 @@ that appends each transcript without clobbering what the user typed meanwhile.
 
 **Props:**
 
-| Prop | Role |
-|---|---|
-| `getValue` / `setValue` | Reads and replaces the field's content. The caller owns the field, so the button never touches the DOM itself |
-| `labelScope` | Names the field in the accessible labels, as the object of "Dictate" and "Stop dictating": `"the search query"`, `"a follow-up question"` |
-| `rightOffset` | Distance from the right edge of the positioned ancestor, for a field that already has a button at its edge |
-| `disabled` | Blocks a new session and stops one already running, for a field that has gone read-only |
+| Prop                    | Role                                                                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `getValue` / `setValue` | Reads and replaces the field's content. The caller owns the field, so the button never touches the DOM itself                             |
+| `labelScope`            | Names the field in the accessible labels, as the object of "Dictate" and "Stop dictating": `"the search query"`, `"a follow-up question"` |
+| `rightOffset`           | Distance from the right edge of the positioned ancestor, for a field that already has a button at its edge                                |
+| `disabled`              | Blocks a new session and stops one already running, for a field that has gone read-only                                                   |
 
 The button renders itself absolutely positioned, so each caller wraps its field
 in a `position: relative` element and reserves `dictationButtonWidth` of right
@@ -239,17 +238,17 @@ function SearchResultsSection() {
 
 **State Machine (`textGenerationStatePubSub`):**
 
-| State | Description | UI Display |
-|-------|-------------|------------|
-| `idle` | No active generation | Hidden or empty |
+| State                            | Description                                | UI Display                                            |
+| -------------------------------- | ------------------------------------------ | ----------------------------------------------------- |
+| `idle`                           | No active generation                       | Hidden or empty                                       |
 | `awaitingModelDownloadAllowance` | Waiting for user to confirm model download | `AiModelDownloadAllowanceContent` confirmation prompt |
-| `loadingModel` | Downloading or initializing AI model | `LoadingModelContent` with progress |
-| `awaitingSearchResults` | Waiting for search to complete | `PreparingContent` indicator |
-| `preparingToGenerate` | Search done, response not yet started | `PreparingContent` indicator |
-| `generating` | Streaming response tokens | Active response with streaming text |
-| `interrupted` | Generation manually stopped by user | Response retained, with a yellow "Interrupted" badge |
-| `completed` | Full response received | Complete response with chat interface |
-| `failed` | Error occurred | Error message with retry option |
+| `loadingModel`                   | Downloading or initializing AI model       | `LoadingModelContent` with progress                   |
+| `awaitingSearchResults`          | Waiting for search to complete             | `PreparingContent` indicator                          |
+| `preparingToGenerate`            | Search done, response not yet started      | `PreparingContent` indicator                          |
+| `generating`                     | Streaming response tokens                  | Active response with streaming text                   |
+| `interrupted`                    | Generation manually stopped by user        | Response retained, with a yellow "Interrupted" badge  |
+| `completed`                      | Full response received                     | Complete response with chat interface                 |
+| `failed`                         | Error occurred                             | Error message with retry option                       |
 
 **Reasoning Content Extraction:**
 
@@ -303,7 +302,10 @@ function AiResponseSection() {
 **Persistence:**
 ```typescript
 // client/modules/pubSub.ts
-export const settingsPubSub = createLocalStoragePubSub('settings', defaultSettings);
+export const settingsPubSub = createLocalStoragePubSub(
+  "settings",
+  defaultSettings,
+);
 ```
 
 `createLocalStoragePubSub` registers the localStorage-writing subscriber internally, so components just read and write `settingsPubSub` like any other channel.
@@ -425,7 +427,8 @@ const [value, setValue] = usePubSub(channel);
 
 Manages search history from IndexedDB:
 ```typescript
-const { searchHistory, groupedSearches, deleteEntry, togglePin } = useSearchHistory();
+const { searchHistory, groupedSearches, deleteEntry, togglePin } =
+  useSearchHistory();
 ```
 
 ### useDrawerState
