@@ -12,6 +12,7 @@ import { defaultContextSize } from "./textGenerationUtilities";
 interface WllamaInitConfig {
   wllama?: WllamaConfig;
   model?: LoadModelParams & DownloadOptions;
+  chatTemplateKwargs?: Record<string, unknown>;
 }
 
 async function createWllamaInstance(config?: WllamaConfig): Promise<Wllama> {
@@ -64,6 +65,9 @@ export async function initializeWllama(
         },
       ],
       max_tokens: 1,
+      ...(config?.chatTemplateKwargs
+        ? { chat_template_kwargs: config.chatTemplateKwargs }
+        : {}),
     });
 
     const hasWarmupSucceeded = !!warmupResponse.choices[0]?.message?.content;
@@ -122,6 +126,13 @@ export interface WllamaModel {
   readonly shouldIncludeUrlsOnPrompt: boolean;
   readonly stopStrings?: string[];
   readonly flash_attn?: boolean;
+  /**
+   * Extra variables handed to the model's chat template on every completion
+   * (wllama's `chat_template_kwargs`). Used to switch off thinking-by-default
+   * templates: MiniSearch renders only the content channel, so a model that
+   * spends its whole budget on `reasoning_content` would answer with nothing.
+   */
+  readonly chatTemplateKwargs?: Record<string, unknown>;
   getSampling: () => Omit<SamplingParams, "logit_bias">;
 }
 
@@ -320,6 +331,14 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00007.gguf",
     fileSizeInMegabytes: 1740,
   },
+  "spark-x2.6-1.7b": {
+    ...createDefaultModelConfig(),
+    label: "Spark X2.6 1.7B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_M-Spark-X2.6-1.7B",
+    hfFilePath: "Spark-X2.6-1.7B-Q4_K_M-00001-of-00004.gguf",
+    fileSizeInMegabytes: 1769,
+    chatTemplateKwargs: { enable_thinking: false },
+  },
   "smollm3-3b": {
     ...createDefaultModelConfig(),
     label: "SmolLM 3 3B",
@@ -348,6 +367,14 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00007.gguf",
     fileSizeInMegabytes: 1930,
   },
+  "granite-4.2-3b": {
+    ...createDefaultModelConfig(),
+    label: "Granite 4.2 3B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-4.2-3b",
+    hfFilePath: "granite-4.2-3b-Q4_K_S-00001-of-00005.gguf",
+    fileSizeInMegabytes: 2143,
+    chatTemplateKwargs: { enable_thinking: false },
+  },
   "phi-3.5-mini-3.8b": {
     ...createDefaultModelConfig(),
     label: "Phi 3.5 Mini 3.8B",
@@ -369,11 +396,35 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00008.gguf",
     fileSizeInMegabytes: 2380,
   },
+  "qwen-3.5-4b": {
+    ...createDefaultModelConfig(),
+    label: "Qwen 3.5 4B",
+    hfRepoId: "Felladrin/gguf-sharded-UD-Q3_K_XL-Qwen3.5-4B",
+    hfFilePath: "Qwen3.5-4B-UD-Q3_K_XL-00001-of-00005.gguf",
+    fileSizeInMegabytes: 2436,
+    chatTemplateKwargs: { enable_thinking: false },
+  },
+  "gemma-4-e2b": {
+    ...createDefaultModelConfig(),
+    label: "Gemma 4 E2B",
+    hfRepoId: "Felladrin/gguf-sharded-Q3_K_S-gemma-4-e2b-it",
+    hfFilePath: "gemma-4-e2b-it-Q3_K_S-00001-of-00005.gguf",
+    fileSizeInMegabytes: 2446,
+    chatTemplateKwargs: { enable_thinking: false },
+  },
   "phi-4-mini-reasoning": {
     ...createDefaultModelConfig(),
     label: "Phi 4 Mini Reasoning 3.8B",
     hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-Phi-4-mini-reasoning",
     hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 2460,
+  },
+  "spark-x2.6-4b": {
+    ...createDefaultModelConfig(),
+    label: "Spark X2.6 4B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_M-Spark-X2.6-4B",
+    hfFilePath: "Spark-X2.6-4B-Q4_K_M-00001-of-00007.gguf",
+    fileSizeInMegabytes: 3543,
+    chatTemplateKwargs: { enable_thinking: false },
   },
 };
