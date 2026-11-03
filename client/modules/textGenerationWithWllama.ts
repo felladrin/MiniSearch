@@ -113,6 +113,8 @@ async function generateWithWllama({
         ? await messagesOrBuilder()
         : messagesOrBuilder;
 
+    let reasoningText = "";
+    let answerText = "";
     let streamedMessage = "";
 
     const stream = await wllama.createChatCompletion({
@@ -135,16 +137,23 @@ async function generateWithWllama({
       }
 
       const delta = chunk.choices[0]?.delta?.content ?? "";
-      if (!delta) continue;
+      // wllama splits a thinking model's chain of thought into its own
+      // channel; the type does not declare it yet.
+      const reasoningDelta =
+        (chunk.choices[0]?.delta as { reasoning_content?: string } | undefined)
+          ?.reasoning_content ?? "";
+      if (!delta && !reasoningDelta) continue;
 
       if (shouldCheckCanRespond && getTextGenerationState() !== "generating") {
         updateTextGenerationState("generating");
       }
 
-      streamedMessage += delta;
+      if (reasoningDelta) reasoningText += reasoningDelta;
+      if (delta) answerText += delta;
+
       streamedMessage = handleWllamaCompletion(
         model,
-        streamedMessage,
+        composeStreamedText(reasoningText, answerText),
         () => abortController.abort(),
         onUpdate,
       );
@@ -197,6 +206,20 @@ async function initializeWllamaInstance(progressCallback?: ProgressCallback) {
   });
 
   return { wllama, model };
+}
+
+/**
+ * Joins the reasoning and answer channels into one stream so the existing
+ * reasoning-marker parsing in the UI shows the chain of thought while the
+ * model thinks. The end marker only appears once the answer has started,
+ * which keeps the UI in its "still thinking" state until then.
+ */
+export function composeStreamedText(reasoning: string, answer: string): string {
+  if (!reasoning) return answer;
+  const { reasoningStartMarker, reasoningEndMarker } = getSettings();
+  return `${reasoningStartMarker}${reasoning}${
+    answer ? `${reasoningEndMarker}${answer}` : ""
+  }`;
 }
 
 function handleWllamaCompletion(
