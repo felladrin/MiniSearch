@@ -46,6 +46,18 @@ describe("wllamaModels catalog", () => {
     }
   });
 
+  it("keeps reasoning budgets small enough to leave room for the answer", () => {
+    // The budget forces the final answer once the chain of thought runs
+    // this long. It must stay far below the 4096-token context, or the
+    // model thinks itself out of the window before answering.
+    for (const [id, model] of models) {
+      if (model.reasoningBudgetTokens !== undefined) {
+        expect(model.reasoningBudgetTokens, id).toBeGreaterThanOrEqual(64);
+        expect(model.reasoningBudgetTokens, id).toBeLessThanOrEqual(1024);
+      }
+    }
+  });
+
   it("uses the shared default context size for every model", () => {
     for (const [id, model] of models) {
       expect(model.contextSize, id).toBe(4096);
