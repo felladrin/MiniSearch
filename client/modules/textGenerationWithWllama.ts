@@ -201,6 +201,9 @@ async function initializeWllamaInstance(progressCallback?: ProgressCallback) {
       flash_attn: model.flash_attn,
       embeddings: false,
       n_gpu_layers: isWebGPUAvailable ? 99999 : 0,
+      ...(model.reasoningBudgetTokens
+        ? { reasoning_budget_tokens: model.reasoningBudgetTokens }
+        : {}),
       progressCallback,
     },
   });

@@ -6,6 +6,7 @@ Notable changes, grouped by date, most recent first.
 ## 2026-11-03
 
 - The five thinking models added on 2026-11-02 (Spark X2.6 1.7B and 4B, Granite 4.2 3B, Qwen 3.5 4B, Gemma 4 E2B) no longer ship with thinking switched off. Their chain of thought arrives on wllama's `reasoning_content` channel and is now wrapped in the configured reasoning markers, so the existing thinking UI shows it while the model reasons and the answer streams in after. The model warmup counts a reasoning token as a working model, so thinking models no longer log a failed warmup.
+- The same five models now cap their chain of thought with `reasoningBudgetTokens` (wllama's `reasoning_budget_tokens`, 256 tokens): when the model has thought that long without answering, the engine closes the reasoning channel and forces the final answer. Without the cap, Spark X2.6 and Granite 4.2 could spend the whole 4096-token context on reasoning and deliver no answer at all.
 
 
 ## 2026-11-02

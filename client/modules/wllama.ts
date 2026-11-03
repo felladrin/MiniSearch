@@ -141,6 +141,14 @@ export interface WllamaModel {
    * it off.
    */
   readonly chatTemplateKwargs?: Record<string, unknown>;
+  /**
+   * Hard cap on the chain of thought, in tokens (wllama's
+   * `reasoning_budget_tokens`). When the model has thought this long
+   * without answering, the engine closes the reasoning channel and forces
+   * the final answer, so a long-winded model cannot spend the whole
+   * context window thinking and deliver nothing.
+   */
+  readonly reasoningBudgetTokens?: number;
   getSampling: () => Omit<SamplingParams, "logit_bias">;
 }
 
@@ -345,6 +353,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_M-Spark-X2.6-1.7B",
     hfFilePath: "Spark-X2.6-1.7B-Q4_K_M-00001-of-00004.gguf",
     fileSizeInMegabytes: 1769,
+    reasoningBudgetTokens: 256,
   },
   "smollm3-3b": {
     ...createDefaultModelConfig(),
@@ -380,6 +389,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-4.2-3b",
     hfFilePath: "granite-4.2-3b-Q4_K_S-00001-of-00005.gguf",
     fileSizeInMegabytes: 2143,
+    reasoningBudgetTokens: 256,
   },
   "phi-3.5-mini-3.8b": {
     ...createDefaultModelConfig(),
@@ -408,6 +418,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-UD-Q3_K_XL-Qwen3.5-4B",
     hfFilePath: "Qwen3.5-4B-UD-Q3_K_XL-00001-of-00005.gguf",
     fileSizeInMegabytes: 2436,
+    reasoningBudgetTokens: 256,
   },
   "gemma-4-e2b": {
     ...createDefaultModelConfig(),
@@ -415,6 +426,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q3_K_S-gemma-4-e2b-it",
     hfFilePath: "gemma-4-e2b-it-Q3_K_S-00001-of-00005.gguf",
     fileSizeInMegabytes: 2446,
+    reasoningBudgetTokens: 256,
   },
   "phi-4-mini-reasoning": {
     ...createDefaultModelConfig(),
@@ -429,5 +441,6 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_M-Spark-X2.6-4B",
     hfFilePath: "Spark-X2.6-4B-Q4_K_M-00001-of-00007.gguf",
     fileSizeInMegabytes: 3543,
+    reasoningBudgetTokens: 256,
   },
 };
