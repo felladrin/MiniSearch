@@ -73,7 +73,7 @@ export async function startBiEncoderService() {
     resolve(message.scores);
   });
 
-  biEncoderWorker.on("error", (error) => {
+  biEncoderWorker.on("error", (error: Error) => {
     printMessage(`Bi-encoder worker failed: ${error.message}`);
     forgetWorker(biEncoderWorker);
   });
