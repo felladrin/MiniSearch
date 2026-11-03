@@ -36,17 +36,13 @@ describe("wllamaModels catalog", () => {
     }
   });
 
-  it("switches thinking-by-default chat templates off", () => {
-    // MiniSearch renders only the content channel. A template that thinks
-    // by default spends the whole token budget on reasoning_content and the
-    // user sees an empty answer, so any model passing template kwargs must
-    // be turning thinking off.
+  it("keeps thinking enabled on every model", () => {
+    // The reasoning channel is streamed into the thinking UI, so a model
+    // must not hand the template a kwarg that switches thinking off: the
+    // answer would arrive with no visible chain of thought, which reads as
+    // a dumber model rather than a feature that was turned off.
     for (const [id, model] of models) {
-      if (model.chatTemplateKwargs) {
-        expect(model.chatTemplateKwargs, id).toEqual({
-          enable_thinking: false,
-        });
-      }
+      expect(model.chatTemplateKwargs?.enable_thinking, id).not.toBe(false);
     }
   });
 

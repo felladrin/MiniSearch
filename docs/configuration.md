@@ -199,7 +199,7 @@ Search results:
 - `{{dateTime}}`: Alias for `{{currentDate}}` - both are replaced with the same current date value
 - `{{searchResults}}`: Formatted search results from the web search, including the page excerpts when `enablePageContentFetch` is on
 
-**Reasoning Markers:** Models that output internal thought processes use `<think>` and `</think>` markers. The UI extracts and separately displays reasoning content from the final response.
+**Reasoning Markers:** Models that output internal thought processes use `<think>` and `</think>` markers. The UI extracts and separately displays reasoning content from the final response. Browser (Wllama) thinking models are wrapped in these markers automatically, so their chain of thought shows up the same way.
 
 ### Privacy Settings
 

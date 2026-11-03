@@ -3,6 +3,11 @@
 Notable changes, grouped by date, most recent first.
 
 
+## 2026-11-03
+
+- The five thinking models added on 2026-11-02 (Spark X2.6 1.7B and 4B, Granite 4.2 3B, Qwen 3.5 4B, Gemma 4 E2B) no longer ship with thinking switched off. Their chain of thought arrives on wllama's `reasoning_content` channel and is now wrapped in the configured reasoning markers, so the existing thinking UI shows it while the model reasons and the answer streams in after. The model warmup counts a reasoning token as a working model, so thinking models no longer log a failed warmup.
+
+
 ## 2026-11-02
 
 - Five new browser models joined the Wllama catalog: Spark X2.6 1.7B, Granite 4.2 3B, Qwen 3.5 4B, Gemma 4 E2B and Spark X2.6 4B, each tested end to end against the shipped wasm build with the search-answer prompt. The Gemma 4 and Qwen 3.5 architectures were previously absent from the catalog, and the new entries run on the wasm engine's supported architectures (`gemma4`, `qwen35`, `spark2_5`, `granite`). Models whose chat template thinks by default ship with `chatTemplateKwargs: { enable_thinking: false }`, a new per-model field passed to wllama as `chat_template_kwargs`, because MiniSearch renders only the content channel and a thinking template would otherwise spend the whole token budget on reasoning and answer with nothing. `docs/ai-integration.md` now records the two measured ceilings a candidate must fit (shard files under 2000 MiB, since Chromium's OPFS silently truncates beyond it; total weights under ~3.7 GB, since the wasm linear memory caps at 4 GiB), and `npm run wllama-catalog-check` HEADs every shard of every catalog model on HuggingFace to verify the claimed sizes.
