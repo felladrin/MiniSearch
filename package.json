@@ -32,7 +32,8 @@
     "eval:answer": "vitest run --config vitest.eval.config.ts answer",
     "changelog-guard": "node scripts/changelog-guard.cjs",
     "license-check": "node scripts/license-check.cjs",
-    "native-module-check": "node scripts/native-module-integrity.cjs"
+    "native-module-check": "node scripts/native-module-integrity.cjs",
+    "wllama-catalog-check": "node scripts/wllama-catalog-check.cjs"
   },
   "allowScripts": {
     "onnxruntime-node": false,

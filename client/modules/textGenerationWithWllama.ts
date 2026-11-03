@@ -121,6 +121,9 @@ async function generateWithWllama({
       stream: true,
       abortSignal: abortController.signal,
       ...model.getSampling(),
+      ...(model.chatTemplateKwargs
+        ? { chat_template_kwargs: model.chatTemplateKwargs }
+        : {}),
     });
 
     for await (const chunk of stream) {
@@ -179,6 +182,7 @@ async function initializeWllamaInstance(progressCallback?: ProgressCallback) {
       suppressNativeLog: true,
       allowOffline: true,
     },
+    chatTemplateKwargs: model.chatTemplateKwargs,
     model: {
       n_threads: getSettings().cpuThreads,
       n_ctx: model.contextSize,

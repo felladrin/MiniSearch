@@ -145,10 +145,10 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 ### Model Selection
 
 **Wllama Models:**
-- 30+ pre-configured models
+- 39 pre-configured models
 - Range from 135M to 4B parameters
-- All quantized to Q4_K_S or UD-Q4_K_XL
-- Stored at: `Felladrin/gguf-sharded-*` on HuggingFace
+- All quantized to a Q3/Q4-class quant (Q4_K_S, Q4_K_M, Q3_K_S, UD-Q3_K_XL or UD-Q4_K_XL)
+- Stored at: `Felladrin/gguf-sharded-*` on HuggingFace, always as sharded GGUFs
 
 **OpenAI/Internal:**
 - Any OpenAI-compatible API

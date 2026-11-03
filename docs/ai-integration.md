@@ -32,7 +32,15 @@ Uses `@wllama/wllama` for browser-based inference. Automatically uses WebGPU whe
 5. Streams tokens via the OAI-compatible `createChatCompletion` API
 
 **Pre-configured Models:**
-30+ stored at `Felladrin/gguf-sharded-*` on HuggingFace. MiniSearch currently ships 35 pre-configured models, ranging from SmolLM 2 135M (~100MB) up to Phi 4 Mini Reasoning 3.8B (~2.4GB). The full, authoritative list with HuggingFace repo IDs and sizes lives in `client/modules/wllama.ts` (`wllamaModels`) and is rendered in the Settings dropdown; refer to that file rather than a static table here, since models are added/swapped frequently.
+30+ stored at `Felladrin/gguf-sharded-*` on HuggingFace. MiniSearch currently ships 39 pre-configured models, ranging from SmolLM 2 135M (~100MB) up to Spark X2.6 4B (~3.5GB). The full, authoritative list with HuggingFace repo IDs and sizes lives in `client/modules/wllama.ts` (`wllamaModels`) and is rendered in the Settings dropdown; refer to that file rather than a static table here, since models are added/swapped frequently.
+
+Two constraints decide what can join that list, both measured against the shipped wasm build:
+- **Every model file must be a shard.** Chromium's OPFS storage silently truncates files past 2000 MiB, so a monolithic GGUF above that size arrives corrupted in the browser. Shards also keep progressive download working.
+- **The wasm linear memory ceiling is 4 GiB.** Models at ~3.5 GB and above OOM during buffer reserve, so the practical catalog ceiling is around 3.7 GB of weights.
+
+Models whose chat template thinks by default (Granite 4.2, Gemma 4, Spark X2.6, Qwen 3.5) would spend the whole token budget on the reasoning channel, which MiniSearch does not render. They are configured with `chatTemplateKwargs: { enable_thinking: false }`, passed to wllama as `chat_template_kwargs`.
+
+`node scripts/wllama-catalog-check.cjs` HEADs every shard of every catalog model on HuggingFace and verifies the claimed sizes; run it after adding or re-sharding a model.
 
 **Configuration:**
 - Settings → Inference Type: `Browser`
