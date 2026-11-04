@@ -140,6 +140,16 @@ link, its taxonomy box and its opening definition, while every passage about
 sleep was ranked, selected, and then cut. Best-first, the same budget opens on
 the passage about how long cats sleep.
 
+The client's second trim, in `client/modules/pageExcerptAllocation.ts`, no
+longer keeps a prefix of what it receives. When a page's share is smaller than
+its excerpt, it scores the query's terms against the text (Chinese and Japanese
+also get character bigrams, which stand in for the missing word boundaries) and
+keeps the window that holds the most matched weight, snapped to word boundaries
+and marked with an ellipsis where it cut. A page that answers in a section
+halfway down - a list of December releases under a month of navigation links -
+therefore reaches the model with the section in it. A page with no query term
+in it still keeps its opening, as before.
+
 ## Ranking Across Languages
 
 The interface is in English; the searches are not. Ranking therefore avoids

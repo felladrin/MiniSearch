@@ -115,6 +115,128 @@ describe("extractReadableText", () => {
   });
 });
 
+describe("noise suppression before extraction", () => {
+  const filler =
+    "Subscribers in several regions reported no change to their plan. ";
+
+  it("drops a plain-div rail of links that no selector names", () => {
+    const rail = Array.from(
+      { length: 12 },
+      (_, index) =>
+        `<a href="/story-${index}">Disney Plus December 2026 story ${index}</a>`,
+    ).join(" ");
+
+    const text = extractReadableText(
+      `<html><body><div class="rail">${rail}</div>` +
+        `<div><p>${filler.repeat(6)}</p></div></body></html>`,
+    );
+
+    expect(text).not.toContain("story 11");
+    expect(text).toContain("Subscribers in several regions");
+  });
+
+  it("keeps a paragraph whose links are only part of its text", () => {
+    const paragraphText =
+      'The schedule was published in a <a href="/guide">guide to the month</a> and covers each release with a short note. ';
+
+    const text = extractReadableText(
+      `<html><body><article><p>${paragraphText.repeat(4)}</p></article></body></html>`,
+    );
+
+    expect(text).toContain("covers each release with a short note");
+    expect(text).toContain("guide to the month");
+  });
+
+  it("keeps the body when a link-heavy rail wraps it in the same container", () => {
+    const rail = Array.from(
+      { length: 12 },
+      (_, index) => `<a href="/story-${index}">Related story ${index}</a>`,
+    ).join(" ");
+
+    const text = extractReadableText(
+      `<html><body><div class="layout"><div>${rail}</div>` +
+        `<div><p>${filler.repeat(8)}</p></div></div></body></html>`,
+    );
+
+    expect(text).toContain("Subscribers in several regions");
+    expect(text).not.toContain("Related story 3");
+  });
+});
+
+describe("page headline context", () => {
+  const filler =
+    "Subscribers in several regions reported no change to their plan. ";
+
+  // Neither paragraph carries the query as a whole: the first matches "disney"
+  // and the second "season", so the lexical score is a tie and the headline is
+  // what has to break it.
+  const firstParagraph =
+    "<p>Disney published its release plan for the month, listing every title " +
+    "with a short note about where it can be watched. " +
+    `${filler.repeat(2)}</p>`;
+  const secondParagraph =
+    "<p>Only Murders in the Building Season 6 arrives, with the same cast " +
+    "returning to a new city for eight episodes. " +
+    `${filler.repeat(2)}</p>`;
+
+  const query = "disney plus december 2026 lineup season";
+
+  function pageWith(head: string) {
+    return `<html><head>${head}</head><body><article>${firstParagraph}${secondParagraph}</article></body></html>`;
+  }
+
+  it("ranks a passage that repeats the page's headline above an earlier one", async () => {
+    respondWithHtml(
+      pageWith(
+        "<title>Only Murders in the Building Season 6 | Streaming guide</title>",
+      ),
+    );
+
+    const [content] = await fetchPageContents(query, [
+      "https://example.com/lineup",
+    ]);
+
+    expect(content.content.startsWith("Only Murders in the Building")).toBe(
+      true,
+    );
+  });
+
+  it("leaves the order alone when the page has no headline", async () => {
+    respondWithHtml(pageWith(""));
+
+    const [content] = await fetchPageContents(query, [
+      "https://example.com/lineup",
+    ]);
+
+    expect(content.content.startsWith("Disney published")).toBe(true);
+  });
+
+  it("puts the answer above a plain-div rail that repeats the query", async () => {
+    const rail = Array.from(
+      { length: 12 },
+      (_, index) =>
+        `<a href="/story-${index}">Disney Plus December 2026 release story ${index}</a>`,
+    ).join(" ");
+    const answer =
+      "<p>WHAT'S NEW ON DISNEY+ IN DECEMBER 2026: Only Murders in the " +
+      "Building Season 6 returns on December 8, 2026. " +
+      `${filler.repeat(3)}</p>`;
+
+    respondWithHtml(
+      `<html><body><div class="rail">${rail}</div><article>${answer}</article></body></html>`,
+    );
+
+    const [content] = await fetchPageContents(query, [
+      "https://example.com/lineup",
+    ]);
+
+    expect(
+      content.content.indexOf("Only Murders in the Building Season 6"),
+    ).toBeLessThan(100);
+    expect(content.content).not.toContain("release story 11");
+  });
+});
+
 describe("splitIntoPassages", () => {
   it("glues a heading onto the block that follows it", () => {
     const passages = splitIntoPassages(

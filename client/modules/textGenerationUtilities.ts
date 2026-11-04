@@ -63,6 +63,7 @@ export function setWorkerFactory(factory: () => Worker) {
 function allocateExcerptsInWorker(
   contents: string[],
   tokenBudget: number,
+  query: string,
 ): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const worker = workerFactory();
@@ -83,7 +84,7 @@ function allocateExcerptsInWorker(
       reject(new Error("The page excerpt worker failed to start"));
     };
 
-    const request: WorkerRequest = { contents, tokenBudget };
+    const request: WorkerRequest = { contents, tokenBudget, query };
     worker.postMessage(request);
   });
 }
@@ -99,15 +100,16 @@ function allocateExcerptsInWorker(
 async function allocatePageExcerptsAsync(
   contents: string[],
   tokenBudget: number,
+  query: string,
 ): Promise<string[]> {
   // Nothing to tokenize when no page was read; a worker per handoff would
   // cost more than the empty allocation it would return.
   if (!contents.some((content) => content.length > 0)) {
-    return allocatePageExcerpts(contents, tokenBudget);
+    return allocatePageExcerpts(contents, tokenBudget, { query });
   }
 
   try {
-    return await allocateExcerptsInWorker(contents, tokenBudget);
+    return await allocateExcerptsInWorker(contents, tokenBudget, query);
   } catch (error) {
     // A worker this environment cannot run - no `Worker` global, or one
     // whose construction or run failed - must not break generation. The
@@ -119,7 +121,7 @@ async function allocatePageExcerptsAsync(
         error instanceof Error ? error.message : "unknown error"
       }`,
     );
-    return allocatePageExcerpts(contents, tokenBudget);
+    return allocatePageExcerpts(contents, tokenBudget, { query });
   }
 }
 
@@ -214,6 +216,7 @@ export async function getFormattedSearchResults(
   const excerpts = await allocatePageExcerptsAsync(
     searchResults.map(([, , url]) => pageContents[url] ?? ""),
     getPageContentTokenBudget(),
+    getQuery(),
   );
 
   const relevanceTags = getRelevanceTags(searchResults);

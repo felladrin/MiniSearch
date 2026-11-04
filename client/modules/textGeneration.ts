@@ -1,3 +1,4 @@
+import { normalizeRelativeDates } from "@shared/relativeDates";
 import gptTokenizer from "gpt-tokenizer";
 import prettyMilliseconds from "pretty-ms";
 import {
@@ -447,8 +448,17 @@ async function startTextSearch(query: string, invocation: number) {
   let pageContentsRead = Promise.resolve();
   let textSearchFailed = false;
 
-  const searchQuery =
-    query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query;
+  // "明年" or "yesterday" name no year to the search engine, which then
+  // matches undated pages and leaves the answer to guess. Only this machine's
+  // clock knows which year the user means, so the query sent to the engine
+  // carries the anchor; the question, the history, and the prompt keep the
+  // wording the user typed.
+  const asOf = new Date();
+
+  const searchQuery = normalizeRelativeDates(
+    query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query,
+    asOf,
+  ).searchQuery;
 
   if (getSettings().enableImageSearch) {
     updateImageSearchState("running");
@@ -466,7 +476,7 @@ async function startTextSearch(query: string, invocation: number) {
       if (textResults.length === 0) {
         const queryKeywords = await getKeywords(query, 10);
         const keywordOutcome = await searchText(
-          queryKeywords.join(" "),
+          normalizeRelativeDates(queryKeywords.join(" "), asOf).searchQuery,
           getSettings().searchResultsLimit,
         );
         textResults = keywordOutcome.results;

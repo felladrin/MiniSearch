@@ -52,4 +52,47 @@ describe("allocatePageExcerpts", () => {
       "",
     ]);
   });
+
+  it("keeps the window where the query occurs instead of the page opening", () => {
+    const content = `${"navigation ".repeat(300)}Only Murders in the Building returns on December 8, 2026. ${"more body text ".repeat(300)}`;
+
+    const [excerpt] = allocatePageExcerpts([content], 60, {
+      query: "only murders",
+    });
+
+    expect(excerpt).toContain("Only Murders");
+    expect(excerpt.startsWith("…")).toBe(true);
+    expect(excerpt.length).toBeLessThan(content.length);
+  });
+
+  it("keeps the page opening when the query does not occur in it", () => {
+    const content = "the opening sentence of the page. ".repeat(200);
+
+    const [excerpt] = allocatePageExcerpts([content], 60, {
+      query: "something absent",
+    });
+
+    expect(excerpt.startsWith("the opening sentence")).toBe(true);
+    expect(excerpt.endsWith("…")).toBe(true);
+  });
+
+  it("picks the window that covers the most query terms", () => {
+    const content = `${"filler ".repeat(200)}bravo ${"filler ".repeat(200)}charlie bravo ${"filler ".repeat(200)}`;
+
+    const [excerpt] = allocatePageExcerpts([content], 60, {
+      query: "bravo charlie",
+    });
+
+    expect(excerpt).toContain("charlie");
+  });
+
+  it("finds CJK terms through their bigrams", () => {
+    const content = `${"開場白 ".repeat(200)}獨家月片單介紹 ${"結尾段落 ".repeat(200)}`;
+
+    const [excerpt] = allocatePageExcerpts([content], 60, {
+      query: "十二月片單",
+    });
+
+    expect(excerpt).toContain("月片單");
+  });
 });

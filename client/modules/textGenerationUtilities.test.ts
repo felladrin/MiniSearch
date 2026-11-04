@@ -334,7 +334,7 @@ describe("worker handoff", () => {
     const formatted = await getFormattedSearchResults(true);
 
     expect(worker.posted).toEqual([
-      { contents: [longPage, ""], tokenBudget: 179 },
+      { contents: [longPage, ""], tokenBudget: 179, query: "the query" },
     ]);
     expect(formatted).toContain("…");
     expect(formatted.length).toBeLessThan(longPage.length);

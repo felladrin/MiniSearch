@@ -1,3 +1,4 @@
+import { authorityBoostMultiplier } from "./authorityRanking.ts";
 import { rerank } from "./rerankerService.ts";
 import { recordRerank } from "./rerankingSinceLastRestart.ts";
 
@@ -35,10 +36,21 @@ export async function rankSearchResults(
 
   const results = await rerank(query, documents);
 
-  const scoredResults = results.map(({ index, relevance_score }) => ({
-    result: searchResults[index],
-    score: relevance_score,
-  }));
+  // A page from the site the query names gets a nudge on the semantic score.
+  // The reranker never sees the URL, and a result that the search did not
+  // return cannot be added here, so this only reorders and re-selects what the
+  // pipeline already holds - which is enough to move a page into the six the
+  // model reads.
+  const scoredResults = results.map(({ index, relevance_score }) => {
+    const result = searchResults[index];
+
+    return {
+      result,
+      score:
+        relevance_score *
+        authorityBoostMultiplier(query, result[0], result[1], result[2]),
+    };
+  });
 
   if (scoredResults.length === 0) {
     return [];

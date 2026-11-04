@@ -298,4 +298,28 @@ describe("rankSearchResults", () => {
       before.fallbackApplied + 1,
     );
   });
+
+  it("moves the site the query names ahead of a higher-scoring stranger", async () => {
+    mockRerank.mockResolvedValue([
+      { index: 0, relevance_score: 2 },
+      { index: 1, relevance_score: 2.2 },
+      { index: 2, relevance_score: 2.19 },
+      { index: 3, relevance_score: 2.18 },
+    ] as { index: number; relevance_score: number }[]);
+    const { rankSearchResults } = await import("./rankSearchResults");
+
+    const result = await rankSearchResults("disney plus next month", "text", [
+      [
+        "New to Disney+ in December",
+        "December releases",
+        "https://www.disneyplus.com/welcome",
+      ],
+      ["Disney+ schedule roundup", "Blog", "https://blog.example.com/one"],
+      ["Another roundup", "Blog", "https://blog.example.com/two"],
+      ["Third roundup", "Blog", "https://blog.example.com/three"],
+    ]);
+
+    expect(result[0][2]).toBe("https://www.disneyplus.com/welcome");
+    expect(result[0][3]).toBeCloseTo(2.5);
+  });
 });

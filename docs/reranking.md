@@ -97,6 +97,43 @@ When `preserveTopResults = true`, the ranking algorithm:
 
 This mode ensures the original top result is never displaced by the reranker, while still improving the ordering of subsequent results.
 
+### Domain Priority
+
+A page from the site the query names gets its semantic score multiplied before
+the filter runs (`server/authorityRanking.ts`, applied in
+`server/rankSearchResults.ts`). The reranker never sees the URL, so a query
+like "disney plus next month" ranks a blog roundup and disneyplus.com on their
+prose alone; the multiplier lets the named site overtake a page whose snippet
+merely talks about it.
+
+The rule is narrow enough to explain in a sentence:
+
+| Situation                                   | Multiplier | Example                                |
+| ------------------------------------------- | ---------- | -------------------------------------- |
+| A query word equals the domain's label      | 1.2        | `disney` → disney.com, `wwe` → wwe.com |
+| The label is the query's words joined       | 1.25       | `disney plus` → disneyplus.com         |
+| The label is the query's words with hyphens | 1.25       | `coca cola` → coca-cola.com            |
+| The label merely contains a query word      | 1          | `disney` → disneyfan.com               |
+
+Subdomains share their registrable domain's label, so investor.disney.com and
+www.disney.com both answer "disney", and two-part public suffixes such as
+co.uk keep their own label. "+" is read as " plus ", because a hostname cannot
+contain it and a user typing "disney+" means the same brand.
+
+Two guards keep the nudge from promoting the wrong page:
+
+- Filler words never match on their own, so "plus size guide" does not promote
+  plus.com and "news about disney" does not promote news.com. A label split
+  into the query's words counts only when one part is five characters or more,
+  unless a hyphen marks the split.
+- When the query names a year, a page whose title and snippet never mention it
+  is left alone: a brand's recap of last year's event is not the page the query
+  meant, and fresher reporting should keep the top spot.
+
+The multiplier is applied before the standard-deviation filter, so it can also
+rescue a page the filter would have dropped. It cannot add a result the search
+did not return; that is a retrieval problem, not a ranking one.
+
 ## Integration with Search Pipeline
 
 The search endpoint coordinates reranking in `searchEndpointServerHook.ts`:
