@@ -266,7 +266,7 @@ function overlaps(occurrence: Occurrence, ranges: readonly Occurrence[]) {
 export function normalizeRelativeDates(
   query: string,
   asOfDate: Date,
-  options?: { strategy?: "append" | "replace" },
+  options?: { strategy?: "append" | "replace"; maxLength?: number },
 ): { searchQuery: string; replacements: RelativeDateReplacement[] } {
   const unchanged = {
     searchQuery: query,
@@ -337,13 +337,22 @@ export function normalizeRelativeDates(
   }));
 
   if (strategy === "append") {
+    // The search endpoint rejects an over-long query, so an anchor that would
+    // push it past the limit is dropped rather than turning a search into a
+    // failed request. No anchor left over means the query goes out untouched.
     const base = query.trimEnd();
-    return {
-      searchQuery: `${base} ${replacements
-        .map((replacement) => replacement.anchor)
-        .join(" ")}`,
-      replacements,
-    };
+    const limit = options?.maxLength ?? Number.POSITIVE_INFINITY;
+    const appended: RelativeDateReplacement[] = [];
+    let searchQuery = base;
+    for (const replacement of replacements) {
+      const candidate = `${searchQuery} ${replacement.anchor}`;
+      if (candidate.length > limit) break;
+      searchQuery = candidate;
+      appended.push(replacement);
+    }
+    if (appended.length === 0) return unchanged;
+
+    return { searchQuery, replacements: appended };
   }
 
   // Replace from left to right over the original string so the anchors keep

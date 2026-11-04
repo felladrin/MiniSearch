@@ -50,30 +50,78 @@ function isAllCjk(text: string) {
   return /^[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]+$/u.test(text);
 }
 
+const cjkRunExpression = /([\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]+)/u;
+const wordCharacterExpression = /[\p{L}\p{N}]/u;
+
 /** Splits a query into searchable terms, adding CJK bigrams as fallbacks. */
 function toWeightedTerms(query: string): WeightedTerm[] {
   const weights = new Map<string, number>();
 
+  const addTerm = (term: string, weight: number) => {
+    if ((weights.get(term) ?? 0) < weight) weights.set(term, weight);
+  };
+
+  const addCjkRun = (run: string) => {
+    if (run.length < minCjkTermLength) return;
+    addTerm(run, 1);
+    for (let index = 0; index + 2 <= run.length; index++) {
+      addTerm(run.slice(index, index + 2), cjkBigramWeight);
+    }
+  };
+
   for (const part of query.toLowerCase().split(/[^\p{L}\p{N}]+/u)) {
-    const cjk = isAllCjk(part);
-    if (part.length < (cjk ? minCjkTermLength : minLatinTermLength)) continue;
-    weights.set(part, 1);
-    if (cjk && part.length > minCjkTermLength) {
-      for (let index = 0; index + 2 <= part.length; index++) {
-        const bigram = part.slice(index, index + 2);
-        if (!weights.has(bigram)) weights.set(bigram, cjkBigramWeight);
-      }
+    if (part.length === 0) continue;
+    if (isAllCjk(part)) {
+      addCjkRun(part);
+      continue;
+    }
+    // A query can mix scripts without a space ("迪士尼plus片单"). Kept as one
+    // token it is neither a CJK run nor a Latin word, so nothing on the page
+    // matches it; split it into runs and read each one as its own script.
+    for (const run of part.split(cjkRunExpression)) {
+      if (run.length === 0) continue;
+      if (isAllCjk(run)) addCjkRun(run);
+      else if (run.length >= minLatinTermLength) addTerm(run, 1);
     }
   }
 
   return [...weights].map(([term, weight]) => ({ term, weight }));
 }
 
+/** How far a word may continue past the term as an inflection ("cat"/"cats"). */
+const maxInflectionChars = 3;
+
+function isWordBoundary(content: string, index: number) {
+  if (index < 0 || index >= content.length) return true;
+  return !wordCharacterExpression.test(content[index]);
+}
+
 /**
- * Finds every place the terms occur, damping each term by how often the page
- * repeats it: a word on every line ("the", "disney" on the brand's own site)
- * locates little, while a rare one locates the answer. Without the damping the
- * window gravitates to the most repetitive part of the page.
+ * A Latin term counts only where it starts a word and ends one, or is the stem
+ * of a short inflection: a substring hit is how "cat" lands on "catalogue" a
+ * thousand times and drags the window there.
+ */
+function matchesWord(content: string, index: number, length: number) {
+  if (!isWordBoundary(content, index - 1)) return false;
+
+  let suffix = 0;
+  for (
+    let cursor = index + length;
+    cursor < content.length && wordCharacterExpression.test(content[cursor]);
+    cursor++
+  ) {
+    suffix++;
+    if (suffix > maxInflectionChars) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Finds every place the terms occur, damping each term so that a page's
+ * repeated words do not outweigh the one that answers the query. A term counts
+ * at most its own weight however often it repeats, or a navigation menu echoing
+ * the query wins the window over the paragraph that holds the answer.
  */
 function findOccurrences(
   lowerContent: string,
@@ -82,14 +130,18 @@ function findOccurrences(
   const occurrences: Occurrence[] = [];
 
   for (const { term, weight } of terms) {
+    const cjkOnly = isAllCjk(term);
     const found: number[] = [];
     let index = lowerContent.indexOf(term);
     while (index !== -1) {
-      found.push(index);
+      if (cjkOnly || matchesWord(lowerContent, index, term.length)) {
+        found.push(index);
+      }
       index = lowerContent.indexOf(term, index + term.length);
     }
+    if (found.length === 0) continue;
 
-    const dampedWeight = weight / Math.sqrt(found.length || 1);
+    const dampedWeight = weight / found.length;
     for (const position of found) {
       occurrences.push({ index: position, weight: dampedWeight });
     }
@@ -160,44 +212,128 @@ function snapToEndOfWord(content: string, end: number) {
 }
 
 /** Keeps the window of a page that covers the query, trimmed to `taken` tokens. */
+/**
+ * The occurrence the window was chosen for, and how much of the share is spent
+ * in front of it. A window longer than the share is cut around this point
+ * rather than from a fixed side: the rare word that locates the answer sits at
+ * the end of the densest stretch as often as at its start.
+ */
+function anchorIndex(occurrences: Occurrence[], from: number, to: number) {
+  if (occurrences.length === 0) return from;
+
+  let anchor = occurrences[0].index;
+  let weight = 0;
+  for (const occurrence of occurrences) {
+    if (occurrence.index < from) continue;
+    if (occurrence.index >= to) break;
+    if (occurrence.weight > weight) {
+      weight = occurrence.weight;
+      anchor = occurrence.index;
+    }
+  }
+  return anchor;
+}
+
+/** Token range that keeps `anchor` inside the share, with context before it. */
+function keeperRange(
+  window: string,
+  from: number,
+  anchor: number,
+  taken: number,
+): [number, number] {
+  const anchorTokens = gptTokenizer.encode(
+    window.slice(0, Math.max(0, anchor - from)),
+  ).length;
+  const start = Math.max(
+    0,
+    Math.min(anchorTokens - Math.floor(taken * 0.2), anchorTokens),
+  );
+  return [start, start + taken];
+}
+
+/**
+ * Fits a window plus its ellipses into the page's share of the budget.
+ *
+ * A window is chosen in characters and cut in tokens, so the two ellipses that
+ * mark the cuts can push the result one or two tokens over the share. The share
+ * is what keeps a long page from crowding out the others, so the body gives up
+ * the tokens the ellipses need.
+ */
+function fitWindow(
+  leading: string,
+  body: string,
+  trailing: string,
+  taken: number,
+): string {
+  let kept = body;
+  while (
+    kept.length > 0 &&
+    gptTokenizer.encode(`${leading}${kept}${trailing}`).length > taken
+  ) {
+    const keptTokens = gptTokenizer.encode(kept);
+    keptTokens.pop();
+    kept = gptTokenizer.decode(keptTokens).trimEnd();
+  }
+  const marker = `${leading}${kept}${trailing}`;
+  if (gptTokenizer.encode(marker).length <= taken) {
+    return marker;
+  }
+  // The cuts alone eat the share: spend it on the marker that still says the
+  // excerpt was cut, rather than on a word of body with no marker.
+  return taken >= 1 ? "…" : "";
+}
+
 function trimToQueryWindow(
   content: string,
   tokens: number[],
   taken: number,
   terms: WeightedTerm[],
 ) {
+  // Without a query there is nothing to centre on, so the opening of the page
+  // is kept exactly as it was before windowed trimming existed.
+  if (terms.length === 0) {
+    return `${gptTokenizer.decode(tokens.slice(0, taken)).trimEnd()}…`;
+  }
+
   const windowCharacters = Math.max(
     1,
     Math.floor((taken * content.length) / tokens.length),
   );
-  const occurrences =
-    terms.length > 0 ? findOccurrences(content.toLowerCase(), terms) : [];
+  const occurrences = findOccurrences(content.toLowerCase(), terms);
 
-  const start =
+  // The window keeps its right edge on the densest stretch of matches: the
+  // context in front of it is the part that gets dropped when the share is
+  // tight, because a match at the end of the stretch is the one the window was
+  // chosen for.
+  const bestStart =
     occurrences.length === 0
       ? 0
-      : Math.max(
-          0,
-          findBestWindowStart(occurrences, windowCharacters) -
-            Math.floor(windowCharacters * leadingContextRatio),
-        );
+      : findBestWindowStart(occurrences, windowCharacters);
+  const start = Math.max(
+    0,
+    bestStart - Math.floor(windowCharacters * leadingContextRatio),
+  );
 
   const from = snapToStartOfWord(content, start);
   const to = snapToEndOfWord(
     content,
-    Math.max(Math.min(content.length, start + windowCharacters), from + 1),
+    Math.max(Math.min(content.length, bestStart + windowCharacters), from + 1),
   );
+  const anchor = anchorIndex(occurrences, from, to);
 
   const window = content.slice(from, to);
   const windowTokens = gptTokenizer.encode(window);
+  const leading = from > 0 ? "…" : "";
+  const trailing = to < content.length ? "…" : "";
+  const bodyBudget = Math.max(0, taken - leading.length - trailing.length);
   const trimmed =
-    windowTokens.length > taken
-      ? gptTokenizer.decode(windowTokens.slice(0, taken))
+    windowTokens.length > bodyBudget
+      ? gptTokenizer.decode(
+          windowTokens.slice(...keeperRange(window, from, anchor, bodyBudget)),
+        )
       : window;
 
-  return `${from > 0 ? "…" : ""}${trimmed.trimEnd()}${
-    to < content.length ? "…" : ""
-  }`;
+  return fitWindow(leading, trimmed.trimEnd(), trailing, taken);
 }
 
 /**

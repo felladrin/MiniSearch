@@ -458,6 +458,8 @@ async function startTextSearch(query: string, invocation: number) {
   const searchQuery = normalizeRelativeDates(
     query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query,
     asOf,
+    // The server rejects a longer query outright, so the anchor has to fit.
+    { maxLength: 2000 },
   ).searchQuery;
 
   if (getSettings().enableImageSearch) {
@@ -476,7 +478,9 @@ async function startTextSearch(query: string, invocation: number) {
       if (textResults.length === 0) {
         const queryKeywords = await getKeywords(query, 10);
         const keywordOutcome = await searchText(
-          normalizeRelativeDates(queryKeywords.join(" "), asOf).searchQuery,
+          normalizeRelativeDates(queryKeywords.join(" "), asOf, {
+            maxLength: 2000,
+          }).searchQuery,
           getSettings().searchResultsLimit,
         );
         textResults = keywordOutcome.results;

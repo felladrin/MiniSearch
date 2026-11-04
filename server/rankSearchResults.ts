@@ -1,4 +1,4 @@
-import { authorityBoostMultiplier } from "./authorityRanking.ts";
+import { authorityBoost } from "./authorityRanking.ts";
 import { rerank } from "./rerankerService.ts";
 import { recordRerank } from "./rerankingSinceLastRestart.ts";
 
@@ -41,15 +41,16 @@ export async function rankSearchResults(
   // return cannot be added here, so this only reorders and re-selects what the
   // pipeline already holds - which is enough to move a page into the six the
   // model reads.
-  const scoredResults = results.map(({ index, relevance_score }) => {
+  const scoredResults = results.map(({ index, relevance_score }, position) => {
     const result = searchResults[index];
+    // The pinned result keeps its place whatever the boost says, so boosting it
+    // would only inflate the distribution the client reads relevance from.
+    const bonus =
+      preserveTopResults && position === 0
+        ? 0
+        : authorityBoost(query, result[0], result[1], result[2]);
 
-    return {
-      result,
-      score:
-        relevance_score *
-        authorityBoostMultiplier(query, result[0], result[1], result[2]),
-    };
+    return { result, score: relevance_score + bonus };
   });
 
   if (scoredResults.length === 0) {

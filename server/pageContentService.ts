@@ -43,17 +43,17 @@ const READABLE_CONTENT_TYPES =
 /**
  * Elements that survive `baseElements` but still carry no article text:
  * cookie banners, share bars, and inline widgets.
+ *
+ * Site chrome by element name (`nav`, `header`, `footer`, `aside`, `form`) is
+ * not listed here: `stripLinkHeavyBlocks` already drops those blocks, and a
+ * document whose `<nav>` never closes would otherwise have everything after it
+ * skipped by the converter, article included.
  */
 const SKIPPED_SELECTORS = [
-  "aside",
   "button",
-  "footer",
-  "form",
-  "header",
   "iframe",
   "img",
   "input",
-  "nav",
   "noscript",
   "select",
   "svg",
@@ -129,6 +129,10 @@ interface TextBlock {
   linkChars: number;
   /** Link depth on entry, restored when the block closes over an unclosed `<a>`. */
   linkDepthAtStart: number;
+  /** A descendant block holds prose, so this container is not a navigation. */
+  proseChild: boolean;
+  /** Site chrome is removed on its closing tag, whatever its density. */
+  alwaysDrop: boolean;
 }
 
 /** `>` inside a quoted attribute value does not end the tag. */
@@ -244,34 +248,61 @@ function stripLinkHeavyBlocks(html: string): string {
         }
       }
       if (at === -1) continue;
-      while (blocks.length > at) {
-        const block = blocks.pop();
-        if (block === undefined) break;
-        const drop =
-          ALWAYS_DROPPED_TAGS.has(block.tag) ||
-          (block.textChars >= NAV_BLOCK_MIN_CHARS &&
-            block.linkChars / block.textChars >= LINK_DENSITY_THRESHOLD);
-        if (drop) {
-          removals.push([block.start, tagEnd + 1]);
-        } else if (blocks.length > 0) {
-          const parent = blocks[blocks.length - 1];
-          parent.textChars += block.textChars;
-          parent.linkChars += block.linkChars;
-        }
-        linkDepth = block.linkDepthAtStart;
+
+      // Empty elements such as `<p>` and `<li>` may omit their closing tag. The
+      // only end marker this scan has belongs to the ancestor that is closing
+      // now, so a removal taken from it would delete the ancestor's remaining
+      // text. Fold such a block into the block that closed instead: its text is
+      // still counted, and nothing is dropped on a guess.
+      while (blocks.length - 1 > at) {
+        const unclosed = blocks.pop();
+        if (unclosed === undefined) break;
+        const matched = blocks[at];
+        matched.textChars += unclosed.textChars;
+        matched.linkChars += unclosed.linkChars;
+        matched.proseChild ||= unclosed.proseChild;
+      }
+
+      const block = blocks.pop();
+      if (block === undefined) {
+        linkDepth = 0;
+        continue;
+      }
+      linkDepth = block.linkDepthAtStart;
+
+      // A container is removed only when the whole subtree reads as links: a
+      // page-wide wrapper that also holds the article must not take it down.
+      const drop =
+        block.alwaysDrop ||
+        (!block.proseChild &&
+          block.textChars >= NAV_BLOCK_MIN_CHARS &&
+          block.linkChars / block.textChars >= LINK_DENSITY_THRESHOLD);
+      if (drop) {
+        removals.push([block.start, tagEnd + 1]);
+      } else if (blocks.length > 0) {
+        const parent = blocks[blocks.length - 1];
+        parent.textChars += block.textChars;
+        parent.linkChars += block.linkChars;
+        const prose =
+          block.proseChild ||
+          (block.textChars > 0 &&
+            block.linkChars / block.textChars < LINK_DENSITY_THRESHOLD);
+        parent.proseChild ||= prose;
       }
       continue;
     }
 
     if (selfClosing || VOID_TAGS.has(tag)) continue;
     if (tag === "a") linkDepth++;
-    if (TEXT_BLOCK_TAGS.has(tag)) {
+    if (TEXT_BLOCK_TAGS.has(tag) || ALWAYS_DROPPED_TAGS.has(tag)) {
       blocks.push({
         tag,
         start: tagStart,
         textChars: 0,
         linkChars: 0,
         linkDepthAtStart: linkDepth,
+        proseChild: false,
+        alwaysDrop: ALWAYS_DROPPED_TAGS.has(tag),
       });
     }
   }
@@ -548,19 +579,42 @@ async function extractPdfText(bytes: Uint8Array): Promise<string> {
  * has no way to tell a rail of links from a paragraph — see
  * `stripLinkHeavyBlocks`.
  */
-export function extractReadableText(html: string): string {
-  return convertHtmlToPlainText(stripLinkHeavyBlocks(html), {
-    wordwrap: false,
+/** Site chrome the density pass drops by element name, listed for the fallback. */
+const CHROME_SELECTORS = ["aside", "footer", "form", "header", "nav"];
+
+function conversionOptions(skippedSelectors: string[]) {
+  return {
+    wordwrap: false as const,
     baseElements: { selectors: ["article", "main", '[role="main"]', "body"] },
     limits: { maxBaseElements: 1 },
     selectors: [
       { selector: "a", options: { ignoreHref: true } },
-      ...SKIPPED_SELECTORS.map((selector) => ({
+      ...skippedSelectors.map((selector) => ({
         selector,
         format: "skip" as const,
       })),
     ],
-  });
+  };
+}
+
+export function extractReadableText(html: string): string {
+  const stripped = stripLinkHeavyBlocks(html);
+  const text = convertHtmlToPlainText(
+    stripped,
+    conversionOptions(SKIPPED_SELECTORS),
+  );
+
+  // A page that is nothing but a link table loses every block to the density
+  // rule and reads as empty. That page still answers "where is the list", so
+  // fall back to its unstripped text rather than drop the result; chrome is
+  // skipped by element name there, since the density pass did not run.
+  if (stripped === html || text.trim().length >= MIN_USEFUL_CHARS) return text;
+
+  const fallback = convertHtmlToPlainText(
+    html,
+    conversionOptions([...SKIPPED_SELECTORS, ...CHROME_SELECTORS]),
+  );
+  return fallback.trim().length > text.trim().length ? fallback : text;
 }
 
 const NAMED_ENTITIES: Record<string, string> = {

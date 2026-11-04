@@ -271,4 +271,30 @@ describe("normalizeRelativeDates", () => {
       }
     });
   });
+  it("drops an anchor that would push the query past the limit", () => {
+    const long = `${"x".repeat(1996)} today`;
+
+    expect(
+      normalizeRelativeDates(long, new Date(2026, 10, 3), { maxLength: 2000 }),
+    ).toEqual({
+      searchQuery: long,
+      replacements: [],
+    });
+  });
+
+  it("keeps the anchors that still fit", () => {
+    const long = `${"x".repeat(1970)} today tomorrow`;
+
+    const { searchQuery } = normalizeRelativeDates(
+      long,
+      new Date(2026, 10, 3),
+      {
+        maxLength: 2000,
+      },
+    );
+
+    expect(searchQuery.endsWith("2026-11-03")).toBe(true);
+    expect(searchQuery).not.toContain("2026-11-04");
+    expect(searchQuery.length).toBeLessThanOrEqual(2000);
+  });
 });

@@ -1,3 +1,4 @@
+import gptTokenizer from "gpt-tokenizer";
 import { describe, expect, it } from "vitest";
 import { allocatePageExcerpts } from "./pageExcerptAllocation";
 
@@ -94,5 +95,13 @@ describe("allocatePageExcerpts", () => {
     });
 
     expect(excerpt).toContain("月片單");
+  });
+  it("keeps the old prefix trim byte for byte when no query is given", () => {
+    const content = "The quick brown fox jumps over the lazy dog. ".repeat(20);
+    const tokens = gptTokenizer.encode(content);
+
+    expect(allocatePageExcerpts([content], 100)[0]).toBe(
+      `${gptTokenizer.decode(tokens.slice(0, 100)).trimEnd()}…`,
+    );
   });
 });

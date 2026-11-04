@@ -147,6 +147,37 @@ describe("noise suppression before extraction", () => {
     expect(text).toContain("guide to the month");
   });
 
+  it("keeps the body when header and footer share its wrapper", () => {
+    const links = Array.from(
+      { length: 20 },
+      (_, index) => `<a href="/section-${index}">Section link</a>`,
+    ).join(" ");
+
+    const text = extractReadableText(
+      `<html><body><div id="app">` +
+        `<header><a href="/">Brand</a>${links}</header>` +
+        `<main><p>${filler.repeat(2)}</p></main>` +
+        `<footer>${links}</footer></div></body></html>`,
+    );
+
+    expect(text).toContain("Subscribers in several regions");
+    expect(text).not.toContain("Section link");
+  });
+
+  it("does not drop the rest of a container when a rail omits its close tag", () => {
+    const rail = Array.from(
+      { length: 8 },
+      (_, index) => `<p><a href="/teaser-${index}">Teaser link text</a>`,
+    ).join("");
+
+    const text = extractReadableText(
+      `<html><body><div class="layout">${rail}` +
+        `<div><p>${filler.repeat(3)}</p></div></div></body></html>`,
+    );
+
+    expect(text).toContain("Subscribers in several regions");
+  });
+
   it("keeps the body when a link-heavy rail wraps it in the same container", () => {
     const rail = Array.from(
       { length: 12 },

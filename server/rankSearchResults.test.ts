@@ -320,6 +320,56 @@ describe("rankSearchResults", () => {
     ]);
 
     expect(result[0][2]).toBe("https://www.disneyplus.com/welcome");
-    expect(result[0][3]).toBeCloseTo(2.5);
+    expect(result[0][3]).toBeCloseTo(2.75);
+  });
+  it("promotes the named site when the reranker scores are negative", async () => {
+    // The reranker returns raw logits, and most documents score below zero. A
+    // multiplicative boost would push those scores further down and could get
+    // the named site filtered out, so the bonus is added instead.
+    mockRerank.mockResolvedValue([
+      { index: 0, relevance_score: -1 },
+      { index: 1, relevance_score: -1.02 },
+      { index: 2, relevance_score: -1.03 },
+      { index: 3, relevance_score: -1.04 },
+    ] as { index: number; relevance_score: number }[]);
+    const { rankSearchResults } = await import("./rankSearchResults");
+
+    const result = await rankSearchResults("disney plus next month", "text", [
+      [
+        "What's new on Disney+",
+        "December releases",
+        "https://www.disneyplus.com/welcome",
+      ],
+      ["Disney+ schedule roundup", "Blog", "https://blog.example.com/one"],
+      ["Another roundup", "Blog", "https://blog.example.com/two"],
+      ["Third roundup", "Blog", "https://blog.example.com/three"],
+    ]);
+
+    expect(result[0][2]).toBe("https://www.disneyplus.com/welcome");
+  });
+
+  it("keeps the boost when the anchored query names a year the page omits", async () => {
+    mockRerank.mockResolvedValue([
+      { index: 0, relevance_score: -0.4 },
+      { index: 1, relevance_score: -0.6 },
+      { index: 2, relevance_score: -0.7 },
+    ] as { index: number; relevance_score: number }[]);
+    const { rankSearchResults } = await import("./rankSearchResults");
+
+    const result = await rankSearchResults(
+      "whats new on disney plus next month December 2026",
+      "text",
+      [
+        [
+          "What's new on Disney+",
+          "December releases, updated as we learn more",
+          "https://www.disneyplus.com/explore",
+        ],
+        ["Roundup", "Blog", "https://blog.example.com/one"],
+        ["Roundup two", "Blog", "https://blog.example.com/two"],
+      ],
+    );
+
+    expect(result[0][2]).toBe("https://www.disneyplus.com/explore");
   });
 });

@@ -142,13 +142,24 @@ the passage about how long cats sleep.
 
 The client's second trim, in `client/modules/pageExcerptAllocation.ts`, no
 longer keeps a prefix of what it receives. When a page's share is smaller than
-its excerpt, it scores the query's terms against the text (Chinese and Japanese
-also get character bigrams, which stand in for the missing word boundaries) and
-keeps the window that holds the most matched weight, snapped to word boundaries
-and marked with an ellipsis where it cut. A page that answers in a section
-halfway down - a list of December releases under a month of navigation links -
-therefore reaches the model with the section in it. A page with no query term
-in it still keeps its opening, as before.
+its excerpt, it scores the query's terms against the text and keeps the window
+that holds the most matched weight, then trims that window to the share from
+the left around its best-scoring occurrence, marking each cut with an ellipsis.
+A page that answers in a section halfway down - a list of December releases
+under a month of navigation links - therefore reaches the model with the section
+in it. A page with no query term in it still keeps its opening, as before.
+
+Three details keep the scoring from being fooled by the page itself:
+
+- A Latin term matches on a word boundary and may only continue into a short
+  inflection, so `cat` matches `cat` and `cats` but not `catalogue`, and a query
+  term is not found inside every longer word on the page.
+- Each term's total weight is capped, so a navigation link that repeats one
+  query word a thousand times cannot outvote the term that appears once, next to
+  the answer.
+- A term written without spaces next to another script, such as
+  `迪士尼plus片单`, is split into its Chinese run and its Latin run, and the
+  Chinese run also contributes character bigrams.
 
 ## Ranking Across Languages
 

@@ -48,8 +48,26 @@ const GENERIC_QUERY_WORDS = new Set([
   "the",
   "this",
   "today",
+  "tomorrow",
+  "tonight",
+  "upcoming",
   "version",
   "was",
+  "week",
+  "april",
+  "august",
+  "december",
+  "february",
+  "january",
+  "july",
+  "june",
+  "march",
+  "may",
+  "november",
+  "october",
+  "september",
+  "weekend",
+  "whats",
   "what",
   "when",
   "where",
@@ -57,6 +75,7 @@ const GENERIC_QUERY_WORDS = new Set([
   "who",
   "with",
   "year",
+  "yesterday",
   "you",
 ]);
 
@@ -81,48 +100,53 @@ const SECOND_LEVEL_SUFFIXES = new Set([
   "org.au",
 ]);
 
-const SINGLE_TOKEN_MULTIPLIER = 1.2;
-const DERIVED_LABEL_MULTIPLIER = 1.25;
+const SINGLE_TOKEN_BONUS = 0.5;
+const DERIVED_LABEL_BONUS = 0.75;
 
 // A label split into the query's words only counts when at least one of those
 // words is long enough to be a name rather than a filler word: "plus size"
-// would otherwise let plus-size.com ride on the word "plus".
-const MIN_DISTINCTIVE_PART_LENGTH = 5;
+// would otherwise let plus-size.com ride on the word "plus". Four characters
+// keeps "coca cola" on cocacola.com while the generic-word list still turns
+// "plus size" down.
+const MIN_DISTINCTIVE_PART_LENGTH = 4;
 const MIN_SINGLE_TOKEN_LENGTH = 3;
 
 /**
- * Multiplies a result's semantic score when its site is the one the query
- * names. `title` and `snippet` are read only for the year guard, so a page
+ * Adds a bonus to a result's semantic score when its site is the one the query
+ * names. The reranker returns a raw logit, which is negative for most
+ * documents, so the bonus is added rather than multiplied: a factor above one
+ * would push a negative score further down and demote the very site it means
+ * to promote. `title` and `snippet` are read only for the year guard, so a page
  * unrelated to the year in the query does not get promoted on brand alone.
  */
-export function authorityBoostMultiplier(
+export function authorityBoost(
   query: string,
   title: string,
   snippet: string,
   url: string,
 ): number {
   const hostname = hostnameOf(url);
-  if (!hostname) return 1;
+  if (!hostname) return 0;
 
   const label = registrableLabel(hostname);
-  if (!label) return 1;
+  if (!label) return 0;
 
   const tokens = tokenize(query);
-  if (tokens.length === 0) return 1;
+  if (tokens.length === 0) return 0;
 
   // "+" is how a brand reads, not how a hostname can: "disney+" tokenizes to
   // disney and plus, letting the derived-label rule see disneyplus.com.
   const normalizedQuery = query.replace(/\+/g, " plus ");
   const normalizedTokens = tokenize(normalizedQuery);
-  if (normalizedTokens.length === 0) return 1;
+  if (normalizedTokens.length === 0) return 0;
 
-  const multiplier = matchMultiplier(label, tokens, normalizedTokens);
-  if (multiplier === 1) return 1;
+  const bonus = matchBonus(label, tokens, normalizedTokens);
+  if (bonus === 0) return 0;
 
-  return mentionsQueryYear(query, title, snippet) ? multiplier : 1;
+  return mentionsQueryYear(query, title, snippet) ? bonus : 0;
 }
 
-function matchMultiplier(
+function matchBonus(
   label: string,
   tokens: string[],
   normalizedTokens: string[],
@@ -133,10 +157,24 @@ function matchMultiplier(
       !GENERIC_QUERY_WORDS.has(token),
   );
 
-  if (distinctiveTokens.includes(label)) return SINGLE_TOKEN_MULTIPLIER;
+  if (distinctiveTokens.includes(label)) return SINGLE_TOKEN_BONUS;
 
   const split = splitLabelIntoQueryWords(label, normalizedTokens);
-  if (!split) return 1;
+  if (!split) return 0;
+
+  // The label has to spell the name the query starts with, not a prefix of a
+  // longer question: "tesla investor relations" must not hand
+  // teslainvestor.com the bonus for a query that names Tesla's own filings.
+  if (GENERIC_QUERY_WORDS.has(split.parts[0])) return 0;
+
+  const leftover = tokens.filter(
+    (token) =>
+      token.length >= MIN_SINGLE_TOKEN_LENGTH &&
+      !GENERIC_QUERY_WORDS.has(token) &&
+      !/^(?:19|20)\d{2}$/.test(token) &&
+      !split.parts.includes(token),
+  );
+  if (leftover.length > 0) return 0;
 
   // A hyphen is itself evidence of a brand ("coca-cola"), so its parts do not
   // need one long word between them; a plain concatenation does, or "plus
@@ -147,7 +185,7 @@ function matchMultiplier(
       (part.length >= MIN_DISTINCTIVE_PART_LENGTH || split.separator === "-"),
   );
 
-  return hasDistinctivePart ? DERIVED_LABEL_MULTIPLIER : 1;
+  return hasDistinctivePart ? DERIVED_LABEL_BONUS : 0;
 }
 
 /**
@@ -205,7 +243,8 @@ function tokenize(query: string): string[] {
 
 function hostnameOf(url: string): string | null {
   try {
-    const hostname = new URL(url).hostname.toLowerCase();
+    // A trailing dot is the same host spelled absolutely: "disney.com.".
+    const hostname = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
     return hostname.replace(/^www\./, "");
   } catch {
     return null;
@@ -231,8 +270,11 @@ function registrableLabel(hostname: string): string | null {
 
 /**
  * A brand page for last year's event is not the page for this year's. When the
- * query carries a year, a result that never mentions it is not the page the
- * query meant, so authority alone does not move it up.
+ * query carries a year, a result that states a different year is the wrong
+ * page, so authority alone does not move it up. A result that states no year
+ * at all is kept: relative-time queries are anchored to a year before they
+ * reach the search ("next month December 2026"), and a page that writes only
+ * "December" is the page that query meant.
  */
 function mentionsQueryYear(
   query: string,
@@ -242,5 +284,8 @@ function mentionsQueryYear(
   const years = query.match(/\b(?:19|20)\d{2}\b/g);
   if (!years) return true;
 
-  return years.some((year) => `${title} ${snippet}`.includes(year));
+  const page = `${title} ${snippet}`;
+  if (years.some((year) => page.includes(year))) return true;
+
+  return !/\b(?:19|20)\d{2}\b/.test(page);
 }
