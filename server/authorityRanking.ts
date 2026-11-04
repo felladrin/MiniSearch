@@ -103,6 +103,9 @@ const SECOND_LEVEL_SUFFIXES = new Set([
 const SINGLE_TOKEN_BONUS = 0.5;
 const DERIVED_LABEL_BONUS = 0.75;
 
+/** The default for callers that have no words to set aside. */
+const NO_IGNORED_WORDS: ReadonlySet<string> = new Set();
+
 // A label split into the query's words only counts when at least one of those
 // words is long enough to be a name rather than a filler word: "plus size"
 // would otherwise let plus-size.com ride on the word "plus". Four characters
@@ -150,11 +153,13 @@ function matchBonus(
   label: string,
   tokens: string[],
   normalizedTokens: string[],
+  ignoredWords: ReadonlySet<string> = NO_IGNORED_WORDS,
 ): number {
   const distinctiveTokens = tokens.filter(
     (token) =>
       token.length >= MIN_SINGLE_TOKEN_LENGTH &&
-      !GENERIC_QUERY_WORDS.has(token),
+      !GENERIC_QUERY_WORDS.has(token) &&
+      !ignoredWords.has(token),
   );
 
   if (distinctiveTokens.includes(label)) return SINGLE_TOKEN_BONUS;
@@ -171,6 +176,7 @@ function matchBonus(
     (token) =>
       token.length >= MIN_SINGLE_TOKEN_LENGTH &&
       !GENERIC_QUERY_WORDS.has(token) &&
+      !ignoredWords.has(token) &&
       !/^(?:19|20)\d{2}$/.test(token) &&
       !split.parts.includes(token),
   );
@@ -241,6 +247,61 @@ function tokenize(query: string): string[] {
     .filter((token) => token.length > 0);
 }
 
+/**
+ * The registrable domain of a URL, or null when the URL cannot be parsed or
+ * carries no registrable part. shop.disney.com and disney.com both answer
+ * "disney.com", which is what the official-lane search scopes with `site:`.
+ */
+export function registrableDomainOf(url: string): string | null {
+  const hostname = hostnameOf(url);
+  if (!hostname) return null;
+
+  const labels = hostname.split(".");
+  const index = registrableLabelIndex(labels);
+  if (index < 0) return null;
+
+  return labels.slice(index).join(".");
+}
+
+/**
+ * The registrable domain of a result when the query names it, or null. The rule
+ * is the one the score bonus uses, so a site the boost would promote is exactly
+ * a site this can be scoped to. The year guard is not part of it: the caller
+ * only asks whether the site is the one the query named, not whether its page
+ * is about the right edition.
+ */
+/**
+ * The registrable domain of a result when the query names it, or null. The rule
+ * is the one the score bonus uses, so a site the boost would promote is exactly
+ * a site this can be scoped to. The year guard is not part of it: the caller
+ * only asks whether the site is the one the query named, not whether its page
+ * is about the right edition. Words in `ignoredWords` do not count as
+ * leftover, which lets a caller treat its own intent words as understood.
+ */
+export function namedDomain(
+  query: string,
+  url: string,
+  ignoredWords: ReadonlySet<string> = NO_IGNORED_WORDS,
+): string | null {
+  const hostname = hostnameOf(url);
+  if (!hostname) return null;
+
+  const label = registrableLabel(hostname);
+  if (!label) return null;
+
+  const tokens = tokenize(query);
+  if (tokens.length === 0) return null;
+
+  const normalizedTokens = tokenize(query.replace(/\+/g, " plus "));
+  if (normalizedTokens.length === 0) return null;
+
+  if (matchBonus(label, tokens, normalizedTokens, ignoredWords) === 0) {
+    return null;
+  }
+
+  return registrableDomainOf(url);
+}
+
 function hostnameOf(url: string): string | null {
   try {
     // A trailing dot is the same host spelled absolutely: "disney.com.".
@@ -257,15 +318,21 @@ function hostnameOf(url: string): string | null {
  */
 function registrableLabel(hostname: string): string | null {
   const labels = hostname.split(".");
-  if (labels.length < 2) return null;
-
-  const lastTwo = labels.slice(-2).join(".");
-  const index = SECOND_LEVEL_SUFFIXES.has(lastTwo)
-    ? labels.length - 3
-    : labels.length - 2;
+  const index = registrableLabelIndex(labels);
+  if (index < 0) return null;
 
   const label = labels[index];
   return label && label.length > 0 ? label : null;
+}
+
+/** Index of the registrable label, or -1 when the host has no registrable part. */
+function registrableLabelIndex(labels: string[]): number {
+  if (labels.length < 2) return -1;
+
+  const lastTwo = labels.slice(-2).join(".");
+  return SECOND_LEVEL_SUFFIXES.has(lastTwo)
+    ? labels.length - 3
+    : labels.length - 2;
 }
 
 /**

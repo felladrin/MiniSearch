@@ -149,16 +149,56 @@ did not return; that is a retrieval problem, not a ranking one. The pinned top
 result of a search is never boosted, so the score distribution the client reads
 relevance tags from keeps its shape.
 
+### Official Page Lane
+
+A bonus can reorder what a search returned, but it cannot summon a page the
+search never returned. When a query asks for an official page and the engine's
+results contain only aggregators and fan pages, there is nothing to promote, so
+the endpoint asks for the page directly: a second SearXNG query scoped to
+`site:<domain>`, whose results are merged into the set before ranking
+(`server/officialLane.ts`, wired in `server/searchEndpointServerHook.ts`).
+
+Two conditions have to hold, because a scoped second query costs latency and
+must not guess:
+
+- The query carries navigation intent. Chinese has no word boundaries to split
+  on, so the phrases are matched in the raw query (`官网`, `官方网站`, `片单`,
+  `排片`, `场次`, `票价`, `营业时间`, `上映时间`, `购票`, `订票`); English
+  matches whole words (`official`, `hours`, `opening`, `schedule`, `showtime`,
+  `showtimes`, `timetable`, `ticket`, `tickets`, `pricing`, `prices`). Words
+  that name the intent do not count as leftover for the domain match, so
+  "disney plus showtimes" reaches disneyplus.com.
+- One of the returned results already names the site, by the same rule the
+  bonus uses (`namedDomain`). The domain is evidence from the search itself;
+  no domain is derived from the query alone, since probing `<token>.com` would
+  turn a search box into a scanner. A query that names a brand whose official
+  site did not appear anywhere in the results gets no lane.
+
+The lane adds at most three results, deduplicated by URL and kept to the
+registrable domain it scoped to, so an engine that ignores `site:` cannot
+smuggle an unrelated host in. They are placed behind the pinned first result:
+the ranking keeps the top result where it is and re-sorts only what follows, so
+a page appended past that window would never be re-sorted at all.
+
+Every failure is the search it already has. The lane is skipped when less than
+five seconds of the 25-second search deadline remain, is capped at eight
+seconds, and a failure or a timeout only logs and increments a counter: it can
+add results, never turn a served search into a 502.
+`SEARCH_OFFICIAL_LANE_ENABLED=false` turns the second upstream request off, and
+`/status` reports `searches.officialLane` with how often the lane ran, how many
+results it added, and how often it failed.
+
 ## Integration with Search Pipeline
 
 The search endpoint coordinates reranking in `searchEndpointServerHook.ts`:
 
 ```
 1. fetchSearXNG(query, searchType, limit) - internally fetches from SearXNG, deduplicates, and cleans results
-2. Check getRerankerStatus()
+2. Text search only: the official page lane may merge results from a `site:`-scoped second query (see above)
+3. Check getRerankerStatus()
    - If healthy: rankSearchResults(query, searchType, results, preserveTopResults)
    - If unhealthy: return unranked results (fallback)
-3. Return structured JSON response
+4. Return structured JSON response
 ```
 
 Reranking is applied to both text and image search results. For image results, titles and URLs are reformatted into the same text-tuple shape used for text search before being sent through the reranker, then the original image data (including thumbnails) is re-matched to the reranked order by URL. Text search passes `preserveTopResults: true` to keep the original top SearXNG result pinned, while image search does not.

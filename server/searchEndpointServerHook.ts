@@ -6,6 +6,11 @@ import {
   isSearchFallbackEnabled,
 } from "./fallbackSearchService.ts";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
+import {
+  isOfficialLaneEnabled,
+  mergeOfficialLaneResults,
+  officialLaneRequest,
+} from "./officialLane.ts";
 import { rankSearchResults } from "./rankSearchResults.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
 import {
@@ -13,7 +18,10 @@ import {
   recordRerankSkipped,
 } from "./rerankingSinceLastRestart.ts";
 import {
+  addOfficialLaneResults,
   incrementGraphicalSearchesSinceLastRestart,
+  incrementOfficialLaneFailures,
+  incrementOfficialLaneSearches,
   incrementSearchesFailedOnFallback,
   incrementSearchesServedByFallback,
   incrementTextualSearchesSinceLastRestart,
@@ -34,6 +42,17 @@ const SEARCH_DEADLINE_MS = 25_000;
 // A fallback cannot finish in this window, so starting one would only move the
 // same 502 further out.
 const MIN_FALLBACK_BUDGET_MS = 2_000;
+
+// The official lane is a supplement for a search that already succeeded, so it
+// never gets the last seconds of the deadline: what it would add is not worth
+// risking a response the client is still waiting for.
+const MIN_OFFICIAL_LANE_BUDGET_MS = 5_000;
+
+// The lane is a supplement to a search that already has results, so it gets a
+// slice of the deadline rather than the rest of it: the ranking still has to
+// run, and a search that waits on a second upstream for the full 25 seconds is
+// slower than the page it was meant to improve.
+const MAX_OFFICIAL_LANE_TIMEOUT_MS = 8_000;
 
 const searchParamsSchema = z.object({
   query: z
@@ -90,6 +109,68 @@ async function handleRanking(
     );
     return results;
   }
+}
+
+/**
+ * Adds the pages a scoped second query finds, when the request asks for it and
+ * the deadline still has room. Every failure here is the search it already has:
+ * the lane never turns a served search into a 502, and a domain that cannot be
+ * scoped confidently leaves the results untouched.
+ */
+async function officialLaneResults(
+  query: string,
+  results: TextResult[],
+  limit: number,
+  remainingMs: number,
+): Promise<TextResult[]> {
+  if (remainingMs < MIN_OFFICIAL_LANE_BUDGET_MS) return results;
+
+  const lane = officialLaneRequest(query, results);
+  if (!lane) return results;
+
+  incrementOfficialLaneSearches();
+
+  try {
+    const laneResults = await withTimeout(
+      fetchSearXNG(lane.query, "text", limit),
+      Math.min(remainingMs, MAX_OFFICIAL_LANE_TIMEOUT_MS),
+    );
+
+    const merged = mergeOfficialLaneResults(
+      results,
+      laneResults as TextResult[],
+      lane.domain,
+    );
+
+    const added = merged.length - results.length;
+    if (added > 0) addOfficialLaneResults(added);
+
+    return merged;
+  } catch (error) {
+    incrementOfficialLaneFailures();
+    // The domain is left out: it is derived from the query, and the failure
+    // count is the fact anyone acts on.
+    console.error(
+      `Official lane search failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return results;
+  }
+}
+
+/** The lane may not outlive the search deadline that asked for it. */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error("Official lane search timed out")),
+      timeoutMs,
+    );
+  });
+
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -200,7 +281,20 @@ export function searchEndpointServerHook<
       }
 
       if (isTextSearch) {
-        const results = searchResults as TextResult[];
+        let results = searchResults as TextResult[];
+
+        if (isOfficialLaneEnabled()) {
+          const remainingMs =
+            SEARCH_DEADLINE_MS - (performance.now() - searchStartedAt);
+
+          results = await officialLaneResults(
+            query,
+            results,
+            limit,
+            remainingMs,
+          );
+        }
+
         const rankedResults = await handleRanking(
           query,
           searchType,

@@ -78,6 +78,35 @@ export function incrementSearchesFailedOnFallback() {
   searchesFailedOnFallback++;
 }
 
+// The official lane (`server/officialLane.ts`) asks SearXNG a second, scoped
+// question when a search both names a site and asks for its official pages.
+// These say how often that question was asked, how many pages it added to the
+// set ranking sees, and how often it failed; a failed lane never costs the
+// search, which is why the failure count sits next to a served one.
+let officialLaneSearches = 0;
+let officialLaneResultsAdded = 0;
+let officialLaneFailures = 0;
+
+export function incrementOfficialLaneSearches() {
+  officialLaneSearches++;
+}
+
+export function addOfficialLaneResults(amount: number) {
+  officialLaneResultsAdded += amount;
+}
+
+export function incrementOfficialLaneFailures() {
+  officialLaneFailures++;
+}
+
+export function getOfficialLaneStats() {
+  return {
+    searches: officialLaneSearches,
+    resultsAdded: officialLaneResultsAdded,
+    failures: officialLaneFailures,
+  };
+}
+
 /** One engine SearXNG reported as unresponsive, with the reason it gave. */
 export interface UnresponsiveEngine {
   engine: string;

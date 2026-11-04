@@ -108,6 +108,20 @@ Each provider has its own terms, and each operator is responsible for following 
 
 That is why a provider that answers HTTP 429 is paused: the cascade skips it, without a network call, until its `Retry-After` has passed (60 seconds when the header is missing or invalid, and never more than an hour or less than a second). A public instance should set a key for each provider.
 
+### Official Page Lane
+
+A search that asks for an official page can miss the official site: an engine
+answering "disney 下个月排片" with aggregators and fan blogs leaves the schedule
+page out of the set entirely, and no ranking of that set can recover it. When
+the query carries navigation intent and one of the returned results names a
+site, the server asks SearXNG a second, `site:`-scoped question and merges the
+answers before ranking. `docs/reranking.md` records the rule; these variables
+govern it.
+
+| Variable                       | Default | Description                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SEARCH_OFFICIAL_LANE_ENABLED` | `true`  | Run the second, `site:`-scoped search when the query asks for an official page. Only `false`, `0` or `off` turns it off, and changing it takes a restart, since a process keeps the environment it was started with. The extra request is skipped when less than five seconds of the search deadline remain and is capped at eight seconds; a failure only logs and is counted, never turning a served search into a 502 |
+
 ## Application Settings
 
 Settings are stored in browser localStorage and can be changed via the Settings UI.

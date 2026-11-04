@@ -3,6 +3,10 @@
 Notable changes, grouped by date, most recent first.
 
 
+## 2026-11-05
+
+- A text search that asks for an official page can now reach the official site even when the engine's results never included it. When the query carries navigation intent (`官网`, `排片`, `营业时间`, `official`, `hours`, `showtimes` and the like) and one of the returned results names a site, the server sends a second, `site:`-scoped query to SearXNG and merges up to three of its results, deduplicated by URL and kept to that registrable domain, behind the pinned first result: the ranking re-sorts only what follows the top result, so a page appended past that window would never be re-sorted at all. The domain has to come from the results themselves, by the same rule the score bonus uses, because guessing `<token>.com` from the query would turn a search box into a scanner; a query that names a brand whose official site is absent from every result gets no second query. The lane is skipped when less than five seconds of the search deadline remain, is capped at eight seconds, and a failure only logs and is counted, so it can add results but never turn a served search into a 502. `SEARCH_OFFICIAL_LANE_ENABLED=false` turns the extra request off, `/status` reports `searches.officialLane` (searches, `resultsAdded`, `failures`), and `server/officialLane.ts` holds the rule.
+
 ## 2026-11-04
 
 - Relative date words in a query are anchored to absolute ones before the search leaves the browser: "next month" reaches the engines as "December 2026" and "明年" as "2027年". The anchor is appended rather than substituted, so a query that already names a year keeps its own phrasing, and two anchors per query is the ceiling. The typed query still drives the prompt, the UI, and the history entry; only the copy sent to the search engines changes, and the search cache key changes with it. Anchors skip song and film titles ("明天你是否依然爱我", "明年今日") and leave "recent" and "latest" alone, because recency is what the engines already rank for. `shared/relativeDates.ts` holds the rules and `client/modules/textGeneration.ts` applies them.
