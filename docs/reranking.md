@@ -99,17 +99,9 @@ This mode ensures the original top result is never displaced by the reranker, wh
 
 ### Domain Priority
 
-A page from the site the query names gets a small bonus on its semantic score
-before the filter runs (`server/authorityRanking.ts`, applied in
-`server/rankSearchResults.ts`). The reranker never sees the URL, so a query
-like "disney plus next month" ranks a blog roundup and disneyplus.com on their
-prose alone; the bonus lets the named site overtake a page whose snippet
-merely talks about it.
+A page from the site the query names gets a small bonus on its semantic score before the filter runs (`server/authorityRanking.ts`, applied in `server/rankSearchResults.ts`). The reranker never sees the URL, so a query like "disney plus next month" ranks a blog roundup and disneyplus.com on their prose alone; the bonus lets the named site overtake a page whose snippet merely talks about it.
 
-The bonus is added, not multiplied, because the reranker returns a raw
-cross-encoder logit: most documents score below zero, and a factor above one
-would push a negative score further down and demote the very site it means to
-promote.
+The bonus is added, not multiplied, because the reranker returns a raw cross-encoder logit: most documents score below zero, and a factor above one would push a negative score further down and demote the very site it means to promote.
 
 The rule is narrow enough to explain in a sentence:
 
@@ -120,73 +112,30 @@ The rule is narrow enough to explain in a sentence:
 | The label is the query's words with hyphens | +0.75 | `coca cola` → coca-cola.com            |
 | The label merely contains a query word      | 0     | `disney` → disneyfan.com               |
 
-Subdomains share their registrable domain's label, so investor.disney.com and
-www.disney.com both answer "disney", and two-part public suffixes such as
-co.uk keep their own label. "+" is read as " plus ", because a hostname cannot
-contain it and a user typing "disney+" means the same brand.
+Subdomains share their registrable domain's label, so investor.disney.com and www.disney.com both answer "disney". A generic second level (`ac`, `co`, `com`, `edu`, `gov`, `net`, `org`) in front of a two-letter country code counts as part of the suffix, so bbc.co.uk answers "bbc" and a `*.com.hk` result never answers "com". "+" is read as " plus ", because a hostname cannot contain it and a user typing "disney+" means the same brand.
 
-Two guards keep the nudge from promoting the wrong page:
+Three guards keep the nudge from promoting the wrong page:
 
-- Filler words never match on their own, so "plus size guide" does not promote
-  plus.com and "news about disney" does not promote news.com. A label split
-  into the query's words counts only when one part is four characters or more,
-  unless a hyphen marks the split.
-- The joined-label bonus needs the words the query is actually about: a label
-  that spells only the start of the query leaves the remaining words unused, so
-  "tesla investor relations" does not promote teslainvestor.com, and a label
-  that starts with a filler word is skipped, so "the disney store" does not
-  promote thedisney.com.
-- When the query names a year, a page that states a different year is left
-  alone: a brand's recap of last year's event is not the page the query meant,
-  and fresher reporting should keep the top spot. A page that states no year at
-  all keeps the bonus, because relative-time queries are anchored to a year
-  before they reach the search ("next month December 2026") and the page that
-  answers them often writes only "December".
+- Filler words never match on their own, so "plus size guide" does not promote plus.com and "news about disney" does not promote news.com. A label split into the query's words counts only when one part is four characters or more, unless a hyphen marks the split.
+- The joined-label bonus needs the words the query is actually about: a label that spells only the start of the query leaves the remaining words unused, so "tesla investor relations" does not promote teslainvestor.com, and a label that starts with a filler word is skipped, so "the disney store" does not promote thedisney.com.
+- When the query names a year, a page that states a different year is left alone: a brand's recap of last year's event is not the page the query meant, and fresher reporting should keep the top spot. A page that states no year at all keeps the bonus, because relative-time queries are anchored to a year before they reach the search ("next month December 2026") and the page that answers them often writes only "December".
 
-The bonus is applied before the standard-deviation filter, so it can also
-rescue a page the filter would have dropped. It cannot add a result the search
-did not return; that is a retrieval problem, not a ranking one. The pinned top
-result of a search is never boosted, so the score distribution the client reads
-relevance tags from keeps its shape.
+The filler-word list is English. In another language, the other words of the query count as leftover, so the joined-label bonus rarely applies there, while the single-word bonus still does.
+
+The bonus is applied before the standard-deviation filter, so it can also rescue a page the filter would have dropped. It cannot add a result the search did not return; that is a retrieval problem, not a ranking one. The pinned top result of a search is never boosted, so the score distribution the client reads relevance tags from keeps its shape.
 
 ### Official Page Lane
 
-A bonus can reorder what a search returned, but it cannot summon a page the
-search never returned. When a query asks for an official page and the engine's
-results contain only aggregators and fan pages, there is nothing to promote, so
-the endpoint asks for the page directly: a second SearXNG query scoped to
-`site:<domain>`, whose results are merged into the set before ranking
-(`server/officialLane.ts`, wired in `server/searchEndpointServerHook.ts`).
+A bonus can reorder what a search returned, but it cannot summon a page the search never returned. When a query asks for an official page and the engine's results contain only aggregators and fan pages, there is nothing to promote, so the endpoint asks for the page directly: a second SearXNG query scoped to `site:<domain>`, whose results are merged into the set before ranking (`server/officialLane.ts`, wired in `server/searchEndpointServerHook.ts`).
 
-Two conditions have to hold, because a scoped second query costs latency and
-must not guess:
+The lane is off by default, because it sends the engines a second request; `SEARCH_OFFICIAL_LANE_ENABLED=true` turns it on. When it is on, two conditions have to hold, because a scoped second query costs latency and must not guess:
 
-- The query carries navigation intent. Chinese has no word boundaries to split
-  on, so the phrases are matched in the raw query (`官网`, `官方网站`, `片单`,
-  `排片`, `场次`, `票价`, `营业时间`, `上映时间`, `购票`, `订票`); English
-  matches whole words (`official`, `hours`, `opening`, `schedule`, `showtime`,
-  `showtimes`, `timetable`, `ticket`, `tickets`, `pricing`, `prices`). Words
-  that name the intent do not count as leftover for the domain match, so
-  "disney plus showtimes" reaches disneyplus.com.
-- One of the returned results already names the site, by the same rule the
-  bonus uses (`namedDomain`). The domain is evidence from the search itself;
-  no domain is derived from the query alone, since probing `<token>.com` would
-  turn a search box into a scanner. A query that names a brand whose official
-  site did not appear anywhere in the results gets no lane.
+- The query carries navigation intent. Chinese has no word boundaries to split on, so the phrases are matched in the raw query (`官网`, `官方网站`, `官方站`, `官方网页`, `官方页面`, `片单`, `排片`, `场次`, `票价`, `营业时间`, `上映时间`, `购票`, `订票`); English matches whole words (`official`, `hours`, `opening`, `schedule`, `showtime`, `showtimes`, `timetable`, `ticket`, `tickets`, `pricing`, `prices`). Other languages have no intent words yet, so their queries get no lane. Words that name the intent do not count as leftover for the domain match, so "disney plus showtimes" reaches disneyplus.com.
+- One of the returned results already names the site, by the same rule the bonus uses (`namedDomain`). The domain is evidence from the search itself; no domain is derived from the query alone, since probing `<token>.com` would turn a search box into a scanner. A query that names a brand whose official site did not appear anywhere in the results gets no lane.
 
-The lane adds at most three results, deduplicated by URL and kept to the
-registrable domain it scoped to, so an engine that ignores `site:` cannot
-smuggle an unrelated host in. They are placed behind the pinned first result:
-the ranking keeps the top result where it is and re-sorts only what follows, so
-a page appended past that window would never be re-sorted at all.
+The lane adds at most three results, deduplicated by URL and kept to the registrable domain it scoped to, so an engine that ignores `site:` cannot smuggle an unrelated host in. They are placed behind the pinned first result: the ranking keeps the top result where it is and re-sorts only what follows, so a page appended past that window would never be re-sorted at all.
 
-Every failure is the search it already has. The lane is skipped when less than
-five seconds of the 25-second search deadline remain, is capped at eight
-seconds, and a failure or a timeout only logs and increments a counter: it can
-add results, never turn a served search into a 502.
-`SEARCH_OFFICIAL_LANE_ENABLED=false` turns the second upstream request off, and
-`/status` reports `searches.officialLane` with how often the lane ran, how many
-results it added, and how often it failed.
+Every failure is the search it already has. The lane runs only when SearXNG served the search, since results from the fallback mean SearXNG has just failed. It is skipped when less than five seconds of the 25-second search deadline remain, and its request is canceled at eight seconds. The request goes through `fetchSupplementarySearXNG` (`server/webSearchService.ts`): one request with no retry, which counts toward neither the circuit breaker nor the engine-health counters, so a `site:` query that comes back empty cannot slow down, open the circuit for, or mark degraded the searches users are waiting on. A failure or a timeout only logs and increments a counter: it can add results, never turn a served search into a 502. `/status` reports `searches.officialLane` with how often the lane ran, how many results it added, and how often it failed.
 
 ## Integration with Search Pipeline
 
@@ -194,7 +143,7 @@ The search endpoint coordinates reranking in `searchEndpointServerHook.ts`:
 
 ```
 1. fetchSearXNG(query, searchType, limit) - internally fetches from SearXNG, deduplicates, and cleans results
-2. Text search only: the official page lane may merge results from a `site:`-scoped second query (see above)
+2. Text search only, when `SEARCH_OFFICIAL_LANE_ENABLED` is on: the official page lane may merge results from a `site:`-scoped second query (see above)
 3. Check getRerankerStatus()
    - If healthy: rankSearchResults(query, searchType, results, preserveTopResults)
    - If unhealthy: return unranked results (fallback)

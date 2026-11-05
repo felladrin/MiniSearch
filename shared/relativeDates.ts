@@ -266,7 +266,7 @@ function overlaps(occurrence: Occurrence, ranges: readonly Occurrence[]) {
 export function normalizeRelativeDates(
   query: string,
   asOfDate: Date,
-  options?: { strategy?: "append" | "replace"; maxLength?: number },
+  options?: { maxLength?: number },
 ): { searchQuery: string; replacements: RelativeDateReplacement[] } {
   const unchanged = {
     searchQuery: query,
@@ -274,7 +274,6 @@ export function normalizeRelativeDates(
   };
 
   if (query.trim() === "") return unchanged;
-  const strategy = options?.strategy ?? "append";
   if (BARE_TITLES.has(query.trim().toLowerCase())) return unchanged;
 
   const blacklistRanges = BLACKLIST_PHRASES.flatMap((phrase) =>
@@ -315,15 +314,10 @@ export function normalizeRelativeDates(
     if (selected.length === MAX_REPLACEMENTS) break;
     if (usedAnchors.has(hit.anchor)) continue;
     if (selected.some((chosen) => overlaps(hit, [chosen]))) continue;
-    // In append mode an anchor the query already spells out is not worth
-    // repeating: the search engine has that year already, and a doubled
-    // anchor only dilutes the query.
-    if (
-      strategy === "append" &&
-      query.toLowerCase().includes(hit.anchor.toLowerCase())
-    ) {
-      continue;
-    }
+    // An anchor the query already spells out is not worth repeating: the
+    // search engine has that year already, and a doubled anchor only dilutes
+    // the query.
+    if (query.toLowerCase().includes(hit.anchor.toLowerCase())) continue;
 
     usedAnchors.add(hit.anchor);
     selected.push(hit);
@@ -336,34 +330,19 @@ export function normalizeRelativeDates(
     anchor,
   }));
 
-  if (strategy === "append") {
-    // The search endpoint rejects an over-long query, so an anchor that would
-    // push it past the limit is dropped rather than turning a search into a
-    // failed request. No anchor left over means the query goes out untouched.
-    const base = query.trimEnd();
-    const limit = options?.maxLength ?? Number.POSITIVE_INFINITY;
-    const appended: RelativeDateReplacement[] = [];
-    let searchQuery = base;
-    for (const replacement of replacements) {
-      const candidate = `${searchQuery} ${replacement.anchor}`;
-      if (candidate.length > limit) break;
-      searchQuery = candidate;
-      appended.push(replacement);
-    }
-    if (appended.length === 0) return unchanged;
-
-    return { searchQuery, replacements: appended };
+  // The search endpoint rejects an over-long query, so an anchor that would
+  // push it past the limit is dropped rather than turning a search into a
+  // failed request. No anchor left over means the query goes out untouched.
+  const limit = options?.maxLength ?? Number.POSITIVE_INFINITY;
+  const appended: RelativeDateReplacement[] = [];
+  let searchQuery = query.trimEnd();
+  for (const replacement of replacements) {
+    const candidate = `${searchQuery} ${replacement.anchor}`;
+    if (candidate.length > limit) break;
+    searchQuery = candidate;
+    appended.push(replacement);
   }
+  if (appended.length === 0) return unchanged;
 
-  // Replace from left to right over the original string so the anchors keep
-  // the surrounding word order and the untouched text stays byte-identical.
-  let searchQuery = "";
-  let cursor = 0;
-  for (const hit of selected) {
-    searchQuery += query.slice(cursor, hit.start) + hit.anchor;
-    cursor = hit.end;
-  }
-  searchQuery += query.slice(cursor);
-
-  return { searchQuery, replacements };
+  return { searchQuery, replacements: appended };
 }

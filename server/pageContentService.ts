@@ -571,14 +571,6 @@ async function extractPdfText(bytes: Uint8Array): Promise<string> {
   }
 }
 
-/**
- * Converts a document to plain text, preferring the innermost article-like
- * container so that sidebars and site chrome never reach the prompt.
- *
- * Navigation that lives in plain divs is removed first, because the conversion
- * has no way to tell a rail of links from a paragraph — see
- * `stripLinkHeavyBlocks`.
- */
 /** Site chrome the density pass drops by element name, listed for the fallback. */
 const CHROME_SELECTORS = ["aside", "footer", "form", "header", "nav"];
 
@@ -597,6 +589,14 @@ function conversionOptions(skippedSelectors: string[]) {
   };
 }
 
+/**
+ * Converts a document to plain text, preferring the innermost article-like
+ * container so that sidebars and site chrome never reach the prompt.
+ *
+ * Navigation that lives in plain divs is removed first, because the conversion
+ * has no way to tell a rail of links from a paragraph — see
+ * `stripLinkHeavyBlocks`.
+ */
 export function extractReadableText(html: string): string {
   const stripped = stripLinkHeavyBlocks(html);
   const text = convertHtmlToPlainText(
@@ -656,8 +656,11 @@ function decodeEntities(text: string): string {
  * measured against it added vocabulary that the body already carried.
  */
 const CONTEXT_TERM_WEIGHT = 0.15;
-const TITLE_PATTERN = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i;
-const HEADING_PATTERN = /<h[12]\b[^>]*>([\s\S]*?)<\/h[12]\s*>/gi;
+// Bounded, because they run on the raw HTML of any public URL: an unbounded
+// match scans to the end of the page from every `<h1` without a closing tag,
+// which is quadratic and blocks the server for minutes at the response limit.
+const TITLE_PATTERN = /<title\b[^>]{0,500}>([\s\S]{0,500}?)<\/title\s*>/i;
+const HEADING_PATTERN = /<h[12]\b[^>]{0,500}>([\s\S]{0,500}?)<\/h[12]\s*>/gi;
 
 function extractPageContext(html: string): string[] {
   const parts: string[] = [];

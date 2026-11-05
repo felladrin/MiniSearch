@@ -29,7 +29,7 @@ import {
   type SearchType,
 } from "./searchesSinceLastRestart.ts";
 import { sendValidationError } from "./utils/httpResponse.ts";
-import { fetchSearXNG } from "./webSearchService.ts";
+import { fetchSearXNG, fetchSupplementarySearXNG } from "./webSearchService.ts";
 
 const DEFAULT_SEARCH_LIMIT = 30;
 const MAX_SEARCH_LIMIT = 30;
@@ -131,16 +131,15 @@ async function officialLaneResults(
   incrementOfficialLaneSearches();
 
   try {
-    const laneResults = await withTimeout(
-      fetchSearXNG(lane.query, "text", limit),
-      Math.min(remainingMs, MAX_OFFICIAL_LANE_TIMEOUT_MS),
+    // The signal cancels the request itself, so a lane that runs out of time
+    // stops using the engines instead of finishing for nobody.
+    const laneResults = await fetchSupplementarySearXNG(
+      lane.query,
+      limit,
+      AbortSignal.timeout(Math.min(remainingMs, MAX_OFFICIAL_LANE_TIMEOUT_MS)),
     );
 
-    const merged = mergeOfficialLaneResults(
-      results,
-      laneResults as TextResult[],
-      lane.domain,
-    );
+    const merged = mergeOfficialLaneResults(results, laneResults, lane.domain);
 
     const added = merged.length - results.length;
     if (added > 0) addOfficialLaneResults(added);
@@ -157,20 +156,6 @@ async function officialLaneResults(
     );
     return results;
   }
-}
-
-/** The lane may not outlive the search deadline that asked for it. */
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error("Official lane search timed out")),
-      timeoutMs,
-    );
-  });
-
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -220,9 +205,11 @@ export function searchEndpointServerHook<
       const searchType = isTextSearch ? "text" : "images";
 
       let searchResults: TextResult[] | ImageResult[] | null;
+      let servedBySearXNG = false;
       const searchStartedAt = performance.now();
       try {
         searchResults = await fetchSearXNG(query, searchType, limit);
+        servedBySearXNG = true;
         recordSearchDuration(searchType, performance.now() - searchStartedAt);
       } catch {
         // SearXNG is unreachable. The operator may have switched on a second
@@ -283,7 +270,9 @@ export function searchEndpointServerHook<
       if (isTextSearch) {
         let results = searchResults as TextResult[];
 
-        if (isOfficialLaneEnabled()) {
+        // Results from the fallback mean SearXNG has just failed, so a second
+        // request to it would only add latency to a search that is already slow.
+        if (servedBySearXNG && isOfficialLaneEnabled()) {
           const remainingMs =
             SEARCH_DEADLINE_MS - (performance.now() - searchStartedAt);
 

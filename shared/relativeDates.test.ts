@@ -8,7 +8,7 @@ const AS_OF = new Date(2026, 10, 3, 12);
 const AS_OF_DECEMBER = new Date(2026, 11, 15, 12);
 
 describe("normalizeRelativeDates", () => {
-  describe("append strategy", () => {
+  describe("appended anchors", () => {
     it("appends the resolved year to a query with a Chinese year word", () => {
       expect(
         normalizeRelativeDates("明年的wrestlemania在哪里举办", AS_OF),
@@ -118,43 +118,6 @@ describe("normalizeRelativeDates", () => {
           replacements: [],
         });
       }
-    });
-  });
-
-  describe("replace strategy", () => {
-    it("swaps the phrase in place and keeps the rest of the query", () => {
-      expect(
-        normalizeRelativeDates("明年的wrestlemania", AS_OF, {
-          strategy: "replace",
-        }),
-      ).toEqual({
-        searchQuery: "2027年的wrestlemania",
-        replacements: [{ phrase: "明年", anchor: "2027年" }],
-      });
-    });
-
-    it("replaces two phrases without touching the text between them", () => {
-      expect(
-        normalizeRelativeDates("下个月和明年", AS_OF, {
-          strategy: "replace",
-        }).searchQuery,
-      ).toBe("2026年12月和2027年");
-    });
-
-    it("replaces an English phrase with its month name", () => {
-      expect(
-        normalizeRelativeDates("new series on disney plus next month", AS_OF, {
-          strategy: "replace",
-        }).searchQuery,
-      ).toBe("new series on disney plus December 2026");
-    });
-
-    it("is the default-free option: append wins when omitted", () => {
-      const withOptions = normalizeRelativeDates("明天见", AS_OF, {});
-      const withoutOptions = normalizeRelativeDates("明天见", AS_OF);
-
-      expect(withOptions).toEqual(withoutOptions);
-      expect(withoutOptions.searchQuery).toBe("明天见 2026-11-04");
     });
   });
 

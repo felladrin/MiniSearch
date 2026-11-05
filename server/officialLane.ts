@@ -118,16 +118,16 @@ export function mergeOfficialLaneResults(
 }
 
 /**
- * On by default, because a query that asks for an official page and returns one
- * is the case this exists for; `SEARCH_OFFICIAL_LANE_ENABLED=false` turns the
- * extra upstream request off.
+ * Off by default, because the lane sends a second request to the engines, and
+ * an instance whose engines already rate-limit it should not have to opt out of
+ * that. `SEARCH_OFFICIAL_LANE_ENABLED=true` turns it on.
  */
 export function isOfficialLaneEnabled(): boolean {
   const value = (process.env.SEARCH_OFFICIAL_LANE_ENABLED ?? "")
     .trim()
     .toLowerCase();
 
-  return value !== "false" && value !== "0" && value !== "off";
+  return value === "true" || value === "1";
 }
 
 function hasNavigationIntent(query: string): boolean {
@@ -147,5 +147,8 @@ function buildScopedQuery(domain: string, query: string): string | null {
 
 /** Trailing slashes and the scheme do not make two spellings of one page. */
 function normalizeUrl(url: string): string {
-  return url.replace(/\/+$/, "").toLowerCase();
+  return url
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "")
+    .toLowerCase();
 }

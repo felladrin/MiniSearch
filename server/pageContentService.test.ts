@@ -266,6 +266,21 @@ describe("page headline context", () => {
     ).toBeLessThan(100);
     expect(content.content).not.toContain("release story 11");
   });
+
+  it("reads the headline in linear time from a page full of unclosed headings", async () => {
+    // The headline is read from the raw HTML of any public URL, where a
+    // comment can hold `<h1` 25,000 times without a single `>`. A pattern that
+    // scans to the end of the page from each of them takes seconds on this
+    // page and minutes at the 1.5 MB response limit, blocking every request.
+    respondWithHtml(
+      `<html><body><article>${firstParagraph}</article><!--${"<h1 ".repeat(25_000)}--></body></html>`,
+    );
+
+    const startedAt = performance.now();
+    await fetchPageContents(query, ["https://example.com/headings"]);
+
+    expect(performance.now() - startedAt).toBeLessThan(1000);
+  });
 });
 
 describe("splitIntoPassages", () => {

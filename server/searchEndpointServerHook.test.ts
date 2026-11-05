@@ -20,6 +20,9 @@ vi.mock("./rerankerService", () => ({
 }));
 
 vi.mock("./searchesSinceLastRestart", () => ({
+  addOfficialLaneResults: vi.fn(),
+  incrementOfficialLaneFailures: vi.fn(),
+  incrementOfficialLaneSearches: vi.fn(),
   incrementTextualSearchesSinceLastRestart: vi.fn(),
   incrementGraphicalSearchesSinceLastRestart: vi.fn(),
   incrementSearchesServedByFallback: vi.fn(),
@@ -29,6 +32,7 @@ vi.mock("./searchesSinceLastRestart", () => ({
 
 vi.mock("./webSearchService", () => ({
   fetchSearXNG: vi.fn(),
+  fetchSupplementarySearXNG: vi.fn(),
 }));
 
 import {
@@ -41,13 +45,15 @@ import { rankSearchResults } from "./rankSearchResults";
 import { getRerankerStatus } from "./rerankerService";
 import { searchEndpointServerHook } from "./searchEndpointServerHook";
 import {
+  addOfficialLaneResults,
   incrementGraphicalSearchesSinceLastRestart,
+  incrementOfficialLaneFailures,
   incrementSearchesFailedOnFallback,
   incrementSearchesServedByFallback,
   incrementTextualSearchesSinceLastRestart,
   recordSearchDuration,
 } from "./searchesSinceLastRestart";
-import { fetchSearXNG } from "./webSearchService";
+import { fetchSearXNG, fetchSupplementarySearXNG } from "./webSearchService";
 
 function createRequest(url: string): IncomingMessage {
   return {
@@ -818,6 +824,83 @@ describe("searchEndpointServerHook", () => {
       }
 
       expect(getRerankingStats().failed).toBe(before.failed + 1);
+    });
+  });
+
+  describe("official lane", () => {
+    const query = "/search/text?q=disney%20showtimes&token=abc";
+    const searxngResults: [string, string, string][] = [
+      ["Disney showtimes roundup", "Blog", "https://blog.example.com/disney"],
+      ["Disney", "Official site", "https://www.disney.com/"],
+    ];
+    const laneResults: [string, string, string][] = [
+      ["Showtimes", "Official schedule", "https://www.disney.com/showtimes"],
+    ];
+
+    beforeEach(() => {
+      vi.stubEnv("SEARCH_OFFICIAL_LANE_ENABLED", "true");
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("asks a supplementary search for the named site and merges it behind the first result", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSupplementarySearXNG).mockResolvedValue(laneResults);
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(createRequest(query), response, vi.fn());
+
+      // One request through the retrying, circuit-counted path: the lane's
+      // own request must not slow down or count against the user's search.
+      expect(fetchSearXNG).toHaveBeenCalledTimes(1);
+      expect(fetchSupplementarySearXNG).toHaveBeenCalledWith(
+        "site:disney.com disney showtimes",
+        30,
+        expect.any(AbortSignal),
+      );
+      expect(response.end).toHaveBeenCalledWith(
+        JSON.stringify([searxngResults[0], laneResults[0], searxngResults[1]]),
+      );
+      expect(addOfficialLaneResults).toHaveBeenCalledWith(1);
+    });
+
+    it("skips the lane when the fallback served the search", async () => {
+      vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+      vi.mocked(fetchSearXNG).mockRejectedValue(
+        new Error("SearXNG request failed with status 503"),
+      );
+      vi.mocked(fetchFallbackTextResults).mockResolvedValue(searxngResults);
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(createRequest(query), response, vi.fn());
+
+      expect(fetchSearXNG).toHaveBeenCalledTimes(1);
+      expect(fetchSupplementarySearXNG).not.toHaveBeenCalled();
+      expect(response.statusCode).toBe(200);
+    });
+
+    it("serves the search it already has when the lane fails", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSupplementarySearXNG).mockRejectedValue(
+        new Error("This operation was aborted"),
+      );
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      try {
+        await handler(createRequest(query), response, vi.fn());
+      } finally {
+        errorSpy.mockRestore();
+      }
+
+      expect(response.statusCode).toBe(200);
+      expect(response.end).toHaveBeenCalledWith(JSON.stringify(searxngResults));
+      expect(incrementOfficialLaneFailures).toHaveBeenCalledTimes(1);
     });
   });
 });

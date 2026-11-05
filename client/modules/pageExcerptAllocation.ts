@@ -211,7 +211,6 @@ function snapToEndOfWord(content: string, end: number) {
   return end;
 }
 
-/** Keeps the window of a page that covers the query, trimmed to `taken` tokens. */
 /**
  * The occurrence the window was chosen for, and how much of the share is spent
  * in front of it. A window longer than the share is cut around this point
@@ -283,6 +282,7 @@ function fitWindow(
   return taken >= 1 ? "…" : "";
 }
 
+/** Keeps the window of a page that covers the query, trimmed to `taken` tokens. */
 function trimToQueryWindow(
   content: string,
   tokens: number[],

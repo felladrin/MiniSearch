@@ -1,5 +1,5 @@
 // A small, explainable nudge toward a result whose domain is the one the query
-// named. Retrieval and semantic ranking stay untouched: this multiplier only
+// named. Retrieval and semantic ranking stay untouched: this bonus only
 // applies to results the search already returned, and it can promote a page
 // into the six the model actually reads.
 //
@@ -79,25 +79,18 @@ const GENERIC_QUERY_WORDS = new Set([
   "you",
 ]);
 
-const SECOND_LEVEL_SUFFIXES = new Set([
-  "ac.uk",
-  "co.in",
-  "co.jp",
-  "co.kr",
-  "co.nz",
-  "co.uk",
-  "com.ar",
-  "com.au",
-  "com.br",
-  "com.cn",
-  "com.mx",
-  "com.sg",
-  "com.tr",
-  "com.tw",
-  "gov.uk",
-  "net.au",
-  "org.uk",
-  "org.au",
+// In front of a two-letter country code, these make a two-part public suffix
+// (co.uk, com.au, gov.br), and the label before them names the site. Read as
+// the label instead, "com" would let any `*.com.hk` result scope the official
+// lane to every site under com.hk.
+const GENERIC_SECOND_LEVEL_LABELS = new Set([
+  "ac",
+  "co",
+  "com",
+  "edu",
+  "gov",
+  "net",
+  "org",
 ]);
 
 const SINGLE_TOKEN_BONUS = 0.5;
@@ -268,13 +261,6 @@ export function registrableDomainOf(url: string): string | null {
  * is the one the score bonus uses, so a site the boost would promote is exactly
  * a site this can be scoped to. The year guard is not part of it: the caller
  * only asks whether the site is the one the query named, not whether its page
- * is about the right edition.
- */
-/**
- * The registrable domain of a result when the query names it, or null. The rule
- * is the one the score bonus uses, so a site the boost would promote is exactly
- * a site this can be scoped to. The year guard is not part of it: the caller
- * only asks whether the site is the one the query named, not whether its page
  * is about the right edition. Words in `ignoredWords` do not count as
  * leftover, which lets a caller treat its own intent words as understood.
  */
@@ -329,10 +315,10 @@ function registrableLabel(hostname: string): string | null {
 function registrableLabelIndex(labels: string[]): number {
   if (labels.length < 2) return -1;
 
-  const lastTwo = labels.slice(-2).join(".");
-  return SECOND_LEVEL_SUFFIXES.has(lastTwo)
-    ? labels.length - 3
-    : labels.length - 2;
+  const twoPartSuffix =
+    labels[labels.length - 1].length === 2 &&
+    GENERIC_SECOND_LEVEL_LABELS.has(labels[labels.length - 2]);
+  return twoPartSuffix ? labels.length - 3 : labels.length - 2;
 }
 
 /**

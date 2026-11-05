@@ -72,6 +72,11 @@ describe("authorityBoost", () => {
     expect(boosted("bbc coverage", "https://www.bbc.co.uk/news")).toBe(0.5);
   });
 
+  it("reads a generic second level before a country code as part of the suffix", () => {
+    expect(boosted("lazada tickets", "https://www.lazada.com.my/")).toBe(0.5);
+    expect(boosted("amazon.com hours", "https://shop.example.com.hk/")).toBe(0);
+  });
+
   it("does not boost a page that cannot support the year in the query", () => {
     expect(
       boosted(
@@ -94,13 +99,14 @@ describe("authorityBoost", () => {
     ).toBe(0.5);
   });
 
-  it("returns 1 for a URL it cannot parse", () => {
+  it("returns 0 for a URL it cannot parse", () => {
     expect(boosted("disney", "not a url")).toBe(0);
   });
 
-  it("returns 1 for a bare hostname without a dot", () => {
+  it("returns 0 for a bare hostname without a dot", () => {
     expect(boosted("localhost", "http://localhost:8888/search")).toBe(0);
   });
+
   it("keeps the boost when the anchored query names a year the page omits", () => {
     expect(
       boosted(

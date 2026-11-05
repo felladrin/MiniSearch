@@ -103,6 +103,15 @@ describe("officialLaneRequest", () => {
     }
   });
 
+  it("never scopes a whole country suffix", () => {
+    expect(
+      officialLaneRequest(
+        "amazon.com hours",
+        results("https://shop.example.com.hk/x"),
+      ),
+    ).toBeNull();
+  });
+
   it("does not scope a query too long to carry the prefix", () => {
     const query = `disney showtimes ${"x".repeat(2000)}`;
     expect(
@@ -135,6 +144,21 @@ describe("mergeOfficialLaneResults", () => {
     expect(
       mergeOfficialLaneResults(main, results(main[0][2]), "disney.com"),
     ).toBe(main);
+  });
+
+  it("reads the http and https spellings of a page as one page", () => {
+    const withOfficialPage = results(
+      "https://disney.com/schedule",
+      "https://news.example.com/disney",
+    );
+
+    expect(
+      mergeOfficialLaneResults(
+        withOfficialPage,
+        results("http://disney.com/schedule/"),
+        "disney.com",
+      ),
+    ).toBe(withOfficialPage);
   });
 
   it("drops a host the engine returned outside the scope", () => {
@@ -176,17 +200,15 @@ describe("isOfficialLaneEnabled", () => {
     vi.unstubAllEnvs();
   });
 
-  it("is on unless the environment turns it off", () => {
-    expect(isOfficialLaneEnabled()).toBe(true);
-
-    for (const value of ["false", "0", "off", " FALSE "]) {
+  it("is off unless the environment turns it on", () => {
+    for (const value of ["", "false", "0", "off", "yes"]) {
       vi.stubEnv("SEARCH_OFFICIAL_LANE_ENABLED", value);
       expect(isOfficialLaneEnabled(), value).toBe(false);
     }
   });
 
-  it("takes any other spelling as on", () => {
-    for (const value of ["true", "1", "on", "yes"]) {
+  it("accepts 'true', ' TRUE ' and '1'", () => {
+    for (const value of ["true", " TRUE ", "1"]) {
       vi.stubEnv("SEARCH_OFFICIAL_LANE_ENABLED", value);
       expect(isOfficialLaneEnabled(), value).toBe(true);
     }

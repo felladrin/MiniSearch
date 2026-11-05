@@ -89,7 +89,7 @@ The system executes two parallel flows when a user submits a query:
 ### Search Flow
 
 1. User submits a query via SearchForm
-2. Relative date words are anchored to absolute ones before the request (`shared/relativeDates.ts`), so "next month" reaches the engines as "December 2026" and a relative phrase cannot leave the index without a year to match; the query as typed still drives the prompt, the history entry, and the UI
+2. Relative date words (English and Chinese for now) are anchored to absolute ones before the request (`shared/relativeDates.ts`), so "next month" reaches the engines as "December 2026" and a relative phrase cannot leave the index without a year to match; the query as typed still drives the prompt, the history entry, and the UI
 3. Client checks IndexedDB cache for matching query hash
 4. On cache miss: authenticated HTTP request to `/search/text` or `/search/images`
 5. Server verifies request token via `searchToken.ts` (CSRF protection)
