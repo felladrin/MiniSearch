@@ -190,7 +190,7 @@ Need to:
 
 1. Check the wasm build can run it: the architecture must exist in `node_modules/@wllama/wllama/esm/wasm/wllama.wasm` (grep the binary for the arch name), and the quant must stay under the ceilings in `docs/ai-integration.md` (shard every file under 2000 MiB; total weights under ~3.7 GB)
 2. Shard the GGUF (`llama-gguf-split --split --size`, or an equivalent) and publish to a `Felladrin/gguf-sharded-<QUANT>-<Name>` repo
-3. Add to `client/modules/wllama.ts`; thinking-by-default templates need `chatTemplateKwargs: { enable_thinking: false }`
+3. Add to `client/modules/wllama.ts`; thinking-by-default templates need nothing extra (their `reasoning_content` channel is streamed into the thinking UI) but do need `reasoningBudgetTokens` so they cannot think past the context without answering
 4. Run `node scripts/wllama-catalog-check.cjs` and `npx vitest run client/modules/wllama.test.ts`
 5. Update `docs/ai-integration.md`
 6. Update `docs/configuration.md` defaults

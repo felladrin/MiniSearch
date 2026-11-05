@@ -3,7 +3,10 @@ import {
   updateModelLoadingProgress,
   updateModelSizeInMegabytes,
 } from "./pubSub";
-import { generateTextWithWllama } from "./textGenerationWithWllama";
+import {
+  composeStreamedText,
+  generateTextWithWllama,
+} from "./textGenerationWithWllama";
 import { initializeWllama } from "./wllama";
 
 vi.mock("./logEntries", () => ({ addLogEntry: vi.fn() }));
@@ -14,6 +17,8 @@ vi.mock("./pubSub", () => ({
     enableAiResponse: true,
     wllamaModelId: "test-model",
     cpuThreads: 1,
+    reasoningStartMarker: "<think>",
+    reasoningEndMarker: "</think>",
   }),
   getTextGenerationState: vi.fn().mockReturnValue("generating"),
   updateModelLoadingProgress: vi.fn(),
@@ -104,5 +109,23 @@ describe("generateTextWithWllama", () => {
 
     expect(updateModelLoadingProgress).not.toHaveBeenCalled();
     expect(updateModelSizeInMegabytes).not.toHaveBeenCalledWith(0);
+  });
+});
+
+describe("composeStreamedText", () => {
+  it("returns the answer unchanged when the model does not think", () => {
+    expect(composeStreamedText("", "The answer.")).toBe("The answer.");
+  });
+
+  it("keeps the reasoning open while the answer has not started", () => {
+    expect(composeStreamedText("hmm, let me see", "")).toBe(
+      "<think>hmm, let me see",
+    );
+  });
+
+  it("closes the reasoning block when the answer starts", () => {
+    expect(composeStreamedText("done thinking", "The answer.")).toBe(
+      "<think>done thinking</think>The answer.",
+    );
   });
 });

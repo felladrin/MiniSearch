@@ -70,7 +70,15 @@ export async function initializeWllama(
         : {}),
     });
 
-    const hasWarmupSucceeded = !!warmupResponse.choices[0]?.message?.content;
+    const warmupMessage = warmupResponse.choices[0]?.message as
+      | { content?: string; reasoning_content?: string }
+      | undefined;
+
+    // A thinking model spends its single warmup token on the reasoning
+    // channel, so either channel counts as a working model.
+    const hasWarmupSucceeded = !!(
+      warmupMessage?.content || warmupMessage?.reasoning_content
+    );
 
     addLogEntry(
       `Wllama warmup ${hasWarmupSucceeded ? "succeeded" : "failed"}.`,
@@ -128,11 +136,19 @@ export interface WllamaModel {
   readonly flash_attn?: boolean;
   /**
    * Extra variables handed to the model's chat template on every completion
-   * (wllama's `chat_template_kwargs`). Used to switch off thinking-by-default
-   * templates: MiniSearch renders only the content channel, so a model that
-   * spends its whole budget on `reasoning_content` would answer with nothing.
+   * (wllama's `chat_template_kwargs`). Thinking stays on: the reasoning
+   * channel is streamed into the thinking UI, so nothing here should turn
+   * it off.
    */
   readonly chatTemplateKwargs?: Record<string, unknown>;
+  /**
+   * Hard cap on the chain of thought, in tokens (wllama's
+   * `reasoning_budget_tokens`). When the model has thought this long
+   * without answering, the engine closes the reasoning channel and forces
+   * the final answer, so a long-winded model cannot spend the whole
+   * context window thinking and deliver nothing.
+   */
+  readonly reasoningBudgetTokens?: number;
   getSampling: () => Omit<SamplingParams, "logit_bias">;
 }
 
@@ -337,7 +353,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_M-Spark-X2.6-1.7B",
     hfFilePath: "Spark-X2.6-1.7B-Q4_K_M-00001-of-00004.gguf",
     fileSizeInMegabytes: 1769,
-    chatTemplateKwargs: { enable_thinking: false },
+    reasoningBudgetTokens: 256,
   },
   "smollm3-3b": {
     ...createDefaultModelConfig(),
@@ -373,7 +389,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-4.2-3b",
     hfFilePath: "granite-4.2-3b-Q4_K_S-00001-of-00005.gguf",
     fileSizeInMegabytes: 2143,
-    chatTemplateKwargs: { enable_thinking: false },
+    reasoningBudgetTokens: 256,
   },
   "phi-3.5-mini-3.8b": {
     ...createDefaultModelConfig(),
@@ -402,7 +418,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-UD-Q3_K_XL-Qwen3.5-4B",
     hfFilePath: "Qwen3.5-4B-UD-Q3_K_XL-00001-of-00005.gguf",
     fileSizeInMegabytes: 2436,
-    chatTemplateKwargs: { enable_thinking: false },
+    reasoningBudgetTokens: 256,
   },
   "gemma-4-e2b": {
     ...createDefaultModelConfig(),
@@ -410,7 +426,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q3_K_S-gemma-4-e2b-it",
     hfFilePath: "gemma-4-e2b-it-Q3_K_S-00001-of-00005.gguf",
     fileSizeInMegabytes: 2446,
-    chatTemplateKwargs: { enable_thinking: false },
+    reasoningBudgetTokens: 256,
   },
   "phi-4-mini-reasoning": {
     ...createDefaultModelConfig(),
@@ -425,6 +441,6 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_M-Spark-X2.6-4B",
     hfFilePath: "Spark-X2.6-4B-Q4_K_M-00001-of-00007.gguf",
     fileSizeInMegabytes: 3543,
-    chatTemplateKwargs: { enable_thinking: false },
+    reasoningBudgetTokens: 256,
   },
 };

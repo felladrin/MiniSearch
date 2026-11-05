@@ -38,7 +38,7 @@ Two constraints decide what can join that list, both measured against the shippe
 - **Every model file must be a shard.** Chromium's OPFS storage silently truncates files past 2000 MiB, so a monolithic GGUF above that size arrives corrupted in the browser. Shards also keep progressive download working.
 - **The wasm linear memory ceiling is 4 GiB.** Models at ~3.5 GB and above OOM during buffer reserve, so the practical catalog ceiling is around 3.7 GB of weights.
 
-Models whose chat template thinks by default (Granite 4.2, Gemma 4, Spark X2.6, Qwen 3.5) would spend the whole token budget on the reasoning channel, which MiniSearch does not render. They are configured with `chatTemplateKwargs: { enable_thinking: false }`, passed to wllama as `chat_template_kwargs`.
+Models whose chat template thinks by default (Granite 4.2, Gemma 4, Spark X2.6, Qwen 3.5) keep thinking: wllama splits their chain of thought into a `reasoning_content` channel, and MiniSearch wraps it in the configured reasoning markers so the thinking UI shows it while the answer follows. Thinking spends the same token budget as the answer, so these models are slower. To keep a long-winded model from thinking its way out of the context window without ever answering, thinking models ship with `reasoningBudgetTokens` (wllama's `reasoning_budget_tokens`, currently 256): once the chain of thought runs that long, the engine closes the reasoning channel and forces the final answer.
 
 `node scripts/wllama-catalog-check.cjs` HEADs every shard of every catalog model on HuggingFace and verifies the claimed sizes; run it after adding or re-sharding a model.
 
