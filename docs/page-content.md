@@ -72,11 +72,24 @@ read degrades one result at a time rather than the whole answer.
 ## Extraction
 
 `server/pageContentService.ts` converts HTML with `html-to-text`, preferring the
-innermost `article` / `main` / `[role="main"]` container and skipping nav,
-header, footer, aside, forms and inline widgets. Readability-style extraction
+innermost `article` / `main` / `[role="main"]` container and skipping inline
+widgets; nav, header, footer, aside and forms are dropped by the scan described
+below. Readability-style extraction
 via `@mozilla/readability` would score better on hostile layouts, but it needs a
 full DOM implementation at runtime; `html-to-text` is already a dependency and
 the passage ranking absorbs most of what boilerplate removal would have.
+
+Sites built out of plain `div`s put the same chrome where no selector names it,
+so a single forward scan (`stripLinkHeavyBlocks`) runs before the conversion. It
+drops `nav`, `aside`, `header`, `footer` and `form` blocks, and any block of 120
+characters or more whose text is 60% or more link text, judged innermost-first
+so that a wrapper which also holds the article survives. Inside `article`,
+`main` or `role="main"`, link density drops nothing: a list of linked titles
+there is usually the answer. The scan stays linear in the page size, which
+matters because it runs on the main thread for any public URL: an unclosed
+`<script>` runs to the end of the page, as a parser reads it, and a closing tag
+with no open block to match skips the walk down the stack. A page that reads as
+empty after the scan falls back to its unstripped text.
 
 Encoding comes from the `Content-Type` header, falling back to the `<meta
 charset>` the document declares, so a page that is not UTF-8 does not reach the
@@ -84,7 +97,9 @@ model as mojibake.
 
 Passages are ranked by how much of the query they cover, with a prior for lead
 passages (the definition or summary usually opens a page). The prior is worth at
-most half a matched term, so it settles ties without outweighing coverage.
+most half a matched term, so it settles ties without outweighing coverage. A
+second prior, worth 0.15, rewards a passage for repeating the page's own
+`<title>` and `h1`/`h2` words, which a rail of unrelated teasers does not do.
 
 For pools of at most 256 passages, the server also scores every passage with
 its local multilingual bi-encoder. Lexical and dense ranks are combined with

@@ -11,6 +11,7 @@ import { getRerankingStats } from "./rerankingSinceLastRestart.ts";
 import {
   getDegradedSearchTypes,
   getGraphicalSearchesSinceLastRestart,
+  getOfficialLaneStats,
   getSearchesFailedOnFallback,
   getSearchesServedByFallback,
   getSearchesWithAllResultsDiscardedSinceLastRestart,
@@ -104,6 +105,7 @@ export function statusEndpointServerHook<
         degradedSearchTypes: getDegradedSearchTypes(),
         unresponsiveEngines: getUnresponsiveEngineStats(),
         fallbackProviders: getFallbackProviderStats(),
+        officialLane: getOfficialLaneStats(),
       },
       reranker: getRerankingStats(),
       thumbnails: getThumbnailStats(),

@@ -43,22 +43,325 @@ const READABLE_CONTENT_TYPES =
 /**
  * Elements that survive `baseElements` but still carry no article text:
  * cookie banners, share bars, and inline widgets.
+ *
+ * Site chrome by element name (`nav`, `header`, `footer`, `aside`, `form`) is
+ * not listed here: `stripLinkHeavyBlocks` already drops those blocks, and a
+ * document whose `<nav>` never closes would otherwise have everything after it
+ * skipped by the converter, article included.
  */
 const SKIPPED_SELECTORS = [
-  "aside",
   "button",
-  "footer",
-  "form",
-  "header",
   "iframe",
   "img",
   "input",
-  "nav",
   "noscript",
   "select",
   "svg",
   "textarea",
 ];
+
+/**
+ * A block whose text sits mostly inside links is a navigation list — a menu, a
+ * breadcrumb, a "worth reading too" rail, a tag cloud, a footer map — not
+ * prose. Those blocks name the page's topic more often than the article does,
+ * so under inverse document frequency they outrank the paragraph that answers
+ * the query, and since the client keeps a prefix of the excerpt, what the
+ * navigation covers is what the model ends up reading.
+ *
+ * 60% of a block's text being link text is where the line sits: a prose
+ * paragraph with inline links stays far below it (the guides this was measured
+ * on stayed under 20%), while a list of links runs 90-100%. Measured on the
+ * Sortir à Paris Disney+ guide, this drops 228 link blocks covering 55,238 of
+ * the page's 57,160 characters and leaves 2,262 characters of article text.
+ */
+const LINK_DENSITY_THRESHOLD = 0.6;
+/** Below this, a block is a caption or a label, not a navigation worth a verdict. */
+const NAV_BLOCK_MIN_CHARS = 120;
+/** Site chrome by element name, dropped before any density is measured. */
+const ALWAYS_DROPPED_TAGS = new Set([
+  "aside",
+  "footer",
+  "form",
+  "header",
+  "nav",
+]);
+/** Blocks whose own text can be judged and removed as a whole. */
+const TEXT_BLOCK_TAGS = new Set([
+  "article",
+  "blockquote",
+  "dd",
+  "div",
+  "dl",
+  "dt",
+  "figure",
+  "figcaption",
+  "li",
+  "main",
+  "ol",
+  "p",
+  "pre",
+  "section",
+  "table",
+  "ul",
+]);
+const VOID_TAGS = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
+]);
+
+interface TextBlock {
+  tag: string;
+  start: number;
+  /** Collapsed text length the block holds, after its own dropped children. */
+  textChars: number;
+  linkChars: number;
+  /** Link depth on entry, restored when the block closes over an unclosed `<a>`. */
+  linkDepthAtStart: number;
+  /** A descendant block holds prose, so this container is not a navigation. */
+  proseChild: boolean;
+  /** Site chrome is removed on its closing tag, whatever its density. */
+  alwaysDrop: boolean;
+  /**
+   * Inside `<article>`, `<main>` or `role="main"`, where a list of links is
+   * usually the answer itself (the titles a "new next month" page lists), so
+   * link density drops nothing there, nor any container around it.
+   */
+  content: boolean;
+}
+
+/**
+ * Elements whose contents are not markup to count: a script is not prose, and
+ * `<title>The <a> tag</title>` would otherwise open a link that never closes.
+ */
+const RAW_TEXT_TAGS = new Set([
+  "noscript",
+  "script",
+  "style",
+  "textarea",
+  "title",
+]);
+
+/** `>` inside a quoted attribute value does not end the tag. */
+function findTagEnd(html: string, start: number): number {
+  let quote = "";
+  for (let index = start + 1; index < html.length; index++) {
+    const character = html[index];
+    if (quote !== "") {
+      if (character === quote) quote = "";
+    } else if (character === '"' || character === "'") {
+      quote = character;
+    } else if (character === ">") {
+      return index;
+    }
+  }
+  return -1;
+}
+
+/** Finds `</tag` without copying or lowercasing the document per script tag. */
+function indexOfClosingTag(html: string, from: number, tag: string): number {
+  const needle = `</${tag}`;
+  for (
+    let at = html.indexOf("<", from);
+    at !== -1;
+    at = html.indexOf("<", at + 1)
+  ) {
+    if (html.slice(at, at + needle.length).toLowerCase() === needle) return at;
+  }
+  return -1;
+}
+
+/**
+ * Removes blocks that are navigation rather than content, before conversion.
+ *
+ * This pass drops `<nav>`, `<header>`, `<footer>`, `<aside>` and `<form>` by
+ * name (html-to-text skips them itself only on the unstripped fallback), but
+ * sites built out of `<div>`s — the one this was measured on has no `<article>`
+ * or `<main>` at all — put the same chrome in plain divs, where only the text
+ * itself can tell it apart from an article. This pass walks the document once,
+ * keeping a stack of the blocks it is inside, and measures each block as it
+ * closes: how much of its text is link text, and how much is left once the
+ * blocks it already dropped are gone. That inner-first order is what keeps a
+ * page wrapper alive — it still holds the article's prose — while the rails
+ * inside it go.
+ *
+ * The scan is deliberately forgiving rather than a parser: an unclosed block
+ * is simply not dropped, because dropping on a guess would delete article text,
+ * and that costs more here than leaving a rail in place.
+ */
+function stripLinkHeavyBlocks(html: string): string {
+  const blocks: TextBlock[] = [];
+  // Open blocks per tag, so a closing tag that matches none (`</span>`, or
+  // `</b>` under thousands of unclosed `<p>`) skips the walk down the stack.
+  const openCounts = new Map<string, number>();
+  const removals: [start: number, end: number][] = [];
+  let linkDepth = 0;
+  let index = 0;
+
+  const popBlock = () => {
+    const block = blocks.pop();
+    if (block) openCounts.set(block.tag, (openCounts.get(block.tag) ?? 1) - 1);
+    return block;
+  };
+
+  const addText = (raw: string) => {
+    const chars = raw.replace(/\s+/g, " ").trim().length;
+    if (chars === 0) return;
+    const block = blocks[blocks.length - 1];
+    if (block === undefined) return;
+    block.textChars += chars;
+    if (linkDepth > 0) block.linkChars += chars;
+  };
+
+  while (index < html.length) {
+    const tagStart = html.indexOf("<", index);
+    if (tagStart === -1) {
+      addText(html.slice(index));
+      break;
+    }
+    if (tagStart > index) addText(html.slice(index, tagStart));
+
+    // A `<` opens a tag only before a letter, `/`, `!` or `?`. Any other is
+    // text ("x < 3"), and reading it as a tag would scan on to the next `>`.
+    if (!/[A-Za-z/!?]/.test(html.charAt(tagStart + 1))) {
+      addText("<");
+      index = tagStart + 1;
+      continue;
+    }
+
+    if (html.startsWith("<!--", tagStart)) {
+      const commentEnd = html.indexOf("-->", tagStart + 4);
+      index = commentEnd === -1 ? html.length : commentEnd + 3;
+      continue;
+    }
+
+    const tagEnd = findTagEnd(html, tagStart);
+    if (tagEnd === -1) {
+      addText(html.slice(tagStart));
+      break;
+    }
+    const raw = html.slice(tagStart + 1, tagEnd);
+    index = tagEnd + 1;
+
+    if (raw.startsWith("!") || raw.startsWith("?")) continue;
+
+    const nameMatch = /^\/?\s*([a-zA-Z][a-zA-Z0-9:-]*)/.exec(raw);
+    if (nameMatch === null) continue;
+    const tag = nameMatch[1].toLowerCase();
+    const closing = raw.startsWith("/");
+    const selfClosing = !closing && raw.trimEnd().endsWith("/");
+
+    if (RAW_TEXT_TAGS.has(tag)) {
+      if (!closing) {
+        // An unclosed one runs to the end of the document, as a parser reads
+        // it. Resuming after its opening tag instead would rescan the rest of
+        // the page once for every such tag.
+        const close = indexOfClosingTag(html, index, tag);
+        const closeEnd = close === -1 ? -1 : findTagEnd(html, close);
+        index = closeEnd === -1 ? html.length : closeEnd + 1;
+      }
+      continue;
+    }
+
+    if (closing) {
+      if (tag === "a") linkDepth = Math.max(0, linkDepth - 1);
+      if (!openCounts.get(tag)) continue;
+      let at = blocks.length - 1;
+      while (blocks[at].tag !== tag) at--;
+
+      // Empty elements such as `<p>` and `<li>` may omit their closing tag. The
+      // only end marker this scan has belongs to the ancestor that is closing
+      // now, so a removal taken from it would delete the ancestor's remaining
+      // text. Fold such a block into the block that closed instead: its text is
+      // still counted, and nothing is dropped on a guess.
+      while (blocks.length - 1 > at) {
+        const unclosed = popBlock();
+        if (unclosed === undefined) break;
+        const matched = blocks[at];
+        matched.textChars += unclosed.textChars;
+        matched.linkChars += unclosed.linkChars;
+        matched.proseChild ||= unclosed.proseChild || unclosed.content;
+      }
+
+      const block = popBlock();
+      if (block === undefined) {
+        linkDepth = 0;
+        continue;
+      }
+      linkDepth = block.linkDepthAtStart;
+
+      // A container is removed only when the whole subtree reads as links: a
+      // page-wide wrapper that also holds the article must not take it down.
+      const drop =
+        block.alwaysDrop ||
+        (!block.content &&
+          !block.proseChild &&
+          block.textChars >= NAV_BLOCK_MIN_CHARS &&
+          block.linkChars / block.textChars >= LINK_DENSITY_THRESHOLD);
+      if (drop) {
+        removals.push([block.start, tagEnd + 1]);
+      } else if (blocks.length > 0) {
+        const parent = blocks[blocks.length - 1];
+        parent.textChars += block.textChars;
+        parent.linkChars += block.linkChars;
+        // A container that holds the content container is not navigation
+        // either, or a plain wrapper around an article of links would take the
+        // article down with it.
+        const prose =
+          block.proseChild ||
+          block.content ||
+          (block.textChars > 0 &&
+            block.linkChars / block.textChars < LINK_DENSITY_THRESHOLD);
+        parent.proseChild ||= prose;
+      }
+      continue;
+    }
+
+    if (selfClosing || VOID_TAGS.has(tag)) continue;
+    if (tag === "a") linkDepth++;
+    if (TEXT_BLOCK_TAGS.has(tag) || ALWAYS_DROPPED_TAGS.has(tag)) {
+      blocks.push({
+        tag,
+        start: tagStart,
+        textChars: 0,
+        linkChars: 0,
+        linkDepthAtStart: linkDepth,
+        proseChild: false,
+        alwaysDrop: ALWAYS_DROPPED_TAGS.has(tag),
+        content:
+          (blocks.at(-1)?.content ?? false) ||
+          tag === "article" ||
+          tag === "main" ||
+          /(?:^|\s)role\s*=\s*["']?main(?:["'\s/]|$)/i.test(raw),
+      });
+      openCounts.set(tag, (openCounts.get(tag) ?? 0) + 1);
+    }
+  }
+
+  if (removals.length === 0) return html;
+
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const [start, end] of removals.sort((a, b) => a[0] - b[0])) {
+    // A removal nested inside one already taken out is already gone.
+    if (start < cursor) continue;
+    parts.push(html.slice(cursor, start));
+    cursor = end;
+  }
+  parts.push(html.slice(cursor));
+  return parts.join("");
+}
 
 /**
  * Word and sentence boundaries come from ICU rather than from an expression
@@ -116,6 +419,8 @@ interface RankedPassage {
 interface FetchedPage {
   url: string;
   passages: string[];
+  /** Headline words of the page, scored as a prior over its own passages. */
+  contextTerms: string[];
   durationMs: number;
   bodyTruncated: boolean;
 }
@@ -308,23 +613,127 @@ async function extractPdfText(bytes: Uint8Array): Promise<string> {
   }
 }
 
-/**
- * Converts a document to plain text, preferring the innermost article-like
- * container so that sidebars and site chrome never reach the prompt.
- */
-export function extractReadableText(html: string): string {
-  return convertHtmlToPlainText(html, {
-    wordwrap: false,
+/** Site chrome the density pass drops by element name, listed for the fallback. */
+const CHROME_SELECTORS = ["aside", "footer", "form", "header", "nav"];
+
+function conversionOptions(skippedSelectors: string[]) {
+  return {
+    wordwrap: false as const,
     baseElements: { selectors: ["article", "main", '[role="main"]', "body"] },
     limits: { maxBaseElements: 1 },
     selectors: [
       { selector: "a", options: { ignoreHref: true } },
-      ...SKIPPED_SELECTORS.map((selector) => ({
+      ...skippedSelectors.map((selector) => ({
         selector,
         format: "skip" as const,
       })),
     ],
+  };
+}
+
+/**
+ * Converts a document to plain text, preferring the innermost article-like
+ * container so that sidebars and site chrome never reach the prompt.
+ *
+ * Navigation that lives in plain divs is removed first, because the conversion
+ * has no way to tell a rail of links from a paragraph — see
+ * `stripLinkHeavyBlocks`.
+ */
+export function extractReadableText(html: string): string {
+  const stripped = stripLinkHeavyBlocks(html);
+  const text = convertHtmlToPlainText(
+    stripped,
+    conversionOptions(SKIPPED_SELECTORS),
+  );
+
+  // A page that is nothing but a link table loses every block to the density
+  // rule and reads as empty. That page still answers "where is the list", so
+  // fall back to its unstripped text rather than drop the result; chrome is
+  // skipped by element name there, since the density pass did not run.
+  if (stripped === html || text.trim().length >= MIN_USEFUL_CHARS) return text;
+
+  const fallback = convertHtmlToPlainText(
+    html,
+    conversionOptions([...SKIPPED_SELECTORS, ...CHROME_SELECTORS]),
+  );
+  return fallback.trim().length > text.trim().length ? fallback : text;
+}
+
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  lt: "<",
+  nbsp: " ",
+  quot: '"',
+};
+
+function decodeEntities(text: string): string {
+  return text.replace(/&(#\d+|#x[\da-f]+|[a-z]+);/gi, (match, body: string) => {
+    if (!body.startsWith("#")) {
+      return NAMED_ENTITIES[body.toLowerCase()] ?? match;
+    }
+    const code =
+      body[1]?.toLowerCase() === "x"
+        ? Number.parseInt(body.slice(2), 16)
+        : Number.parseInt(body.slice(1), 10);
+    if (!Number.isFinite(code) || code <= 0 || code > 0x10ffff) return match;
+    return String.fromCodePoint(code);
   });
+}
+
+/**
+ * Words that name what the page itself is about: its `<title>` plus the `h1`
+ * and `h2` text around the article.
+ *
+ * The headline is the publisher's own one-line summary of the subject, and it
+ * is usually phrased in the query's vocabulary even when the body paraphrases
+ * it or buries it below a promotional rail. Scoring these words as *context*
+ * rather than as extra query terms keeps them from inventing evidence: a
+ * passage gains only by repeating the page's own headline, which a rail of
+ * unrelated teasers does not do.
+ *
+ * Only the top two heading levels are read: `h3`-down is section furniture on
+ * most sites ("Share", "Comments", "More from"), and on the pages this was
+ * measured against it added vocabulary that the body already carried.
+ */
+const CONTEXT_TERM_WEIGHT = 0.15;
+// Bounded, because they run on the raw HTML of any public URL: an unbounded
+// match scans to the end of the page from every `<h1` without a closing tag,
+// which is quadratic and blocks the server for minutes at the response limit.
+const TITLE_PATTERN = /<title\b[^>]{0,500}>([\s\S]{0,500}?)<\/title\s*>/i;
+const HEADING_PATTERN = /<h[12]\b[^>]{0,500}>([\s\S]{0,500}?)<\/h[12]\s*>/gi;
+
+function extractPageContext(html: string): string[] {
+  const parts: string[] = [];
+
+  const title = TITLE_PATTERN.exec(html)?.[1];
+  if (title !== undefined) parts.push(title);
+
+  for (const heading of html.matchAll(HEADING_PATTERN)) {
+    if (heading[1] !== undefined) parts.push(heading[1]);
+  }
+
+  // Tags go before entities are decoded, and a tag ends at the next `<` as
+  // well as at `>`, so text holding thousands of `<` is still read once.
+  const text = decodeEntities(parts.join(" ").replace(/<[^<>]*>/g, " "));
+  return [...new Set(tokenize(text))];
+}
+
+/**
+ * How much of the page's own headline vocabulary a passage carries, as a
+ * fraction of the distinct context words. Exact tokens only: the context is
+ * small, and the prefix rule the query uses would let a generic heading word
+ * ("Disney") reach a passage about Disneyland.
+ */
+function contextCoverage(words: Set<string>, contextTerms: string[]): number {
+  if (contextTerms.length === 0) return 0;
+
+  let matched = 0;
+  for (const term of contextTerms) {
+    if (words.has(term)) matched++;
+  }
+  return matched / contextTerms.length;
 }
 
 function sliceEvery(text: string, size: number): string[] {
@@ -525,6 +934,7 @@ function scorePassage(
   totalWeight: number,
   termCount: number,
   positionInPage: number,
+  contextCoverage: number,
 ): number {
   const position = 1 / (1 + positionInPage);
   if (termCount === 0) return position;
@@ -533,7 +943,16 @@ function scorePassage(
   // prior worth half a matched term: enough to break ties and to float the
   // intro of a page whose body never repeats the query, never enough to
   // outrank a passage that covers more of it.
-  return matchedWeight / totalWeight + (0.5 * position) / termCount;
+  //
+  // The page's own headline is worth a fraction of a matched term on top: it
+  // says the page is about the query even where the body says it in other
+  // words, and it costs a passage nothing to ignore, since only a passage that
+  // repeats the headline collects it.
+  return (
+    matchedWeight / totalWeight +
+    (0.5 * position) / termCount +
+    CONTEXT_TERM_WEIGHT * contextCoverage
+  );
 }
 
 /**
@@ -542,11 +961,17 @@ function scorePassage(
  *
  * @param passages - Candidate passages with their source URLs. The ranking is
  * relative to this global pool, so term statistics are computed across all
- * pages, not per page.
+ * pages, not per page. `contextTerms` are the headline words of the page the
+ * passage came from, if any.
  */
 function rankPassages(
   query: string,
-  passages: { url: string; text: string; positionInPage: number }[],
+  passages: {
+    url: string;
+    text: string;
+    positionInPage: number;
+    contextTerms?: string[];
+  }[],
 ): RankedPassage[] {
   const passageWords = passages.map((p) => new Set(tokenize(p.text)));
   const queryTerms = [...new Set(tokenize(query))];
@@ -561,6 +986,7 @@ function rankPassages(
         totalWeight,
         queryTerms.length,
         p.positionInPage,
+        contextCoverage(passageWords[index], p.contextTerms ?? []),
       ),
       index,
       tokens: passageWords[index],
@@ -570,7 +996,12 @@ function rankPassages(
 
 async function rankPassagesWithDenseScores(
   query: string,
-  passages: { url: string; text: string; positionInPage: number }[],
+  passages: {
+    url: string;
+    text: string;
+    positionInPage: number;
+    contextTerms?: string[];
+  }[],
 ): Promise<RankedPassage[]> {
   const lexicalRanked = rankPassages(query, passages);
   if (passages.length === 0 || passages.length > MAX_DENSE_PASSAGES) {
@@ -717,6 +1148,7 @@ async function fetchPageContent(
   passages: string[];
   durationMs: number;
   bodyTruncated: boolean;
+  contextTerms: string[];
 } | null> {
   const startedAt = performance.now();
   const since = () => performance.now() - startedAt;
@@ -734,6 +1166,10 @@ async function fetchPageContent(
     const html = download.text ?? extractReadableText(download.html ?? "");
     const passages = splitIntoPassages(html);
     const content = passages.join("\n");
+    // A PDF has no markup to read a headline out of, so it ranks on the query
+    // alone.
+    const contextTerms =
+      download.html === undefined ? [] : extractPageContext(download.html);
 
     if (content.length < MIN_USEFUL_CHARS) {
       recordPageRead({
@@ -747,7 +1183,13 @@ async function fetchPageContent(
     // Don't record passage stats here — selection happens globally in
     // fetchPageContents, and we need to report how many passages actually
     // survived the global budget, not how many the page yielded.
-    return { url, passages, durationMs: since(), bodyTruncated };
+    return {
+      url,
+      passages,
+      durationMs: since(),
+      bodyTruncated,
+      contextTerms,
+    };
   } catch {
     recordPageRead({
       outcome: "failed",
@@ -796,6 +1238,7 @@ export async function fetchPageContents(
       url: p.url,
       text,
       positionInPage: passageIndex,
+      contextTerms: p.contextTerms,
     })),
   );
 

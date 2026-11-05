@@ -365,6 +365,35 @@ export async function fetchSearXNG(
   }
 }
 
+/**
+ * One text search that adds to a search SearXNG has already answered (the
+ * official lane). It is allowed to fail, so it skips what `fetchSearXNG` does to
+ * protect the user's own search: no retry, no circuit breaker, and no
+ * engine-health counters. Otherwise an empty `site:` answer could slow down,
+ * open the circuit for, or mark degraded the searches users are waiting on.
+ */
+export async function fetchSupplementarySearXNG(
+  query: string,
+  limit: number,
+  signal?: AbortSignal,
+) {
+  const response = await fetch(buildSearchUrl(query, "text"), {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`SearXNG request failed with status ${response.status}`);
+  }
+
+  const data = (await response.json()) as SearxngSearchResponse;
+  const results = Array.isArray(data.results) ? data.results : [];
+  const textualResults = await Promise.all(
+    deduplicateResults(results).slice(0, limit).map(processTextualResult),
+  );
+  return filterNullResults(textualResults);
+}
+
 async function processGraphicalResult(result: SearxngSearchResult) {
   const thumbnailSource =
     result.category === "videos" ? result.thumbnail : result.thumbnail_src;

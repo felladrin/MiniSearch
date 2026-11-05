@@ -6,6 +6,11 @@ import {
   isSearchFallbackEnabled,
 } from "./fallbackSearchService.ts";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
+import {
+  isOfficialLaneEnabled,
+  mergeOfficialLaneResults,
+  officialLaneRequest,
+} from "./officialLane.ts";
 import { rankSearchResults } from "./rankSearchResults.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
 import {
@@ -13,7 +18,10 @@ import {
   recordRerankSkipped,
 } from "./rerankingSinceLastRestart.ts";
 import {
+  addOfficialLaneResults,
   incrementGraphicalSearchesSinceLastRestart,
+  incrementOfficialLaneFailures,
+  incrementOfficialLaneSearches,
   incrementSearchesFailedOnFallback,
   incrementSearchesServedByFallback,
   incrementTextualSearchesSinceLastRestart,
@@ -21,7 +29,7 @@ import {
   type SearchType,
 } from "./searchesSinceLastRestart.ts";
 import { sendValidationError } from "./utils/httpResponse.ts";
-import { fetchSearXNG } from "./webSearchService.ts";
+import { fetchSearXNG, fetchSupplementarySearXNG } from "./webSearchService.ts";
 
 const DEFAULT_SEARCH_LIMIT = 30;
 const MAX_SEARCH_LIMIT = 30;
@@ -34,6 +42,17 @@ const SEARCH_DEADLINE_MS = 25_000;
 // A fallback cannot finish in this window, so starting one would only move the
 // same 502 further out.
 const MIN_FALLBACK_BUDGET_MS = 2_000;
+
+// The official lane is a supplement for a search that already succeeded, so it
+// never gets the last seconds of the deadline: what it would add is not worth
+// risking a response the client is still waiting for.
+const OFFICIAL_LANE_RESERVED_MS = 5_000;
+
+// The lane is a supplement to a search that already has results, so it gets a
+// slice of the deadline rather than the rest of it: the ranking still has to
+// run, and a search that waits on a second upstream for the full 25 seconds is
+// slower than the page it was meant to improve.
+const MAX_OFFICIAL_LANE_TIMEOUT_MS = 8_000;
 
 const searchParamsSchema = z.object({
   query: z
@@ -93,6 +112,57 @@ async function handleRanking(
 }
 
 /**
+ * Adds the pages a scoped second query finds, when the request asks for it and
+ * the deadline still has room. Every failure here is the search it already has:
+ * the lane never turns a served search into a 502, and a domain that cannot be
+ * scoped confidently leaves the results untouched.
+ */
+async function officialLaneResults(
+  query: string,
+  results: TextResult[],
+  limit: number,
+  remainingMs: number,
+): Promise<TextResult[]> {
+  const budgetMs = Math.min(
+    MAX_OFFICIAL_LANE_TIMEOUT_MS,
+    remainingMs - OFFICIAL_LANE_RESERVED_MS,
+  );
+  if (budgetMs <= 0) return results;
+
+  const lane = officialLaneRequest(query, results);
+  if (!lane) return results;
+
+  incrementOfficialLaneSearches();
+
+  try {
+    // The signal cancels the request itself, so a lane that runs out of time
+    // stops using the engines instead of finishing for nobody.
+    const laneResults = await fetchSupplementarySearXNG(
+      lane.query,
+      limit,
+      AbortSignal.timeout(budgetMs),
+    );
+
+    const merged = mergeOfficialLaneResults(results, laneResults, lane.domain);
+
+    const added = merged.length - results.length;
+    if (added > 0) addOfficialLaneResults(added);
+
+    return merged;
+  } catch (error) {
+    incrementOfficialLaneFailures();
+    // The domain is left out: it is derived from the query, and the failure
+    // count is the fact anyone acts on.
+    console.error(
+      `Official lane search failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return results;
+  }
+}
+
+/**
  * Serves `/search/text` and `/search/images`: verified requests go through
  * SearXNG, with reranking and score filtering. Image results carry the
  * thumbnail URL as SearXNG returned it; the client loads each one from
@@ -139,9 +209,11 @@ export function searchEndpointServerHook<
       const searchType = isTextSearch ? "text" : "images";
 
       let searchResults: TextResult[] | ImageResult[] | null;
+      let servedBySearXNG = false;
       const searchStartedAt = performance.now();
       try {
         searchResults = await fetchSearXNG(query, searchType, limit);
+        servedBySearXNG = true;
         recordSearchDuration(searchType, performance.now() - searchStartedAt);
       } catch {
         // SearXNG is unreachable. The operator may have switched on a second
@@ -200,7 +272,22 @@ export function searchEndpointServerHook<
       }
 
       if (isTextSearch) {
-        const results = searchResults as TextResult[];
+        let results = searchResults as TextResult[];
+
+        // Results from the fallback mean SearXNG has just failed, so a second
+        // request to it would only add latency to a search that is already slow.
+        if (servedBySearXNG && isOfficialLaneEnabled()) {
+          const remainingMs =
+            SEARCH_DEADLINE_MS - (performance.now() - searchStartedAt);
+
+          results = await officialLaneResults(
+            query,
+            results,
+            limit,
+            remainingMs,
+          );
+        }
+
         const rankedResults = await handleRanking(
           query,
           searchType,

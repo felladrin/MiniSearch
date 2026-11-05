@@ -115,6 +115,273 @@ describe("extractReadableText", () => {
   });
 });
 
+describe("noise suppression before extraction", () => {
+  const filler =
+    "Subscribers in several regions reported no change to their plan. ";
+
+  it("drops a plain-div rail of links that no selector names", () => {
+    const rail = Array.from(
+      { length: 12 },
+      (_, index) =>
+        `<a href="/story-${index}">Disney Plus December 2026 story ${index}</a>`,
+    ).join(" ");
+
+    const text = extractReadableText(
+      `<html><body><div class="rail">${rail}</div>` +
+        `<div><p>${filler.repeat(6)}</p></div></body></html>`,
+    );
+
+    expect(text).not.toContain("story 11");
+    expect(text).toContain("Subscribers in several regions");
+  });
+
+  it("keeps a paragraph whose links are only part of its text", () => {
+    const paragraphText =
+      'The schedule was published in a <a href="/guide">guide to the month</a> and covers each release with a short note. ';
+
+    const text = extractReadableText(
+      `<html><body><article><p>${paragraphText.repeat(4)}</p></article></body></html>`,
+    );
+
+    expect(text).toContain("covers each release with a short note");
+    expect(text).toContain("guide to the month");
+  });
+
+  it("keeps the body when header and footer share its wrapper", () => {
+    const links = Array.from(
+      { length: 20 },
+      (_, index) => `<a href="/section-${index}">Section link</a>`,
+    ).join(" ");
+
+    const text = extractReadableText(
+      `<html><body><div id="app">` +
+        `<header><a href="/">Brand</a>${links}</header>` +
+        `<main><p>${filler.repeat(2)}</p></main>` +
+        `<footer>${links}</footer></div></body></html>`,
+    );
+
+    expect(text).toContain("Subscribers in several regions");
+    expect(text).not.toContain("Section link");
+  });
+
+  it("does not drop the rest of a container when a rail omits its close tag", () => {
+    const rail = Array.from(
+      { length: 8 },
+      (_, index) => `<p><a href="/teaser-${index}">Teaser link text</a>`,
+    ).join("");
+
+    const text = extractReadableText(
+      `<html><body><div class="layout">${rail}` +
+        `<div><p>${filler.repeat(3)}</p></div></div></body></html>`,
+    );
+
+    expect(text).toContain("Subscribers in several regions");
+  });
+
+  it("keeps the body when a link-heavy rail wraps it in the same container", () => {
+    const rail = Array.from(
+      { length: 12 },
+      (_, index) => `<a href="/story-${index}">Related story ${index}</a>`,
+    ).join(" ");
+
+    const text = extractReadableText(
+      `<html><body><div class="layout"><div>${rail}</div>` +
+        `<div><p>${filler.repeat(8)}</p></div></div></body></html>`,
+    );
+
+    expect(text).toContain("Subscribers in several regions");
+    expect(text).not.toContain("Related story 3");
+  });
+
+  describe("inside the page's content container", () => {
+    const releases = Array.from(
+      { length: 6 },
+      (_, index) =>
+        `<li><a href="/title-${index}">Only Murders in the Building Season ${index}</a> (Dec. ${index + 1})</li>`,
+    ).join("");
+
+    // A list of links there is usually the answer itself: the titles a
+    // "coming next month" page exists to list.
+    it.each([
+      ["an article", `<article><ul>${releases}</ul></article>`],
+      ["a main", `<main><ul>${releases}</ul></main>`],
+      ["a role=main div", `<div role="main"><ul>${releases}</ul></div>`],
+      [
+        "an article in a plain wrapper",
+        `<div class="wrap"><article><ul>${releases}</ul></article></div>`,
+      ],
+    ])("keeps a list of linked titles inside %s", (_name, container) => {
+      const text = extractReadableText(
+        `<html><body><p>${filler.repeat(4)}</p>${container}</body></html>`,
+      );
+
+      expect(text).toContain("Only Murders in the Building Season 5");
+    });
+
+    it.each([
+      ["data-role", "data-role"],
+      ["a longer role name", "role"],
+    ])("still drops a rail marked with %s", (_name, attribute) => {
+      const value = attribute === "role" ? "main-nav" : "main";
+      const text = extractReadableText(
+        `<html><body><p>${filler.repeat(4)}</p><div ${attribute}="${value}"><ul>${releases}</ul></div></body></html>`,
+      );
+
+      expect(text).not.toContain("Only Murders in the Building Season 5");
+    });
+  });
+
+  it("reads a literal < in prose as text, not as the start of a tag", () => {
+    const rail = Array.from(
+      { length: 12 },
+      (_, index) => `<a href="/story-${index}">Related story ${index}</a>`,
+    ).join(" ");
+
+    // The apostrophe after the `<` must not open a quoted attribute that
+    // swallows the rest of the page, rail included.
+    const text = extractReadableText(
+      `<html><body><div><p>Pick x < 3 if it's cold. ${filler.repeat(6)}</p></div>` +
+        `<div class="rail">${rail}</div></body></html>`,
+    );
+
+    expect(text).toContain("Subscribers in several regions");
+    expect(text).not.toContain("Related story 11");
+  });
+
+  it("does not read a tag written inside the title as a link", () => {
+    const rail = Array.from(
+      { length: 12 },
+      (_, index) => `<a href="/story-${index}">Related story ${index}</a>`,
+    ).join(" ");
+
+    const text = extractReadableText(
+      `<html><head><title>The <a> tag, explained</title></head><body>` +
+        `<div class="rail">${rail}</div><div><p>${filler.repeat(6)}</p></div></body></html>`,
+    );
+
+    expect(text).toContain("Subscribers in several regions");
+    expect(text).not.toContain("Related story 11");
+  });
+
+  // Each page below costs seconds to minutes with a scan that is quadratic in
+  // the page's size; the server reads any public URL, on its main thread.
+  it.each([
+    ["unclosed scripts", "<script>".repeat(25_000)],
+    [
+      "unclosed paragraphs and stray closing tags",
+      `${"<p>x".repeat(30_000)}${"</b>".repeat(30_000)}`,
+    ],
+  ])("strips a page of %s without rescanning it", (_name, body) => {
+    const startedAt = performance.now();
+    extractReadableText(`<html><body>${body}</body></html>`);
+
+    expect(performance.now() - startedAt).toBeLessThan(1000);
+  });
+});
+
+describe("page headline context", () => {
+  const filler =
+    "Subscribers in several regions reported no change to their plan. ";
+
+  // Neither paragraph carries the query as a whole: the first matches "disney"
+  // and the second "season", so the lexical score is a tie and the headline is
+  // what has to break it.
+  const firstParagraph =
+    "<p>Disney published its release plan for the month, listing every title " +
+    "with a short note about where it can be watched. " +
+    `${filler.repeat(2)}</p>`;
+  const secondParagraph =
+    "<p>Only Murders in the Building Season 6 arrives, with the same cast " +
+    "returning to a new city for eight episodes. " +
+    `${filler.repeat(2)}</p>`;
+
+  const query = "disney plus december 2026 lineup season";
+
+  function pageWith(head: string) {
+    return `<html><head>${head}</head><body><article>${firstParagraph}${secondParagraph}</article></body></html>`;
+  }
+
+  it("ranks a passage that repeats the page's headline above an earlier one", async () => {
+    respondWithHtml(
+      pageWith(
+        "<title>Only Murders in the Building Season 6 | Streaming guide</title>",
+      ),
+    );
+
+    const [content] = await fetchPageContents(query, [
+      "https://example.com/lineup",
+    ]);
+
+    expect(content.content.startsWith("Only Murders in the Building")).toBe(
+      true,
+    );
+  });
+
+  it("leaves the order alone when the page has no headline", async () => {
+    respondWithHtml(pageWith(""));
+
+    const [content] = await fetchPageContents(query, [
+      "https://example.com/lineup",
+    ]);
+
+    expect(content.content.startsWith("Disney published")).toBe(true);
+  });
+
+  it("puts the answer above a plain-div rail that repeats the query", async () => {
+    const rail = Array.from(
+      { length: 12 },
+      (_, index) =>
+        `<a href="/story-${index}">Disney Plus December 2026 release story ${index}</a>`,
+    ).join(" ");
+    const answer =
+      "<p>WHAT'S NEW ON DISNEY+ IN DECEMBER 2026: Only Murders in the " +
+      "Building Season 6 returns on December 8, 2026. " +
+      `${filler.repeat(3)}</p>`;
+
+    respondWithHtml(
+      `<html><body><div class="rail">${rail}</div><article>${answer}</article></body></html>`,
+    );
+
+    const [content] = await fetchPageContents(query, [
+      "https://example.com/lineup",
+    ]);
+
+    expect(
+      content.content.indexOf("Only Murders in the Building Season 6"),
+    ).toBeLessThan(100);
+    expect(content.content).not.toContain("release story 11");
+  });
+
+  it("reads the headline without rescanning a page full of unclosed headings", async () => {
+    // The headline is read from the raw HTML of any public URL, where a
+    // comment can hold `<h1` 25,000 times without a single `>`. A pattern that
+    // scans to the end of the page from each of them takes seconds on this
+    // page and minutes at the 1.5 MB response limit, blocking every request.
+    respondWithHtml(
+      `<html><body><article>${firstParagraph}</article><!--${"<h1 ".repeat(25_000)}--></body></html>`,
+    );
+
+    const startedAt = performance.now();
+    await fetchPageContents(query, ["https://example.com/headings"]);
+
+    expect(performance.now() - startedAt).toBeLessThan(1000);
+  });
+
+  it("reads the headline without rescanning headings full of angle brackets", async () => {
+    // Each heading is short enough to match, and the text they capture holds
+    // 49,000 `<` and no `>`: a tag strip that scans to the next `>` from
+    // every one of them takes seconds on this 50 KB page.
+    respondWithHtml(
+      `<html><body><article>${firstParagraph}</article>${`<h1>${"<".repeat(490)}</h1>`.repeat(100)}</body></html>`,
+    );
+
+    const startedAt = performance.now();
+    await fetchPageContents(query, ["https://example.com/brackets"]);
+
+    expect(performance.now() - startedAt).toBeLessThan(1000);
+  });
+});
+
 describe("splitIntoPassages", () => {
   it("glues a heading onto the block that follows it", () => {
     const passages = splitIntoPassages(

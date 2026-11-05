@@ -18,7 +18,9 @@ import {
 import { CircuitBreaker } from "./utils/circuitBreaker";
 import {
   fetchSearXNG,
+  fetchSupplementarySearXNG,
   formatUnresponsiveEngines,
+  getSearchCircuitStats,
   getWebSearchServiceStatus,
   getWebSearchStatus,
   parseUnresponsiveEngines,
@@ -1038,5 +1040,61 @@ describe("getWebSearchServiceStatus", () => {
       searchesWithoutResults + 1,
     );
     expect(getUnresponsiveEngineStats()[""]).toBeUndefined();
+  });
+});
+
+describe("fetchSupplementarySearXNG", () => {
+  const healthBookkeeping = () => ({
+    degradedSearchTypes: getDegradedSearchTypes(),
+    searchesWithUnresponsiveEngines:
+      getSearchesWithUnresponsiveEnginesSinceLastRestart(),
+    searchesWithoutResults: getSearchesWithoutResultsSinceLastRestart(),
+    circuit: getSearchCircuitStats(),
+  });
+
+  it("makes one request and records nothing when the engines come back empty", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [],
+          unresponsive_engines: [["google", "Timeout"]],
+        }),
+      ),
+    );
+    const before = healthBookkeeping();
+
+    await expect(
+      fetchSupplementarySearXNG("site:example.com test", 30),
+    ).resolves.toEqual([]);
+
+    // The search it supplements already succeeded, so this request may not
+    // retry, mark the engines degraded, or count toward opening the circuit.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(healthBookkeeping()).toEqual(before);
+  });
+
+  it("fails on the first error status, without retrying", async () => {
+    fetchMock.mockResolvedValue(createMockResponse("", false, 500));
+    const before = healthBookkeeping();
+
+    await expect(
+      fetchSupplementarySearXNG("site:example.com test", 30),
+    ).rejects.toThrow("SearXNG request failed with status 500");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(healthBookkeeping()).toEqual(before);
+  });
+
+  it("returns processed text results and passes its signal to the request", async () => {
+    fetchMock.mockResolvedValue(successResponse());
+    const controller = new AbortController();
+
+    await expect(
+      fetchSupplementarySearXNG("site:example.com test", 30, controller.signal),
+    ).resolves.toEqual([["example", "example content", "https://example.com"]]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: controller.signal }),
+    );
   });
 });

@@ -89,13 +89,14 @@ The system executes two parallel flows when a user submits a query:
 ### Search Flow
 
 1. User submits a query via SearchForm
-2. Client checks IndexedDB cache for matching query hash
-3. On cache miss: authenticated HTTP request to `/search/text` or `/search/images`
-4. Server verifies request token via `searchToken.ts` (CSRF protection)
-5. `webSearchService.ts` forwards query to SearXNG at `http://127.0.0.1:8888`
-6. Raw results are deduplicated, cleaned, and optionally reranked
-7. Image results keep the thumbnail URLs SearXNG returned, and results that came back without one are dropped; the client loads each tile on its own from `/thumbnail`, so the response does not wait on any thumbnail host
-8. Results returned as structured JSON and cached in IndexedDB (15-minute freshness TTL)
+2. Relative month and year words (English and Chinese for now) are anchored to absolute ones before the request (`shared/relativeDates.ts`), so "next month" reaches the engines as "December 2026" and a relative phrase cannot leave the index without a year to match; the query as typed still drives the prompt, the history entry, and the UI
+3. Client checks IndexedDB cache for matching query hash
+4. On cache miss: authenticated HTTP request to `/search/text` or `/search/images`
+5. Server verifies request token via `searchToken.ts` (CSRF protection)
+6. `webSearchService.ts` forwards query to SearXNG at `http://127.0.0.1:8888`
+7. Raw results are deduplicated, cleaned, and optionally reranked; a result from the site the query names gets a small score boost (`server/authorityRanking.ts`, see `docs/reranking.md`)
+8. Image results keep the thumbnail URLs SearXNG returned, and results that came back without one are dropped; the client loads each tile on its own from `/thumbnail`, so the response does not wait on any thumbnail host
+9. Results returned as structured JSON and cached in IndexedDB (15-minute freshness TTL)
 
 ### AI Generation Flow
 
