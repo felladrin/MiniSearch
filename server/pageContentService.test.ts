@@ -193,20 +193,42 @@ describe("noise suppression before extraction", () => {
     expect(text).not.toContain("Related story 3");
   });
 
-  it("keeps a list of linked titles inside an article", () => {
+  describe("inside the page's content container", () => {
     const releases = Array.from(
       { length: 6 },
       (_, index) =>
         `<li><a href="/title-${index}">Only Murders in the Building Season ${index}</a> (Dec. ${index + 1})</li>`,
     ).join("");
 
-    const text = extractReadableText(
-      `<html><body><article><p>${filler.repeat(4)}</p><ul>${releases}</ul></article></body></html>`,
-    );
+    // A list of links there is usually the answer itself: the titles a
+    // "coming next month" page exists to list.
+    it.each([
+      ["an article", `<article><ul>${releases}</ul></article>`],
+      ["a main", `<main><ul>${releases}</ul></main>`],
+      ["a role=main div", `<div role="main"><ul>${releases}</ul></div>`],
+      [
+        "an article in a plain wrapper",
+        `<div class="wrap"><article><ul>${releases}</ul></article></div>`,
+      ],
+    ])("keeps a list of linked titles inside %s", (_name, container) => {
+      const text = extractReadableText(
+        `<html><body><p>${filler.repeat(4)}</p>${container}</body></html>`,
+      );
 
-    // Inside the article, a list of links is usually the answer itself: the
-    // titles a "coming next month" page exists to list.
-    expect(text).toContain("Only Murders in the Building Season 5");
+      expect(text).toContain("Only Murders in the Building Season 5");
+    });
+
+    it.each([
+      ["data-role", "data-role"],
+      ["a longer role name", "role"],
+    ])("still drops a rail marked with %s", (_name, attribute) => {
+      const value = attribute === "role" ? "main-nav" : "main";
+      const text = extractReadableText(
+        `<html><body><p>${filler.repeat(4)}</p><div ${attribute}="${value}"><ul>${releases}</ul></div></body></html>`,
+      );
+
+      expect(text).not.toContain("Only Murders in the Building Season 5");
+    });
   });
 
   it("reads a literal < in prose as text, not as the start of a tag", () => {
@@ -249,7 +271,7 @@ describe("noise suppression before extraction", () => {
       "unclosed paragraphs and stray closing tags",
       `${"<p>x".repeat(30_000)}${"</b>".repeat(30_000)}`,
     ],
-  ])("strips a page of %s in linear time", (_name, body) => {
+  ])("strips a page of %s without rescanning it", (_name, body) => {
     const startedAt = performance.now();
     extractReadableText(`<html><body>${body}</body></html>`);
 
@@ -330,7 +352,7 @@ describe("page headline context", () => {
     expect(content.content).not.toContain("release story 11");
   });
 
-  it("reads the headline in linear time from a page full of unclosed headings", async () => {
+  it("reads the headline without rescanning a page full of unclosed headings", async () => {
     // The headline is read from the raw HTML of any public URL, where a
     // comment can hold `<h1` 25,000 times without a single `>`. A pattern that
     // scans to the end of the page from each of them takes seconds on this
@@ -345,7 +367,7 @@ describe("page headline context", () => {
     expect(performance.now() - startedAt).toBeLessThan(1000);
   });
 
-  it("reads the headline in linear time from headings full of angle brackets", async () => {
+  it("reads the headline without rescanning headings full of angle brackets", async () => {
     // Each heading is short enough to match, and the text they capture holds
     // 49,000 `<` and no `>`: a tag strip that scans to the next `>` from
     // every one of them takes seconds on this 50 KB page.

@@ -289,7 +289,7 @@ function hostnameOf(url: string): string | null {
 
 /**
  * The label of the registrable domain: disney.com and shop.disney.com both
- * answer "disney". A two-part public suffix (co.uk) keeps its own label.
+ * answer "disney", and the suffix list makes bbc.co.uk answer "bbc".
  */
 function registrableLabel(hostname: string): string | null {
   return getDomainWithoutSuffix(hostname, SUFFIX_LIST_OPTIONS) || null;

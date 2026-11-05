@@ -136,7 +136,7 @@ interface TextBlock {
   /**
    * Inside `<article>`, `<main>` or `role="main"`, where a list of links is
    * usually the answer itself (the titles a "new next month" page lists), so
-   * link density drops nothing there.
+   * link density drops nothing there, nor any container around it.
    */
   content: boolean;
 }
@@ -185,7 +185,8 @@ function indexOfClosingTag(html: string, from: number, tag: string): number {
 /**
  * Removes blocks that are navigation rather than content, before conversion.
  *
- * html-to-text already skips `<nav>`, `<header>`, `<footer>` and `<aside>`, but
+ * This pass drops `<nav>`, `<header>`, `<footer>`, `<aside>` and `<form>` by
+ * name (html-to-text skips them itself only on the unstripped fallback), but
  * sites built out of `<div>`s — the one this was measured on has no `<article>`
  * or `<main>` at all — put the same chrome in plain divs, where only the text
  * itself can tell it apart from an article. This pass walks the document once,
@@ -290,7 +291,7 @@ function stripLinkHeavyBlocks(html: string): string {
         const matched = blocks[at];
         matched.textChars += unclosed.textChars;
         matched.linkChars += unclosed.linkChars;
-        matched.proseChild ||= unclosed.proseChild;
+        matched.proseChild ||= unclosed.proseChild || unclosed.content;
       }
 
       const block = popBlock();
@@ -314,8 +315,12 @@ function stripLinkHeavyBlocks(html: string): string {
         const parent = blocks[blocks.length - 1];
         parent.textChars += block.textChars;
         parent.linkChars += block.linkChars;
+        // A container that holds the content container is not navigation
+        // either, or a plain wrapper around an article of links would take the
+        // article down with it.
         const prose =
           block.proseChild ||
+          block.content ||
           (block.textChars > 0 &&
             block.linkChars / block.textChars < LINK_DENSITY_THRESHOLD);
         parent.proseChild ||= prose;
@@ -338,7 +343,7 @@ function stripLinkHeavyBlocks(html: string): string {
           (blocks.at(-1)?.content ?? false) ||
           tag === "article" ||
           tag === "main" ||
-          /\brole\s*=\s*["']?main\b/i.test(raw),
+          /(?:^|\s)role\s*=\s*["']?main(?:["'\s/]|$)/i.test(raw),
       });
       openCounts.set(tag, (openCounts.get(tag) ?? 0) + 1);
     }

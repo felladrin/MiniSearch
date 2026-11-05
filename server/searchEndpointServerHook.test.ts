@@ -48,6 +48,7 @@ import {
   addOfficialLaneResults,
   incrementGraphicalSearchesSinceLastRestart,
   incrementOfficialLaneFailures,
+  incrementOfficialLaneSearches,
   incrementSearchesFailedOnFallback,
   incrementSearchesServedByFallback,
   incrementTextualSearchesSinceLastRestart,
@@ -860,6 +861,23 @@ describe("searchEndpointServerHook", () => {
       await handler(createRequest(query), createResponse(), vi.fn());
 
       expect(timeout).toHaveBeenCalledWith(1_000);
+    });
+
+    it("skips the lane when no more than five seconds remain", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      // SearXNG answered at 21 s: the 4 s left all belong to the ranking.
+      vi.spyOn(performance, "now")
+        .mockReturnValueOnce(0)
+        .mockReturnValue(21_000);
+      const handler = getRegisteredHandler();
+      const response = createResponse();
+
+      await handler(createRequest(query), response, vi.fn());
+
+      expect(incrementOfficialLaneSearches).not.toHaveBeenCalled();
+      expect(incrementOfficialLaneFailures).not.toHaveBeenCalled();
+      expect(fetchSupplementarySearXNG).not.toHaveBeenCalled();
+      expect(response.end).toHaveBeenCalledWith(JSON.stringify(searxngResults));
     });
 
     it("asks a supplementary search for the named site and merges it behind the first result", async () => {

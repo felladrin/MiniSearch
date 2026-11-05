@@ -72,8 +72,9 @@ read degrades one result at a time rather than the whole answer.
 ## Extraction
 
 `server/pageContentService.ts` converts HTML with `html-to-text`, preferring the
-innermost `article` / `main` / `[role="main"]` container and skipping nav,
-header, footer, aside, forms and inline widgets. Readability-style extraction
+innermost `article` / `main` / `[role="main"]` container and skipping inline
+widgets; nav, header, footer, aside and forms are dropped by the scan described
+below. Readability-style extraction
 via `@mozilla/readability` would score better on hostile layouts, but it needs a
 full DOM implementation at runtime; `html-to-text` is already a dependency and
 the passage ranking absorbs most of what boilerplate removal would have.
