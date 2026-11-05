@@ -75,6 +75,16 @@ describe("authorityBoost", () => {
   it("reads a generic second level before a country code as part of the suffix", () => {
     expect(boosted("lazada tickets", "https://www.lazada.com.my/")).toBe(0.5);
     expect(boosted("amazon.com hours", "https://shop.example.com.hk/")).toBe(0);
+    expect(boosted("ministry tickets", "https://www.ministry.go.jp/")).toBe(
+      0.5,
+    );
+  });
+
+  it("reads the tenant of a shared host as the site, not the host", () => {
+    expect(
+      boosted("github copilot pricing", "https://someone.github.io/post"),
+    ).toBe(0);
+    expect(boosted("mozilla docs", "https://mozilla.github.io/docs")).toBe(0.5);
   });
 
   it("does not boost a page that cannot support the year in the query", () => {

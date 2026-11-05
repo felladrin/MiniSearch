@@ -448,7 +448,7 @@ async function startTextSearch(query: string, invocation: number) {
   let pageContentsRead = Promise.resolve();
   let textSearchFailed = false;
 
-  // "明年" or "yesterday" name no year to the search engine, which then
+  // "明年" or "next month" name no year to the search engine, which then
   // matches undated pages and leaves the answer to guess. Only this machine's
   // clock knows which year the user means, so the query sent to the engine
   // carries the anchor; the question, the history, and the prompt keep the

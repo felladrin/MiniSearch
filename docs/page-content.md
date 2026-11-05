@@ -78,13 +78,27 @@ via `@mozilla/readability` would score better on hostile layouts, but it needs a
 full DOM implementation at runtime; `html-to-text` is already a dependency and
 the passage ranking absorbs most of what boilerplate removal would have.
 
+Sites built out of plain `div`s put the same chrome where no selector names it,
+so a single forward scan (`stripLinkHeavyBlocks`) runs before the conversion. It
+drops `nav`, `aside`, `header`, `footer` and `form` blocks, and any block of 120
+characters or more whose text is 60% or more link text, judged innermost-first
+so that a wrapper which also holds the article survives. Inside `article`,
+`main` or `role="main"`, link density drops nothing: a list of linked titles
+there is usually the answer. The scan stays linear in the page size, which
+matters because it runs on the main thread for any public URL: an unclosed
+`<script>` runs to the end of the page, as a parser reads it, and a closing tag
+with no open block to match skips the walk down the stack. A page that reads as
+empty after the scan falls back to its unstripped text.
+
 Encoding comes from the `Content-Type` header, falling back to the `<meta
 charset>` the document declares, so a page that is not UTF-8 does not reach the
 model as mojibake.
 
 Passages are ranked by how much of the query they cover, with a prior for lead
 passages (the definition or summary usually opens a page). The prior is worth at
-most half a matched term, so it settles ties without outweighing coverage.
+most half a matched term, so it settles ties without outweighing coverage. A
+second prior, worth 0.15, rewards a passage for repeating the page's own
+`<title>` and `h1`/`h2` words, which a rail of unrelated teasers does not do.
 
 For pools of at most 256 passages, the server also scores every passage with
 its local multilingual bi-encoder. Lexical and dense ranks are combined with
@@ -139,27 +153,6 @@ the 904 characters that reached the prompt were the page's "skip to content"
 link, its taxonomy box and its opening definition, while every passage about
 sleep was ranked, selected, and then cut. Best-first, the same budget opens on
 the passage about how long cats sleep.
-
-The client's second trim, in `client/modules/pageExcerptAllocation.ts`, no
-longer keeps a prefix of what it receives. When a page's share is smaller than
-its excerpt, it scores the query's terms against the text and keeps the window
-that holds the most matched weight, then trims that window to the share from
-the left around its best-scoring occurrence, marking each cut with an ellipsis.
-A page that answers in a section halfway down - a list of December releases
-under a month of navigation links - therefore reaches the model with the section
-in it. A page with no query term in it still keeps its opening, as before.
-
-Three details keep the scoring from being fooled by the page itself:
-
-- A Latin term matches on a word boundary and may only continue into a short
-  inflection, so `cat` matches `cat` and `cats` but not `catalogue`, and a query
-  term is not found inside every longer word on the page.
-- Each term's total weight is capped, so a navigation link that repeats one
-  query word a thousand times cannot outvote the term that appears once, next to
-  the answer.
-- A term written without spaces next to another script, such as
-  `迪士尼plus片单`, is split into its Chinese run and its Latin run, and the
-  Chinese run also contributes character bigrams.
 
 ## Ranking Across Languages
 

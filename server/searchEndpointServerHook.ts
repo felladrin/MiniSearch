@@ -46,7 +46,7 @@ const MIN_FALLBACK_BUDGET_MS = 2_000;
 // The official lane is a supplement for a search that already succeeded, so it
 // never gets the last seconds of the deadline: what it would add is not worth
 // risking a response the client is still waiting for.
-const MIN_OFFICIAL_LANE_BUDGET_MS = 5_000;
+const OFFICIAL_LANE_RESERVED_MS = 5_000;
 
 // The lane is a supplement to a search that already has results, so it gets a
 // slice of the deadline rather than the rest of it: the ranking still has to
@@ -123,7 +123,11 @@ async function officialLaneResults(
   limit: number,
   remainingMs: number,
 ): Promise<TextResult[]> {
-  if (remainingMs < MIN_OFFICIAL_LANE_BUDGET_MS) return results;
+  const budgetMs = Math.min(
+    MAX_OFFICIAL_LANE_TIMEOUT_MS,
+    remainingMs - OFFICIAL_LANE_RESERVED_MS,
+  );
+  if (budgetMs <= 0) return results;
 
   const lane = officialLaneRequest(query, results);
   if (!lane) return results;
@@ -136,7 +140,7 @@ async function officialLaneResults(
     const laneResults = await fetchSupplementarySearXNG(
       lane.query,
       limit,
-      AbortSignal.timeout(Math.min(remainingMs, MAX_OFFICIAL_LANE_TIMEOUT_MS)),
+      AbortSignal.timeout(budgetMs),
     );
 
     const merged = mergeOfficialLaneResults(results, laneResults, lane.domain);

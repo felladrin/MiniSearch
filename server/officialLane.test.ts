@@ -103,13 +103,16 @@ describe("officialLaneRequest", () => {
     }
   });
 
-  it("never scopes a whole country suffix", () => {
-    expect(
-      officialLaneRequest(
-        "amazon.com hours",
-        results("https://shop.example.com.hk/x"),
-      ),
-    ).toBeNull();
+  it("never scopes a whole country suffix or a shared host", () => {
+    for (const url of [
+      "https://shop.example.com.hk/x",
+      "https://someone.github.io/x",
+    ]) {
+      expect(
+        officialLaneRequest("amazon.com github hours", results(url)),
+        url,
+      ).toBeNull();
+    }
   });
 
   it("does not scope a query too long to carry the prefix", () => {
@@ -146,16 +149,16 @@ describe("mergeOfficialLaneResults", () => {
     ).toBe(main);
   });
 
-  it("reads the http and https spellings of a page as one page", () => {
+  it("reads the scheme and www spellings of a page as one page", () => {
     const withOfficialPage = results(
-      "https://disney.com/schedule",
+      "https://www.disney.com/schedule",
       "https://news.example.com/disney",
     );
 
     expect(
       mergeOfficialLaneResults(
         withOfficialPage,
-        results("http://disney.com/schedule/"),
+        results("http://disney.com/schedule/", "https://disney.com/schedule"),
         "disney.com",
       ),
     ).toBe(withOfficialPage);

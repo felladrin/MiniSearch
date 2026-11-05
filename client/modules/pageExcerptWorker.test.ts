@@ -24,13 +24,6 @@ const fixtures: WorkerRequest[] = [
     tokenBudget: 120,
   },
   { contents: ["content", "more content"], tokenBudget: 0 },
-  {
-    contents: [
-      `${"nav ".repeat(300)}Only Murders returns ${"body ".repeat(300)}`,
-    ],
-    tokenBudget: 60,
-    query: "only murders",
-  },
 ];
 
 describe("handleExcerptRequest", () => {
@@ -38,9 +31,7 @@ describe("handleExcerptRequest", () => {
     for (const request of fixtures) {
       expect(handleExcerptRequest(request)).toEqual({
         type: "excerpts",
-        excerpts: allocatePageExcerpts(request.contents, request.tokenBudget, {
-          query: request.query,
-        }),
+        excerpts: allocatePageExcerpts(request.contents, request.tokenBudget),
       });
     }
   });

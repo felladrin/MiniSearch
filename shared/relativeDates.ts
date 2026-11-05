@@ -7,6 +7,10 @@
  *
  * The clock is a parameter and never `Date.now()`, so a caller can anchor a
  * whole batch of queries to one instant and the tests stay deterministic.
+ *
+ * Only month and year words get an anchor. A day word would need an ISO date
+ * ("2026-11-04"), which is not how pages write dates, and many queries use
+ * those words as names ("usa today", "the day after tomorrow").
  */
 
 export type RelativeDateReplacement = { phrase: string; anchor: string };
@@ -34,7 +38,7 @@ interface Rule {
   phrase: string;
   /**
    * English triggers only match on word boundaries: "this yearly" and
-   * "todays" are not time references.
+   * "next monthly" are not time references.
    */
   wordBounded: boolean;
   anchor: (asOf: Date) => string;
@@ -49,26 +53,6 @@ interface Hit extends Occurrence {
   /** The matched text spelled as the query spells it, kept for the caller. */
   phrase: string;
   anchor: string;
-}
-
-function pad2(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
-/**
- * Day arithmetic through the Date constructor instead of adding milliseconds,
- * so a query asked across a daylight-saving switch still lands on the intended
- * calendar day.
- */
-function shiftDays(asOf: Date, days: number): string {
-  const date = new Date(
-    asOf.getFullYear(),
-    asOf.getMonth(),
-    asOf.getDate() + days,
-  );
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
-    date.getDate(),
-  )}`;
 }
 
 /**
@@ -143,12 +127,6 @@ const RULES: readonly Rule[] = [
     wordBounded: false,
     anchor: (asOf) => chineseMonthAnchor(asOf, 0),
   },
-  { phrase: "明天", wordBounded: false, anchor: (asOf) => shiftDays(asOf, 1) },
-  { phrase: "后天", wordBounded: false, anchor: (asOf) => shiftDays(asOf, 2) },
-  { phrase: "昨天", wordBounded: false, anchor: (asOf) => shiftDays(asOf, -1) },
-  { phrase: "前天", wordBounded: false, anchor: (asOf) => shiftDays(asOf, -2) },
-  { phrase: "今天", wordBounded: false, anchor: (asOf) => shiftDays(asOf, 0) },
-  { phrase: "今日", wordBounded: false, anchor: (asOf) => shiftDays(asOf, 0) },
   {
     phrase: "next year",
     wordBounded: true,
@@ -179,47 +157,23 @@ const RULES: readonly Rule[] = [
     wordBounded: true,
     anchor: (asOf) => englishMonthAnchor(asOf, 0),
   },
-  {
-    phrase: "tomorrow",
-    wordBounded: true,
-    anchor: (asOf) => shiftDays(asOf, 1),
-  },
-  {
-    phrase: "yesterday",
-    wordBounded: true,
-    anchor: (asOf) => shiftDays(asOf, -1),
-  },
-  {
-    phrase: "today",
-    wordBounded: true,
-    anchor: (asOf) => shiftDays(asOf, 0),
-  },
 ];
 
 /**
  * Titles and longer words that contain a trigger but are not time references.
- * "大后天" is three days out, not two, so anchoring it as 后天 would be wrong.
- * "next year's" is the possessive that shows up in titles and headlines.
+ * "登上月球" (landing on the Moon) holds 上月, "next year's" is the possessive
+ * of titles and headlines, and "the last year of college" is the final year,
+ * not 2025.
  */
 const BLACKLIST_PHRASES: readonly string[] = [
   "明年今日",
-  "明天你是否依然爱我",
-  "明天会更好",
   "去年冬天",
   "去年夏天",
-  "大后天",
-  "大前天",
-  "yesterday once more",
-  "tomorrow never dies",
+  "上月球",
   "next year's",
+  "last month of",
+  "last year of",
 ];
-
-/**
- * A query that is nothing but "yesterday" is a lookup of the song or the film,
- * not of a day; appending a date would only pull the result away from it.
- * "tomorrow" is deliberately absent: on its own it is still a plain day word.
- */
-const BARE_TITLES: ReadonlySet<string> = new Set(["yesterday"]);
 
 function isAsciiLetter(char: string): boolean {
   return (char >= "A" && char <= "Z") || (char >= "a" && char <= "z");
@@ -274,7 +228,6 @@ export function normalizeRelativeDates(
   };
 
   if (query.trim() === "") return unchanged;
-  if (BARE_TITLES.has(query.trim().toLowerCase())) return unchanged;
 
   const blacklistRanges = BLACKLIST_PHRASES.flatMap((phrase) =>
     findOccurrences(query, phrase, false),

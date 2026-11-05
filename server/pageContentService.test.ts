@@ -192,6 +192,69 @@ describe("noise suppression before extraction", () => {
     expect(text).toContain("Subscribers in several regions");
     expect(text).not.toContain("Related story 3");
   });
+
+  it("keeps a list of linked titles inside an article", () => {
+    const releases = Array.from(
+      { length: 6 },
+      (_, index) =>
+        `<li><a href="/title-${index}">Only Murders in the Building Season ${index}</a> (Dec. ${index + 1})</li>`,
+    ).join("");
+
+    const text = extractReadableText(
+      `<html><body><article><p>${filler.repeat(4)}</p><ul>${releases}</ul></article></body></html>`,
+    );
+
+    // Inside the article, a list of links is usually the answer itself: the
+    // titles a "coming next month" page exists to list.
+    expect(text).toContain("Only Murders in the Building Season 5");
+  });
+
+  it("reads a literal < in prose as text, not as the start of a tag", () => {
+    const rail = Array.from(
+      { length: 12 },
+      (_, index) => `<a href="/story-${index}">Related story ${index}</a>`,
+    ).join(" ");
+
+    // The apostrophe after the `<` must not open a quoted attribute that
+    // swallows the rest of the page, rail included.
+    const text = extractReadableText(
+      `<html><body><div><p>Pick x < 3 if it's cold. ${filler.repeat(6)}</p></div>` +
+        `<div class="rail">${rail}</div></body></html>`,
+    );
+
+    expect(text).toContain("Subscribers in several regions");
+    expect(text).not.toContain("Related story 11");
+  });
+
+  it("does not read a tag written inside the title as a link", () => {
+    const rail = Array.from(
+      { length: 12 },
+      (_, index) => `<a href="/story-${index}">Related story ${index}</a>`,
+    ).join(" ");
+
+    const text = extractReadableText(
+      `<html><head><title>The <a> tag, explained</title></head><body>` +
+        `<div class="rail">${rail}</div><div><p>${filler.repeat(6)}</p></div></body></html>`,
+    );
+
+    expect(text).toContain("Subscribers in several regions");
+    expect(text).not.toContain("Related story 11");
+  });
+
+  // Each page below costs seconds to minutes with a scan that is quadratic in
+  // the page's size; the server reads any public URL, on its main thread.
+  it.each([
+    ["unclosed scripts", "<script>".repeat(25_000)],
+    [
+      "unclosed paragraphs and stray closing tags",
+      `${"<p>x".repeat(30_000)}${"</b>".repeat(30_000)}`,
+    ],
+  ])("strips a page of %s in linear time", (_name, body) => {
+    const startedAt = performance.now();
+    extractReadableText(`<html><body>${body}</body></html>`);
+
+    expect(performance.now() - startedAt).toBeLessThan(1000);
+  });
 });
 
 describe("page headline context", () => {
@@ -278,6 +341,20 @@ describe("page headline context", () => {
 
     const startedAt = performance.now();
     await fetchPageContents(query, ["https://example.com/headings"]);
+
+    expect(performance.now() - startedAt).toBeLessThan(1000);
+  });
+
+  it("reads the headline in linear time from headings full of angle brackets", async () => {
+    // Each heading is short enough to match, and the text they capture holds
+    // 49,000 `<` and no `>`: a tag strip that scans to the next `>` from
+    // every one of them takes seconds on this 50 KB page.
+    respondWithHtml(
+      `<html><body><article>${firstParagraph}</article>${`<h1>${"<".repeat(490)}</h1>`.repeat(100)}</body></html>`,
+    );
+
+    const startedAt = performance.now();
+    await fetchPageContents(query, ["https://example.com/brackets"]);
 
     expect(performance.now() - startedAt).toBeLessThan(1000);
   });

@@ -145,10 +145,11 @@ function buildScopedQuery(domain: string, query: string): string | null {
   return scopedQuery.length <= MAX_QUERY_LENGTH ? scopedQuery : null;
 }
 
-/** Trailing slashes and the scheme do not make two spellings of one page. */
+/** The scheme, `www.` and trailing slashes do not make two spellings of one page. */
 function normalizeUrl(url: string): string {
   return url
     .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
     .replace(/\/+$/, "")
     .toLowerCase();
 }

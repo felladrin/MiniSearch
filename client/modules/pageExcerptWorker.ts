@@ -16,9 +16,7 @@ export function handleExcerptRequest(data: WorkerRequest): WorkerResponse {
   try {
     return {
       type: "excerpts",
-      excerpts: allocatePageExcerpts(data.contents, data.tokenBudget, {
-        query: data.query,
-      }),
+      excerpts: allocatePageExcerpts(data.contents, data.tokenBudget),
     };
   } catch (error) {
     return {

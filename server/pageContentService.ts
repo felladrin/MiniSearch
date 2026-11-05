@@ -133,7 +133,25 @@ interface TextBlock {
   proseChild: boolean;
   /** Site chrome is removed on its closing tag, whatever its density. */
   alwaysDrop: boolean;
+  /**
+   * Inside `<article>`, `<main>` or `role="main"`, where a list of links is
+   * usually the answer itself (the titles a "new next month" page lists), so
+   * link density drops nothing there.
+   */
+  content: boolean;
 }
+
+/**
+ * Elements whose contents are not markup to count: a script is not prose, and
+ * `<title>The <a> tag</title>` would otherwise open a link that never closes.
+ */
+const RAW_TEXT_TAGS = new Set([
+  "noscript",
+  "script",
+  "style",
+  "textarea",
+  "title",
+]);
 
 /** `>` inside a quoted attribute value does not end the tag. */
 function findTagEnd(html: string, start: number): number {
@@ -183,9 +201,18 @@ function indexOfClosingTag(html: string, from: number, tag: string): number {
  */
 function stripLinkHeavyBlocks(html: string): string {
   const blocks: TextBlock[] = [];
+  // Open blocks per tag, so a closing tag that matches none (`</span>`, or
+  // `</b>` under thousands of unclosed `<p>`) skips the walk down the stack.
+  const openCounts = new Map<string, number>();
   const removals: [start: number, end: number][] = [];
   let linkDepth = 0;
   let index = 0;
+
+  const popBlock = () => {
+    const block = blocks.pop();
+    if (block) openCounts.set(block.tag, (openCounts.get(block.tag) ?? 1) - 1);
+    return block;
+  };
 
   const addText = (raw: string) => {
     const chars = raw.replace(/\s+/g, " ").trim().length;
@@ -203,6 +230,14 @@ function stripLinkHeavyBlocks(html: string): string {
       break;
     }
     if (tagStart > index) addText(html.slice(index, tagStart));
+
+    // A `<` opens a tag only before a letter, `/`, `!` or `?`. Any other is
+    // text ("x < 3"), and reading it as a tag would scan on to the next `>`.
+    if (!/[A-Za-z/!?]/.test(html.charAt(tagStart + 1))) {
+      addText("<");
+      index = tagStart + 1;
+      continue;
+    }
 
     if (html.startsWith("<!--", tagStart)) {
       const commentEnd = html.indexOf("-->", tagStart + 4);
@@ -226,28 +261,23 @@ function stripLinkHeavyBlocks(html: string): string {
     const closing = raw.startsWith("/");
     const selfClosing = !closing && raw.trimEnd().endsWith("/");
 
-    // A script's contents are not text; counting them would read as prose.
-    if (tag === "script" || tag === "style" || tag === "noscript") {
+    if (RAW_TEXT_TAGS.has(tag)) {
       if (!closing) {
+        // An unclosed one runs to the end of the document, as a parser reads
+        // it. Resuming after its opening tag instead would rescan the rest of
+        // the page once for every such tag.
         const close = indexOfClosingTag(html, index, tag);
-        if (close !== -1) {
-          const closeEnd = findTagEnd(html, close);
-          index = closeEnd === -1 ? html.length : closeEnd + 1;
-        }
+        const closeEnd = close === -1 ? -1 : findTagEnd(html, close);
+        index = closeEnd === -1 ? html.length : closeEnd + 1;
       }
       continue;
     }
 
     if (closing) {
       if (tag === "a") linkDepth = Math.max(0, linkDepth - 1);
-      let at = -1;
-      for (let scan = blocks.length - 1; scan >= 0; scan--) {
-        if (blocks[scan].tag === tag) {
-          at = scan;
-          break;
-        }
-      }
-      if (at === -1) continue;
+      if (!openCounts.get(tag)) continue;
+      let at = blocks.length - 1;
+      while (blocks[at].tag !== tag) at--;
 
       // Empty elements such as `<p>` and `<li>` may omit their closing tag. The
       // only end marker this scan has belongs to the ancestor that is closing
@@ -255,7 +285,7 @@ function stripLinkHeavyBlocks(html: string): string {
       // text. Fold such a block into the block that closed instead: its text is
       // still counted, and nothing is dropped on a guess.
       while (blocks.length - 1 > at) {
-        const unclosed = blocks.pop();
+        const unclosed = popBlock();
         if (unclosed === undefined) break;
         const matched = blocks[at];
         matched.textChars += unclosed.textChars;
@@ -263,7 +293,7 @@ function stripLinkHeavyBlocks(html: string): string {
         matched.proseChild ||= unclosed.proseChild;
       }
 
-      const block = blocks.pop();
+      const block = popBlock();
       if (block === undefined) {
         linkDepth = 0;
         continue;
@@ -274,7 +304,8 @@ function stripLinkHeavyBlocks(html: string): string {
       // page-wide wrapper that also holds the article must not take it down.
       const drop =
         block.alwaysDrop ||
-        (!block.proseChild &&
+        (!block.content &&
+          !block.proseChild &&
           block.textChars >= NAV_BLOCK_MIN_CHARS &&
           block.linkChars / block.textChars >= LINK_DENSITY_THRESHOLD);
       if (drop) {
@@ -303,7 +334,13 @@ function stripLinkHeavyBlocks(html: string): string {
         linkDepthAtStart: linkDepth,
         proseChild: false,
         alwaysDrop: ALWAYS_DROPPED_TAGS.has(tag),
+        content:
+          (blocks.at(-1)?.content ?? false) ||
+          tag === "article" ||
+          tag === "main" ||
+          /\brole\s*=\s*["']?main\b/i.test(raw),
       });
+      openCounts.set(tag, (openCounts.get(tag) ?? 0) + 1);
     }
   }
 
@@ -672,7 +709,9 @@ function extractPageContext(html: string): string[] {
     if (heading[1] !== undefined) parts.push(heading[1]);
   }
 
-  const text = decodeEntities(parts.join(" ")).replace(/<[^>]*>/g, " ");
+  // Tags go before entities are decoded, and a tag ends at the next `<` as
+  // well as at `>`, so text holding thousands of `<` is still read once.
+  const text = decodeEntities(parts.join(" ").replace(/<[^<>]*>/g, " "));
   return [...new Set(tokenize(text))];
 }
 

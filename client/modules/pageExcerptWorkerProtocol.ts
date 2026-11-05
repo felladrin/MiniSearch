@@ -11,12 +11,6 @@ export interface WorkerRequest {
   contents: string[];
   /** Tokens the excerpts may occupy together. */
   tokenBudget: number;
-  /**
-   * The query the pages were read for, when known. The allocation uses it to
-   * keep the part of a trimmed page that answers the query, so this decides
-   * which lines the model reads.
-   */
-  query?: string;
 }
 
 export type WorkerResponse =

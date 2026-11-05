@@ -99,15 +99,15 @@ describe("normalizeRelativeDates", () => {
     });
 
     it("collapses two phrases that resolve to the same anchor", () => {
-      expect(normalizeRelativeDates("今天 和 今日 都下雨", AS_OF)).toEqual({
-        searchQuery: "今天 和 今日 都下雨 2026-11-03",
-        replacements: [{ phrase: "今天", anchor: "2026-11-03" }],
+      expect(normalizeRelativeDates("这个月 和 本月 都下雨", AS_OF)).toEqual({
+        searchQuery: "这个月 和 本月 都下雨 2026年11月",
+        replacements: [{ phrase: "这个月", anchor: "2026年11月" }],
       });
     });
 
     it("appends a trailing anchor without doubling the separator", () => {
-      expect(normalizeRelativeDates("明天几点 ", AS_OF).searchQuery).toBe(
-        "明天几点 2026-11-04",
+      expect(normalizeRelativeDates("下个月几号 ", AS_OF).searchQuery).toBe(
+        "下个月几号 2026年12月",
       );
     });
 
@@ -125,12 +125,11 @@ describe("normalizeRelativeDates", () => {
     it("skips a word that belongs to a longer title", () => {
       for (const query of [
         "明年今日 电影",
-        "明天会更好",
-        "明天你是否依然爱我",
         "去年冬天",
         "去年夏天",
-        "tomorrow never dies",
-        "yesterday once more",
+        "人类第一次登上月球是哪一年",
+        "last month of pregnancy symptoms",
+        "last year of college",
       ]) {
         expect(normalizeRelativeDates(query, AS_OF)).toEqual({
           searchQuery: query,
@@ -146,23 +145,21 @@ describe("normalizeRelativeDates", () => {
       });
     });
 
-    it("skips a three-day phrase rather than anchoring it as two days out", () => {
-      for (const query of ["大后天出发", "大前天到的"]) {
+    it("leaves day words alone", () => {
+      for (const query of [
+        "明天几点",
+        "昨天的比赛",
+        "今日头条",
+        "高铁票提前天数",
+        "what happened yesterday",
+        "today show hosts",
+        "the day after tomorrow cast",
+      ]) {
         expect(normalizeRelativeDates(query, AS_OF)).toEqual({
           searchQuery: query,
           replacements: [],
         });
       }
-    });
-
-    it("leaves a bare title query alone but anchors the same word in a sentence", () => {
-      expect(normalizeRelativeDates("yesterday", AS_OF)).toEqual({
-        searchQuery: "yesterday",
-        replacements: [],
-      });
-      expect(
-        normalizeRelativeDates("what happened yesterday", AS_OF).searchQuery,
-      ).toBe("what happened yesterday 2026-11-02");
     });
   });
 
@@ -188,31 +185,12 @@ describe("normalizeRelativeDates", () => {
       expect(anchors("这个月")).toEqual(["2026年11月"]);
     });
 
-    it("resolves the Chinese day words to ISO dates", () => {
-      const anchors = (query: string) =>
-        normalizeRelativeDates(query, AS_OF).replacements.map(
-          (replacement) => replacement.anchor,
-        );
-
-      expect(anchors("后天")).toEqual(["2026-11-05"]);
-      expect(anchors("昨天")).toEqual(["2026-11-02"]);
-      expect(anchors("前天")).toEqual(["2026-11-01"]);
-      expect(anchors("今天")).toEqual(["2026-11-03"]);
-      expect(anchors("今日")).toEqual(["2026-11-03"]);
-    });
-
-    it("resolves the English year and day words", () => {
+    it("resolves the English year words", () => {
       expect(normalizeRelativeDates("this year", AS_OF).replacements).toEqual([
         { phrase: "this year", anchor: "2026" },
       ]);
       expect(normalizeRelativeDates("last year", AS_OF).replacements).toEqual([
         { phrase: "last year", anchor: "2025" },
-      ]);
-      expect(
-        normalizeRelativeDates("today's weather", AS_OF).replacements,
-      ).toEqual([{ phrase: "today", anchor: "2026-11-03" }]);
-      expect(normalizeRelativeDates("tomorrow", AS_OF).replacements).toEqual([
-        { phrase: "tomorrow", anchor: "2026-11-04" },
       ]);
     });
 
@@ -226,7 +204,11 @@ describe("normalizeRelativeDates", () => {
 
   describe("English word boundaries", () => {
     it("does not match a trigger inside a longer word", () => {
-      for (const query of ["this yearly report", "todays", "yesterdays"]) {
+      for (const query of [
+        "this yearly report",
+        "next monthly plan",
+        "last years",
+      ]) {
         expect(normalizeRelativeDates(query, AS_OF)).toEqual({
           searchQuery: query,
           replacements: [],
@@ -235,7 +217,7 @@ describe("normalizeRelativeDates", () => {
     });
   });
   it("drops an anchor that would push the query past the limit", () => {
-    const long = `${"x".repeat(1996)} today`;
+    const long = `${"x".repeat(1990)} next year`;
 
     expect(
       normalizeRelativeDates(long, new Date(2026, 10, 3), { maxLength: 2000 }),
@@ -246,7 +228,7 @@ describe("normalizeRelativeDates", () => {
   });
 
   it("keeps the anchors that still fit", () => {
-    const long = `${"x".repeat(1970)} today tomorrow`;
+    const long = `${"x".repeat(1970)} next year next month`;
 
     const { searchQuery } = normalizeRelativeDates(
       long,
@@ -256,8 +238,8 @@ describe("normalizeRelativeDates", () => {
       },
     );
 
-    expect(searchQuery.endsWith("2026-11-03")).toBe(true);
-    expect(searchQuery).not.toContain("2026-11-04");
+    expect(searchQuery.endsWith("2027")).toBe(true);
+    expect(searchQuery).not.toContain("December 2026");
     expect(searchQuery.length).toBeLessThanOrEqual(2000);
   });
 });

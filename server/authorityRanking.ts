@@ -10,6 +10,8 @@
 // support the year the query asks about is left alone rather than pulled in
 // front of fresher reporting.
 
+import { getDomain, getDomainWithoutSuffix } from "tldts";
+
 const GENERIC_QUERY_WORDS = new Set([
   "about",
   "and",
@@ -79,19 +81,12 @@ const GENERIC_QUERY_WORDS = new Set([
   "you",
 ]);
 
-// In front of a two-letter country code, these make a two-part public suffix
-// (co.uk, com.au, gov.br), and the label before them names the site. Read as
-// the label instead, "com" would let any `*.com.hk` result scope the official
-// lane to every site under com.hk.
-const GENERIC_SECOND_LEVEL_LABELS = new Set([
-  "ac",
-  "co",
-  "com",
-  "edu",
-  "gov",
-  "net",
-  "org",
-]);
+// The public suffix list, its private section included: a site's label is the
+// one in front of the suffix, so bbc.co.uk answers "bbc", and a tenant of a
+// shared host (someone.github.io) answers its own name instead of "github".
+// Read wrongly, the official lane would scope `site:github.io` and merge pages
+// of any tenant.
+const SUFFIX_LIST_OPTIONS = { allowPrivateDomains: true };
 
 const SINGLE_TOKEN_BONUS = 0.5;
 const DERIVED_LABEL_BONUS = 0.75;
@@ -247,13 +242,7 @@ function tokenize(query: string): string[] {
  */
 export function registrableDomainOf(url: string): string | null {
   const hostname = hostnameOf(url);
-  if (!hostname) return null;
-
-  const labels = hostname.split(".");
-  const index = registrableLabelIndex(labels);
-  if (index < 0) return null;
-
-  return labels.slice(index).join(".");
+  return hostname ? getDomain(hostname, SUFFIX_LIST_OPTIONS) : null;
 }
 
 /**
@@ -303,22 +292,7 @@ function hostnameOf(url: string): string | null {
  * answer "disney". A two-part public suffix (co.uk) keeps its own label.
  */
 function registrableLabel(hostname: string): string | null {
-  const labels = hostname.split(".");
-  const index = registrableLabelIndex(labels);
-  if (index < 0) return null;
-
-  const label = labels[index];
-  return label && label.length > 0 ? label : null;
-}
-
-/** Index of the registrable label, or -1 when the host has no registrable part. */
-function registrableLabelIndex(labels: string[]): number {
-  if (labels.length < 2) return -1;
-
-  const twoPartSuffix =
-    labels[labels.length - 1].length === 2 &&
-    GENERIC_SECOND_LEVEL_LABELS.has(labels[labels.length - 2]);
-  return twoPartSuffix ? labels.length - 3 : labels.length - 2;
+  return getDomainWithoutSuffix(hostname, SUFFIX_LIST_OPTIONS) || null;
 }
 
 /**

@@ -843,6 +843,23 @@ describe("searchEndpointServerHook", () => {
 
     afterEach(() => {
       vi.unstubAllEnvs();
+      vi.restoreAllMocks();
+    });
+
+    it("never gives the lane the last five seconds of the search deadline", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSupplementarySearXNG).mockResolvedValue([]);
+      // SearXNG answered at 19 s of the 25 s deadline: 6 s remain, and the
+      // lane may only spend what is left after the last 5.
+      vi.spyOn(performance, "now")
+        .mockReturnValueOnce(0)
+        .mockReturnValue(19_000);
+      const timeout = vi.spyOn(AbortSignal, "timeout");
+      const handler = getRegisteredHandler();
+
+      await handler(createRequest(query), createResponse(), vi.fn());
+
+      expect(timeout).toHaveBeenCalledWith(1_000);
     });
 
     it("asks a supplementary search for the named site and merges it behind the first result", async () => {
