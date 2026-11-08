@@ -32,6 +32,7 @@ can reach the instance, so keep secrets out of that interface.
 ### Search Token Lifecycle
 
 Every HTTP request from client to backend carries a `token` query parameter for CSRF protection:
+
 1. **Token Generation**: On first use in a process, `regenerateSearchToken()` draws 32 random bytes and writes them to `{os.tempdir()}/minisearch-token` with `0600`. The file is never read back as a source of truth: a token that survives into a published image is one every container of that build shares, and anyone who pulls the image can read it out of the layer
 2. **Client Distribution**: The server holds the token it generated for the life of the process and serves it as `searchToken` in `/api/config`. Each process generates its own, so a restart or a second instance means a new token, which is why a bookmarked or shared search URL stops working and lands on the expired-link page
 3. **Per-Request Auth**: Client includes token as `?token=` parameter on all `/search/text`, `/search/images`, `/page-content`, `/thumbnail` and `/inference` requests
@@ -65,6 +66,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 ## Supply Chain: Native & WebAssembly Modules
 
 The full trust model lives in [`.github/SECURITY.md`](../.github/SECURITY.md) ("Native & WebAssembly Module Trust Model"); the operational parts are mirrored here.
+
 - **Exact pins**: the native/WASM dependencies — `onnxruntime-node@1.29.0`, `@wllama/wllama@3.6.1`, `@huggingface/tokenizers@0.2.0`, `hash-wasm@4.12.0` and `@moonshine-ai/moonshine-wasm@0.1.5` — are declared with single exact versions in `package.json` (no caret ranges), and `package-lock.json` pins each tarball's SHA-512 integrity hash
 - **Install-script policy**: `package.json#allowScripts` carries an explicit decision for every package in the tree that ships an install script — `onnxruntime-node` **denied** (its postinstall downloads CUDA 12 nupkgs unpacked by symlink-following `adm-zip`, GHSA-vwc7-r8mq-g2x9; both inference services run `executionProviders: ["cpu"]` and the CPU runtime ships in the tarball), `protobufjs` **denied** (its postinstall only prints a version-scheme advisory), `fsevents@2.3.3` **allowed** (the optional macOS file watcher must compile at install)
 - **Strict mode**: `.npmrc` sets `strict-allow-scripts = true`, so an install script with no recorded decision fails `npm ci` instead of warning; the `.npmrc` layer itself can only allow, never deny, which is why the policy lives in `package.json`

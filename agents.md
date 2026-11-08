@@ -5,11 +5,13 @@ This is your navigation hub. Start here, follow the links, and return when you n
 ## Before You Start
 
 **New to this codebase?** Read in this order:
+
 1. `docs/quick-start.md` - Get it running
 2. `docs/overview.md` - Understand the system
 3. `docs/project-structure.md` - Navigate the code
 
 **Making changes?** Check:
+
 - `docs/coding-conventions.md` - Code style
 - `docs/development-commands.md` - Available commands
 - `docs/pull-requests.md` - How to submit
@@ -222,6 +224,7 @@ Need to:
 ## Quality Gates
 
 Before any change:
+
 ```bash
 npm run lint
 ```
@@ -229,6 +232,7 @@ npm run lint
 Inside the dev container, the same command is `docker compose exec development-server npm run lint`.
 
 This runs:
+
 - Biome (formatting/linting)
 - TypeScript (type checking)
 - knip (dead code detection)
@@ -251,21 +255,25 @@ So `npx tsc --noEmit` reports success while type errors sit in `server/` or `eva
 ## Agent-First Principles
 
 **Repository as System of Record:**
+
 - All knowledge lives in versioned docs/ structure
 - This file is your entry point - start here
 - Follow links, don't assume - verify in code
 
 **Context Efficiency:**
+
 - Use this map to navigate quickly
 - Return to this file when context drifts
 - Follow the decision tree for common tasks
 
 **Architecture & Boundaries:**
+
 - Respect PubSub boundaries - don't cross concerns
 - Client vs server - keep them separate
 - Feature-based organization - one folder per feature
 
 **Documentation Maintenance:**
+
 - Update these docs when you learn something new
 - Add cross-references when linking concepts
 - Keep examples current with actual code

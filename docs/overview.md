@@ -33,6 +33,7 @@ MiniSearch integrates multiple technology stacks within a unified deployment con
 ## Application Entry Points
 
 The application has three primary entry points:
+
 1. **Browser Entry**: `client/index.tsx` initializes the React application, mounting the root component and setting up error boundaries.
 
 2. **Server Entry**: `vite.config.ts` configures the Vite development and preview servers, registering server hooks for search and inference endpoints.
@@ -42,6 +43,7 @@ The application has three primary entry points:
 ## Multi-Service Container Architecture
 
 The Docker container runs three services concurrently:
+
 - **SearXNG** - Privacy-focused metasearch engine
 - **ONNX Runtime** - In-process inference for result reranking
 - **Node.js application** - Main application server
@@ -57,6 +59,7 @@ PubSub channels are created using the create-pubsub package and provide type-saf
 ## Data Persistence Strategy
 
 MiniSearch employs a dual-layer persistence approach:
+
 - **IndexedDB** - Local storage for search history, settings, cached results, and saved AI transcripts
 - **TTL-based caching** - 15-minute freshness cache for search results to minimize API calls, with a 24-hour stale retention as a fallback when the live search fails
 
@@ -112,6 +115,7 @@ The `textGeneration` module orchestrates the entire search-to-response flow, man
 ### Web Search Service Reliability
 
 `server/webSearchService.ts` implements resilience patterns for SearXNG integration:
+
 - **Circuit Breaker**: Opens after 5 consecutive failures, blocking requests for 60 seconds before attempting reset
 - **Retry Logic**: Exponential backoff for HTTP 500 errors, up to 3 retries
 - **Fail-Fast on Suspending Engines**: An empty response in which every unresponsive engine is under a long suspension (CAPTCHA, rate limit, access denied; SearXNG suspends them for an hour to a day) throws on the first attempt instead of spending the retry budget, which it could not possibly outlast. Transient engine errors (timeouts, server API errors) keep the full retry budget.
@@ -123,6 +127,7 @@ None of this changes which engines answer. That is decided inside SearXNG, and w
 ### Search Token Lifecycle
 
 CSRF protection uses a token the server owns for its lifetime:
+
 1. **Generation**: `regenerateSearchToken()` draws 32 random bytes on first use in a process and writes them to the token file; the file is a record, never read back as a source of truth
 2. **Storage**: The token is held in memory for the life of the process, and recorded at `{os.tempdir()}/minisearch-token` with `0600` permissions
 3. **Distribution**: Server serves the token to the client at runtime through `/api/config`, so a client always holds the token of the server answering it
@@ -140,6 +145,7 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 ### State Machine Transitions
 
 **Text Generation States:**
+
 - `idle` - No active generation
 - `awaitingModelDownloadAllowance` - Waiting for user consent to download a browser model
 - `loadingModel` - Downloading or initializing the browser (Wllama) model
@@ -151,6 +157,7 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 - `failed` - Error occurred
 
 **Search States:**
+
 - `idle` - No active search
 - `running` - Search in progress
 - `completed` - Results received
@@ -206,6 +213,7 @@ MiniSearch implements all server-side logic as Vite plugin hooks. Each hook regi
 | `rerankerServiceHook`           | `server/rerankerServiceHook.ts`           | Reranker model lifecycle management for result reranking              |
 
 Key server-side modules:
+
 - **`server/webSearchService.ts`**: Integrates with SearXNG at `http://127.0.0.1:8888`. Implements a circuit breaker (opens after 5 failures, resets after 60s) and retry logic (up to 3 retries with exponential backoff, for 500s and for empty responses naming transiently unresponsive engines; an all-suspended set fails fast on the first attempt, since SearXNG suspensions last an hour to a day).
 - **`server/pageContentService.ts`**: Reads result pages for answer grounding: SSRF-guarded fetches with a byte cap, readable-text extraction, and query-relevant passage selection. Reads run under a per-host circuit breaker (`server/pageReadHostBreaker.ts`) that skips a host for 5 minutes after 3 refusals in a row, then probes it with one read.
 - **`server/searchToken.ts`**: Manages a token at `{os.tempdir()}/minisearch-token` used for CSRF protection on search requests.
@@ -437,6 +445,7 @@ MiniSearch uses a multi-layered client-side persistence strategy:
 ### IndexedDB Databases
 
 Two separate Dexie databases handle different persistence needs:
+
 1. **SearchCacheDatabase** (`client/modules/search.ts`): Temporary cache for search results with TTL-based expiration. Table schema:
    - `textSearchHistory`: Keyed by hashed query, indexed by timestamp
    - `imageSearchHistory`: Keyed by hashed query, indexed by timestamp
@@ -464,6 +473,7 @@ Two separate Dexie databases handle different persistence needs:
 ### localStorage Persistence
 
 Lightweight state persisted across sessions via `createLocalStoragePubSub` pattern:
+
 - `settings`: Application preferences (inference type, model, UI options)
 - `querySuggestions`: Shuffled search suggestion pool
 - `lastSearchTokenHash`: Cached security token hash

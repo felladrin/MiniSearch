@@ -29,6 +29,7 @@
 ## Technology Selection Criteria
 
 Technologies are chosen based on:
+
 - **Agent legibility**: Easy for agents to model and reason about
 - **Stability**: Mature, well-documented libraries
 - **Composability**: Clean APIs that work well together

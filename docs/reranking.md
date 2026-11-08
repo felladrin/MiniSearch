@@ -18,6 +18,7 @@ The reranking subsystem consists of four components:
 ### Startup
 
 The `rerankerServiceHook` starts the reranker during server initialization:
+
 1. Downloads the model and tokenizer from HuggingFace if not present (`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`)
 2. Creates an ONNX Runtime inference session
 3. Performs a warmup inference (`query: "test"`, `documents: ["test document"]`) to ensure the graph is initialized
@@ -79,6 +80,7 @@ Documents are sent to the reranker whole. Truncation happens by tokens inside th
 ### Scoring and Filtering
 
 The reranker returns the classifier's raw relevance logit for each document. Scores are deliberately not passed through a sigmoid, because the filter below is calibrated against the raw scale. Results are then filtered using a two-stage statistical approach:
+
 1. **Score Normalization**: Scores are shifted to positive range by adding the absolute value of the minimum score
 2. **Standard Deviation Filter**: Results below `mean - kStandardDeviationFactor * standardDeviation` are filtered out
    - `kStandardDeviationFactor = 0.3`
@@ -90,6 +92,7 @@ This filter is invariant to linear rescaling of the scores, since both the score
 ### Preserve Top Results Mode
 
 When `preserveTopResults = true`, the ranking algorithm:
+
 1. Keeps the original top result (first from SearXNG) at position 1
 2. Filters remaining results by score
 3. Takes up to 9 next-best results, sorted by reranker score

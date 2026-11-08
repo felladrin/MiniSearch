@@ -22,6 +22,7 @@ docker compose exec development-server npm run lint
 ```
 
 This runs:
+
 - Biome (formatting/linting)
 - TypeScript (type checking)
 - knip (dead code detection)

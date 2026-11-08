@@ -7,6 +7,7 @@ MiniSearch keeps a local-first record of every search so agents can resurface te
 ## Data Model and Storage
 
 The `HistoryDatabase` Dexie instance stores three related tables:
+
 1. `searches` – canonical log of each query plus hydrated results payloads (text, image, run metadata, source, pin state).
 2. `llmResponses` – snapshot of every AI answer tied to its originating search run, enabling restoration of the assistant output.
 3. `chatHistory` – chronological record of chat turns (user/assistant roles) scoped by `conversationId` (the `searchRunId`).
@@ -16,6 +17,7 @@ All three tables share a `searchRunId` foreign key so restoring a specific run c
 ## Cleanup Guarantees
 
 To keep IndexedDB lean, inserts trigger `performCleanup()`, which enforces:
+
 - **Retention window** – non-pinned entries older than `historyRetentionDays` are deleted in batches of 100.
 - **Max entries** – if the total exceeds `historyMaxEntries`, the oldest unpinned rows past the limit are removed.
 - **Pin protection** – pinned entries are skipped by both retention and max-entry sweeps.
@@ -25,6 +27,7 @@ Cleanup is gated by `historyAutoCleanup`, so advanced users can opt out. These k
 ## Hook API
 
 `useSearchHistory` exposes the canonical API surface for components:
+
 - Fetches recent searches (optionally paginated) and exposes filtered/grouped views.
 - Provides fuzzy search, pin toggling, delete/clear operations, and error retry helpers.
 - Keeps derived state such as grouped sections (Today/Yesterday/etc.) in sync with the settings flag `historyGroupByDate`.
@@ -51,12 +54,14 @@ The History Drawer Analytics tab renders the compact `SearchStats` cards scoped 
 Alongside the history database, MiniSearch uses a separate `SearchCacheDatabase` for temporary result caching:
 
 **Schema:**
+
 | Store                | Key          | Index     | Entry Type         |
 | -------------------- | ------------ | --------- | ------------------ |
 | `textSearchHistory`  | hashed query | timestamp | `TextSearchCache`  |
 | `imageSearchHistory` | hashed query | timestamp | `ImageSearchCache` |
 
 **Configuration:**
+
 | Parameter           | Value      | Description                                                                           |
 | ------------------- | ---------- | ------------------------------------------------------------------------------------- |
 | TTL                 | 15 minutes | Freshness window: a hit inside it skips the network                                   |
