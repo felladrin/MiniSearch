@@ -20,6 +20,7 @@ Report security vulnerabilities through GitHub's [Private Vulnerability Reportin
 ### What to Include
 
 When reporting a vulnerability, please include:
+
 - A clear description of the vulnerability
 - Steps to reproduce the issue
 - Potential impact of the vulnerability
@@ -60,23 +61,27 @@ When reporting a vulnerability, please include:
 MiniSearch is designed as a privacy-focused search application with the following security assumptions:
 
 **Trust Boundaries:**
+
 - **Browser Environment**: The application runs entirely in the user's browser
 - **Server Component**: Optional backend for search and AI processing
 - **AI Models**: Local or remote AI processing with configurable endpoints
 
 **Data Flow:**
+
 - User queries are sent to SearXNG instances (configurable)
 - AI processing can be local (Wllama) or remote (API endpoints)
 - Search history is stored locally in the browser
 - No tracking or analytics by default
 
 **Security Controls:**
+
 - Optional access key protection for deployment
 - Configurable AI endpoints for privacy
 - Local-first data storage
 - No third-party tracking or analytics
 
 **Potential Risks:**
+
 - Malicious SearXNG instances could log queries
 - Remote AI endpoints could access user queries
 - Browser extensions could interfere with the application
@@ -118,6 +123,7 @@ A few of MiniSearch's dependencies ship native code or WebAssembly rather than a
 ### Approving a new install script
 
 Under `strict-allow-scripts`, any package that ships an install script without a recorded decision fails the install. To unblock it, a maintainer must:
+
 1. Read the script first (`npm view <pkg> scripts`, or the unpacked tarball) and decide whether it is acceptable.
 2. Record the decision: `npm approve-scripts <pkg>` writes a version-pinned `"<name>@<version>": true` entry to `package.json#allowScripts` (`allow-scripts-pin` is on); `npm deny-scripts <pkg>` writes `"<name>": false`, denying every version of the package.
 3. Update the decision list above in the same PR, with the reasoning.
@@ -156,6 +162,7 @@ Because native/WASM deps are exact pins, a Renovate bump arrives as a one-line v
 ## Security Updates
 
 Security updates will be:
+
 - Released as new versions
 - Announced in release notes
 - Coordinated with dependency updates when applicable
@@ -163,6 +170,7 @@ Security updates will be:
 ## Security Team
 
 The MiniSearch security team is currently the project maintainer:
+
 - [@felladrin](https://github.com/felladrin) - Project Maintainer
 
 ## Acknowledgments

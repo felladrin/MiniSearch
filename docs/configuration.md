@@ -12,6 +12,7 @@ All configuration is done via environment variables. Create a `.env` file in the
 | `ACCESS_KEY_TIMEOUT_HOURS` | `24`    | Hours to cache validated keys in browser. Set to `0` to require validation on every request |
 
 **Example:**
+
 ```bash
 ACCESS_KEYS="my-secret-key-1,my-secret-key-2"
 ACCESS_KEY_TIMEOUT_HOURS="24"
@@ -55,6 +56,7 @@ For self-hosted OpenAI-compatible APIs:
 | `INTERNAL_OPENAI_COMPATIBLE_API_NAME`     | `Internal API` | Display name shown in UI                                           |
 
 **Example:**
+
 ```bash
 INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL="https://llm.internal.company.com/v1"
 INTERNAL_OPENAI_COMPATIBLE_API_KEY="sk-internal-xxx"
@@ -103,6 +105,7 @@ When SearXNG fails on a text search, the server can retry that search against se
 `SEARCH_FALLBACK_PROVIDER` and `SEARCH_FALLBACK_API_KEY` are gone. If either is still set to a non-empty value while `SEARCH_FALLBACK_ENABLED` is on, the server stops at start with an error that names the variable to use instead, so an upgrade cannot silently drop a key: move the key to `SEARCH_FALLBACK_PARALLEL_API_KEY` or `SEARCH_FALLBACK_YOUCOM_API_KEY`, and the provider choice to `SEARCH_FALLBACK_PROVIDERS`.
 
 Each provider has its own terms, and each operator is responsible for following them:
+
 - **Parallel**: Parallel describes its keyless tier as for exploration and light use, and asks for an account and an API key for production use ([docs.parallel.ai](https://docs.parallel.ai/integrations/mcp/search-mcp)).
 - **You.com**: the keyless `profile=free` endpoint allows 100 queries per day ([you.com](https://you.com/docs/build-with-agents/mcp-server)). Its API acceptable use policy asks integrations to honor 429 responses ([you.com](https://you.com/acceptable-use-policy-may-2026)).
 
@@ -153,17 +156,20 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 ### Model Selection
 
 **Wllama Models:**
+
 - 39 pre-configured models
 - Range from 135M to 4B parameters
 - All quantized to a Q3/Q4-class quant (Q4_K_S, Q4_K_M, Q3_K_S, UD-Q3_K_XL or UD-Q4_K_XL)
 - Stored at: `Felladrin/gguf-sharded-*` on HuggingFace, always as sharded GGUFs
 
 **OpenAI/Internal:**
+
 - Any OpenAI-compatible API
 - Auto-model detection if not specified
 - Supports streaming and reasoning models
 
 **AI Horde:**
+
 - Uses aihorde.net distributed network
 - Anonymous or authenticated access
 - Parallel generation with race conditions
@@ -203,6 +209,7 @@ Search results:
 ```
 
 **Placeholders:**
+
 - `{{currentDate}}`: Current date injected at generation time
 - `{{dateTime}}`: Alias for `{{currentDate}}` - both are replaced with the same current date value
 - `{{searchResults}}`: Formatted search results from the web search, including the page excerpts when `enablePageContentFetch` is on
@@ -253,6 +260,7 @@ Same structure but without volume mounts and with pre-built assets.
 ### Dockerfile Environment
 
 The Dockerfile sets up a single runtime stage:
+
 - Node.js LTS
 - Python 3 + SearXNG
 
@@ -350,6 +358,7 @@ services:
 ```
 
 Two things about that command are required, not optional:
+
 - **The file must be readable by uid 1000.** The container runs as `node`, and a file readable only by its owner on the host is invisible to it.
 - **`secret_key` must be set to your own random value.** SearXNG refuses to start on the `ultrasecretkey` placeholder and logs `server.secret_key is not changed. Please use something else instead of ultrasecretkey.` The image's own file never carries the placeholder, because the Dockerfile replaces it at build time, but a file you write has to carry a real key.
 
@@ -451,6 +460,7 @@ MiniSearch logs internal events to an in-app log panel (see the Logs section of 
 **Diagnosing empty search results:** the client distinguishes a search that returned no results (a no-results alert, state stays `completed`) from one that failed outright on an outage (a distinct failed state, with a retry on text searches). An empty response that names unresponsive engines is retried within the same budget as a 500 and counts as the second if it is still empty when the retries are spent, since a rate-limited, suspended or CAPTCHA-challenged engine is reported that way and not with a status code. The actual reason is printed to the server's console (via `server/webSearchService.ts`, always-on `debug` logging), either the SearXNG engines that failed (timeouts, suspensions, rate limits, from SearXNG's `unresponsive_engines` field) or a note that all returned results were discarded during processing (missing title, snippet, or media source). Check the server logs (`docker compose logs`) when troubleshooting failed searches.
 
 Check effective configuration:
+
 ```typescript
 // In browser console
 console.log("Settings:", JSON.parse(localStorage.getItem("settings") || "{}"));

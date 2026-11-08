@@ -24,6 +24,7 @@
 ## Component Organization
 
 Components are organized by feature domain. Each component folder contains:
+
 - Component implementation
 - Related styles
 - Custom hooks

@@ -20,11 +20,13 @@ Runs AI models entirely in the browser using WebAssembly or WebGPU. No data leav
 Uses `@wllama/wllama` for browser-based inference. Automatically uses WebGPU when available, falling back to CPU via WebAssembly.
 
 **Requirements:**
+
 - Any modern browser
 - ~300MB-2GB free RAM
 - WebGPU optional (Chrome 113+, Edge 113+) - enables GPU acceleration
 
 **How It Works:**
+
 1. Checks WebGPU availability via `"gpu" in navigator`
 2. Downloads model from HuggingFace (GGUF format, cached in the browser's Origin Private File System)
 3. Loads model with `n_gpu_layers: 99999` if WebGPU is present, else `0` for CPU-only
@@ -35,6 +37,7 @@ Uses `@wllama/wllama` for browser-based inference. Automatically uses WebGPU whe
 30+ stored at `Felladrin/gguf-sharded-*` on HuggingFace. MiniSearch currently ships 39 pre-configured models, ranging from SmolLM 2 135M (~100MB) up to Spark X2.6 4B (~3.5GB). The full, authoritative list with HuggingFace repo IDs and sizes lives in `client/modules/wllama.ts` (`wllamaModels`) and is rendered in the Settings dropdown; refer to that file rather than a static table here, since models are added/swapped frequently.
 
 Two constraints decide what can join that list, both measured against the shipped wasm build:
+
 - **Every model file must be a shard.** Chromium's OPFS storage silently truncates files past 2000 MiB, so a monolithic GGUF above that size arrives corrupted in the browser. Shards also keep progressive download working.
 - **The wasm linear memory ceiling is 4 GiB.** Models at ~3.5 GB and above OOM during buffer reserve, so the practical catalog ceiling is around 3.7 GB of weights.
 
@@ -43,11 +46,13 @@ Models whose chat template thinks by default (Granite 4.2, Gemma 4, Spark X2.6, 
 `node scripts/wllama-catalog-check.cjs` HEADs every shard of every catalog model on HuggingFace and verifies the claimed sizes; run it after adding or re-sharding a model.
 
 **Configuration:**
+
 - Settings → Inference Type: `Browser`
 - Settings → Wllama Model: Select from dropdown
 - Settings → CPU threads: Relevant only when WebGPU is unavailable
 
 **WebGPU Detection:**
+
 ```typescript
 // client/modules/webGpu.ts
 /** Whether the browser supports the WebGPU API. */
@@ -55,6 +60,7 @@ export const isWebGPUAvailable = "gpu" in navigator;
 ```
 
 **Limitations:**
+
 - First load requires model download (progressive via sharded files)
 - Limited to smaller models (~4B params max due to browser memory)
 - CPU mode is 2-5x slower than WebGPU
@@ -64,24 +70,28 @@ export const isWebGPUAvailable = "gpu" in navigator;
 Uses OpenAI's API or any OpenAI-compatible service.
 
 **Setup:**
+
 1. Get API key from OpenAI or compatible provider
 2. Settings → Inference Type: `OpenAI`
 3. Settings → OpenAI API Key: Enter key
 4. Settings → OpenAI Model: Select or enter model ID
 
 **Supported Providers:**
+
 - OpenAI (gpt-4, gpt-3.5-turbo)
 - Anthropic (via OpenAI-compatible endpoint)
 - Google (Gemini via OpenAI-compatible endpoint)
 - Any custom provider with OpenAI-compatible API
 
 **Features:**
+
 - Streaming responses, built on the Vercel AI SDK (`ai` + `@ai-sdk/openai-compatible`)
 - Auto model selection (if blank)
 - On a request error, automatically retries up to 5 times, switching to a different model fetched from the provider's `/models` endpoint each time (100ms × attempt backoff between retries)
 - Reasoning content support: reasoning/thinking output is wrapped between configurable `reasoningStartMarker`/`reasoningEndMarker` settings (default `<think>` / `</think>`)
 
 **Configuration:**
+
 ```typescript
 {
   inferenceType: 'openai',
@@ -92,6 +102,7 @@ Uses OpenAI's API or any OpenAI-compatible service.
 ```
 
 **Privacy Considerations:**
+
 - Search queries and results sent to OpenAI
 - Not suitable for sensitive data
 - Consider internal API for private data
@@ -101,11 +112,13 @@ Uses OpenAI's API or any OpenAI-compatible service.
 Uses aihorde.net, a distributed volunteer GPU network.
 
 **Setup:**
+
 1. Settings → Inference Type: `AI Horde`
 2. (Optional) Settings → AI Horde API Key: Get from aihorde.net
 3. Settings → AI Horde Model: Select preferred model
 
 **How It Works:**
+
 1. Request sent to AI Horde API
 2. Distributed to volunteer workers
 3. Multiple workers may process in parallel
@@ -113,12 +126,14 @@ Uses aihorde.net, a distributed volunteer GPU network.
 5. Results streamed back
 
 **Features:**
+
 - Free to use (anonymous or authenticated)
 - Kudos-based priority system
 - Large model selection (70B+ params available)
 - No API key required (but recommended for priority)
 
 **Configuration:**
+
 ```typescript
 {
   inferenceType: 'horde',
@@ -128,6 +143,7 @@ Uses aihorde.net, a distributed volunteer GPU network.
 ```
 
 **Limitations:**
+
 - Variable latency (depends on worker availability)
 - Quality varies by worker
 - May queue during high demand
@@ -138,11 +154,13 @@ Uses aihorde.net, a distributed volunteer GPU network.
 Self-hosted OpenAI-compatible API for teams and compliance.
 
 **Setup:**
+
 1. Host an OpenAI-compatible API (e.g., vLLM, llama.cpp server, Ollama with OpenAI compat)
 2. Configure environment variables (see `docs/configuration.md`)
 3. Settings → Inference Type: `Internal`
 
 **Environment Variables:**
+
 ```bash
 INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL="https://llm.company.com/v1"
 INTERNAL_OPENAI_COMPATIBLE_API_KEY="sk-internal-xxx"
@@ -152,12 +170,14 @@ INTERNAL_OPENAI_COMPATIBLE_API_NAME="Company LLM"
 
 **Server-Side Proxy:**
 The internal API uses a server-side proxy to:
+
 - Hide API keys from client
 - Add request logging/auditing
 - Apply rate limiting
 - Enable token-based authentication
 
 **Endpoint:**
+
 ```
 POST /inference?token=<argon2-hashed-search-token>
 Content-Type: application/json
@@ -179,12 +199,14 @@ the first token, how many models were tried, and which model ids failed. See
 the `/status` section of `docs/overview.md` for the field reference.
 
 **Features:**
+
 - Private data stays in your infrastructure
 - Custom model selection
 - Server-side logging
 - Compatible with any OpenAI-compatible API
 
 **Recommended Self-Hosted Options:**
+
 - **vLLM**: High-performance, production-ready
 - **llama.cpp server**: Single binary, easy setup
 - **Ollama**: Simple, Docker-friendly
@@ -257,6 +279,7 @@ For non-browser inference types (`openai`, `internal`, `horde`), the state skips
 ### Response Throttling
 
 Two PubSub update functions are throttled to 12 updates per second to ensure UI performance during high-frequency streaming:
+
 - `updateResponse` &rarr; `responsePubSub`
 - `updateReasoningContent` &rarr; `reasoningContentPubSub`
 
@@ -283,6 +306,7 @@ For browser inference, the system first loads the model from HuggingFace with a 
 - **Available for Context:** 75% (~3072 tokens)
 
 **Allocation Priority:**
+
 1. System prompt (with search results)
 2. Conversation summary (if exists)
 3. Recent chat messages (newest first)
@@ -291,6 +315,7 @@ For browser inference, the system first loads the model from HuggingFace with a 
 ### Rolling Summaries
 
 When conversation exceeds token budget:
+
 1. **Detect Overflow:** Current tokens > 3072
 2. **Generate Summary:** Call LLM with 800-token limit
 3. **Store Summary:** Save in conversationSummaryPubSub
@@ -298,6 +323,7 @@ When conversation exceeds token budget:
 5. **Continue:** Use summary + remaining messages for context
 
 **Summary Prompt:**
+
 ```
 Summarize this conversation in 3-5 sentences, preserving key facts
 and user intent. Be concise but informative.
@@ -364,6 +390,7 @@ Wllama handles both WebGPU and CPU paths internally. If the model fails to load 
 ### State Recovery
 
 If generation fails mid-stream:
+
 1. Set `textGenerationState` to `failed`
 2. Preserve partial response in `responsePubSub`
 3. Allow user to retry or modify query
@@ -383,6 +410,7 @@ Wllama model shards are cached in the browser's Origin Private File System after
 ### Progressive Model Loading
 
 Wllama models are sharded (split into chunks):
+
 1. Download metadata first (small, fast)
 2. Download required shards progressively
 3. Start inference when first shards available

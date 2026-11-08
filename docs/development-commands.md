@@ -26,6 +26,7 @@ Failure-injection cases (dependency down, empty results, aborted stream) are cat
 `eval/` is an offline eval that gives a regression signal for changes to the
 reranker, the system prompt, the search-results formatting, or the model. See
 `eval/README.md` for details and the LLM-judge environment variables.
+
 - **`npm run eval`**: Run the full eval (retrieval + answer)
 - **`npm run eval:retrieval`**: Retrieval eval (real ONNX reranker; local only, needs the model in `server/models/`)
 - **`npm run eval:answer`**: Answer eval (LLM judge; gated on `EVAL_LLM_API_KEY`, skips without one)
@@ -33,6 +34,7 @@ reranker, the system prompt, the search-results formatting, or the model. See
 ### Coverage Reports for AI Analysis
 
 After running `test:coverage`, AI agents can analyze these JSON files:
+
 - **`coverage/coverage-summary.json`**: Quick metrics view - overall percentages per file
 
   ```json
@@ -52,6 +54,7 @@ After running `test:coverage`, AI agents can analyze these JSON files:
   - Maps statement/branch/function IDs to source locations
 
 AI agents can parse these to identify:
+
 - Files with coverage below thresholds
 - Uncovered lines and branches
 - Functions without tests
@@ -78,6 +81,7 @@ The repository uses nine GitHub Actions workflows for continuous integration, de
 ### Reusable Workflow (`reusable-check-docker.yml`)
 
 Used by both `on-push-to-main` and `on-pull-request-to-main` to run the production container smoke test:
+
 1. **check-docker-container** - Builds and starts the production container with `docker compose -f docker-compose.production.yml up -d`, then verifies the main page returns HTTP 200 within 60 seconds
 
 ### Docker Image Builds

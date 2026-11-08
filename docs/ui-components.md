@@ -27,6 +27,7 @@ updateQuery("new query");
 ```
 
 **Benefits:**
+
 - **Decoupling** — Modules (text generation, search, React components) read and write shared state without importing each other directly
 - **No provider boilerplate** — Unlike React Context or Redux, no `Provider` wrapper needed; any module imports a channel from `pubSub.ts`
 - **Selective subscriptions** — Components subscribe only to channels they use; a streaming token update throttling `responsePubSub` does not trigger re-renders in unrelated components
@@ -35,6 +36,7 @@ updateQuery("new query");
 ### localStorage Persistence
 
 Some state must survive page reloads. The `createLocalStoragePubSub` helper wraps `createPubSub` with two behaviors:
+
 1. **Hydration** — On first call, reads existing value from `localStorage` via `localStorage.getItem(key)`. If a stored JSON string is found, it is parsed and used as the initial value; otherwise the default value is used
 2. **Persistence** — A subscriber is immediately registered on the inner PubSub that calls `localStorage.setItem` with the JSON-serialized new value on every state change
 
@@ -133,6 +135,7 @@ App
 **Responsibility:** Application shell and routing
 
 **Logic:**
+
 ```typescript
 // App.tsx
 // Access key validation is handled via useAccessKeyValidation hook
@@ -147,6 +150,7 @@ App
 **Responsibility:** Query input and search initiation
 
 **PubSub:**
+
 - **Subscribes:** `queryPubSub`, `textSearchStatePubSub`
 - **Updates:** `queryPubSub` (on type), triggers `searchAndRespond()` (on submit)
 
@@ -155,6 +159,7 @@ The query field is wrapped in its own `position: relative` element so
 when the row of buttons below the field changes height.
 
 **Logic:**
+
 ```typescript
 function SearchForm() {
   const [query, setQuery] = usePubSub(queryPubSub);
@@ -185,6 +190,7 @@ dictation session: the engine choice, the microphone lifecycle, and the splice
 that appends each transcript without clobbering what the user typed meanwhile.
 
 **PubSub:**
+
 - **Subscribes:** `settingsPubSub` (`enableDictation`, `enableLocalDictationModel`)
 
 **Props:**
@@ -208,9 +214,11 @@ effect never runs.
 **Responsibility:** Display search results (text and images)
 
 **PubSub:**
+
 - **Subscribes:** `textSearchResultsPubSub`, `imageSearchResultsPubSub`, `textSearchStatePubSub`
 
 **Logic:**
+
 ```typescript
 function SearchResultsSection() {
   const [textResults] = usePubSub(textSearchResultsPubSub);
@@ -234,6 +242,7 @@ function SearchResultsSection() {
 **Responsibility:** AI response display and chat interface
 
 **PubSub:**
+
 - **Subscribes:** `responsePubSub`, `textGenerationStatePubSub`, `chatMessagesPubSub`
 
 **State Machine (`textGenerationStatePubSub`):**
@@ -255,6 +264,7 @@ function SearchResultsSection() {
 When models output internal thought processes, the UI extracts reasoning content bounded by `reasoningStartMarker` and `reasoningEndMarker` markers. Reasoning is displayed separately from the final response in a collapsible section.
 
 **Logic:**
+
 ```typescript
 function AiResponseSection() {
   const [response] = usePubSub(responsePubSub);
@@ -289,6 +299,7 @@ function AiResponseSection() {
 **Responsibility:** Application settings UI
 
 **Sub-components:**
+
 - **AISettingsForm:** Model selection, inference type, reasoning markers (sampling parameters such as temperature are hardcoded, not user-configurable)
 - **SearchSettingsForm:** Result limits, image search toggle
 - **InterfaceSettingsForm:** UI preferences
@@ -297,9 +308,11 @@ function AiResponseSection() {
 - **ActionsForm:** Data management actions
 
 **PubSub:**
+
 - **Subscribes/Updates:** `settingsPubSub` (full settings object)
 
 **Persistence:**
+
 ```typescript
 // client/modules/pubSub.ts
 export const settingsPubSub = createLocalStoragePubSub(
@@ -315,9 +328,11 @@ export const settingsPubSub = createLocalStoragePubSub(
 **Responsibility:** Search history display and management
 
 **PubSub:**
+
 - **Subscribes:** History loaded from IndexedDB (not via PubSub, via custom hook)
 
 **Hook:** `useSearchHistory()`
+
 ```typescript
 const {
   filteredSearches,
@@ -329,11 +344,13 @@ const {
 ```
 
 Restoring a past search (re-running its query) is handled separately by `useHistoryRestore`, used in `SearchForm`:
+
 ```typescript
 const { restoreSearch } = useHistoryRestore(updateQuery, textAreaRef);
 ```
 
 **Features:**
+
 - Fuzzy search through history
 - Date-based grouping (Today, Yesterday, Last Week, etc.)
 - Pin/unpin searches
@@ -419,6 +436,7 @@ Saved to IndexedDB
 ### usePubSub
 
 Subscribes to a PubSub channel:
+
 ```typescript
 const [value, setValue] = usePubSub(channel);
 ```
@@ -426,6 +444,7 @@ const [value, setValue] = usePubSub(channel);
 ### useSearchHistory
 
 Manages search history from IndexedDB:
+
 ```typescript
 const { searchHistory, groupedSearches, deleteEntry, togglePin } =
   useSearchHistory();
@@ -434,6 +453,7 @@ const { searchHistory, groupedSearches, deleteEntry, togglePin } =
 ### useDrawerState
 
 Manages open/close state for a drawer with log entry tracking:
+
 ```typescript
 const { isDrawerOpen, openDrawer, closeDrawer } = useDrawerState(
   "User opened the menu",
@@ -446,6 +466,7 @@ const { isDrawerOpen, openDrawer, closeDrawer } = useDrawerState(
 Holds the [Screen Wake Lock](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API)
 while the flag is true, so a phone left untouched during a long answer does not
 lock while the text streams in:
+
 ```typescript
 useScreenWakeLock(statesKeepingTheScreenAwake.includes(textGenerationState));
 ```
@@ -460,12 +481,14 @@ lock and no error.
 **Framework:** Mantine UI v9
 
 **Theme Configuration:**
+
 ```typescript
 // client/components/App/App.tsx
 <MantineProvider defaultColorScheme="dark">
 ```
 
 **Dark Mode:**
+
 - Default color scheme is dark
 - All components support dark mode via Mantine
 
@@ -474,12 +497,14 @@ lock and no error.
 **Standards:** WCAG 2.1 AA compliance
 
 **Features:**
+
 - All interactive elements keyboard accessible
 - ARIA labels on select interactive elements (e.g. chat input, message list, history actions, logs modal)
 - Focus management in drawers and modals
 - Screen reader announcements for loading states
 
 **Implementation:**
+
 ```typescript
 // Using Mantine's accessibility props
 <Button aria-label="Search the web">

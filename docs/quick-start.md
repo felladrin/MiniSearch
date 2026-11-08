@@ -23,6 +23,7 @@ docker compose up
 Access the application at `http://localhost:7860` (main). During development, HMR is available on `http://localhost:7861` for instant code changes.
 
 The development server includes:
+
 - Hot Module Replacement (HMR) on port 7861 for instant code changes
 - Full dev tools and source maps
 - Live code watching with volume mounts
@@ -39,6 +40,7 @@ docker compose -f docker-compose.production.yml up --build
 Access at `http://localhost:7860`
 
 Production mode:
+
 - Pre-built optimized assets
 - No dev tools or HMR
 - Optimized Docker layer caching
@@ -46,6 +48,7 @@ Production mode:
 ## Container Internals
 
 The Docker container runs three services concurrently:
+
 - **SearXNG** - Privacy-focused metasearch engine (starts in background)
 - **ONNX Runtime** - In-process inference for result reranking
 - **Node.js (Vite)** - Main application server
@@ -139,6 +142,7 @@ Access at `http://localhost:7860`
 ### Issue: Search returns no results
 
 **Solution**: Verify SearXNG is running. Check container logs:
+
 ```bash
 docker compose logs searxng
 ```
@@ -146,6 +150,7 @@ docker compose logs searxng
 ### Issue: AI response never loads
 
 **Solution**: Check browser console for errors. Common causes:
+
 - WebGPU not supported (app will automatically fall back to Wllama)
 - Model download blocked by firewall or CORS
 - Insufficient disk space for model caching
@@ -159,6 +164,7 @@ docker compose logs searxng
 ### Issue: Port already in use
 
 **Solution**: Change ports in `docker-compose.yml`:
+
 ```yaml
 ports:
   - "7862:7861" # Use 7862 instead of 7860 (HMR port)
