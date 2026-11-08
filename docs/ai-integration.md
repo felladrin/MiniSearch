@@ -34,7 +34,7 @@ Uses `@wllama/wllama` for browser-based inference. Automatically uses WebGPU whe
 5. Streams tokens via the OAI-compatible `createChatCompletion` API
 
 **Pre-configured Models:**
-30+ stored at `Felladrin/gguf-sharded-*` on HuggingFace. MiniSearch currently ships 39 pre-configured models, ranging from SmolLM 2 135M (~100MB) up to Spark X2.6 4B (~3.5GB). The full, authoritative list with HuggingFace repo IDs and sizes lives in `client/modules/wllama.ts` (`wllamaModels`) and is rendered in the Settings dropdown; refer to that file rather than a static table here, since models are added/swapped frequently.
+Several, stored at `Felladrin/gguf-sharded-*` on HuggingFace. The full, authoritative list with HuggingFace repo IDs and sizes lives in `client/modules/wllama.ts` (`wllamaModels`) and is rendered in the Settings dropdown; refer to that file rather than a static table here, since models are added/swapped frequently.
 
 Two constraints decide what can join that list, both measured against the shipped wasm build:
 
