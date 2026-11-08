@@ -8,6 +8,7 @@
   "ignoreFiles": [
     "client/postcss.config.cjs",
     "vitest.integration.config.ts",
-    "scripts/npm-bundle-overlay.cjs"
+    "scripts/npm-bundle-overlay.cjs",
+    "scripts/wllama-bench/bench.ts"
   ]
 }

@@ -1,0 +1,374 @@
+[
+  {
+    "name": "en",
+    "language": "en",
+    "facts": ["330", "Koechlin|Nouguier", "1889"],
+    "query": "How tall is the Eiffel Tower, who designed it, and why was it built?",
+    "results": [
+      [
+        "Eiffel Tower height and dimensions",
+        "Standing 330 metres including its antennas, the tower is the tallest structure in Paris.",
+        "https://example.org/eiffel-height"
+      ],
+      [
+        "Who designed the Eiffel Tower?",
+        "Engineers Maurice Koechlin and Émile Nouguier drew the first design; Gustave Eiffel's company built it.",
+        "https://example.org/eiffel-design"
+      ],
+      [
+        "The 1889 Exposition Universelle",
+        "The tower was the entrance arch to the 1889 World's Fair, marking 100 years since the French Revolution.",
+        "https://example.org/expo-1889"
+      ]
+    ],
+    "pages": {
+      "https://example.org/eiffel-design": "The idea for the tower came from Maurice Koechlin and Émile Nouguier, two senior engineers at Gustave Eiffel's firm. Architect Stephen Sauvestre reworked the look of their first sketch. Eiffel bought the rights to the patent from his engineers and promoted the project, so the tower carries his name."
+    }
+  },
+  {
+    "name": "pt-from-en",
+    "language": "pt",
+    "facts": ["330", "1889"],
+    "query": "Qual é a altura da Torre Eiffel e por que ela foi construída?",
+    "results": [
+      [
+        "Eiffel Tower height and dimensions",
+        "Standing 330 metres including its antennas, the tower is the tallest structure in Paris.",
+        "https://example.org/eiffel-height"
+      ],
+      [
+        "The 1889 Exposition Universelle",
+        "The tower was the entrance arch to the 1889 World's Fair, marking 100 years since the French Revolution.",
+        "https://example.org/expo-1889"
+      ],
+      [
+        "Eiffel Tower facts",
+        "It was the world's tallest man-made structure for 41 years, until New York's Chrysler Building in 1930.",
+        "https://example.org/eiffel-facts"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "es",
+    "language": "es",
+    "facts": ["1914", "82"],
+    "query": "¿Cuándo se inauguró el Canal de Panamá y cuánto mide?",
+    "results": [
+      [
+        "Canal de Panamá - Historia",
+        "El Canal de Panamá se inauguró el 15 de agosto de 1914, tras diez años de obras dirigidas por Estados Unidos.",
+        "https://example.org/canal-historia"
+      ],
+      [
+        "Datos del Canal de Panamá",
+        "El canal mide unos 82 kilómetros y une el océano Atlántico con el océano Pacífico.",
+        "https://example.org/canal-datos"
+      ],
+      [
+        "Ampliación del canal",
+        "Las nuevas esclusas, abiertas en 2016, permiten el paso de buques mucho más grandes.",
+        "https://example.org/canal-ampliacion"
+      ]
+    ],
+    "pages": {
+      "https://example.org/canal-datos": "El Canal de Panamá tiene una longitud aproximada de 82 kilómetros. Un barco tarda entre ocho y diez horas en cruzarlo. El canal utiliza un sistema de esclusas que eleva los barcos hasta el lago Gatún, a 26 metros sobre el nivel del mar."
+    }
+  },
+  {
+    "name": "fr",
+    "language": "fr",
+    "facts": ["1862", "Bruxelles|Belgique"],
+    "query": "Quand et où Les Misérables a-t-il été publié pour la première fois ?",
+    "results": [
+      [
+        "Les Misérables - Publication",
+        "Le roman de Victor Hugo paraît pour la première fois en 1862, à Bruxelles, chez l'éditeur Lacroix.",
+        "https://example.org/miserables-publication"
+      ],
+      [
+        "Victor Hugo en exil",
+        "Hugo écrit la fin du roman pendant son exil à Guernesey.",
+        "https://example.org/hugo-exil"
+      ],
+      [
+        "Les Misérables - Résumé",
+        "Le livre suit Jean Valjean, un ancien forçat, de 1815 à 1832.",
+        "https://example.org/miserables-resume"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "de",
+    "language": "de",
+    "facts": ["1989", "155"],
+    "query": "Wann fiel die Berliner Mauer und wie lang war sie?",
+    "results": [
+      [
+        "Fall der Berliner Mauer",
+        "Am 9. November 1989 öffnete die DDR die Grenzübergänge, und die Berliner Mauer fiel.",
+        "https://example.org/mauerfall"
+      ],
+      [
+        "Die Berliner Mauer in Zahlen",
+        "Die Grenzanlagen rund um West-Berlin waren etwa 155 Kilometer lang.",
+        "https://example.org/mauer-zahlen"
+      ],
+      [
+        "Bau der Mauer",
+        "Mit dem Bau der Mauer begann die DDR am 13. August 1961.",
+        "https://example.org/mauerbau"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "zh",
+    "language": "zh",
+    "facts": ["21[,，\\s\\u202f]?196|2\\.1万|两万一千"],
+    "query": "长城的总长度是多少？",
+    "results": [
+      [
+        "长城资源调查结果",
+        "2012年，国家文物局公布历代长城总长度为21196.18千米。",
+        "https://example.org/changcheng-diaocha"
+      ],
+      [
+        "长城简介",
+        "长城是中国古代的军事防御工程，修筑历史可上溯到西周时期。",
+        "https://example.org/changcheng-jianjie"
+      ],
+      [
+        "明长城",
+        "现存的长城遗迹主要为明代所修，东起鸭绿江，西至嘉峪关。",
+        "https://example.org/ming-changcheng"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "ja",
+    "language": "ja",
+    "facts": ["3[,，\\s\\u202f]?776|三千七百七十六"],
+    "query": "富士山の標高はどのくらいですか？",
+    "results": [
+      [
+        "富士山 - 基本情報",
+        "富士山は静岡県と山梨県にまたがる活火山で、標高は3776メートル、日本で最も高い山です。",
+        "https://example.org/fujisan-kihon"
+      ],
+      [
+        "富士山の世界遺産登録",
+        "富士山は2013年に「富士山－信仰の対象と芸術の源泉」として世界文化遺産に登録されました。",
+        "https://example.org/fujisan-isan"
+      ],
+      [
+        "富士登山の季節",
+        "一般的な登山シーズンは7月上旬から9月上旬までです。",
+        "https://example.org/fujisan-tozan"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "ko",
+    "language": "ko",
+    "facts": ["1[,，\\s\\u202f]?947"],
+    "query": "한라산의 높이는 얼마인가요?",
+    "results": [
+      [
+        "한라산 - 개요",
+        "한라산은 제주도 중앙에 있는 화산으로, 높이는 1,947미터이며 남한에서 가장 높은 산이다.",
+        "https://example.org/hallasan-gaeyo"
+      ],
+      [
+        "한라산 국립공원",
+        "한라산 일대는 1970년에 국립공원으로 지정되었다.",
+        "https://example.org/hallasan-gongwon"
+      ],
+      [
+        "백록담",
+        "정상에는 백록담이라는 화구호가 있다.",
+        "https://example.org/baengnokdam"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "ar",
+    "language": "ar",
+    "facts": ["1869|١٨٦٩"],
+    "query": "متى افتتحت قناة السويس؟",
+    "results": [
+      [
+        "قناة السويس - التاريخ",
+        "افتتحت قناة السويس للملاحة في 17 نوفمبر 1869 بعد عشر سنوات من الحفر.",
+        "https://example.org/suez-tarikh"
+      ],
+      [
+        "قناة السويس - الموقع",
+        "تربط القناة بين البحر الأبيض المتوسط والبحر الأحمر.",
+        "https://example.org/suez-mawqi"
+      ],
+      [
+        "تأميم القناة",
+        "أمم الرئيس جمال عبد الناصر شركة قناة السويس عام 1956.",
+        "https://example.org/suez-tamim"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "hi",
+    "language": "hi",
+    "facts": [
+      "शाहजहाँ|शाहजहां|शाह जहाँ|शाह जहां|Shah ?Jahan",
+      "मुमताज़|मुमताज|Mumtaz"
+    ],
+    "query": "ताजमहल किसने और किसकी याद में बनवाया था?",
+    "results": [
+      [
+        "ताजमहल - इतिहास",
+        "ताजमहल का निर्माण मुग़ल बादशाह शाहजहाँ ने अपनी पत्नी मुमताज़ महल की याद में करवाया था।",
+        "https://example.org/tajmahal-itihas"
+      ],
+      [
+        "ताजमहल - स्थान",
+        "ताजमहल आगरा में यमुना नदी के किनारे स्थित है।",
+        "https://example.org/tajmahal-sthan"
+      ],
+      [
+        "विश्व धरोहर",
+        "ताजमहल को 1983 में यूनेस्को विश्व धरोहर स्थल घोषित किया गया।",
+        "https://example.org/tajmahal-dharohar"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "ru",
+    "language": "ru",
+    "facts": ["1703", "Пётр|Петр|Петра|Петром|Петру"],
+    "query": "Когда и кем был основан Санкт-Петербург?",
+    "results": [
+      [
+        "История Санкт-Петербурга",
+        "Санкт-Петербург был основан Петром I 27 мая 1703 года в устье реки Невы.",
+        "https://example.org/spb-istoriya"
+      ],
+      [
+        "Санкт-Петербург - столица империи",
+        "С 1712 по 1918 год город был столицей России.",
+        "https://example.org/spb-stolitsa"
+      ],
+      [
+        "Петропавловская крепость",
+        "Крепость, заложенная в день основания города, стала его первым сооружением.",
+        "https://example.org/spb-krepost"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "de-synthesis",
+    "language": "de",
+    "facts": ["Gro(ß|ss)glockner", "836"],
+    "allowNumbers": ["836"],
+    "query": "Welcher Berg ist höher, die Zugspitze oder der Großglockner, und um wie viel?",
+    "results": [
+      [
+        "Zugspitze - Steckbrief",
+        "Die Zugspitze ist mit 2962 Metern der höchste Berg Deutschlands.",
+        "https://example.org/zugspitze"
+      ],
+      [
+        "Großglockner - Steckbrief",
+        "Der Großglockner ist mit 3798 Metern der höchste Berg Österreichs.",
+        "https://example.org/grossglockner"
+      ],
+      [
+        "Alpen in Zahlen",
+        "Die Alpen erstrecken sich über acht Staaten.",
+        "https://example.org/alpen"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "es-distractor",
+    "language": "es",
+    "facts": ["183|204"],
+    "forbidden": ["225", "246"],
+    "query": "¿Qué altura tiene la Torre Latinoamericana?",
+    "results": [
+      [
+        "Torre Mayor",
+        "La Torre Mayor, en Paseo de la Reforma, mide 225 metros.",
+        "https://example.org/torre-mayor"
+      ],
+      [
+        "Torre Reforma",
+        "Con 246 metros, la Torre Reforma es una de las más altas de la Ciudad de México.",
+        "https://example.org/torre-reforma"
+      ],
+      [
+        "Torre Latinoamericana",
+        "La Torre Latinoamericana, inaugurada en 1956, mide 183 metros, o 204 metros con su antena.",
+        "https://example.org/torre-latinoamericana"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "pt-not-covered",
+    "language": "pt",
+    "allowOwnKnowledge": true,
+    "facts": [
+      "não[^.]{0,30}(informa|menciona|traz|cont[eé]m|apresenta|fornece|cita|encontr|lista|consta)|não há informaç|nenhum dos resultados|resultados não|sem (essa|esta) informação|(próprio|meu) conhecimento"
+    ],
+    "query": "Qual é a população atual de Curitiba?",
+    "results": [
+      [
+        "Clima de Curitiba",
+        "Curitiba tem clima subtropical úmido, com invernos frios e geadas frequentes.",
+        "https://example.org/curitiba-clima"
+      ],
+      [
+        "Transporte em Curitiba",
+        "O sistema de ônibus BRT de Curitiba foi inaugurado em 1974 e inspirou cidades do mundo todo.",
+        "https://example.org/curitiba-brt"
+      ],
+      [
+        "Ópera de Arame",
+        "A Ópera de Arame, teatro de estrutura tubular, foi inaugurada em 1992.",
+        "https://example.org/opera-de-arame"
+      ]
+    ],
+    "pages": {}
+  },
+  {
+    "name": "zh-from-en",
+    "language": "zh",
+    "facts": ["8[,，\\s\\u202f]?848"],
+    "query": "珠穆朗玛峰有多高？",
+    "results": [
+      [
+        "Mount Everest height",
+        "A 2020 survey by China and Nepal set Mount Everest's height at 8,848.86 metres above sea level.",
+        "https://example.org/everest-height"
+      ],
+      [
+        "Climbing Everest",
+        "Most climbers attempt the summit in May, when the jet stream moves away.",
+        "https://example.org/everest-climbing"
+      ],
+      [
+        "Everest in Nepal and Tibet",
+        "The mountain sits on the border between Nepal and the Tibet Autonomous Region of China.",
+        "https://example.org/everest-border"
+      ]
+    ],
+    "pages": {}
+  }
+]

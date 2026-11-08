@@ -34,6 +34,7 @@ This is your navigation hub. Start here, follow the links, and return when you n
 
 - **`docs/api.md`** - HTTP endpoint reference: parameters, responses, and error codes
 - **`docs/ai-integration.md`** - AI inference types (Wllama, OpenAI, AI Horde, Internal)
+- **`docs/wllama-model-evaluation.md`** - How in-browser models are scored on MiniSearch's task
 - **`docs/ui-components.md`** - Component architecture and PubSub patterns
 - **`docs/search-history.md`** - History database schema and management
 - **`docs/conversation-memory.md`** - Token budgeting and rolling summaries
@@ -190,7 +191,7 @@ Need to:
 
 ### Add a new AI model
 
-1. Check the wasm build can run it: the architecture must exist in `node_modules/@wllama/wllama/esm/wasm/wllama.wasm` (grep the binary for the arch name), and the quant must stay under the ceilings in `docs/ai-integration.md` (shard every file under 2000 MiB; total weights under ~3.7 GB)
+1. Check the wasm build can run it: the architecture must exist in `node_modules/@wllama/wllama/esm/wasm/wllama.wasm` (grep the binary for the arch name), and the quant must stay under the ceilings in `docs/ai-integration.md` (shard every file under 2000 MiB; total weights under ~3.7 GB). Then run it for real with `npm run bench:wllama -- --model owner/repo/file.gguf` (see `docs/development-commands.md#wllama-benchmark`), on both devices: speed and answer quality can rank differently on WebGPU and on CPU
 2. Shard the GGUF (`llama-gguf-split --split --size`, or an equivalent) and publish to a `Felladrin/gguf-sharded-<QUANT>-<Name>` repo
 3. Add to `client/modules/wllama.ts`; thinking-by-default templates need nothing extra (their `reasoning_content` channel is streamed into the thinking UI) but do need `reasoningBudgetTokens` so they cannot think past the context without answering
 4. Run `node scripts/wllama-catalog-check.cjs` and `npx vitest run client/modules/wllama.test.ts`

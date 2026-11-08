@@ -33,7 +33,8 @@
     "changelog-guard": "node scripts/changelog-guard.cjs",
     "license-check": "node scripts/license-check.cjs",
     "native-module-check": "node scripts/native-module-integrity.cjs",
-    "wllama-catalog-check": "node scripts/wllama-catalog-check.cjs"
+    "wllama-catalog-check": "node scripts/wllama-catalog-check.cjs",
+    "bench:wllama": "node scripts/wllama-bench/run.mjs"
   },
   "allowScripts": {
     "onnxruntime-node": false,

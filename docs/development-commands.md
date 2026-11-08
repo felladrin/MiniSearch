@@ -31,6 +31,38 @@ reranker, the system prompt, the search-results formatting, or the model. See
 - **`npm run eval:retrieval`**: Retrieval eval (real ONNX reranker; local only, needs the model in `server/models/`)
 - **`npm run eval:answer`**: Answer eval (LLM judge; gated on `EVAL_LLM_API_KEY`, skips without one)
 
+## wllama benchmark
+
+`npm run bench:wllama` loads a wllama model in headless Chromium, times it on the questions in `scripts/wllama-bench/cases.json`, and scores the answers. It goes through MiniSearch's own code: the catalog entry in `client/modules/wllama.ts`, the warmup-then-load in `initializeWllama`, and the chat messages built from search results and page excerpts. So the numbers and answers are the ones a user would get. Use it to vet a model before it joins the catalog, or to compare catalog models. The scoring rules and the latest results are in [wllama-model-evaluation.md](wllama-model-evaluation.md).
+
+```bash
+npm run bench:wllama -- --model qwen-3.5-0.8b --model granite-4.2-3b --device webgpu
+npm run bench:wllama -- --model owner/repo/Model-Q4_K_M-00001-of-00003.gguf --template-kwargs '{"enable_thinking":false}'
+```
+
+| Option                 | Default              | Meaning                                                                                |
+| ---------------------- | -------------------- | -------------------------------------------------------------------------------------- |
+| `--model` (repeatable) | required             | A catalog id, or `owner/repo/file.gguf` on Hugging Face for a model not in the catalog |
+| `--device`             | `both`               | `webgpu`, `cpu` (`n_gpu_layers: 0`, what MiniSearch does without WebGPU), or `both`    |
+| `--runs`               | `1`                  | Repetitions per model and device                                                       |
+| `--threads`            | `cpuThreads` setting | CPU threads                                                                            |
+| `--template-kwargs`    | catalog value        | JSON for `chat_template_kwargs`; replaces the catalog's                                |
+| `--reasoning-budget`   | catalog value        | `reasoning_budget_tokens`, applied at load time as the app does                        |
+| `--chrome`             | Playwright Chromium  | Path to another Chromium binary                                                        |
+| `--json`               | none                 | Writes every result, including the full reasoning and answer, to this file             |
+| `--cases`              | `cases.json`         | Another question set with the same shape                                               |
+| `--case-timeout`       | `300`                | Seconds before an answer is cut off; the scorer counts the cut as a violation          |
+| `--profile`            | see below            | Browser profile directory; two runs at once need two, since Chromium locks one in use  |
+| `--system-prompt`      | none                 | A file with another system prompt, to measure a change to it before shipping it        |
+| `--verbose`            | off                  | Streams the page console, llama.cpp's log included                                     |
+
+Things to know:
+
+- Run it on the host, not in the dev container, which has no browser or GPU. It needs the host's `npm install` and Playwright's Chromium (`npx playwright install chromium`).
+- An old system Chrome is not a stand-in: Chrome 137 rejects the `subgroup_id` WGSL builtin that wllama's WebGPU shaders use, so every model aborts on WebGPU there.
+- The browser profile lives in `<system temp>/minisearch-wllama-bench-profile`, so OPFS keeps each model after its first download. Delete that folder to reclaim the space.
+- On a failure the script prints the page's last console lines; llama.cpp's reason for an abort is usually among them.
+
 ### Coverage Reports for AI Analysis
 
 After running `test:coverage`, AI agents can analyze these JSON files:
