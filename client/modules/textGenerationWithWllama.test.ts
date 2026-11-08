@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { addLogEntry } from "./logEntries";
 import {
+  getSettings,
   updateModelLoadingProgress,
   updateModelSizeInMegabytes,
+  updateSettings,
 } from "./pubSub";
 import {
   composeStreamedText,
@@ -24,7 +27,16 @@ vi.mock("./pubSub", () => ({
   updateModelLoadingProgress: vi.fn(),
   updateModelSizeInMegabytes: vi.fn(),
   updateResponse: vi.fn(),
+  updateSettings: vi.fn(),
   updateTextGenerationState: vi.fn(),
+}));
+
+vi.mock("./config", () => ({
+  getConfig: vi.fn().mockResolvedValue({
+    wllamaDefaultModelId: "test-model",
+    wllamaDefaultGpuModelId: "test-gpu-model",
+  }),
+  FALLBACK_CONFIG: {},
 }));
 
 vi.mock("./systemPrompt", () => ({
@@ -100,6 +112,29 @@ describe("generateTextWithWllama", () => {
       [250], // measured size, republished with each progress update
       [250],
     ]);
+  });
+
+  it("switches to the default model when the saved one left the catalog", async () => {
+    const savedSettings = getSettings();
+    vi.mocked(getSettings).mockReturnValue({
+      ...savedSettings,
+      wllamaModelId: "removed-model",
+    });
+    mockDownload([]);
+
+    try {
+      await generateTextWithWllama();
+    } finally {
+      vi.mocked(getSettings).mockReturnValue(savedSettings);
+    }
+
+    expect(vi.mocked(initializeWllama).mock.calls[0]?.[0]).toBe("repo");
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ wllamaModelId: "test-model" }),
+    );
+    expect(addLogEntry).toHaveBeenCalledWith(
+      expect.stringContaining("removed-model"),
+    );
   });
 
   it("keeps the last known size when the total is not available yet", async () => {

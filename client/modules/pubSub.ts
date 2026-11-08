@@ -117,7 +117,8 @@ export const settingsPubSub = createLocalStoragePubSub(
   defaultSettings,
 );
 
-export const [, listenToSettingsChanges, getSettings] = settingsPubSub;
+export const [updateSettings, listenToSettingsChanges, getSettings] =
+  settingsPubSub;
 
 export const modelSizeInMegabytesPubSub = createPubSub(0);
 

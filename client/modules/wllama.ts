@@ -169,26 +169,12 @@ const createDefaultModelConfig = (): Omit<
 });
 
 export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
-  "smollm2-135m": {
-    ...createDefaultModelConfig(),
-    label: "SmolLM 2 135M",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-SmolLM2-135M-Instruct",
-    hfFilePath: "model.shard-00001-of-00004.gguf",
-    fileSizeInMegabytes: 102,
-  },
   "lfm2.5-230m": {
     ...createDefaultModelConfig(),
     label: "LFM2.5 230M",
     hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-LFM2.5-230M",
     hfFilePath: "LFM2.5-230M-Q4_K_XL-00001-of-00003.gguf",
     fileSizeInMegabytes: 160,
-  },
-  "granite-4.0-350m": {
-    ...createDefaultModelConfig(),
-    label: "Granite 4.0 350M",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-4.0-350m",
-    hfFilePath: "granite-4.0-350m-Q4_K_S-00001-of-00003.gguf",
-    fileSizeInMegabytes: 229,
   },
   "littlelamb-290m": {
     ...createDefaultModelConfig(),
@@ -263,33 +249,12 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00003.gguf",
     fileSizeInMegabytes: 781,
   },
-  "pints-1.5b": {
-    ...createDefaultModelConfig(),
-    label: "Pints 1.5B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-1.5-Pints-16K-v0.1",
-    hfFilePath: "model.shard-00001-of-00018.gguf",
-    fileSizeInMegabytes: 905,
-  },
   "olmo-2-0425-1b": {
     ...createDefaultModelConfig(),
     label: "OLMo 2 1B",
     hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-OLMo-2-0425-1B-Instruct",
     hfFilePath: "model.shard-00001-of-00006.gguf",
     fileSizeInMegabytes: 967,
-  },
-  "granite-4.0-1b": {
-    ...createDefaultModelConfig(),
-    label: "Granite 4.0 1B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-4.0-1b",
-    hfFilePath: "granite-4.0-1b-Q4_K_S-00001-of-00006.gguf",
-    fileSizeInMegabytes: 981,
-  },
-  "stablelm-2-zephyr-1.6b": {
-    ...createDefaultModelConfig(),
-    label: "StableLM 2 Zephyr 1.6B",
-    hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-stablelm-2-zephyr-1.6b",
-    hfFilePath: "model.shard-00001-of-00006.gguf",
-    fileSizeInMegabytes: 989,
   },
   "smollm2-1.7b": {
     ...createDefaultModelConfig(),
