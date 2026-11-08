@@ -1,4 +1,7 @@
-import { DEFAULT_SYSTEM_PROMPT } from "@shared/defaultSystemPrompt";
+import {
+  CITATION_EXAMPLE,
+  DEFAULT_SYSTEM_PROMPT,
+} from "@shared/defaultSystemPrompt";
 import {
   DEFAULT_INFERENCE_TYPE,
   DEFAULT_WLLAMA_GPU_MODEL_ID,
@@ -135,6 +138,28 @@ export function getInferenceTypes(config: ServerConfig) {
       ? [{ value: "internal" as const, label: config.internalApiName }]
       : []),
   ];
+}
+
+/** The citation example the default prompt carried until 2026-11-08. */
+const PREVIOUS_CITATION_EXAMPLE =
+  "[youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ)";
+
+/**
+ * Moves a saved prompt that is exactly the previous default onto the current
+ * one. Settings store the whole prompt, so without this a profile that saved
+ * its settings would keep the old citation example forever. A prompt the user
+ * edited is their choice and stays.
+ */
+export function upgradeUntouchedSystemPrompt(
+  settings: typeof defaultSettings,
+): typeof defaultSettings {
+  const previousDefault = DEFAULT_SYSTEM_PROMPT.replace(
+    CITATION_EXAMPLE,
+    PREVIOUS_CITATION_EXAMPLE,
+  );
+  return settings.systemPrompt === previousDefault
+    ? { ...settings, systemPrompt: DEFAULT_SYSTEM_PROMPT }
+    : settings;
 }
 
 /**

@@ -17,6 +17,7 @@ import {
   applyServerConfig,
   defaultSettings,
   hasStoredUserSettings,
+  upgradeUntouchedSystemPrompt,
 } from "@/modules/settings";
 import { isWebGPUAvailable } from "@/modules/webGpu";
 import "@mantine/notifications/styles.css";
@@ -116,7 +117,7 @@ function useInitializeSettings(config: ConfigState) {
 
     setSettings(
       applyServerConfig(
-        { ...defaultSettings, ...settings },
+        upgradeUntouchedSystemPrompt({ ...defaultSettings, ...settings }),
         config === "unavailable" ? FALLBACK_CONFIG : config,
         hasStoredUserSettings,
         isWebGPUAvailable,

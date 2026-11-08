@@ -1,3 +1,7 @@
+import {
+  CITATION_EXAMPLE,
+  DEFAULT_SYSTEM_PROMPT,
+} from "@shared/defaultSystemPrompt";
 import { describe, expect, it, vi } from "vitest";
 import type { ServerConfig } from "./config";
 import {
@@ -6,6 +10,7 @@ import {
   getDefaultCpuThreads,
   getInferenceTypes,
   prefersLocalDictationModel,
+  upgradeUntouchedSystemPrompt,
 } from "./settings";
 
 const mockConfig: ServerConfig = {
@@ -216,5 +221,29 @@ describe("dictation model default", () => {
     const { defaultSettings: settings } = await loadWithLanguage("en-US");
 
     expect(settings.enableLocalDictationModel).toBe(true);
+  });
+});
+
+describe("upgradeUntouchedSystemPrompt", () => {
+  const previousDefault = DEFAULT_SYSTEM_PROMPT.replace(
+    CITATION_EXAMPLE,
+    "[youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ)",
+  );
+
+  it("replaces a saved prompt that is exactly the previous default", () => {
+    const upgraded = upgradeUntouchedSystemPrompt({
+      ...defaultSettings,
+      systemPrompt: previousDefault,
+    });
+    expect(upgraded.systemPrompt).toBe(DEFAULT_SYSTEM_PROMPT);
+  });
+
+  it("keeps a prompt the user edited", () => {
+    const edited = `${previousDefault}\nAlways answer in haiku.`;
+    const kept = upgradeUntouchedSystemPrompt({
+      ...defaultSettings,
+      systemPrompt: edited,
+    });
+    expect(kept.systemPrompt).toBe(edited);
   });
 });
