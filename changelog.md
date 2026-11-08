@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-08
+
+- Thinking models get a 1024-token reasoning budget instead of 256, because a chain of thought cut off that early degraded the answer. Every model is also asked for `reasoning_effort: "low"`, which Granite 4.2 and Spark X2.6 honor by thinking less; the other templates ignore it. Five models that think by default had no budget at all and now get the same 1024 tokens: LittleLamb 290M, Qwen 3 0.6B, Qwen 3 1.7B, Polaris 4B and DeepSeek R1 Distill Qwen 1.5B. LittleLamb, the default for browsers without WebGPU, thought for up to 3,663 tokens on a single answer and sometimes never answered; with the budget it answered all 33 questions of three benchmark runs.
+
 ## 2026-11-05
 
 - Relative month and year words in a query are anchored to absolute ones before the search leaves the browser: "next month" reaches the engines as "December 2026" and "明年" as "2027年". The anchor is appended rather than substituted, so a query that already names a year keeps its own phrasing, and two anchors per query is the ceiling. The typed query still drives the prompt, the UI, and the history entry; only the copy sent to the search engines changes, and the search cache key changes with it. Anchors skip titles and phrases that are not dates ("明年今日", "登上月球", "the last year of college") and leave "recent" and "latest" alone, because recency is what the engines already rank for. Day words ("tomorrow", "明天") stay as typed: their anchor would be an ISO date, which pages rarely write, and many queries use them as names ("usa today"). Only English and Chinese phrases are recognized. `shared/relativeDates.ts` holds the rules and `client/modules/textGeneration.ts` applies them.

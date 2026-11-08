@@ -46,6 +46,17 @@ describe("wllamaModels catalog", () => {
     }
   });
 
+  it("asks every thinking model for low reasoning effort", () => {
+    // A chain of thought cut off by the budget degrades the answer, so the
+    // budget is only a backstop; templates that read `reasoning_effort`
+    // must be steered to think less in the first place.
+    for (const [id, model] of models) {
+      if (model.reasoningBudgetTokens !== undefined) {
+        expect(model.chatTemplateKwargs?.reasoning_effort, id).toBe("low");
+      }
+    }
+  });
+
   it("keeps reasoning budgets small enough to leave room for the answer", () => {
     // The budget forces the final answer once the chain of thought runs
     // this long. It must stay far below the 4096-token context, or the
