@@ -19,7 +19,7 @@ import {
   hasStoredUserSettings,
   upgradeUntouchedSystemPrompt,
 } from "@/modules/settings";
-import { isWebGPUAvailable } from "@/modules/webGpu";
+import { webGpuSupport } from "@/modules/webGpu";
 import "@mantine/notifications/styles.css";
 import { verifyStoredAccessKey } from "@/modules/accessKey";
 import {
@@ -104,28 +104,41 @@ function useServerConfig(): ConfigState {
  * A custom React hook that initializes the application settings.
  *
  * @remarks
- * Waits for the server config so its defaults can seed a fresh profile. Falling
- * back to shipped defaults is safe here: unlike access control, guessing wrong
- * only means the user sees the settings they can already change themselves.
+ * Waits for the server config so its defaults can seed a fresh profile, and
+ * for the WebGPU check, which picks between the GPU and the CPU default model.
+ * Falling back to shipped defaults is safe here: unlike access control,
+ * guessing wrong only means the user sees the settings they can already
+ * change themselves.
  */
 function useInitializeSettings(config: ConfigState) {
   const [settings, setSettings] = usePubSub(settingsPubSub);
   const [settingsInitialized, setSettingsInitialized] = useState(false);
+  const [hasWebGpu, setHasWebGpu] = useState<boolean>();
 
   useEffect(() => {
-    if (settingsInitialized || config === "loading") return;
+    webGpuSupport.then(setHasWebGpu);
+  }, []);
+
+  useEffect(() => {
+    if (
+      settingsInitialized ||
+      config === "loading" ||
+      hasWebGpu === undefined
+    ) {
+      return;
+    }
 
     setSettings(
       applyServerConfig(
         upgradeUntouchedSystemPrompt({ ...defaultSettings, ...settings }),
         config === "unavailable" ? FALLBACK_CONFIG : config,
         hasStoredUserSettings,
-        isWebGPUAvailable,
+        hasWebGpu,
       ),
     );
     setSettingsInitialized(true);
     addLogEntry("Settings initialized");
-  }, [config, settingsInitialized, settings, setSettings]);
+  }, [config, settingsInitialized, settings, setSettings, hasWebGpu]);
 }
 
 /**

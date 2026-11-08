@@ -53,7 +53,7 @@ vi.mock("./textGenerationUtilities", async (importOriginal) => {
   };
 });
 
-vi.mock("./webGpu", () => ({ isWebGPUAvailable: false }));
+vi.mock("./webGpu", () => ({ webGpuSupport: Promise.resolve(false) }));
 
 const megabyte = 1024 * 1024;
 

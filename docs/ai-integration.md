@@ -53,11 +53,14 @@ Models whose chat template thinks by default (Granite 4.2, Gemma 4, Spark X2.6, 
 
 **WebGPU Detection:**
 
-```typescript
-// client/modules/webGpu.ts
-/** Whether the browser supports the WebGPU API. */
-export const isWebGPUAvailable = "gpu" in navigator;
-```
+`webGpuSupport` in `client/modules/webGpu.ts` decides once per page load whether models run on the GPU (`n_gpu_layers: 99999`) or the CPU (`0`), and which default model a new profile gets. Having the WebGPU API is not enough, because wllama's shaders use subgroups and the `subgroup_id` builtin. The GPU is used only when all of these hold:
+
+- `navigator.gpu` exists, and `navigator.gpu.wgslLanguageFeatures` has `subgroup_id` (Chrome 137 has the API but not this, and every model aborted there).
+- `navigator.gpu.requestAdapter()` returns an adapter within 5 seconds.
+- The adapter is not a software fallback (`adapter.info.isFallbackAdapter`).
+- The adapter has the `subgroups` feature.
+
+The result and its reason go to the app's logs.
 
 **Limitations:**
 
