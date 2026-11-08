@@ -2,8 +2,9 @@ import {
   DEFAULT_WLLAMA_GPU_MODEL_ID,
   DEFAULT_WLLAMA_MODEL_ID,
 } from "@shared/serverConfig";
+import type { CacheEntry, CacheManager } from "@wllama/wllama";
 import { describe, expect, it, vi } from "vitest";
-import { wllamaModels } from "./wllama";
+import { deleteIncompleteCachedModels, wllamaModels } from "./wllama";
 
 vi.mock("./logEntries", () => ({ addLogEntry: vi.fn() }));
 vi.mock("./textGenerationUtilities", () => ({ defaultContextSize: 4096 }));
@@ -82,5 +83,37 @@ describe("wllamaModels catalog", () => {
     for (const [id, model] of models) {
       expect(model.contextSize, id).toBe(4096);
     }
+  });
+});
+
+describe("deleteIncompleteCachedModels", () => {
+  const shard = (repo: string, index: number, total: number) =>
+    `https://huggingface.co/${repo}/resolve/main/model-0000${index}-of-0000${total}.gguf`;
+  const entry = (url: string): CacheEntry => ({
+    name: url,
+    size: 1,
+    metadata: { originalURL: url, etag: "", originalSize: 1 },
+  });
+
+  it("deletes only the shards of a model whose download did not finish", async () => {
+    let files = [
+      entry(shard("complete", 1, 2)),
+      entry(shard("complete", 2, 2)),
+      entry(shard("interrupted", 1, 3)),
+      entry(shard("interrupted", 3, 3)),
+    ];
+    const cacheManager = {
+      list: async () => files,
+      deleteMany: async (predicate: (file: CacheEntry) => boolean) => {
+        files = files.filter((file) => !predicate(file));
+      },
+    } as unknown as CacheManager;
+
+    await deleteIncompleteCachedModels(cacheManager);
+
+    expect(files.map((file) => file.metadata.originalURL)).toEqual([
+      shard("complete", 1, 2),
+      shard("complete", 2, 2),
+    ]);
   });
 });
