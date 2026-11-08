@@ -1,5 +1,7 @@
 import {
+  type CacheManager,
   type LoadModelParams,
+  ModelManager,
   type SamplingParams,
   Wllama,
   type WllamaConfig,
@@ -34,6 +36,35 @@ async function createWllamaInstance(config?: WllamaConfig): Promise<Wllama> {
 }
 
 /**
+ * Deletes the cached shards of every model whose download did not finish.
+ * wllama 3.8.1 builds each cached model before checking it, and a missing
+ * shard makes that throw, so one interrupted download would otherwise stop
+ * every model from loading until the whole cache is cleared.
+ */
+export async function deleteIncompleteCachedModels(cacheManager: CacheManager) {
+  const cachedUrls = new Set(
+    (await cacheManager.list())
+      .map((file) => file.metadata.originalURL)
+      // wllama skips files saved without one, so they cannot block a load.
+      .filter(Boolean),
+  );
+  const incompleteUrls = new Set(
+    [...cachedUrls]
+      .map((url) => ModelManager.parseModelUrl(url))
+      .filter((shards) => shards.some((shard) => !cachedUrls.has(shard)))
+      .flat(),
+  );
+  if (incompleteUrls.size === 0) return;
+
+  addLogEntry(
+    `Deleting ${incompleteUrls.size} cached file(s) of models whose download did not finish`,
+  );
+  await cacheManager.deleteMany((file) =>
+    incompleteUrls.has(file.metadata.originalURL),
+  );
+}
+
+/**
  * Initializes Wllama with a specific model from HuggingFace.
  * Performs a single-threaded warmup run before loading with the full config.
  */
@@ -46,6 +77,8 @@ export async function initializeWllama(
 
   try {
     const wllama = await createWllamaInstance(config?.wllama);
+
+    await deleteIncompleteCachedModels(wllama.cacheManager);
 
     await wllama.loadModelFromHF(
       { repo: hfRepoId, file: hfFilePath },
