@@ -227,6 +227,14 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     fileSizeInMegabytes: 406,
     reasoningBudgetTokens: 1024,
   },
+  "qwen-3.5-0.8b": {
+    ...createDefaultModelConfig(),
+    label: "Qwen 3.5 0.8B",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_M-Qwen3.5-0.8B",
+    hfFilePath: "Qwen3.5-0.8B-Q4_K_M-00001-of-00003.gguf",
+    fileSizeInMegabytes: 533,
+    reasoningBudgetTokens: 1024,
+  },
   "lfm2.5-1.2b-instruct": {
     ...createDefaultModelConfig(),
     label: "LFM2.5 1.2B Instruct",
