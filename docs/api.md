@@ -392,6 +392,7 @@ a restart with different environment variables takes effect on the next reload.
   "accessKeysEnabled": false,
   "accessKeyTimeoutHours": 0,
   "wllamaDefaultModelId": "...",
+  "wllamaDefaultGpuModelId": "...",
   "internalApiEnabled": false,
   "internalApiName": "...",
   "defaultInferenceType": "...",

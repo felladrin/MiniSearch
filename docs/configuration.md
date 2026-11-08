@@ -22,9 +22,12 @@ ACCESS_KEY_TIMEOUT_HOURS="24"
 
 Configure default models for different inference types:
 
-| Variable                  | Default           | Description                                                                  |
-| ------------------------- | ----------------- | ---------------------------------------------------------------------------- |
-| `WLLAMA_DEFAULT_MODEL_ID` | `littlelamb-290m` | Default Wllama model ID (used for both WebGPU-accelerated and CPU inference) |
+| Variable                      | Default           | Description                                                                                   |
+| ----------------------------- | ----------------- | --------------------------------------------------------------------------------------------- |
+| `WLLAMA_DEFAULT_MODEL_ID`     | `littlelamb-290m` | Default Wllama model ID for browsers without WebGPU, where the model runs on the CPU          |
+| `WLLAMA_DEFAULT_GPU_MODEL_ID` | `gemma-3-4b`      | Default Wllama model ID for browsers with WebGPU. It does not fall back to the variable above |
+
+Both only seed a profile that has never saved settings; a user's own choice always wins. Detection is the same `"gpu" in navigator` check that decides whether the model's layers go to the GPU (`client/modules/webGpu.ts`).
 
 ### Server Model Request Configuration
 
@@ -145,7 +148,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `inferenceType`        | enum    | `'browser'`                       | AI provider: `browser`, `openai`, `horde`, `internal`                                                                                  |
 | `cpuThreads`           | number  | (auto)                            | Number of CPU threads for inference (Wllama), defaults to half the logical processors (`navigator.hardwareConcurrency / 2`), minimum 1 |
 | `allowAiModelDownload` | boolean | `false`                           | Allow automatic AI model downloads                                                                                                     |
-| `wllamaModelId`        | string  | `WLLAMA_DEFAULT_MODEL_ID` env var | Default Wllama model ID                                                                                                                |
+| `wllamaModelId`        | string  | WebGPU or CPU default, see above. | Default Wllama model ID, chosen by whether the browser has WebGPU                                                                      |
 | `hordeApiKey`          | string  | `'0000000000'`                    | AI Horde API key (default is anonymous)                                                                                                |
 | `hordeModel`           | string  | `''`                              | Specific AI Horde model to request                                                                                                     |
 | `openAiApiBaseUrl`     | string  | `''`                              | Base URL for the OpenAI-compatible API                                                                                                 |
@@ -396,6 +399,7 @@ Client-facing configuration (access keys, inference type, internal API settings)
   "accessKeysEnabled": true,
   "accessKeyTimeoutHours": 24,
   "wllamaDefaultModelId": "littlelamb-290m",
+  "wllamaDefaultGpuModelId": "gemma-3-4b",
   "internalApiEnabled": true,
   "internalApiName": "Internal API",
   "defaultInferenceType": "browser",
@@ -412,6 +416,7 @@ Client-facing configuration (access keys, inference type, internal API settings)
 | `ACCESS_KEYS`                      | Runtime     | Read from `/api/config`                                                             |
 | `ACCESS_KEY_TIMEOUT_HOURS`         | Runtime     | Read from `/api/config`                                                             |
 | `WLLAMA_DEFAULT_MODEL_ID`          | Runtime     | Read from `/api/config`                                                             |
+| `WLLAMA_DEFAULT_GPU_MODEL_ID`      | Runtime     | Read from `/api/config`                                                             |
 | `INTERNAL_OPENAI_COMPATIBLE_API_*` | Runtime     | Read from `/api/config` (except `API_KEY` which is server-only)                     |
 | `DEFAULT_INFERENCE_TYPE`           | Runtime     | Read from `/api/config`                                                             |
 | Search token                       | Runtime     | Read from `/api/config`, so a reload picks up the token of whichever server answers |

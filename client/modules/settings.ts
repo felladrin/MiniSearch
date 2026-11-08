@@ -1,6 +1,7 @@
 import { DEFAULT_SYSTEM_PROMPT } from "@shared/defaultSystemPrompt";
 import {
   DEFAULT_INFERENCE_TYPE,
+  DEFAULT_WLLAMA_GPU_MODEL_ID,
   DEFAULT_WLLAMA_MODEL_ID,
   type ServerConfig,
 } from "@shared/serverConfig";
@@ -142,17 +143,23 @@ export function getInferenceTypes(config: ServerConfig) {
  * These are defaults, not overrides: they seed a profile that has never been
  * saved and are ignored once the user has settings of their own, since a stored
  * value is a choice even when it matches what the code ships with.
+ *
+ * The Wllama model default depends on `hasWebGpu`, because a model that
+ * answers quickly on a GPU can take minutes per answer on the CPU.
  */
 export function applyServerConfig(
   settings: typeof defaultSettings,
   config: ServerConfig,
   userSettingsWereStored: boolean,
+  hasWebGpu: boolean,
 ): typeof defaultSettings {
   if (userSettingsWereStored) return settings;
 
   return {
     ...settings,
-    wllamaModelId: config.wllamaDefaultModelId || DEFAULT_WLLAMA_MODEL_ID,
+    wllamaModelId: hasWebGpu
+      ? config.wllamaDefaultGpuModelId || DEFAULT_WLLAMA_GPU_MODEL_ID
+      : config.wllamaDefaultModelId || DEFAULT_WLLAMA_MODEL_ID,
     inferenceType: config.defaultInferenceType || DEFAULT_INFERENCE_TYPE,
   };
 }
