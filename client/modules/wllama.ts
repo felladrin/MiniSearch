@@ -161,6 +161,10 @@ const createDefaultModelConfig = (): Omit<
   flash_attn: true,
   contextSize: defaultContextSize,
   shouldIncludeUrlsOnPrompt: true,
+  // Templates that read it (Granite 4.2, Spark X2.6) think less, so they
+  // reach the answer before `reasoningBudgetTokens` cuts them off; the others
+  // ignore it.
+  chatTemplateKwargs: { reasoning_effort: "low" },
   getSampling: () => ({}),
 });
 
@@ -192,6 +196,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-LittleLamb",
     hfFilePath: "LittleLamb-i1-Q4_K_S-00001-of-00003.gguf",
     fileSizeInMegabytes: 231,
+    reasoningBudgetTokens: 1024,
   },
   "gemma-3-270m": {
     ...createDefaultModelConfig(),
@@ -220,6 +225,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-Qwen3-0.6B",
     hfFilePath: "model.shard-00001-of-00004.gguf",
     fileSizeInMegabytes: 406,
+    reasoningBudgetTokens: 1024,
   },
   "lfm2.5-1.2b-instruct": {
     ...createDefaultModelConfig(),
@@ -304,6 +310,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-DeepSeek-R1-Distill-Qwen-1.5B",
     hfFilePath: "model.shard-00001-of-00006.gguf",
     fileSizeInMegabytes: 1070,
+    reasoningBudgetTokens: 1024,
   },
   "internlm-2.5-1.8b": {
     ...createDefaultModelConfig(),
@@ -318,6 +325,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-UD-Q4_K_XL-Qwen3-1.7B",
     hfFilePath: "model.shard-00001-of-00005.gguf",
     fileSizeInMegabytes: 1140,
+    reasoningBudgetTokens: 1024,
   },
   "granite-3.3-2b": {
     ...createDefaultModelConfig(),
@@ -353,7 +361,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_M-Spark-X2.6-1.7B",
     hfFilePath: "Spark-X2.6-1.7B-Q4_K_M-00001-of-00004.gguf",
     fileSizeInMegabytes: 1769,
-    reasoningBudgetTokens: 256,
+    reasoningBudgetTokens: 1024,
   },
   "smollm3-3b": {
     ...createDefaultModelConfig(),
@@ -389,7 +397,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-granite-4.2-3b",
     hfFilePath: "granite-4.2-3b-Q4_K_S-00001-of-00005.gguf",
     fileSizeInMegabytes: 2143,
-    reasoningBudgetTokens: 256,
+    reasoningBudgetTokens: 1024,
   },
   "phi-3.5-mini-3.8b": {
     ...createDefaultModelConfig(),
@@ -411,6 +419,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_S-Polaris-4B-Preview",
     hfFilePath: "model.shard-00001-of-00008.gguf",
     fileSizeInMegabytes: 2380,
+    reasoningBudgetTokens: 1024,
   },
   "qwen-3.5-4b": {
     ...createDefaultModelConfig(),
@@ -418,7 +427,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-UD-Q3_K_XL-Qwen3.5-4B",
     hfFilePath: "Qwen3.5-4B-UD-Q3_K_XL-00001-of-00005.gguf",
     fileSizeInMegabytes: 2436,
-    reasoningBudgetTokens: 256,
+    reasoningBudgetTokens: 1024,
   },
   "gemma-4-e2b": {
     ...createDefaultModelConfig(),
@@ -426,7 +435,7 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q3_K_S-gemma-4-e2b-it",
     hfFilePath: "gemma-4-e2b-it-Q3_K_S-00001-of-00005.gguf",
     fileSizeInMegabytes: 2446,
-    reasoningBudgetTokens: 256,
+    reasoningBudgetTokens: 1024,
   },
   "phi-4-mini-reasoning": {
     ...createDefaultModelConfig(),
@@ -441,6 +450,6 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfRepoId: "Felladrin/gguf-sharded-Q4_K_M-Spark-X2.6-4B",
     hfFilePath: "Spark-X2.6-4B-Q4_K_M-00001-of-00007.gguf",
     fileSizeInMegabytes: 3543,
-    reasoningBudgetTokens: 256,
+    reasoningBudgetTokens: 1024,
   },
 };
