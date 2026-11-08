@@ -2,6 +2,7 @@ import type { PreviewServer, ViteDevServer } from "vite";
 import {
   DEFAULT_INFERENCE_TYPE,
   DEFAULT_INTERNAL_API_NAME,
+  DEFAULT_WLLAMA_GPU_MODEL_ID,
   DEFAULT_WLLAMA_MODEL_ID,
   type ServerConfig,
 } from "../shared/serverConfig.ts";
@@ -25,6 +26,10 @@ export function configEndpointServerHook<
       accessKeyTimeoutHours: Number(process.env.ACCESS_KEY_TIMEOUT_HOURS) || 0,
       wllamaDefaultModelId:
         process.env.WLLAMA_DEFAULT_MODEL_ID || DEFAULT_WLLAMA_MODEL_ID,
+      // Not a fallback to WLLAMA_DEFAULT_MODEL_ID: `.env.example` sets that
+      // one, so most deployments would hand GPUs the CPU default.
+      wllamaDefaultGpuModelId:
+        process.env.WLLAMA_DEFAULT_GPU_MODEL_ID || DEFAULT_WLLAMA_GPU_MODEL_ID,
       internalApiEnabled: Boolean(
         process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
       ),

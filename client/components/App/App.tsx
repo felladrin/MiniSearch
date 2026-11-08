@@ -18,6 +18,7 @@ import {
   defaultSettings,
   hasStoredUserSettings,
 } from "@/modules/settings";
+import { isWebGPUAvailable } from "@/modules/webGpu";
 import "@mantine/notifications/styles.css";
 import { verifyStoredAccessKey } from "@/modules/accessKey";
 import {
@@ -118,6 +119,7 @@ function useInitializeSettings(config: ConfigState) {
         { ...defaultSettings, ...settings },
         config === "unavailable" ? FALLBACK_CONFIG : config,
         hasStoredUserSettings,
+        isWebGPUAvailable,
       ),
     );
     setSettingsInitialized(true);

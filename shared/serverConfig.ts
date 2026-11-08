@@ -1,7 +1,10 @@
 export interface ServerConfig {
   accessKeysEnabled: boolean;
   accessKeyTimeoutHours: number;
+  /** Default Wllama model where the browser has no WebGPU, so it runs on the CPU. */
   wllamaDefaultModelId: string;
+  /** Default Wllama model where the browser has WebGPU. */
+  wllamaDefaultGpuModelId: string;
   internalApiEnabled: boolean;
   internalApiName: string;
   defaultInferenceType: string;
@@ -15,5 +18,6 @@ export interface ServerConfig {
  * response and the client-side fallback.
  */
 export const DEFAULT_WLLAMA_MODEL_ID = "littlelamb-290m";
+export const DEFAULT_WLLAMA_GPU_MODEL_ID = "gemma-3-4b";
 export const DEFAULT_INFERENCE_TYPE = "browser";
 export const DEFAULT_INTERNAL_API_NAME = "Internal API";

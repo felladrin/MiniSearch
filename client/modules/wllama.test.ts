@@ -1,3 +1,7 @@
+import {
+  DEFAULT_WLLAMA_GPU_MODEL_ID,
+  DEFAULT_WLLAMA_MODEL_ID,
+} from "@shared/serverConfig";
 import { describe, expect, it, vi } from "vitest";
 import { wllamaModels } from "./wllama";
 
@@ -67,6 +71,11 @@ describe("wllamaModels catalog", () => {
         expect(model.reasoningBudgetTokens, id).toBeLessThanOrEqual(1024);
       }
     }
+  });
+
+  it("includes both default models", () => {
+    expect(wllamaModels).toHaveProperty([DEFAULT_WLLAMA_MODEL_ID]);
+    expect(wllamaModels).toHaveProperty([DEFAULT_WLLAMA_GPU_MODEL_ID]);
   });
 
   it("uses the shared default context size for every model", () => {

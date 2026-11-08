@@ -12,6 +12,7 @@ const mockConfig: ServerConfig = {
   accessKeysEnabled: false,
   accessKeyTimeoutHours: 0,
   wllamaDefaultModelId: "littlelamb-290m",
+  wllamaDefaultGpuModelId: "gemma-3-4b",
   internalApiEnabled: false,
   internalApiName: "Internal API",
   defaultInferenceType: "browser",
@@ -102,9 +103,23 @@ describe("Settings Module", () => {
       wllamaDefaultModelId: "custom-model",
       defaultInferenceType: "internal",
     };
-    const applied = applyServerConfig(defaultSettings, config, false);
+    const applied = applyServerConfig(defaultSettings, config, false, false);
     expect(applied.wllamaModelId).toBe("custom-model");
     expect(applied.inferenceType).toBe("internal");
+  });
+
+  it("should seed the GPU model default when the browser has WebGPU", () => {
+    const config = {
+      ...mockConfig,
+      wllamaDefaultModelId: "cpu-model",
+      wllamaDefaultGpuModelId: "gpu-model",
+    };
+    expect(
+      applyServerConfig(defaultSettings, config, false, true).wllamaModelId,
+    ).toBe("gpu-model");
+    expect(
+      applyServerConfig(defaultSettings, config, false, false).wllamaModelId,
+    ).toBe("cpu-model");
   });
 
   it("should preserve stored settings that differ from the server defaults", () => {
@@ -118,7 +133,7 @@ describe("Settings Module", () => {
       wllamaModelId: "user-picked-model",
       inferenceType: "horde",
     };
-    const applied = applyServerConfig(userSettings, config, true);
+    const applied = applyServerConfig(userSettings, config, true, true);
     expect(applied.wllamaModelId).toBe("user-picked-model");
     expect(applied.inferenceType).toBe("horde");
   });
@@ -129,7 +144,7 @@ describe("Settings Module", () => {
       wllamaDefaultModelId: "admin-preferred-model",
       defaultInferenceType: "internal",
     };
-    const applied = applyServerConfig(defaultSettings, config, true);
+    const applied = applyServerConfig(defaultSettings, config, true, true);
     expect(applied.wllamaModelId).toBe(defaultSettings.wllamaModelId);
     expect(applied.inferenceType).toBe(defaultSettings.inferenceType);
   });

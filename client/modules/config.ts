@@ -9,6 +9,7 @@
 import {
   DEFAULT_INFERENCE_TYPE,
   DEFAULT_INTERNAL_API_NAME,
+  DEFAULT_WLLAMA_GPU_MODEL_ID,
   DEFAULT_WLLAMA_MODEL_ID,
   type ServerConfig,
 } from "@shared/serverConfig";
@@ -28,6 +29,7 @@ export const FALLBACK_CONFIG: ServerConfig = {
   accessKeysEnabled: false,
   accessKeyTimeoutHours: 0,
   wllamaDefaultModelId: DEFAULT_WLLAMA_MODEL_ID,
+  wllamaDefaultGpuModelId: DEFAULT_WLLAMA_GPU_MODEL_ID,
   internalApiEnabled: false,
   internalApiName: DEFAULT_INTERNAL_API_NAME,
   defaultInferenceType: DEFAULT_INFERENCE_TYPE,

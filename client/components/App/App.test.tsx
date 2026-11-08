@@ -25,6 +25,7 @@ const serverConfig: ServerConfig = {
   accessKeysEnabled: false,
   accessKeyTimeoutHours: 24,
   wllamaDefaultModelId: "littlelamb-290m",
+  wllamaDefaultGpuModelId: "gemma-3-4b",
   internalApiEnabled: false,
   internalApiName: "Internal API",
   defaultInferenceType: "browser",

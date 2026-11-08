@@ -8,6 +8,7 @@ const serverConfig: ServerConfig = {
   accessKeysEnabled: true,
   accessKeyTimeoutHours: 24,
   wllamaDefaultModelId: "some-model",
+  wllamaDefaultGpuModelId: "some-gpu-model",
   internalApiEnabled: true,
   internalApiName: "Custom LLM",
   defaultInferenceType: "internal",
