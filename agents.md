@@ -127,7 +127,7 @@ Need to:
 - `client/modules/settings.ts` - Default settings and inference type definitions
 - `client/modules/history.ts` - IndexedDB persistence for searches and chat
 - `client/modules/wllama.ts` - Wllama model configuration and management
-- `client/modules/webGpu.ts` - WebGPU availability detection (`"gpu" in navigator`)
+- `client/modules/webGpu.ts` - Whether the GPU can run wllama's shaders (API, `subgroup_id`, a real adapter with `subgroups`); decides GPU or CPU and the default model
 - `client/modules/querySuggestions.ts` - Search suggestion UI, stored in IndexedDB
 - `client/modules/relatedSearchQuery.ts` - Generates related search queries
 - `client/modules/followUpQuestions.ts` - Generates follow-up questions via `followUpQuestionPubSub`

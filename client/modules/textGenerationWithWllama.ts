@@ -18,7 +18,7 @@ import {
   getFormattedSearchResults,
 } from "./textGenerationUtilities";
 import type { ChatMessage } from "./types";
-import { isWebGPUAvailable } from "./webGpu";
+import { webGpuSupport } from "./webGpu";
 import { type WllamaModel, wllamaModels } from "./wllama";
 
 type ProgressCallback = ({
@@ -193,7 +193,7 @@ async function getSelectedWllamaModel(): Promise<WllamaModel> {
 
   // Safe without the server: the fallback is only a model to switch to.
   const config = await getConfig().catch(() => FALLBACK_CONFIG);
-  const defaultId = isWebGPUAvailable
+  const defaultId = (await webGpuSupport)
     ? config.wllamaDefaultGpuModelId
     : config.wllamaDefaultModelId;
   const defaultModel = wllamaModels[defaultId];
@@ -230,7 +230,7 @@ async function initializeWllamaInstance(progressCallback?: ProgressCallback) {
       cache_type_v: model.cacheTypeV,
       flash_attn: model.flash_attn,
       embeddings: false,
-      n_gpu_layers: isWebGPUAvailable ? 99999 : 0,
+      n_gpu_layers: (await webGpuSupport) ? 99999 : 0,
       ...(model.reasoningBudgetTokens
         ? { reasoning_budget_tokens: model.reasoningBudgetTokens }
         : {}),

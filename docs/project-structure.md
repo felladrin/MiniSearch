@@ -48,7 +48,7 @@ The `client/modules/` directory contains core business logic organized by domain
 | `followUpQuestions.ts`          | Generates contextual follow-up questions                                                                                        |
 | `relatedSearchQuery.ts`         | Creates related search queries from conversation                                                                                |
 | `querySuggestions.ts`           | Query suggestion UI data management                                                                                             |
-| `webGpu.ts`                     | WebGPU availability detection                                                                                                   |
+| `webGpu.ts`                     | Whether the GPU can run wllama                                                                                                  |
 | `wllama.ts`                     | Wllama model configuration and management                                                                                       |
 | `accessKey.ts`                  | Access key validation and storage                                                                                               |
 | `searchTokenHash.ts`            | CSRF protection token generation                                                                                                |

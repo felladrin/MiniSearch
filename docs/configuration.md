@@ -27,7 +27,7 @@ Configure default models for different inference types:
 | `WLLAMA_DEFAULT_MODEL_ID`     | `littlelamb-290m` | Default Wllama model ID for browsers without WebGPU, where the model runs on the CPU          |
 | `WLLAMA_DEFAULT_GPU_MODEL_ID` | `gemma-3-4b`      | Default Wllama model ID for browsers with WebGPU. It does not fall back to the variable above |
 
-Both only seed a profile that has never saved settings; a user's own choice always wins. Detection is the same `"gpu" in navigator` check that decides whether the model's layers go to the GPU (`client/modules/webGpu.ts`).
+Both only seed a profile that has never saved settings; a user's own choice always wins. Detection is the same check that decides whether the model runs on the GPU: the browser must have WebGPU, and its GPU must be able to run wllama's shaders (`client/modules/webGpu.ts`, described in [ai-integration.md](ai-integration.md)).
 
 ### Server Model Request Configuration
 
