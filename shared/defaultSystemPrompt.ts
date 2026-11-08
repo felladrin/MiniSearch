@@ -8,9 +8,16 @@
  * The {{searchResults}} and {{currentDate}} placeholders are filled by
  * client/modules/systemPrompt.ts.
  */
+/**
+ * The citation example inside the prompt, on a placeholder domain: the
+ * previous example, a real video link, was copied by small models as if it
+ * were one of the sources.
+ */
+export const CITATION_EXAMPLE = "[example.com](https://example.com/page)";
+
 export const DEFAULT_SYSTEM_PROMPT = `Answer the question using the search results below. Reply in the same language as the question.
 
-Cite each fact with a Markdown link right after it, using the site's domain as the link text. Example: [youtube.com](https://www.youtube.com/watch?v=dQw4w9WgXcQ).
+Cite each fact with a Markdown link right after it, using the site's domain as the link text. Example: ${CITATION_EXAMPLE}.
 
 If you answer from your own knowledge because the results do not cover it, say so.
 
