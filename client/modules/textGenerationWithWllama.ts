@@ -1,4 +1,5 @@
 import type { Wllama } from "@wllama/wllama";
+import { FALLBACK_CONFIG, getConfig } from "./config";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
@@ -6,6 +7,7 @@ import {
   updateModelLoadingProgress,
   updateModelSizeInMegabytes,
   updateResponse,
+  updateSettings,
   updateTextGenerationState,
 } from "./pubSub";
 import {
@@ -33,8 +35,7 @@ export async function generateTextWithWllama(): Promise<void> {
   try {
     const response = await generateWithWllama({
       messages: async () => {
-        const settings = getSettings();
-        const modelConfig = wllamaModels[settings.wllamaModelId];
+        const modelConfig = await getSelectedWllamaModel();
         return getDefaultChatMessages(
           await getFormattedSearchResults(
             modelConfig.shouldIncludeUrlsOnPrompt,
@@ -180,9 +181,38 @@ async function generateWithWllama({
   }
 }
 
+/**
+ * The model the settings point at, or the default when that model has left
+ * the catalog. Without this, removing a model from the catalog would break
+ * every answer for whoever had picked it.
+ */
+async function getSelectedWllamaModel(): Promise<WllamaModel> {
+  const { wllamaModelId } = getSettings();
+  const model = wllamaModels[wllamaModelId];
+  if (model) return model;
+
+  // Safe without the server: the fallback is only a model to switch to.
+  const config = await getConfig().catch(() => FALLBACK_CONFIG);
+  const defaultId = isWebGPUAvailable
+    ? config.wllamaDefaultGpuModelId
+    : config.wllamaDefaultModelId;
+  const defaultModel = wllamaModels[defaultId];
+  if (!defaultModel) {
+    throw new Error(
+      `Neither the selected model "${wllamaModelId}" nor the default "${defaultId}" is in the catalog`,
+    );
+  }
+
+  addLogEntry(
+    `Model "${wllamaModelId}" is no longer available; switched to "${defaultId}"`,
+  );
+  updateSettings({ ...getSettings(), wllamaModelId: defaultId });
+  return defaultModel;
+}
+
 async function initializeWllamaInstance(progressCallback?: ProgressCallback) {
-  const { initializeWllama, wllamaModels } = await import("./wllama");
-  const model = wllamaModels[getSettings().wllamaModelId];
+  const { initializeWllama } = await import("./wllama");
+  const model = await getSelectedWllamaModel();
 
   updateModelSizeInMegabytes(model.fileSizeInMegabytes);
 
