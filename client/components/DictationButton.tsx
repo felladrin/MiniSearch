@@ -129,9 +129,17 @@ export default memo(function DictationButton({
    */
   const pressGenerationRef = useRef(0);
 
+  /**
+   * Aborts the press still loading, so a ~700 MB first-run download stops
+   * with the button that started it instead of finishing in the background.
+   */
+  const loadAbortRef = useRef<AbortController | null>(null);
+
   /** Ends the session and drops its transcript, for a field that cannot take it. */
   const cancel = useCallback(() => {
     pressGenerationRef.current += 1;
+    loadAbortRef.current?.abort();
+    loadAbortRef.current = null;
     const session = sessionRef.current;
     sessionRef.current = null;
     lastTranscriptRef.current = "";
@@ -147,6 +155,7 @@ export default memo(function DictationButton({
       // mid-session. Without this the microphone track, the AudioContext and
       // the model all outlive it, with the recording indicator still on.
       pressGenerationRef.current += 1;
+      loadAbortRef.current?.abort();
       sessionRef.current?.cancel();
       sessionRef.current = null;
     },
@@ -189,12 +198,17 @@ export default memo(function DictationButton({
     }
 
     const generation = ++pressGenerationRef.current;
+    const loadAbort = new AbortController();
+    loadAbortRef.current = loadAbort;
     setPhase("loading");
     try {
       const session = await startDictation(
         {
           onTranscript: handleTranscript,
-          onProgress: (loaded, total) => setProgress({ loaded, total }),
+          onProgress: (loaded, total) => {
+            if (pressGenerationRef.current === generation)
+              setProgress({ loaded, total });
+          },
           onFallback: () =>
             notifications.show({
               title: "Using the browser's recognizer",
@@ -218,7 +232,9 @@ export default memo(function DictationButton({
           },
         },
         preferLocalModel,
+        loadAbort.signal,
       );
+      if (loadAbortRef.current === loadAbort) loadAbortRef.current = null;
       // The load takes seconds and the permission prompt can take minutes, so
       // the button may well be gone by now; whichever path removed it had no
       // session to stop when it ran.
@@ -229,6 +245,10 @@ export default memo(function DictationButton({
       sessionRef.current = session;
       setPhase("recording");
     } catch (error) {
+      if (loadAbortRef.current === loadAbort) loadAbortRef.current = null;
+      // An abandoned press has no button left to explain a failure on, and a
+      // newer press owns the phase now.
+      if (pressGenerationRef.current !== generation) return;
       setPhase("idle");
       setProgress(null);
       const denied =

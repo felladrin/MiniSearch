@@ -238,6 +238,7 @@ async function releaseModel(wllama: Wllama): Promise<void> {
 
 async function loadDictationModel(
   callbacks: DictationCallbacks,
+  signal?: AbortSignal,
 ): Promise<Wllama> {
   const { createWllamaInstance } = await import("./wllama");
   const wllama = await createWllamaInstance({
@@ -251,6 +252,7 @@ async function loadDictationModel(
       n_gpu_layers: (await webGpuSupport) ? 99999 : 0,
       progressCallback: ({ loaded, total }) =>
         callbacks.onProgress?.(loaded, total),
+      signal,
     });
   } catch (error) {
     void releaseModel(wllama);
@@ -259,13 +261,20 @@ async function loadDictationModel(
       `The dictation model could not be loaded: ${describeError(error)}`,
     );
   }
+  // The abort only reaches the download; once the files are in, the load in
+  // the worker runs to the end, and the model is dropped here instead.
+  if (signal?.aborted) {
+    void releaseModel(wllama);
+    throw new DictationError("engine", "Dictation was cancelled");
+  }
   return wllama;
 }
 
 async function startWasmDictation(
   callbacks: DictationCallbacks,
+  signal?: AbortSignal,
 ): Promise<DictationSession> {
-  const wllama = await loadDictationModel(callbacks);
+  const wllama = await loadDictationModel(callbacks, signal);
 
   // Only once the model is ready: opening it first would light the browser's
   // recording indicator for the whole of a first-run download.
@@ -317,7 +326,9 @@ async function startWasmDictation(
     source = context.createMediaStreamSource(mediaStream);
     // A 1-channel ScriptProcessor downmixes stereo capture to mono, which
     // matters for devices whose microphone sits on the right channel only.
-    processor = context.createScriptProcessor(4096, 1, 1);
+    // 1024 samples, because the block being filled when the user stops is
+    // lost: 64 ms of the last word instead of 256 ms with 4096.
+    processor = context.createScriptProcessor(1024, 1, 1);
 
     processor.onaudioprocess = (event) => {
       // The processor must stay connected to the destination to be called;
@@ -409,9 +420,11 @@ async function startWasmDictation(
       cancelled = true;
       releaseAudio();
       transcription.abort();
-      // A running `stop` unloads the model once the aborted transcription
-      // settles; unloading under it would fail the request instead.
-      if (!stopping) void releaseModel(wllama);
+      // Unloading terminates wllama's worker at once, so a running
+      // transcription stops using the CPU now instead of at its next check of
+      // the signal. The `finally` in `finish` then unloads it a second time,
+      // which wllama treats as a no-op.
+      void releaseModel(wllama);
     },
   };
 }
@@ -508,16 +521,23 @@ function startWebSpeechDictation(
  * Starts dictating. Resolves once the microphone is open (and, on the WASM
  * path, the model is loaded); rejects with a `DictationError` whose `kind`
  * tells the caller whether the user denied permission or the engine failed.
+ *
+ * `signal` abandons a session that is still loading: the model download
+ * stops, the microphone never opens, and nothing falls back.
  */
 export async function startDictation(
   callbacks: DictationCallbacks,
   preferLocalModel: boolean,
+  signal?: AbortSignal,
 ): Promise<DictationSession> {
   const engine = getDictationEngine(preferLocalModel);
   if (engine === "wasm") {
     try {
-      return await startWasmDictation(callbacks);
+      return await startWasmDictation(callbacks, signal);
     } catch (error) {
+      // Abandoned: falling back would open the vendor's recognizer for a
+      // button that is gone.
+      if (signal?.aborted) throw error;
       // A denied microphone is the user's answer, not an engine that cannot
       // run, so it is reported rather than retried on a path that would ask
       // again and, in Chrome, ship the audio to the browser vendor.

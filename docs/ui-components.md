@@ -192,7 +192,8 @@ The on-device model writes the text only after the recording stops, so the
 button has a fourth state between "recording" and "idle": "transcribing",
 with a spinner and the label "Transcribing <field>". Stopping waits for the
 transcript; a field that goes away or turns read-only cancels instead, which
-drops the transcript.
+drops the transcript, and aborts the model download when the press is still
+loading.
 
 **PubSub:**
 

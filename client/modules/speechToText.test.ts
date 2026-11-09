@@ -23,6 +23,7 @@ class FakeWllama {
           loaded: number;
           total: number;
         }) => void;
+        signal?: AbortSignal;
       },
     ) => {
       params.progressCallback?.({ loaded: 1000, total: 2000 });
@@ -61,23 +62,33 @@ type AudioProcessHandler = (event: {
 }) => void;
 
 /** The script processor of the latest audio context, to feed it samples. */
-let processor: { onaudioprocess: AudioProcessHandler | null } | undefined;
+let processor:
+  | {
+      onaudioprocess: AudioProcessHandler | null;
+      disconnect: ReturnType<typeof vi.fn>;
+    }
+  | undefined;
+let closeAudioContext: ReturnType<typeof vi.fn<() => Promise<void>>>;
 
-/** Hands the processor one block captured at the stubbed 48 kHz. */
-function capture(samples: number) {
+/** Hands the processor one block captured at the stubbed rate. */
+function capture(samples: number, input = new Float32Array(samples).fill(0.5)) {
   processor?.onaudioprocess?.({
-    inputBuffer: { getChannelData: () => new Float32Array(samples).fill(0.5) },
+    inputBuffer: { getChannelData: () => input },
     outputBuffer: { getChannelData: () => new Float32Array(samples) },
   });
 }
 
-function stubWasmSupport(getUserMedia: ReturnType<typeof vi.fn>) {
+function stubWasmSupport(
+  getUserMedia: ReturnType<typeof vi.fn>,
+  sampleRate = 48000,
+) {
   vi.stubGlobal("Worker", class {});
   vi.stubGlobal("WebAssembly", { instantiate: vi.fn() });
+  closeAudioContext = vi.fn<() => Promise<void>>(() => Promise.resolve());
   vi.stubGlobal(
     "AudioContext",
     class {
-      sampleRate = 48000;
+      sampleRate = sampleRate;
       createMediaStreamSource() {
         return { connect: vi.fn(), disconnect: vi.fn() };
       }
@@ -86,11 +97,11 @@ function stubWasmSupport(getUserMedia: ReturnType<typeof vi.fn>) {
           onaudioprocess: null,
           connect: vi.fn(),
           disconnect: vi.fn(),
-        } as typeof processor;
+        } as unknown as typeof processor;
         return processor;
       }
       close() {
-        return Promise.resolve();
+        return closeAudioContext();
       }
     },
   );
@@ -195,6 +206,10 @@ describe("encodeWav", () => {
     expect(view.getUint16(22, true)).toBe(1);
     expect(view.getUint32(24, true)).toBe(16000);
     expect(view.getUint16(34, true)).toBe(16);
+    expect(view.getUint32(4, true)).toBe(44);
+    expect(view.getUint32(16, true)).toBe(16);
+    expect(view.getUint32(28, true)).toBe(32000);
+    expect(view.getUint16(32, true)).toBe(2);
     expect(view.getUint32(40, true)).toBe(8);
     expect(file.byteLength).toBe(52);
     expect([0, 1, 2, 3].map((i) => view.getInt16(44 + i * 2, true))).toEqual([
@@ -272,6 +287,75 @@ describe("startDictation with the wasm engine", () => {
     expect(onTranscript).toHaveBeenCalledTimes(1);
     expect(onTranscript).toHaveBeenCalledWith("hello world");
     expect(tracks.every((track) => track.stopped)).toBe(true);
+    expect(processor?.disconnect).toHaveBeenCalled();
+    expect(closeAudioContext).toHaveBeenCalledTimes(1);
+    expect(wllama.exit).toHaveBeenCalledTimes(1);
+  });
+
+  it("copies each block on a 16 kHz device, whose capture buffer is reused", async () => {
+    const { stream } = makeMediaStream();
+    stubWasmSupport(vi.fn().mockResolvedValue(stream), 16000);
+
+    const session = await startDictation({ onTranscript: vi.fn() }, true);
+    // The browser hands the processor the same array for every block.
+    const reused = new Float32Array(2).fill(0.5);
+    capture(2, reused);
+    reused.fill(-0.5);
+    capture(2, reused);
+    await session.stop();
+
+    const { file } = wllama.createTranscription.mock.calls[0][0];
+    const view = new DataView(file);
+    expect([0, 1, 2, 3].map((i) => view.getInt16(44 + i * 2, true))).toEqual([
+      16384, 16384, -16383, -16383,
+    ]);
+  });
+
+  it("stops the download and never opens the microphone when abandoned mid-load", async () => {
+    const getUserMedia = vi.fn();
+    stubWasmSupport(getUserMedia);
+    const started = installLocalRecognitionFake();
+    wllama.loadModelFromUrl.mockImplementation(
+      (_source, params: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          params.signal?.addEventListener("abort", () =>
+            reject(new DOMException("Aborted", "AbortError")),
+          );
+        }),
+    );
+    const abort = new AbortController();
+    const onFallback = vi.fn();
+
+    const loading = startDictation(
+      { onTranscript: vi.fn(), onFallback },
+      true,
+      abort.signal,
+    );
+    await vi.waitFor(() =>
+      expect(wllama.loadModelFromUrl).toHaveBeenCalledTimes(1),
+    );
+    abort.abort();
+
+    await expect(loading).rejects.toBeInstanceOf(DictationError);
+    expect(getUserMedia).not.toHaveBeenCalled();
+    expect(wllama.exit).toHaveBeenCalledTimes(1);
+    // The button is gone, so the vendor's recognizer must not take over.
+    expect(onFallback).not.toHaveBeenCalled();
+    expect(started()).toBe(false);
+  });
+
+  it("drops a model that finished loading after the session was abandoned", async () => {
+    const getUserMedia = vi.fn();
+    stubWasmSupport(getUserMedia);
+    const abort = new AbortController();
+    wllama.loadModelFromUrl.mockImplementation(async () => {
+      abort.abort();
+    });
+
+    await expect(
+      startDictation({ onTranscript: vi.fn() }, true, abort.signal),
+    ).rejects.toBeInstanceOf(DictationError);
+    expect(getUserMedia).not.toHaveBeenCalled();
     expect(wllama.exit).toHaveBeenCalledTimes(1);
   });
 
@@ -340,14 +424,15 @@ describe("startDictation with the wasm engine", () => {
   it("drops the transcript of a session cancelled while it transcribes", async () => {
     const { stream } = makeMediaStream();
     stubWasmSupport(vi.fn().mockResolvedValue(stream));
-    let finishTranscription: (() => void) | undefined;
+    // Like wllama, unloading rejects the request still running.
+    let unload: (() => void) | undefined;
     wllama.createTranscription.mockImplementation(
       () =>
-        new Promise((resolve) => {
-          finishTranscription = () =>
-            resolve({ text: "language English<asr_text>too late" });
+        new Promise((_resolve, reject) => {
+          unload = () => reject(new Error("The model was unloaded"));
         }),
     );
+    wllama.exit.mockImplementation(async () => unload?.());
     const onTranscript = vi.fn();
     const onError = vi.fn();
 
@@ -363,16 +448,14 @@ describe("startDictation with the wasm engine", () => {
     expect(
       wllama.createTranscription.mock.calls[0][0].abortSignal?.aborted,
     ).toBe(true);
-    // Unloading under the running request would fail it instead of letting
-    // the abort settle it.
-    expect(wllama.exit).not.toHaveBeenCalled();
+    // Unloaded at once, so the transcription stops using the CPU now.
+    expect(wllama.exit).toHaveBeenCalled();
 
-    finishTranscription?.();
     await stopping;
 
     expect(onTranscript).not.toHaveBeenCalled();
+    // The unload's rejection is the cancel, not a failure to report.
     expect(onError).not.toHaveBeenCalled();
-    expect(wllama.exit).toHaveBeenCalledTimes(1);
   });
 
   it("releases the microphone and the model when cancelled while recording", async () => {

@@ -125,7 +125,11 @@ it("passes the local-model preference through to the engine", async () => {
       screen.getByRole("button", { name: "Dictate the search query" }),
     );
     await waitFor(() =>
-      expect(startDictation).toHaveBeenCalledWith(expect.anything(), false),
+      expect(startDictation).toHaveBeenCalledWith(
+        expect.anything(),
+        false,
+        expect.any(AbortSignal),
+      ),
     );
     expect(getDictationEngine).toHaveBeenCalledWith(false);
   } finally {
@@ -148,7 +152,11 @@ it("switches to the recording state and stops on the second press", async () => 
   // `true` restored by that test's finally block, so a hardcoded `false`
   // at the forwarding sites fails here.
   await waitFor(() =>
-    expect(startDictation).toHaveBeenCalledWith(expect.anything(), true),
+    expect(startDictation).toHaveBeenCalledWith(
+      expect.anything(),
+      true,
+      expect.any(AbortSignal),
+    ),
   );
 
   await waitFor(() =>
@@ -498,6 +506,59 @@ it("splices the transcript into the field without clobbering the base text", asy
 });
 
 describe("teardown", () => {
+  it("aborts the model download when the button unmounts mid-load", async () => {
+    vi.mocked(startDictation).mockReturnValue(new Promise(() => {}));
+    const user = userEvent.setup();
+    const { unmount } = renderButton();
+
+    await user.click(screen.getByRole("button"));
+    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
+    const signal = vi.mocked(startDictation).mock.calls[0][2];
+    expect(signal?.aborted).toBe(false);
+
+    // There is no session to cancel yet, and the first-run download is
+    // ~700 MB: without the abort it finishes for a button that is gone.
+    unmount();
+
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it("stays quiet when a load abandoned by the setting fails", async () => {
+    const user = userEvent.setup();
+    const { settingsPubSub } = await import("@/modules/pubSub");
+    let fail: ((error: Error) => void) | undefined;
+    vi.mocked(startDictation).mockReturnValue(
+      new Promise((_resolve, reject) => {
+        fail = reject;
+      }),
+    );
+
+    renderButton();
+    await user.click(screen.getByRole("button"));
+    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
+
+    try {
+      settingsPubSub[0]({
+        ...(settingsPubSub[2]?.() ?? {}),
+        enableDictation: false,
+      });
+      await waitFor(() =>
+        expect(vi.mocked(startDictation).mock.calls[0][2]?.aborted).toBe(true),
+      );
+      await act(async () =>
+        fail?.(new DictationError("engine", "Dictation was cancelled")),
+      );
+
+      // The button is gone, so there is nothing for the failure to explain.
+      expect(notifications.show).not.toHaveBeenCalled();
+    } finally {
+      settingsPubSub[0]({
+        ...(settingsPubSub[2]?.() ?? {}),
+        enableDictation: true,
+      });
+    }
+  });
+
   it("releases the microphone when the button unmounts mid-recording", async () => {
     const user = userEvent.setup();
     const { unmount } = renderButton();
