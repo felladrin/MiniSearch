@@ -25,7 +25,7 @@ Qwen3-ASR replaced Moonshine for three reasons. It understands every language Mi
 What it cost:
 
 - **The download.** About 700 MB on the first press, against Moonshine's 51 MB.
-- **Live text.** Qwen3-ASR has no streaming transcription in wllama 3.13.0 (`has_live_asr` is false), so the text appears when the user stops, not while they speak. A short query takes about a second on WebGPU.
+- **Live text.** Qwen3-ASR has no streaming transcription in wllama 3.13.0 (`has_live_asr` is false), so the text appears when the user stops, not while they speak. In the app, a short query landed in the field 1.4 to 2.2 seconds after the user stopped, on WebGPU.
 - **A two-minute cap.** The whole recording goes to the model at once, so it has to fit the context; the recording ends on its own at two minutes.
 
 ## Reading aloud

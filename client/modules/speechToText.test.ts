@@ -359,6 +359,35 @@ describe("startDictation with the wasm engine", () => {
     expect(wllama.exit).toHaveBeenCalledTimes(1);
   });
 
+  it("closes the microphone of a session abandoned while the permission prompt was open", async () => {
+    const { tracks, stream } = makeMediaStream();
+    const abort = new AbortController();
+    stubWasmSupport(
+      vi.fn(async () => {
+        abort.abort();
+        return stream;
+      }),
+    );
+
+    await expect(
+      startDictation({ onTranscript: vi.fn() }, true, abort.signal),
+    ).rejects.toBeInstanceOf(DictationError);
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    expect(processor).toBeUndefined();
+    expect(wllama.exit).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the load of a session abandoned before it started", async () => {
+    stubWasmSupport(vi.fn());
+    const abort = new AbortController();
+    abort.abort();
+
+    await expect(
+      startDictation({ onTranscript: vi.fn() }, true, abort.signal),
+    ).rejects.toBeInstanceOf(DictationError);
+    expect(wllama.loadModelFromUrl).not.toHaveBeenCalled();
+  });
+
   it("reports a permission error and unloads the model when the microphone is denied", async () => {
     const getUserMedia = vi
       .fn()

@@ -407,7 +407,7 @@ fills the field from speech. Two engines back it, chosen by the
    stripped, the text is spliced into the field, and the model is unloaded.
 
 The model is not kept loaded between presses, so a second dictation costs a
-load from OPFS (about 2.5 seconds) instead of holding hundreds of megabytes of
+load from OPFS (about 2 seconds) instead of holding hundreds of megabytes of
 memory next to the chat model. When it cannot load, the button falls back to
 the browser's recognizer and says so, because the audio's destination changes.
 Why Qwen3-ASR replaced Moonshine, and which other models were tried, is in

@@ -245,6 +245,12 @@ async function loadDictationModel(
     suppressNativeLog: true,
     allowOffline: true,
   });
+  const abandon = () => {
+    void releaseModel(wllama);
+    return new DictationError("engine", "Dictation was cancelled");
+  };
+  // Even from the cache, the load takes seconds a gone button cannot use.
+  if (signal?.aborted) throw abandon();
   try {
     await wllama.loadModelFromUrl(DICTATION_MODEL_SOURCE, {
       n_ctx: DICTATION_CONTEXT_SIZE,
@@ -263,10 +269,7 @@ async function loadDictationModel(
   }
   // The abort only reaches the download; once the files are in, the load in
   // the worker runs to the end, and the model is dropped here instead.
-  if (signal?.aborted) {
-    void releaseModel(wllama);
-    throw new DictationError("engine", "Dictation was cancelled");
-  }
+  if (signal?.aborted) throw abandon();
   return wllama;
 }
 
@@ -287,6 +290,14 @@ async function startWasmDictation(
       "permission",
       `The microphone could not be opened: ${describeError(error)}`,
     );
+  }
+  // Abandoned while the permission prompt was open.
+  if (signal?.aborted) {
+    mediaStream.getTracks().forEach((track) => {
+      track.stop();
+    });
+    void releaseModel(wllama);
+    throw new DictationError("engine", "Dictation was cancelled");
   }
 
   const chunks: Float32Array[] = [];
