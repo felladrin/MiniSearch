@@ -378,6 +378,41 @@ ONNX runtime and the phonemizer come from CDNs, while browser inference already
 downloads its models from HuggingFace. See the privacy note in
 `docs/security.md`.
 
+The speech models wllama can run since 3.13.0 were measured against Piper and
+turned down; the numbers and reasons are in
+[speech-model-evaluation.md](speech-model-evaluation.md).
+
+## Dictation
+
+The microphone button inside the search field and the chat follow-up field
+fills the field from speech. Two engines back it, chosen by the
+`enableLocalDictationModel` setting:
+
+| Engine    | Model                                       | Where the audio goes                    | When the text appears |
+| --------- | ------------------------------------------- | --------------------------------------- | --------------------- |
+| On-device | Qwen3-ASR 0.6B (Q4_K_M), run through wllama | Nowhere: it is transcribed in the page  | When the user stops   |
+| Browser   | The browser's own `SpeechRecognition`       | To the browser vendor, in most browsers | While the user speaks |
+
+### Flow
+
+1. Each press creates a wllama instance of its own, separate from the chat
+   model's, and loads the model from a Hugging Face URL pinned to one commit.
+   The first press downloads about 700 MB, which OPFS keeps for the next ones.
+   The microphone opens only once the model is ready.
+2. `client/modules/speechToText.ts` records 16 kHz mono audio through an
+   `AudioContext`, for at most two minutes, so the recording fits the model's
+   4096-token context.
+3. When the user stops, the recording is wrapped in a WAV file and passed to
+   `createTranscription`. The model's `language <name><asr_text>` prefix is
+   stripped, the text is spliced into the field, and the model is unloaded.
+
+The model is not kept loaded between presses, so a second dictation costs a
+load from OPFS (about 2.5 seconds) instead of holding hundreds of megabytes of
+memory next to the chat model. When it cannot load, the button falls back to
+the browser's recognizer and says so, because the audio's destination changes.
+Why Qwen3-ASR replaced Moonshine, and which other models were tried, is in
+[speech-model-evaluation.md](speech-model-evaluation.md).
+
 ## Error Handling and Fallbacks
 
 ### Browser Inference Failures

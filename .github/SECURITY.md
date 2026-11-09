@@ -93,13 +93,12 @@ A few of MiniSearch's dependencies ship native code or WebAssembly rather than a
 
 ### Inventory
 
-| Module                         | Type                | Where it runs                         | Why it is trusted                                                                                                                |
-| ------------------------------ | ------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `onnxruntime-node`             | Native (Node addon) | Server-side reranker, CPU only        | Microsoft-published ONNX Runtime; exact pin; its install script is **denied** (see below), so nothing is fetched at install time |
-| `@wllama/wllama`               | WebAssembly         | Browser inference                     | Published wllama project; exact pin; no install script                                                                           |
-| `@huggingface/tokenizers`      | Native (Node addon) | Server-side tokenization              | Hugging Face-published; exact pin; no install script                                                                             |
-| `hash-wasm`                    | WebAssembly         | argon2id hashing (browser and server) | Widely-used, audited WASM hash library; exact pin; no install script                                                             |
-| `@moonshine-ai/moonshine-wasm` | WebAssembly         | Browser dictation                     | Exact pin; no install script                                                                                                     |
+| Module                    | Type                | Where it runs                         | Why it is trusted                                                                                                                |
+| ------------------------- | ------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `onnxruntime-node`        | Native (Node addon) | Server-side reranker, CPU only        | Microsoft-published ONNX Runtime; exact pin; its install script is **denied** (see below), so nothing is fetched at install time |
+| `@wllama/wllama`          | WebAssembly         | Browser inference and dictation       | Published wllama project; exact pin; no install script                                                                           |
+| `@huggingface/tokenizers` | Native (Node addon) | Server-side tokenization              | Hugging Face-published; exact pin; no install script                                                                             |
+| `hash-wasm`               | WebAssembly         | argon2id hashing (browser and server) | Widely-used, audited WASM hash library; exact pin; no install script                                                             |
 
 ### What is verified at install
 
@@ -117,7 +116,7 @@ A few of MiniSearch's dependencies ship native code or WebAssembly rather than a
 ### What is NOT verified
 
 - **Binary semantics.** A registry signature proves the tarball came from the npm registry unmodified; it does not prove the native/WASM binary is free of malicious behaviour. Native and WASM payloads are opaque and are not human-audited here.
-- **Runtime downloads.** Model files fetched at use time (HuggingFace, `download.moonshine.ai`, the text-to-speech engine's CDN hosts) are outside the install-time gate; their trust model is documented in [docs/security.md](../docs/security.md).
+- **Runtime downloads.** Model files fetched at use time (HuggingFace, the text-to-speech engine's CDN hosts) are outside the install-time gate; their trust model is documented in [docs/security.md](../docs/security.md).
 - **Future approvals.** An install script added by a later version or a new dependency is only as trustworthy as the review behind the `approve-scripts` entry that covers it.
 
 ### Approving a new install script

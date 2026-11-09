@@ -35,6 +35,7 @@ This is your navigation hub. Start here, follow the links, and return when you n
 - **`docs/api.md`** - HTTP endpoint reference: parameters, responses, and error codes
 - **`docs/ai-integration.md`** - AI inference types (Wllama, OpenAI, AI Horde, Internal)
 - **`docs/wllama-model-evaluation.md`** - How in-browser models are scored on MiniSearch's task
+- **`docs/speech-model-evaluation.md`** - The speech models tried for dictation and reading aloud, and why only Qwen3-ASR made it in
 - **`docs/ui-components.md`** - Component architecture and PubSub patterns
 - **`docs/search-history.md`** - History database schema and management
 - **`docs/conversation-memory.md`** - Token budgeting and rolling summaries
@@ -145,10 +146,7 @@ Need to:
 - `client/modules/textToSpeechWorker.ts` - Synthesizes sentences off the main thread
 - `client/modules/textToSpeechWorkerProtocol.ts` - Message types shared by both sides of the worker
 - `client/modules/piper.ts` - The only module that imports `@diffusionstudio/vits-web`
-- `client/modules/speechToText.ts` - Dictation: microphone capture, the worker's lifecycle, and engine selection between the on-device model and `SpeechRecognition`
-- `client/modules/speechToTextWorker.ts` - Runs the Moonshine transcriber off the main thread
-- `client/modules/speechToTextWorkerProtocol.ts` - Message types shared by both sides of the dictation worker
-- `client/modules/moonshine.ts` - The only module that imports `@moonshine-ai/moonshine-wasm`
+- `client/modules/speechToText.ts` - Dictation: microphone capture, the on-device Qwen3-ASR model's lifecycle, and engine selection between it and `SpeechRecognition`
 - `client/modules/keyboard.ts` - Keyboard shortcut handling
 - `client/modules/stringFormatters.ts` - Text formatting utilities
 - `client/modules/types.ts` - Shared TypeScript type definitions
@@ -164,7 +162,6 @@ Need to:
 - `server/rerankerServiceHook.ts` - Reranker model lifecycle management
 - `server/compressionServerHook.ts` - gzip/brotli compression for responses
 - `server/crossOriginServerHook.ts` - COOP/COEP headers for SharedArrayBuffer
-- `server/dictationModelServerHook.ts` - `/dictation-models/` endpoint: serves the pinned speech-to-text model files from the instance
 - `server/cacheServerHook.ts` - Cache-Control headers (preview server only)
 - `server/webSearchService.ts` - SearXNG integration with circuit breaker and retry logic
 - `server/fallbackSearchService.ts` - Fallback text-search cascade over Parallel and You.com for when SearXNG fails and `SEARCH_FALLBACK_ENABLED` is on, with a per-provider pause after a 429

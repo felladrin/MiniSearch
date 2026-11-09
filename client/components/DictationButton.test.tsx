@@ -65,12 +65,15 @@ function renderButton({
 }
 
 const stopFn = vi.fn();
+const cancelFn = vi.fn();
+const session = { stop: stopFn, cancel: cancelFn };
 
 beforeEach(() => {
   vi.mocked(getDictationEngine).mockReturnValue("wasm");
-  vi.mocked(startDictation).mockResolvedValue({ stop: stopFn });
+  vi.mocked(startDictation).mockResolvedValue(session);
   vi.mocked(notifications.show).mockClear();
-  stopFn.mockClear();
+  stopFn.mockReset();
+  cancelFn.mockReset();
 });
 
 it("renders a dictation button with an accessible label", () => {
@@ -143,8 +146,7 @@ it("switches to the recording state and stops on the second press", async () => 
 
   // The mirror of the `false` case above: the pubsub holds a literal
   // `true` restored by that test's finally block, so a hardcoded `false`
-  // at the forwarding sites fails here. The en-US derivation itself is
-  // pinned in settings.test.ts.
+  // at the forwarding sites fails here.
   await waitFor(() =>
     expect(startDictation).toHaveBeenCalledWith(expect.anything(), true),
   );
@@ -161,8 +163,141 @@ it("switches to the recording state and stops on the second press", async () => 
 
   expect(stopFn).toHaveBeenCalledTimes(1);
   expect(
-    screen.getByRole("button", { name: "Dictate the search query" }),
+    await screen.findByRole("button", { name: "Dictate the search query" }),
   ).toHaveAttribute("aria-pressed", "false");
+});
+
+describe("the transcribing phase", () => {
+  async function startRecording() {
+    const user = userEvent.setup();
+    let value = "existing query";
+    const view = renderButton({
+      getValue: () => value,
+      setValue: (text) => {
+        value = text;
+      },
+    });
+    await user.click(screen.getByRole("button"));
+    await waitFor(() =>
+      expect(screen.getByRole("button")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
+    );
+    return { user, view, getValue: () => value };
+  }
+
+  it("waits for the transcript the session delivers while it stops", async () => {
+    let finishStop: (() => void) | undefined;
+    stopFn.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishStop = resolve;
+        }),
+    );
+    const { user, getValue } = await startRecording();
+
+    await user.click(screen.getByRole("button"));
+
+    // The on-device model only transcribes once the recording is over, so
+    // the press has to show that work is still going on.
+    expect(screen.getByRole("button")).toHaveAttribute(
+      "aria-label",
+      "Transcribing the search query",
+    );
+    expect(screen.getByRole("button")).toHaveAttribute(
+      "data-dictation-phase",
+      "transcribing",
+    );
+
+    // A second press while it transcribes must not stop it twice.
+    await user.click(screen.getByRole("button"));
+    expect(stopFn).toHaveBeenCalledTimes(1);
+
+    const { onTranscript } = vi.mocked(startDictation).mock.calls[0][0];
+    act(() => onTranscript("hello world"));
+    await act(async () => finishStop?.());
+
+    expect(getValue()).toBe("existing query hello world");
+    expect(screen.getByRole("button")).toHaveAttribute(
+      "aria-label",
+      "Dictate the search query",
+    );
+  });
+
+  it("cancels a transcription whose field becomes disabled", async () => {
+    stopFn.mockReturnValue(new Promise<void>(() => {}));
+    const { user, view } = await startRecording();
+
+    await user.click(screen.getByRole("button"));
+    expect(screen.getByRole("button")).toHaveAttribute(
+      "data-dictation-phase",
+      "transcribing",
+    );
+
+    view.rerender(
+      <MantineProvider>
+        <DictationButton
+          getValue={() => ""}
+          setValue={() => {}}
+          labelScope="the search query"
+          disabled
+        />
+      </MantineProvider>,
+    );
+
+    // The transcript would otherwise land in a field that went read-only.
+    await waitFor(() => expect(cancelFn).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button")).toHaveAttribute(
+      "data-dictation-phase",
+      "idle",
+    );
+  });
+
+  it("leaves a newer session alone when a cancelled one finishes stopping", async () => {
+    let finishStop: (() => void) | undefined;
+    stopFn.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishStop = resolve;
+      }),
+    );
+    const { user, view } = await startRecording();
+    await user.click(screen.getByRole("button"));
+
+    const renderWith = (disabled: boolean) =>
+      view.rerender(
+        <MantineProvider>
+          <DictationButton
+            getValue={() => ""}
+            setValue={() => {}}
+            labelScope="the search query"
+            disabled={disabled}
+          />
+        </MantineProvider>,
+      );
+    renderWith(true);
+    await waitFor(() => expect(cancelFn).toHaveBeenCalledTimes(1));
+    renderWith(false);
+
+    const newer = { stop: vi.fn(), cancel: vi.fn() };
+    vi.mocked(startDictation).mockResolvedValue(newer);
+    await user.click(screen.getByRole("button"));
+    await waitFor(() =>
+      expect(screen.getByRole("button")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
+    );
+
+    // The first session's stop settles only after its aborted transcription
+    // does. Taking the ref down then would orphan the newer session, with
+    // its microphone open and no button left to stop it.
+    await act(async () => finishStop?.());
+
+    expect(screen.getByRole("button")).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button"));
+    expect(newer.stop).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("the icon-only render", () => {
@@ -207,7 +342,7 @@ describe("the icon-only render", () => {
   });
 
   it("keeps the download progress in the accessible name while it loads", async () => {
-    let release: ((session: { stop: () => Promise<void> }) => void) | undefined;
+    let release: ((value: typeof session) => void) | undefined;
     vi.mocked(startDictation).mockReturnValue(
       new Promise((resolve) => {
         release = resolve;
@@ -234,7 +369,7 @@ describe("the icon-only render", () => {
       "loading",
     );
 
-    release?.({ stop: stopFn });
+    release?.(session);
   });
 
   it("shows the same wording in the tooltip as in the accessible name", async () => {
@@ -290,8 +425,8 @@ describe("the disabled prop", () => {
       ),
     );
 
-    // Disabling only blocks the next press. Without the stop, the transcript
-    // keeps landing in a field the user can no longer correct.
+    // Disabling only blocks the next press. Without the cancel, the
+    // transcript lands in a field the user can no longer correct.
     rerender(
       <MantineProvider>
         <DictationButton
@@ -303,7 +438,8 @@ describe("the disabled prop", () => {
       </MantineProvider>,
     );
 
-    await waitFor(() => expect(stopFn).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(cancelFn).toHaveBeenCalledTimes(1));
+    expect(stopFn).not.toHaveBeenCalled();
   });
 });
 
@@ -338,7 +474,7 @@ it("splices the transcript into the field without clobbering the base text", asy
 
   vi.mocked(startDictation).mockImplementation(async (callbacks) => {
     onTranscript = callbacks.onTranscript;
-    return { stop: stopFn };
+    return session;
   });
 
   const user = userEvent.setup();
@@ -368,19 +504,19 @@ describe("teardown", () => {
 
     await user.click(screen.getByRole("button"));
     await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
-    expect(stopFn).not.toHaveBeenCalled();
+    expect(cancelFn).not.toHaveBeenCalled();
 
     // `SearchForm` remounts the moment the query goes non-empty, so this is
     // the primary flow, not a corner case.
     unmount();
 
-    await waitFor(() => expect(stopFn).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(cancelFn).toHaveBeenCalledTimes(1));
   });
 
   it("discards a session that arrives after the setting was turned off", async () => {
     const user = userEvent.setup();
     const { settingsPubSub } = await import("@/modules/pubSub");
-    let release: ((session: { stop: () => Promise<void> }) => void) | undefined;
+    let release: ((value: typeof session) => void) | undefined;
     vi.mocked(startDictation).mockReturnValue(
       new Promise((resolve) => {
         release = resolve;
@@ -398,9 +534,9 @@ describe("teardown", () => {
         ...(settingsPubSub[2]?.() ?? {}),
         enableDictation: false,
       });
-      release?.({ stop: stopFn });
+      release?.(session);
 
-      await waitFor(() => expect(stopFn).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(cancelFn).toHaveBeenCalledTimes(1));
     } finally {
       settingsPubSub[0]({
         ...(settingsPubSub[2]?.() ?? {}),
@@ -412,9 +548,9 @@ describe("teardown", () => {
   it("does not adopt a load an earlier press abandoned", async () => {
     const user = userEvent.setup();
     const { settingsPubSub } = await import("@/modules/pubSub");
-    const firstStop = vi.fn().mockResolvedValue(undefined);
-    const secondStop = vi.fn().mockResolvedValue(undefined);
-    const releases: ((session: { stop: () => Promise<void> }) => void)[] = [];
+    const first = { stop: vi.fn(), cancel: vi.fn() };
+    const second = { stop: vi.fn(), cancel: vi.fn() };
+    const releases: ((value: typeof session) => void)[] = [];
     vi.mocked(startDictation).mockImplementation(
       () => new Promise((resolve) => releases.push(resolve)),
     );
@@ -439,14 +575,14 @@ describe("teardown", () => {
       await user.click(await screen.findByRole("button"));
       await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(2));
 
-      releases[0]({ stop: firstStop });
-      releases[1]({ stop: secondStop });
+      releases[0](first);
+      releases[1](second);
 
       // The first load lost its UI when the setting went off. Adopting it here
-      // leaves its microphone and worker running for the life of the page,
+      // leaves its microphone and model running for the life of the page,
       // because the second press overwrites the ref that would stop it.
-      await waitFor(() => expect(firstStop).toHaveBeenCalledTimes(1));
-      expect(secondStop).not.toHaveBeenCalled();
+      await waitFor(() => expect(first.cancel).toHaveBeenCalledTimes(1));
+      expect(second.cancel).not.toHaveBeenCalled();
     } finally {
       settingsPubSub[0]({
         ...(settingsPubSub[2]?.() ?? {}),
@@ -463,10 +599,11 @@ describe("teardown", () => {
     await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
 
     const { onEnd } = vi.mocked(startDictation).mock.calls[0][0];
-    onEnd?.();
+    act(() => onEnd?.());
 
-    // The recognizer stopping itself is not a failure, but the button has to
-    // come back or it sits on "Listening" with nothing behind it.
+    // The engine ending by itself is not a failure, but the button has to
+    // come back or it sits on "Listening" with nothing behind it. It stops
+    // rather than cancels: the on-device recording still needs transcribing.
     await waitFor(() =>
       expect(screen.getByRole("button")).toHaveAttribute(
         "aria-label",
@@ -485,9 +622,9 @@ describe("teardown", () => {
     await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
 
     const { onError } = vi.mocked(startDictation).mock.calls[0][0];
-    onError?.(new DictationError("engine", "the transcriber died"));
+    act(() => onError?.(new DictationError("engine", "the transcriber died")));
 
-    await waitFor(() => expect(stopFn).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(cancelFn).toHaveBeenCalledTimes(1));
     expect(vi.mocked(notifications.show)).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Dictation stopped" }),
     );

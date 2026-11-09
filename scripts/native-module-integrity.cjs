@@ -31,7 +31,6 @@ const path = require("node:path");
  */
 const NATIVE_MODULES = [
   "@huggingface/tokenizers",
-  "@moonshine-ai/moonshine-wasm",
   "@wllama/wllama",
   "hash-wasm",
   "onnxruntime-node",

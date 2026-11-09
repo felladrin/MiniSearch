@@ -1,10 +1,11 @@
-import { DICTATION_MODELS_ROUTE_PREFIX } from "@shared/dictationModel";
+import type { Wllama } from "@wllama/wllama";
 import { addLogEntry } from "./logEntries";
-import type { WorkerResponse } from "./speechToTextWorkerProtocol";
+import { getSettings } from "./pubSub";
+import { webGpuSupport } from "./webGpu";
 
 /**
  * Which path can transcribe speech in this browser. `"wasm"` runs the
- * Moonshine model locally in a worker; `"web-speech"` falls back to the
+ * Qwen3-ASR model locally through wllama; `"web-speech"` falls back to the
  * browser's own `SpeechRecognition`, which sends audio to the vendor.
  */
 export type DictationEngine = "wasm" | "web-speech";
@@ -21,23 +22,33 @@ export class DictationError extends Error {
 }
 
 /**
- * The streaming English model (MIT-licensed), served from this instance at
- * `/dictation-models/<file>` instead of the Moonshine CDN, so the page makes
- * no third-party requests. The filenames are the canonical ones the
- * streaming architecture loads; the server hook maps them to the pinned
- * upstream files and caches them on disk.
+ * Qwen3-ASR 0.6B (Apache-2.0), pinned to a commit of the repository so an
+ * upstream re-upload cannot change what users download. The browser fetches
+ * it straight from Hugging Face, like the in-browser chat models, and wllama
+ * keeps it in the origin's private file system after the first press.
  */
-const DICTATION_MODEL_FILES: Record<string, string> = Object.fromEntries(
-  [
-    "frontend.ort",
-    "encoder.ort",
-    "adapter.ort",
-    "cross_kv.ort",
-    "decoder_kv.ort",
-    "streaming_config.json",
-    "tokenizer.bin",
-  ].map((file) => [file, `${DICTATION_MODELS_ROUTE_PREFIX}${file}`]),
-);
+const DICTATION_MODEL_URL_PREFIX =
+  "https://huggingface.co/mradermacher/Qwen3-ASR-0.6B-GGUF/resolve/39c0af5b4099296b922e9b61db2fce4317fe2d35/";
+
+export const DICTATION_MODEL_SOURCE = {
+  url: `${DICTATION_MODEL_URL_PREFIX}Qwen3-ASR-0.6B.Q4_K_M.gguf`,
+  mmprojUrl: `${DICTATION_MODEL_URL_PREFIX}Qwen3-ASR-0.6B.mmproj-Q8_0.gguf`,
+};
+
+/** The sample rate Qwen3-ASR's audio encoder takes. */
+const MODEL_SAMPLE_RATE = 16000;
+
+/**
+ * The recording ends on its own after this long, so the audio always fits
+ * the context below. A search query or a follow-up question is far shorter.
+ */
+export const MAX_RECORDING_SECONDS = 120;
+
+/**
+ * Room for `MAX_RECORDING_SECONDS` of audio, the prompt and the transcript.
+ * The audio encoder emits about 13 tokens per second of speech.
+ */
+const DICTATION_CONTEXT_SIZE = 4096;
 
 /** The minimum the app needs from `window.SpeechRecognition`. */
 interface SpeechRecognitionLike {
@@ -100,7 +111,11 @@ export function getDictationEngine(
 }
 
 export interface DictationCallbacks {
-  /** Called with the whole dictated text so far, as it grows. */
+  /**
+   * Called with the whole dictated text so far. The browser's recognizer
+   * calls it as the text grows; the on-device model calls it once, while
+   * `stop()` is running, because it transcribes the recording as a whole.
+   */
   onTranscript: (text: string) => void;
   /** Model download progress; `total` is undefined when sizes are unknown. */
   onProgress?: (loaded: number, total?: number) => void;
@@ -110,31 +125,34 @@ export interface DictationCallbacks {
    */
   onFallback?: () => void;
   /**
-   * The engine stopped on its own, without failing. The browser's recognizer
-   * ends after silence even with `continuous`, and the session is over once it
-   * does.
+   * The engine stopped listening on its own, without failing: the browser's
+   * recognizer ends after silence even with `continuous`, and the on-device
+   * recording ends at `MAX_RECORDING_SECONDS`. The caller then calls `stop()`
+   * to collect the transcript.
    */
   onEnd?: () => void;
   /**
    * A failure after the engine loaded. The load itself rejects instead, so
-   * this is the channel for a worker that dies mid-dictation, which would
-   * otherwise leave the UI listening forever with the microphone open.
+   * this is the channel for an engine that dies mid-dictation, which would
+   * otherwise leave the UI listening forever with the microphone open, and for
+   * a transcription that fails after `stop()`.
    */
   onError?: (error: DictationError) => void;
 }
 
 export interface DictationSession {
+  /**
+   * Stops listening and resolves once the transcript, if any, has been
+   * delivered through `onTranscript`. Never rejects: a failure goes to
+   * `onError`.
+   */
   stop: () => Promise<void>;
-}
-
-let workerFactory = () =>
-  new Worker(new URL("./speechToTextWorker.ts", import.meta.url), {
-    type: "module",
-  });
-
-/** Lets the tests supply a fake worker; the real one needs a bundler. */
-export function setWorkerFactory(factory: () => Worker) {
-  workerFactory = factory;
+  /**
+   * Stops listening and drops whatever was not delivered yet. For a session
+   * whose field is gone or read-only, where a late transcript has nowhere
+   * to go.
+   */
+  cancel: () => void;
 }
 
 /**
@@ -161,62 +179,93 @@ export function resampleTo16k(
   return output;
 }
 
+/**
+ * Wraps mono samples in a 16-bit PCM WAV file, the container wllama's
+ * transcription decodes.
+ */
+export function encodeWav(
+  samples: Float32Array,
+  sampleRate: number,
+): ArrayBuffer {
+  const headerSize = 44;
+  const dataSize = samples.length * 2;
+  const buffer = new ArrayBuffer(headerSize + dataSize);
+  const view = new DataView(buffer);
+  const writeText = (offset: number, text: string) => {
+    for (let i = 0; i < text.length; i++)
+      view.setUint8(offset + i, text.charCodeAt(i));
+  };
+  writeText(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeText(8, "WAVE");
+  writeText(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeText(36, "data");
+  view.setUint32(40, dataSize, true);
+  for (let i = 0; i < samples.length; i++) {
+    const sample = Math.max(-1, Math.min(1, samples[i] ?? 0));
+    view.setInt16(headerSize + i * 2, Math.round(sample * 0x7fff), true);
+  }
+  return buffer;
+}
+
+/**
+ * Qwen3-ASR opens its answer with the language it detected, as in
+ * `language English<asr_text>The text.`; only the text belongs in the field.
+ */
+export function stripLanguageTag(output: string): string {
+  return output.replace(/^\s*language[^<]*<asr_text>/, "").trim();
+}
+
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** Frees the model's memory; a failure here is logged, never thrown. */
+async function releaseModel(wllama: Wllama): Promise<void> {
+  try {
+    await wllama.exit();
+  } catch (error) {
+    addLogEntry(`The dictation model did not unload: ${describeError(error)}`);
+  }
+}
+
+async function loadDictationModel(
+  callbacks: DictationCallbacks,
+): Promise<Wllama> {
+  const { createWllamaInstance } = await import("./wllama");
+  const wllama = await createWllamaInstance({
+    suppressNativeLog: true,
+    allowOffline: true,
+  });
+  try {
+    await wllama.loadModelFromUrl(DICTATION_MODEL_SOURCE, {
+      n_ctx: DICTATION_CONTEXT_SIZE,
+      n_threads: getSettings().cpuThreads,
+      n_gpu_layers: (await webGpuSupport) ? 99999 : 0,
+      progressCallback: ({ loaded, total }) =>
+        callbacks.onProgress?.(loaded, total),
+    });
+  } catch (error) {
+    void releaseModel(wllama);
+    throw new DictationError(
+      "engine",
+      `The dictation model could not be loaded: ${describeError(error)}`,
+    );
+  }
+  return wllama;
 }
 
 async function startWasmDictation(
   callbacks: DictationCallbacks,
 ): Promise<DictationSession> {
-  const worker = workerFactory();
-  /**
-   * Set the moment `stop()` is entered. Every callback is gated on it: the
-   * engines both emit one last result after being told to stop, and the button
-   * has already forgotten what it appended by then, so an ungated late
-   * transcript is appended a second time in full.
-   */
-  let stopped = false;
-
-  /**
-   * An engine failure between `loaded` and the microphone being granted. The
-   * load promise has already settled by then, so rejecting it again is a no-op;
-   * the permission prompt can sit open for minutes, and the transcriber is
-   * already running and can die in that window.
-   */
-  let failureAfterLoad: DictationError | null = null;
-  let engineLoaded = false;
-
-  const loadEngine = () =>
-    new Promise<void>((resolve, reject) => {
-      worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
-        if (data.type === "loaded") {
-          engineLoaded = true;
-          resolve();
-        } else if (data.type === "progress")
-          callbacks.onProgress?.(data.loaded, data.total);
-        else if (data.type === "error") {
-          const failure = new DictationError("engine", data.message);
-          if (engineLoaded) failureAfterLoad = failure;
-          else reject(failure);
-        }
-      };
-      worker.onerror = () => {
-        const failure = new DictationError(
-          "engine",
-          "The dictation worker failed to start",
-        );
-        if (engineLoaded) failureAfterLoad = failure;
-        else reject(failure);
-      };
-      worker.postMessage({ type: "load", modelFiles: DICTATION_MODEL_FILES });
-    });
-
-  try {
-    await loadEngine();
-  } catch (error) {
-    worker.terminate();
-    throw error;
-  }
+  const wllama = await loadDictationModel(callbacks);
 
   // Only once the model is ready: opening it first would light the browser's
   // recording indicator for the whole of a first-run download.
@@ -224,60 +273,46 @@ async function startWasmDictation(
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (error) {
-    worker.terminate();
+    void releaseModel(wllama);
     throw new DictationError(
       "permission",
       `The microphone could not be opened: ${describeError(error)}`,
     );
   }
 
-  // Failed while the permission prompt was open. Thrown rather than reported
-  // through `onError`, so it lands in `startDictation`'s catch and takes the
-  // same fallback as any other engine failure.
-  if (failureAfterLoad) {
+  const chunks: Float32Array[] = [];
+  let recordedSamples = 0;
+  const maxSamples = MAX_RECORDING_SECONDS * MODEL_SAMPLE_RATE;
+  /** Cleared once the microphone is released, by `stop`, `cancel` or the cap. */
+  let listening = true;
+  let cancelled = false;
+  const transcription = new AbortController();
+
+  let audioContext: AudioContext | undefined;
+  let source: MediaStreamAudioSourceNode | undefined;
+  let processor: ScriptProcessorNode | undefined;
+
+  const releaseAudio = () => {
+    if (!listening) return;
+    listening = false;
+    processor?.disconnect();
+    source?.disconnect();
     mediaStream.getTracks().forEach((track) => {
       track.stop();
     });
-    worker.terminate();
-    throw failureAfterLoad;
-  }
-
-  let acknowledgeStop: (() => void) | null = null;
-
-  worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
-    if (data.type === "stopped") {
-      acknowledgeStop?.();
-      return;
-    }
-    if (stopped) return;
-    if (data.type === "transcript") callbacks.onTranscript(data.text);
-    else if (data.type === "error")
-      callbacks.onError?.(new DictationError("engine", data.message));
-  };
-  worker.onerror = () => {
-    if (stopped) return;
-    callbacks.onError?.(
-      new DictationError("engine", "The dictation worker stopped unexpectedly"),
-    );
+    audioContext?.close().catch((error: unknown) => {
+      addLogEntry(
+        `The dictation audio context did not close: ${describeError(error)}`,
+      );
+    });
   };
 
   // Asking for 16 kHz lets the browser resample properly. `resampleTo16k` is
   // the fallback for devices that refuse the rate: its linear interpolation
   // has no lowpass, so everything above 8 kHz aliases into the band the model
   // listens to.
-  const releasePartialSession = (context?: AudioContext) => {
-    mediaStream.getTracks().forEach((track) => {
-      track.stop();
-    });
-    void context?.close();
-    worker.terminate();
-  };
-
-  let audioContext: AudioContext | undefined;
-  let source: MediaStreamAudioSourceNode | undefined;
-  let processor: ScriptProcessorNode | undefined;
   try {
-    const context = new AudioContext({ sampleRate: 16000 });
+    const context = new AudioContext({ sampleRate: MODEL_SAMPLE_RATE });
     audioContext = context;
     source = context.createMediaStreamSource(mediaStream);
     // A 1-channel ScriptProcessor downmixes stereo capture to mono, which
@@ -285,21 +320,24 @@ async function startWasmDictation(
     processor = context.createScriptProcessor(4096, 1, 1);
 
     processor.onaudioprocess = (event) => {
-      if (stopped) return;
-      const input = event.inputBuffer.getChannelData(0);
-      const resampled = resampleTo16k(input, context.sampleRate);
-      // The capture buffer is reused and a transferred buffer cannot be read
-      // again, so the untouched path needs a copy. `resampleTo16k` already
-      // returned a fresh array nobody else holds.
-      const copy = resampled === input ? new Float32Array(input) : resampled;
-      worker.postMessage(
-        { type: "audio", buffer: copy.buffer, sampleRate: 16000 },
-        [copy.buffer],
-      );
       // The processor must stay connected to the destination to be called;
       // zero the output so the microphone is not played back through the
       // speakers.
       event.outputBuffer.getChannelData(0).fill(0);
+      if (!listening) return;
+      const input = event.inputBuffer.getChannelData(0);
+      const resampled = resampleTo16k(input, context.sampleRate);
+      // The capture buffer is reused for the next block, so the untouched
+      // path needs a copy. `resampleTo16k` already returned a fresh array.
+      const chunk = (
+        resampled === input ? new Float32Array(input) : resampled
+      ).subarray(0, maxSamples - recordedSamples);
+      chunks.push(chunk);
+      recordedSamples += chunk.length;
+      if (recordedSamples >= maxSamples) {
+        releaseAudio();
+        callbacks.onEnd?.();
+      }
     };
 
     source.connect(processor);
@@ -309,41 +347,71 @@ async function startWasmDictation(
     // Chrome throws once a page holds too many live contexts. Escaping here as
     // a plain Error would be caught as "the local engine cannot run" and hand
     // the microphone to the browser's cloud recognizer by accident.
-    releasePartialSession(audioContext);
+    releaseAudio();
+    void releaseModel(wllama);
     throw new DictationError(
       "engine",
       `The audio pipeline could not be started: ${describeError(error)}`,
     );
   }
 
-  return {
-    stop: async () => {
-      if (stopped) return;
-      stopped = true;
-      processor?.disconnect();
-      source?.disconnect();
-      mediaStream.getTracks().forEach((track) => {
-        track.stop();
-      });
+  const transcribe = async () => {
+    const samples = new Float32Array(recordedSamples);
+    let offset = 0;
+    for (const chunk of chunks) {
+      samples.set(chunk, offset);
+      offset += chunk.length;
+    }
+    chunks.length = 0;
+    // Nothing was captured when stop comes right after the press.
+    if (samples.length === 0) return;
+    const result = await wllama.createTranscription({
+      file: encodeWav(samples, MODEL_SAMPLE_RATE),
+      abortSignal: transcription.signal,
+    });
+    const text = stripLanguageTag(result.text);
+    if (!cancelled && text) callbacks.onTranscript(text);
+  };
 
-      // Wait for the transcriber to drain its queue, but never hang the UI on
-      // a worker that has stopped answering.
-      const acknowledged = new Promise<void>((resolve) => {
-        acknowledgeStop = resolve;
-      });
-      worker.postMessage({ type: "stop" });
-      await Promise.race([
-        acknowledged,
-        new Promise<void>((resolve) => setTimeout(resolve, 2000)),
-      ]);
-
-      try {
-        await audioContext?.close();
-      } finally {
-        // Never skipped: a rejecting close would otherwise leave the worker,
-        // and its transcriber, running for the life of the page.
-        worker.terminate();
+  const finish = async () => {
+    releaseAudio();
+    try {
+      await transcribe();
+    } catch (error) {
+      if (!cancelled) {
+        callbacks.onError?.(
+          new DictationError(
+            "engine",
+            `The recording could not be transcribed: ${describeError(error)}`,
+          ),
+        );
       }
+    } finally {
+      await releaseModel(wllama);
+    }
+  };
+
+  /**
+   * Shared by every caller, so a second `stop` (the user pressing while the
+   * cap ends the recording) waits for the same transcript instead of
+   * resolving before it lands.
+   */
+  let stopping: Promise<void> | null = null;
+
+  return {
+    stop: () => {
+      if (cancelled) return Promise.resolve();
+      stopping ??= finish();
+      return stopping;
+    },
+    cancel: () => {
+      if (cancelled) return;
+      cancelled = true;
+      releaseAudio();
+      transcription.abort();
+      // A running `stop` unloads the model once the aborted transcription
+      // settles; unloading under it would fail the request instead.
+      if (!stopping) void releaseModel(wllama);
     },
   };
 }
@@ -418,12 +486,13 @@ function startWebSpeechDictation(
     try {
       recognition.start();
       resolved = true;
-      resolve({
-        stop: async () => {
-          stopped = true;
-          recognition.stop();
-        },
-      });
+      // The recognizer delivers its text as it goes, so stopping it and
+      // dropping its last result is all either one needs to do.
+      const end = () => {
+        stopped = true;
+        recognition.stop();
+      };
+      resolve({ stop: async () => end(), cancel: end });
     } catch (error) {
       reject(
         new DictationError(
@@ -466,7 +535,7 @@ export async function startDictation(
   }
   if (engine === "web-speech") {
     // No reverse fallback to wasm when this recognizer fails. Falling through
-    // would start a ~51 MB model download right after the user turned that
+    // would start a ~700 MB model download right after the user turned that
     // model off; a clear failure is the better answer, and it matches what
     // web-speech-only browsers already do.
     return startWebSpeechDictation(callbacks);

@@ -1,36 +1,42 @@
 import {
+  DICTATION_MODEL_SOURCE,
   DictationError,
-  type DictationSession,
+  encodeWav,
   getDictationEngine,
+  MAX_RECORDING_SECONDS,
   resampleTo16k,
-  setWorkerFactory,
   startDictation,
+  stripLanguageTag,
 } from "@/modules/speechToText";
-import type { WorkerResponse } from "@/modules/speechToTextWorkerProtocol";
+import { createWllamaInstance } from "@/modules/wllama";
 
-class FakeWorker {
-  static instances: FakeWorker[] = [];
-  onmessage: ((event: MessageEvent) => void) | null = null;
-  onerror: ((event: unknown) => void) | null = null;
-  terminated = false;
-  messages: unknown[] = [];
+vi.mock("@/modules/wllama", () => ({ createWllamaInstance: vi.fn() }));
+vi.mock("@/modules/webGpu", () => ({ webGpuSupport: Promise.resolve(false) }));
 
-  constructor() {
-    FakeWorker.instances.push(this);
-  }
-
-  postMessage(message: unknown, _transfer?: Transferable[]) {
-    this.messages.push(message);
-  }
-
-  terminate() {
-    this.terminated = true;
-  }
-
-  respond(response: WorkerResponse) {
-    this.onmessage?.({ data: response } as MessageEvent);
-  }
+/** The parts of a wllama instance the dictation calls. */
+class FakeWllama {
+  loadModelFromUrl = vi.fn(
+    async (
+      _source: unknown,
+      params: {
+        progressCallback?: (progress: {
+          loaded: number;
+          total: number;
+        }) => void;
+      },
+    ) => {
+      params.progressCallback?.({ loaded: 1000, total: 2000 });
+    },
+  );
+  createTranscription = vi.fn(
+    async (_params: { file: ArrayBuffer; abortSignal?: AbortSignal }) => ({
+      text: "language English<asr_text>hello world",
+    }),
+  );
+  exit = vi.fn(async () => {});
 }
+
+let wllama: FakeWllama;
 
 class FakeMediaStreamTrack {
   stopped = false;
@@ -49,8 +55,24 @@ function makeMediaStream() {
   };
 }
 
+type AudioProcessHandler = (event: {
+  inputBuffer: { getChannelData: (channel: number) => Float32Array };
+  outputBuffer: { getChannelData: (channel: number) => Float32Array };
+}) => void;
+
+/** The script processor of the latest audio context, to feed it samples. */
+let processor: { onaudioprocess: AudioProcessHandler | null } | undefined;
+
+/** Hands the processor one block captured at the stubbed 48 kHz. */
+function capture(samples: number) {
+  processor?.onaudioprocess?.({
+    inputBuffer: { getChannelData: () => new Float32Array(samples).fill(0.5) },
+    outputBuffer: { getChannelData: () => new Float32Array(samples) },
+  });
+}
+
 function stubWasmSupport(getUserMedia: ReturnType<typeof vi.fn>) {
-  vi.stubGlobal("Worker", FakeWorker);
+  vi.stubGlobal("Worker", class {});
   vi.stubGlobal("WebAssembly", { instantiate: vi.fn() });
   vi.stubGlobal(
     "AudioContext",
@@ -60,11 +82,12 @@ function stubWasmSupport(getUserMedia: ReturnType<typeof vi.fn>) {
         return { connect: vi.fn(), disconnect: vi.fn() };
       }
       createScriptProcessor() {
-        return {
+        processor = {
           onaudioprocess: null,
           connect: vi.fn(),
           disconnect: vi.fn(),
-        };
+        } as typeof processor;
+        return processor;
       }
       close() {
         return Promise.resolve();
@@ -77,7 +100,22 @@ function stubWasmSupport(getUserMedia: ReturnType<typeof vi.fn>) {
   });
 }
 
+/** The number of samples in the WAV file handed to the transcription. */
+function transcribedSamples() {
+  const { file } = wllama.createTranscription.mock.calls[0][0];
+  return new DataView(file).getUint32(40, true) / 2;
+}
+
 const originalMediaDevices = navigator.mediaDevices;
+
+beforeEach(() => {
+  wllama = new FakeWllama();
+  vi.mocked(createWllamaInstance).mockReset();
+  vi.mocked(createWllamaInstance).mockResolvedValue(
+    wllama as unknown as Awaited<ReturnType<typeof createWllamaInstance>>,
+  );
+  processor = undefined;
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -86,10 +124,6 @@ afterEach(() => {
     value: originalMediaDevices,
   });
   delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
-  setWorkerFactory(() => {
-    throw new Error("no worker factory configured");
-  });
-  FakeWorker.instances = [];
 });
 
 describe("getDictationEngine", () => {
@@ -146,63 +180,46 @@ describe("resampleTo16k", () => {
   });
 });
 
-describe("startDictation with the wasm engine", () => {
-  it("loads the model, streams the transcript and releases everything on stop", async () => {
-    const { tracks, stream } = makeMediaStream();
-    const getUserMedia = vi.fn().mockResolvedValue(stream);
-    stubWasmSupport(getUserMedia);
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
-
-    const transcripts: string[] = [];
-    const progress: [number, number | undefined][] = [];
-
-    const sessionPromise = startDictation(
-      {
-        onTranscript: (text) => transcripts.push(text),
-        onProgress: (loaded, total) => progress.push([loaded, total]),
-      },
-      true,
-    );
-
-    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
-    const worker = FakeWorker.instances[0];
-    expect(worker.messages[0]).toMatchObject({ type: "load" });
-
-    worker.respond({ type: "progress", loaded: 1000, total: 2000 });
-    worker.respond({ type: "loaded" });
-
-    const session: DictationSession = await sessionPromise;
-
-    worker.respond({ type: "transcript", text: "hello" });
-    worker.respond({ type: "transcript", text: "hello world" });
-
-    expect(transcripts).toEqual(["hello", "hello world"]);
-    expect(progress).toEqual([[1000, 2000]]);
-
-    await session.stop();
-
-    expect(tracks.every((track) => track.stopped)).toBe(true);
-    expect(worker.terminated).toBe(true);
-    expect(worker.messages).toContainEqual({ type: "stop" });
-  });
-
-  it("reports a permission error when the microphone is denied", async () => {
-    const getUserMedia = vi
-      .fn()
-      .mockRejectedValue(
-        new DOMException("Permission denied", "NotAllowedError"),
+describe("encodeWav", () => {
+  it("writes a 16-bit mono PCM header and clamps the samples", () => {
+    const file = encodeWav(new Float32Array([0, 1, -1, 2]), 16000);
+    const view = new DataView(file);
+    const text = (offset: number) =>
+      String.fromCharCode(
+        ...new Uint8Array(file.slice(offset, offset + 4)).values(),
       );
-    stubWasmSupport(getUserMedia);
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
 
-    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
-    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
-    FakeWorker.instances[0].respond({ type: "loaded" });
+    expect(text(0)).toBe("RIFF");
+    expect(text(8)).toBe("WAVE");
+    expect(view.getUint16(20, true)).toBe(1);
+    expect(view.getUint16(22, true)).toBe(1);
+    expect(view.getUint32(24, true)).toBe(16000);
+    expect(view.getUint16(34, true)).toBe(16);
+    expect(view.getUint32(40, true)).toBe(8);
+    expect(file.byteLength).toBe(52);
+    expect([0, 1, 2, 3].map((i) => view.getInt16(44 + i * 2, true))).toEqual([
+      0, 32767, -32767, 32767,
+    ]);
+  });
+});
 
-    await expect(sessionPromise).rejects.toMatchObject({ kind: "permission" });
-    expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
+describe("stripLanguageTag", () => {
+  it("keeps only the text after the detected language", () => {
+    expect(
+      stripLanguageTag("language Portuguese<asr_text>A torre foi construída."),
+    ).toBe("A torre foi construída.");
   });
 
+  it("leaves an answer without the tag as it is", () => {
+    expect(stripLanguageTag("  plain text ")).toBe("plain text");
+  });
+
+  it("returns nothing for silence", () => {
+    expect(stripLanguageTag("language None<asr_text>")).toBe("");
+  });
+});
+
+describe("startDictation with the wasm engine", () => {
   /** Minimal `SpeechRecognition` stand-in; reports whether it was started. */
   function installLocalRecognitionFake() {
     let started = false;
@@ -223,196 +240,205 @@ describe("startDictation with the wasm engine", () => {
     return () => started;
   }
 
-  it("falls back to the browser recognizer when the local engine fails", async () => {
-    const { stream } = makeMediaStream();
+  it("loads the pinned model, transcribes the recording on stop and releases everything", async () => {
+    const { tracks, stream } = makeMediaStream();
     stubWasmSupport(vi.fn().mockResolvedValue(stream));
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
-    const started = installLocalRecognitionFake();
+    const onTranscript = vi.fn();
+    const progress: [number, number | undefined][] = [];
 
-    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
-    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
-    // A 502 from `/dictation-models/` is "cannot run here", not "no engine".
-    FakeWorker.instances[0].respond({
-      type: "error",
-      message: "model download failed",
-    });
+    const session = await startDictation(
+      {
+        onTranscript,
+        onProgress: (loaded, total) => progress.push([loaded, total]),
+      },
+      true,
+    );
 
-    await sessionPromise;
-    expect(started()).toBe(true);
+    expect(wllama.loadModelFromUrl).toHaveBeenCalledWith(
+      DICTATION_MODEL_SOURCE,
+      expect.objectContaining({ n_gpu_layers: 0 }),
+    );
+    expect(progress).toEqual([[1000, 2000]]);
+
+    capture(4800);
+    capture(4800);
+    // Nothing is transcribed while the microphone is open.
+    expect(wllama.createTranscription).not.toHaveBeenCalled();
+
+    await session.stop();
+
+    // Two 48 kHz blocks of 4800 samples are 0.2 s, or 3200 samples at 16 kHz.
+    expect(transcribedSamples()).toBe(3200);
+    expect(onTranscript).toHaveBeenCalledTimes(1);
+    expect(onTranscript).toHaveBeenCalledWith("hello world");
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    expect(wllama.exit).toHaveBeenCalledTimes(1);
   });
 
-  it("reports a denied microphone instead of falling back", async () => {
-    stubWasmSupport(
-      vi
-        .fn()
-        .mockRejectedValue(
-          new DOMException("Permission denied", "NotAllowedError"),
-        ),
-    );
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
+  it("reports a permission error and unloads the model when the microphone is denied", async () => {
+    const getUserMedia = vi
+      .fn()
+      .mockRejectedValue(
+        new DOMException("Permission denied", "NotAllowedError"),
+      );
+    stubWasmSupport(getUserMedia);
     const started = installLocalRecognitionFake();
 
-    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
-    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
-    FakeWorker.instances[0].respond({ type: "loaded" });
-
-    await expect(sessionPromise).rejects.toMatchObject({ kind: "permission" });
+    await expect(
+      startDictation({ onTranscript: vi.fn() }, true),
+    ).rejects.toMatchObject({ kind: "permission" });
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
+    expect(wllama.exit).toHaveBeenCalledTimes(1);
     // Falling back here would ask again and, in Chrome, send the audio away.
     expect(started()).toBe(false);
   });
 
-  it("fails the load when the engine dies while permission is pending", async () => {
-    const { tracks, stream } = makeMediaStream();
-    let grantMicrophone: ((stream: MediaStream) => void) | undefined;
-    stubWasmSupport(
-      vi.fn().mockReturnValue(
-        new Promise((resolve) => {
-          grantMicrophone = resolve as (stream: MediaStream) => void;
-        }),
-      ),
-    );
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
-    const started = installLocalRecognitionFake();
-
-    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
-    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
-    const worker = FakeWorker.instances[0];
-    worker.respond({ type: "loaded" });
-
-    // The prompt can sit open for minutes, and the transcriber is already
-    // running by now. Rejecting the settled load promise would be a no-op.
-    worker.respond({ type: "error", message: "the transcriber died" });
-    grantMicrophone?.(stream);
-
-    await sessionPromise;
-    expect(tracks.every((track) => track.stopped)).toBe(true);
-    expect(worker.terminated).toBe(true);
-    // Treated as any other engine failure, so the browser recognizer takes it.
-    expect(started()).toBe(true);
-  });
-
-  it("fails the load when the worker dies uncaught while permission is pending", async () => {
-    const { tracks, stream } = makeMediaStream();
-    let grantMicrophone: ((stream: MediaStream) => void) | undefined;
-    stubWasmSupport(
-      vi.fn().mockReturnValue(
-        new Promise((resolve) => {
-          grantMicrophone = resolve as (stream: MediaStream) => void;
-        }),
-      ),
-    );
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
-    const started = installLocalRecognitionFake();
-
-    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
-    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
-    const worker = FakeWorker.instances[0];
-    worker.respond({ type: "loaded" });
-
-    // An uncaught error rather than a posted one: the worker's own try/catch
-    // converts most failures, so this is the channel it cannot cover.
-    worker.onerror?.(new ErrorEvent("error"));
-    grantMicrophone?.(stream);
-
-    await sessionPromise;
-    expect(tracks.every((track) => track.stopped)).toBe(true);
-    expect(worker.terminated).toBe(true);
-    expect(started()).toBe(true);
-  });
-
-  it("ignores a transcript that arrives after stop", async () => {
-    const { stream } = makeMediaStream();
-    stubWasmSupport(vi.fn().mockResolvedValue(stream));
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
-    const onTranscript = vi.fn();
-
-    const sessionPromise = startDictation({ onTranscript }, true);
-    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
-    const worker = FakeWorker.instances[0];
-    worker.respond({ type: "loaded" });
-    const session = await sessionPromise;
-
-    worker.respond({ type: "transcript", text: "hello world" });
-    expect(onTranscript).toHaveBeenCalledWith("hello world");
-
-    const stopping = session.stop();
-    // Both engines emit one last result after being told to stop. The caller
-    // has already forgotten what it appended, so this would be appended twice.
-    worker.respond({ type: "transcript", text: "hello world" });
-    worker.respond({ type: "stopped" });
-    await stopping;
-
-    expect(onTranscript).toHaveBeenCalledTimes(1);
-  });
-
-  it("waits for the worker to drain before terminating it", async () => {
-    const { stream } = makeMediaStream();
-    stubWasmSupport(vi.fn().mockResolvedValue(stream));
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
-
-    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
-    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
-    const worker = FakeWorker.instances[0];
-    worker.respond({ type: "loaded" });
-    const session = await sessionPromise;
-
-    const stopping = session.stop();
-    await Promise.resolve();
-    // The transcriber runs synchronously inside the worker's `onmessage`, so a
-    // backlog can leave it seconds behind; terminating now drops the tail.
-    expect(worker.terminated).toBe(false);
-
-    worker.respond({ type: "stopped" });
-    await stopping;
-    expect(worker.terminated).toBe(true);
-  });
-
-  it("reports a worker failure that happens after the engine loaded", async () => {
-    const { stream } = makeMediaStream();
-    stubWasmSupport(vi.fn().mockResolvedValue(stream));
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
-    const onError = vi.fn();
-
-    const sessionPromise = startDictation(
-      {
-        onTranscript: vi.fn(),
-        onError,
-      },
-      true,
-    );
-    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
-    const worker = FakeWorker.instances[0];
-    worker.respond({ type: "loaded" });
-    await sessionPromise;
-
-    // The load promise has settled, so rejecting it again is a no-op: without
-    // a live channel the UI listens forever with the microphone open.
-    worker.respond({ type: "error", message: "the transcriber died" });
-
-    expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError.mock.calls[0][0]).toMatchObject({ kind: "engine" });
-  });
-
-  it("never opens the microphone when the model fails to load", async () => {
-    const { tracks, stream } = makeMediaStream();
-    const getUserMedia = vi.fn().mockResolvedValue(stream);
+  it("falls back to the browser recognizer without opening the microphone when the model fails to load", async () => {
+    const getUserMedia = vi.fn();
     stubWasmSupport(getUserMedia);
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
+    wllama.loadModelFromUrl.mockRejectedValue(new Error("network error"));
+    const started = installLocalRecognitionFake();
+    const onFallback = vi.fn();
 
-    const sessionPromise = startDictation({ onTranscript: vi.fn() }, true);
-    await vi.waitFor(() => expect(FakeWorker.instances.length).toBe(1));
-    const worker = FakeWorker.instances[0];
-    worker.respond({ type: "error", message: "model download failed" });
+    await startDictation({ onTranscript: vi.fn(), onFallback }, true);
 
-    await expect(sessionPromise).rejects.toBeInstanceOf(DictationError);
-    await expect(
-      sessionPromise.catch((error: DictationError) => error.kind),
-    ).resolves.toBe("engine");
+    expect(started()).toBe(true);
+    expect(onFallback).toHaveBeenCalledTimes(1);
     // The load runs first, so a failed download never lights the recording
     // indicator at all.
     expect(getUserMedia).not.toHaveBeenCalled();
-    expect(tracks.every((track) => track.stopped)).toBe(false);
-    expect(worker.terminated).toBe(true);
+    expect(wllama.exit).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects with an engine error when the model fails to load and no recognizer exists", async () => {
+    stubWasmSupport(vi.fn());
+    wllama.loadModelFromUrl.mockRejectedValue(new Error("network error"));
+
+    const failure = startDictation({ onTranscript: vi.fn() }, true);
+
+    await expect(failure).rejects.toBeInstanceOf(DictationError);
+    await expect(failure).rejects.toMatchObject({ kind: "engine" });
+  });
+
+  it("reports a transcription that fails after stop", async () => {
+    const { stream } = makeMediaStream();
+    stubWasmSupport(vi.fn().mockResolvedValue(stream));
+    wllama.createTranscription.mockRejectedValue(new Error("out of memory"));
+    const onTranscript = vi.fn();
+    const onError = vi.fn();
+
+    const session = await startDictation({ onTranscript, onError }, true);
+    capture(4800);
+    await session.stop();
+
+    expect(onTranscript).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0][0]).toMatchObject({ kind: "engine" });
+    expect(wllama.exit).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops the transcript of a session cancelled while it transcribes", async () => {
+    const { stream } = makeMediaStream();
+    stubWasmSupport(vi.fn().mockResolvedValue(stream));
+    let finishTranscription: (() => void) | undefined;
+    wllama.createTranscription.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishTranscription = () =>
+            resolve({ text: "language English<asr_text>too late" });
+        }),
+    );
+    const onTranscript = vi.fn();
+    const onError = vi.fn();
+
+    const session = await startDictation({ onTranscript, onError }, true);
+    capture(4800);
+    const stopping = session.stop();
+    await vi.waitFor(() =>
+      expect(wllama.createTranscription).toHaveBeenCalledTimes(1),
+    );
+
+    session.cancel();
+
+    expect(
+      wllama.createTranscription.mock.calls[0][0].abortSignal?.aborted,
+    ).toBe(true);
+    // Unloading under the running request would fail it instead of letting
+    // the abort settle it.
+    expect(wllama.exit).not.toHaveBeenCalled();
+
+    finishTranscription?.();
+    await stopping;
+
+    expect(onTranscript).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(wllama.exit).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases the microphone and the model when cancelled while recording", async () => {
+    const { tracks, stream } = makeMediaStream();
+    stubWasmSupport(vi.fn().mockResolvedValue(stream));
+    const onTranscript = vi.fn();
+
+    const session = await startDictation({ onTranscript }, true);
+    capture(4800);
+    session.cancel();
+    await session.stop();
+
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+    expect(wllama.exit).toHaveBeenCalledTimes(1);
+    expect(wllama.createTranscription).not.toHaveBeenCalled();
+    expect(onTranscript).not.toHaveBeenCalled();
+  });
+
+  it("ends the recording at the cap and transcribes exactly that much", async () => {
+    const { tracks, stream } = makeMediaStream();
+    stubWasmSupport(vi.fn().mockResolvedValue(stream));
+    const onEnd = vi.fn();
+
+    const session = await startDictation(
+      { onTranscript: vi.fn(), onEnd },
+      true,
+    );
+    // Blocks of 16384 samples at 16 kHz, so one straddles the cap, and more
+    // of them than the cap holds.
+    for (let block = 0; block < MAX_RECORDING_SECONDS; block++) capture(49152);
+
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(tracks.every((track) => track.stopped)).toBe(true);
+
+    await session.stop();
+    // Past the cap the audio would no longer fit the model's context.
+    expect(transcribedSamples()).toBe(MAX_RECORDING_SECONDS * 16000);
+  });
+
+  it("gives a second stop the same transcript instead of resolving early", async () => {
+    const { stream } = makeMediaStream();
+    stubWasmSupport(vi.fn().mockResolvedValue(stream));
+    const onTranscript = vi.fn();
+
+    const session = await startDictation({ onTranscript }, true);
+    capture(4800);
+    const first = session.stop();
+    const second = session.stop();
+
+    expect(second).toBe(first);
+    await second;
+    expect(onTranscript).toHaveBeenCalledTimes(1);
+    expect(wllama.createTranscription).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips the transcription when nothing was recorded", async () => {
+    const { stream } = makeMediaStream();
+    stubWasmSupport(vi.fn().mockResolvedValue(stream));
+    const onTranscript = vi.fn();
+
+    const session = await startDictation({ onTranscript }, true);
+    await session.stop();
+
+    expect(wllama.createTranscription).not.toHaveBeenCalled();
+    expect(onTranscript).not.toHaveBeenCalled();
+    expect(wllama.exit).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -442,26 +468,24 @@ describe("startDictation with the local model preference off", () => {
     recognitionStarted = false;
   });
 
-  it("never constructs the model worker on a fully wasm-capable browser", async () => {
-    // The whole point of the setting: with it off, the ~51 MB model must
+  it("never loads the model on a fully wasm-capable browser", async () => {
+    // The whole point of the setting: with it off, the ~700 MB model must
     // not be downloaded even where it could run.
     const { stream } = makeMediaStream();
     stubWasmSupport(vi.fn().mockResolvedValue(stream));
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
     installRecognitionFake();
 
     const session = await startDictation({ onTranscript: vi.fn() }, false);
 
-    expect(FakeWorker.instances.length).toBe(0);
+    expect(createWllamaInstance).not.toHaveBeenCalled();
     expect(recognitionStarted).toBe(true);
     await session.stop();
   });
 
   it("does not fall back to the wasm engine when the recognizer fails", async () => {
-    // A reverse fallback would start the ~51 MB download right after the
+    // A reverse fallback would start the ~700 MB download right after the
     // user turned that model off; the failure must surface instead.
     stubWasmSupport(vi.fn());
-    setWorkerFactory(() => new FakeWorker() as unknown as Worker);
     installRecognitionFake(() => {
       throw new Error("recognizer refused to start");
     });
@@ -469,7 +493,7 @@ describe("startDictation with the local model preference off", () => {
     await expect(
       startDictation({ onTranscript: vi.fn() }, false),
     ).rejects.toMatchObject({ kind: "unavailable" });
-    expect(FakeWorker.instances.length).toBe(0);
+    expect(createWllamaInstance).not.toHaveBeenCalled();
   });
 });
 

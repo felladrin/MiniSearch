@@ -53,7 +53,6 @@
     "@mantine/form": "^9.0.0",
     "@mantine/hooks": "^9.0.0",
     "@mantine/notifications": "^9.0.0",
-    "@moonshine-ai/moonshine-wasm": "0.1.5",
     "@tabler/icons-react": "^3.16.0",
     "@vitejs/plugin-basic-ssl": "^2.0.0",
     "@vitejs/plugin-react": "^6.0.0",

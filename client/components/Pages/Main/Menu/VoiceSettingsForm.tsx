@@ -64,8 +64,8 @@ export default function VoiceSettingsForm() {
         {...form.getInputProps("enableLocalDictationModel", {
           type: "checkbox",
         })}
-        label="On-device dictation model (English-only)"
-        description="Downloads a ~51 MB model on first use and transcribes without the audio leaving this device, but it only understands English. Turn it off to use your browser's built-in speech recognition instead, which handles other languages but may send the audio to your browser vendor. On browsers without built-in speech recognition, the on-device model is used regardless."
+        label="On-device dictation model"
+        description="Downloads a ~700 MB model on first use and transcribes many languages without the audio leaving this device. The text appears when you stop recording. Turn it off to use your browser's built-in speech recognition instead, which shows the text as you speak but may send the audio to your browser vendor. On browsers without built-in speech recognition, the on-device model is used regardless."
         labelPosition="left"
         disabled={!settings.enableDictation}
       />

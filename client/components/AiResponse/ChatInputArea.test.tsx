@@ -35,6 +35,7 @@ vi.mock("create-pubsub/react", () => ({
 }));
 
 const stopFn = vi.fn();
+const cancelFn = vi.fn();
 
 function renderChatInputArea() {
   return render(
@@ -46,7 +47,10 @@ function renderChatInputArea() {
 
 beforeEach(() => {
   vi.mocked(getDictationEngine).mockReturnValue("wasm");
-  vi.mocked(startDictation).mockResolvedValue({ stop: stopFn });
+  vi.mocked(startDictation).mockResolvedValue({
+    stop: stopFn,
+    cancel: cancelFn,
+  });
   chatInputPubSub[0]("");
   chatGenerationStatePubSub[0]({
     isGeneratingResponse: false,
@@ -78,7 +82,7 @@ it("writes the transcript into the chat input", async () => {
   let onTranscript: (text: string) => void = () => {};
   vi.mocked(startDictation).mockImplementation(async (callbacks) => {
     onTranscript = callbacks.onTranscript;
-    return { stop: stopFn };
+    return { stop: stopFn, cancel: cancelFn };
   });
 
   const user = userEvent.setup();
@@ -138,5 +142,5 @@ it("stops a running session when a response starts generating", async () => {
   // The field goes read-only while the answer streams, and `handleSend`
   // clears it: a session still running would splice its transcript onto an
   // input the user cannot see or correct.
-  await waitFor(() => expect(stopFn).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(cancelFn).toHaveBeenCalledTimes(1));
 });
