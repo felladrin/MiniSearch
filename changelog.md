@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-09
+
+- The in-browser engine, wllama, moves from 3.8.1 to 3.13.0. It now handles a model download that stopped midway by itself, so MiniSearch no longer deletes those files before each load.
+
 ## 2026-11-08
 
 - MiniSearch now checks that the GPU can run wllama's shaders before using it, instead of only checking that the browser has WebGPU. The shaders use subgroups and the `subgroup_id` builtin, so the GPU is used only when the browser's shader compiler supports `subgroup_id`, an adapter answers within 5 seconds, it is not a software fallback, and it has the `subgroups` feature. Otherwise the model runs on the CPU and a new profile starts on the CPU default model. On Chrome 137, which has WebGPU but not `subgroup_id`, every model used to abort; it now answers on the CPU with LittleLamb 290M. The logs say which check failed.
