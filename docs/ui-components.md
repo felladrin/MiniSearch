@@ -188,6 +188,12 @@ Shared by `SearchForm` and `ChatInputArea`, which is why it sits at the top of
 `client/components/` rather than under one feature folder. It owns the whole
 dictation session: the engine choice, the microphone lifecycle, and the splice
 that appends each transcript without clobbering what the user typed meanwhile.
+The on-device model writes the text only after the recording stops, so the
+button has a fourth state between "recording" and "idle": "transcribing",
+with a spinner and the label "Transcribing <field>". Stopping waits for the
+transcript; a field that goes away or turns read-only cancels instead, which
+drops the transcript, and aborts the model download when the press is still
+loading.
 
 **PubSub:**
 
@@ -200,12 +206,12 @@ that appends each transcript without clobbering what the user typed meanwhile.
 | `getValue` / `setValue` | Reads and replaces the field's content. The caller owns the field, so the button never touches the DOM itself                             |
 | `labelScope`            | Names the field in the accessible labels, as the object of "Dictate" and "Stop dictating": `"the search query"`, `"a follow-up question"` |
 | `rightOffset`           | Distance from the right edge of the positioned ancestor, for a field that already has a button at its edge                                |
-| `disabled`              | Blocks a new session and stops one already running, for a field that has gone read-only                                                   |
+| `disabled`              | Blocks a new session and cancels one already running or transcribing, for a field that has gone read-only                                 |
 
 The button renders itself absolutely positioned, so each caller wraps its field
 in a `position: relative` element and reserves `dictationButtonWidth` of right
 padding on the input. It renders nothing when `enableDictation` is off or no
-engine can run, which is also why the setting and the disabled prop each stop a
+engine can run, which is also why the setting and the disabled prop each cancel a
 session of their own accord: returning `null` is not an unmount, so the cleanup
 effect never runs.
 

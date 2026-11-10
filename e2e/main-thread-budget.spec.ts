@@ -209,7 +209,7 @@ function seedSettings(page: Page, inferencePort: number) {
     historyRetentionDays: 30,
     historyGroupByDate: true,
     selectedVoiceId: "",
-    enableDictation: false, // no moonshine wasm in the window
+    enableDictation: false, // no dictation model in the window
     enableLocalDictationModel: false,
     textToSpeechEngine: "system",
     reasoningStartMarker: "think",

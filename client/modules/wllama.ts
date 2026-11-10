@@ -15,7 +15,9 @@ interface WllamaInitConfig {
   chatTemplateKwargs?: Record<string, unknown>;
 }
 
-async function createWllamaInstance(config?: WllamaConfig): Promise<Wllama> {
+export async function createWllamaInstance(
+  config?: WllamaConfig,
+): Promise<Wllama> {
   try {
     return new Wllama(
       {

@@ -37,37 +37,34 @@ This self-contained structure makes it easy for agents to understand and modify 
 
 The `client/modules/` directory contains core business logic organized by domain:
 
-| Module                          | Purpose                                                                                                                         |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `pubSub.ts`                     | All PubSub channels for state management                                                                                        |
-| `search.ts`                     | Search orchestration, caching, and reranking                                                                                    |
-| `textGeneration.ts`             | AI response generation and chat handling                                                                                        |
-| `textGenerationWith*.ts`        | Provider-specific inference implementations (Wllama, OpenAI, Horde, Internal API)                                               |
-| `history.ts`                    | IndexedDB persistence for searches and chat                                                                                     |
-| `settings.ts`                   | Default settings and inference type definitions                                                                                 |
-| `followUpQuestions.ts`          | Generates contextual follow-up questions                                                                                        |
-| `relatedSearchQuery.ts`         | Creates related search queries from conversation                                                                                |
-| `querySuggestions.ts`           | Query suggestion UI data management                                                                                             |
-| `webGpu.ts`                     | Whether the GPU can run wllama                                                                                                  |
-| `wllama.ts`                     | Wllama model configuration and management                                                                                       |
-| `accessKey.ts`                  | Access key validation and storage                                                                                               |
-| `searchTokenHash.ts`            | CSRF protection token generation                                                                                                |
-| `parentWindow.ts`               | PostMessage API for parent window embedding                                                                                     |
-| `logEntries.ts`                 | Application logging with unique IDs                                                                                             |
-| `appInfo.ts`                    | Application metadata and version info                                                                                           |
-| `textToSpeech.ts`               | Reads answers aloud: engine selection, fallback, and the playback queue                                                         |
-| `textToSpeechWorker.ts`         | Synthesizes sentences off the main thread                                                                                       |
-| `textToSpeechWorkerProtocol.ts` | Message types shared by both sides of the worker                                                                                |
-| `piper.ts`                      | The only module that imports `@diffusionstudio/vits-web`                                                                        |
-| `speechToText.ts`               | Dictation: microphone capture, the worker's lifecycle, and engine selection between the on-device model and `SpeechRecognition` |
-| `speechToTextWorker.ts`         | Runs the Moonshine transcriber off the main thread                                                                              |
-| `speechToTextWorkerProtocol.ts` | Message types shared by both sides of the dictation worker                                                                      |
-| `moonshine.ts`                  | The only module that imports `@moonshine-ai/moonshine-wasm`                                                                     |
-| `keyboard.ts`                   | Keyboard shortcut handling                                                                                                      |
-| `pageContent.ts`                | Requests extracted result-page text used to ground answers                                                                      |
-| `systemPrompt.ts`               | System prompt templates                                                                                                         |
-| `stringFormatters.ts`           | Text formatting utilities                                                                                                       |
-| `types.ts`                      | Shared TypeScript type definitions                                                                                              |
+| Module                          | Purpose                                                                                                                           |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `pubSub.ts`                     | All PubSub channels for state management                                                                                          |
+| `search.ts`                     | Search orchestration, caching, and reranking                                                                                      |
+| `textGeneration.ts`             | AI response generation and chat handling                                                                                          |
+| `textGenerationWith*.ts`        | Provider-specific inference implementations (Wllama, OpenAI, Horde, Internal API)                                                 |
+| `history.ts`                    | IndexedDB persistence for searches and chat                                                                                       |
+| `settings.ts`                   | Default settings and inference type definitions                                                                                   |
+| `followUpQuestions.ts`          | Generates contextual follow-up questions                                                                                          |
+| `relatedSearchQuery.ts`         | Creates related search queries from conversation                                                                                  |
+| `querySuggestions.ts`           | Query suggestion UI data management                                                                                               |
+| `webGpu.ts`                     | Whether the GPU can run wllama                                                                                                    |
+| `wllama.ts`                     | Wllama model configuration and management                                                                                         |
+| `accessKey.ts`                  | Access key validation and storage                                                                                                 |
+| `searchTokenHash.ts`            | CSRF protection token generation                                                                                                  |
+| `parentWindow.ts`               | PostMessage API for parent window embedding                                                                                       |
+| `logEntries.ts`                 | Application logging with unique IDs                                                                                               |
+| `appInfo.ts`                    | Application metadata and version info                                                                                             |
+| `textToSpeech.ts`               | Reads answers aloud: engine selection, fallback, and the playback queue                                                           |
+| `textToSpeechWorker.ts`         | Synthesizes sentences off the main thread                                                                                         |
+| `textToSpeechWorkerProtocol.ts` | Message types shared by both sides of the worker                                                                                  |
+| `piper.ts`                      | The only module that imports `@diffusionstudio/vits-web`                                                                          |
+| `speechToText.ts`               | Dictation: microphone capture, the on-device Qwen3-ASR model's lifecycle, and engine selection between it and `SpeechRecognition` |
+| `keyboard.ts`                   | Keyboard shortcut handling                                                                                                        |
+| `pageContent.ts`                | Requests extracted result-page text used to ground answers                                                                        |
+| `systemPrompt.ts`               | System prompt templates                                                                                                           |
+| `stringFormatters.ts`           | Text formatting utilities                                                                                                         |
+| `types.ts`                      | Shared TypeScript type definitions                                                                                                |
 
 ## Related Topics
 

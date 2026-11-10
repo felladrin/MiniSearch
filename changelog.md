@@ -5,6 +5,7 @@ Notable changes, grouped by date, most recent first.
 ## 2026-11-09
 
 - The in-browser engine, wllama, moves from 3.8.1 to 3.13.0. It now handles a model download that stopped midway by itself, so MiniSearch no longer deletes those files before each load.
+- Dictation's on-device model is now Qwen3-ASR 0.6B, run through wllama, instead of Moonshine. It understands every language MiniSearch answers in, not only English, so the setting that prefers it is now on by default for every browser; a profile saved before keeps its value, so a non-English profile turns it on in the Voice settings. The text now appears when the user stops recording rather than while they speak (about 2 seconds for a short query on WebGPU), and a recording ends on its own after two minutes. The first press downloads about 700 MB from Hugging Face, against 51 MB before, and later presses load it from the browser's storage in about 2 seconds; leaving the page or turning dictation off mid-download aborts it. The Moonshine runtime leaves the build, which shrinks from 35.7 MB to 22.2 MB, and the `/dictation-models/` route and `DICTATION_MODELS_DIR` are gone, since the server no longer serves model files. `docs/speech-model-evaluation.md` records the speech models tried for dictation and reading aloud, and why the others were turned down.
 
 ## 2026-11-08
 

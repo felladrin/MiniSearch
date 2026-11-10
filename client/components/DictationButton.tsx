@@ -4,7 +4,7 @@ import { IconMicrophone, IconPlayerStopFilled } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { settingsPubSub } from "@/modules/pubSub";
-import { prefersLocalDictationModel } from "@/modules/settings";
+import { defaultSettings } from "@/modules/settings";
 import {
   DictationError,
   type DictationSession,
@@ -35,7 +35,7 @@ interface DictationButtonProps {
   disabled?: boolean;
 }
 
-type DictationPhase = "idle" | "loading" | "recording";
+type DictationPhase = "idle" | "loading" | "recording" | "transcribing";
 
 /**
  * Splices the transcript into the field without clobbering edits the
@@ -57,9 +57,8 @@ function spliceTranscript(
 }
 
 /**
- * `total` never arrives on this path: the library's asset downloader opens its
- * progress session with an undefined total and reports that, whatever
- * `Content-Length` the route sets. Megabytes still tell the user the ~51 MB
+ * A percentage when the download's size is known. Without a `Content-Length`
+ * the total is missing, and megabytes still tell the user the ~700 MB
  * download is moving rather than stuck.
  */
 function formatDownloadProgress(
@@ -103,13 +102,22 @@ export default memo(function DictationButton({
     [getValue, setValue],
   );
 
-  const stop = useCallback(async () => {
+  /**
+   * Ends the session and waits for its transcript: the on-device model only
+   * transcribes once the recording is over. The session stays in the ref
+   * until then, so a field that goes away meanwhile can still cancel it.
+   */
+  const finish = useCallback(async () => {
     const session = sessionRef.current;
+    if (!session) return;
+    setPhase("transcribing");
+    setProgress(null);
+    await session.stop();
+    // Cancelled while transcribing; `cancel` already reset everything.
+    if (sessionRef.current !== session) return;
     sessionRef.current = null;
     lastTranscriptRef.current = "";
     setPhase("idle");
-    setProgress(null);
-    await session?.stop();
   }, []);
 
   /**
@@ -121,14 +129,34 @@ export default memo(function DictationButton({
    */
   const pressGenerationRef = useRef(0);
 
+  /**
+   * Aborts the press still loading, so a ~700 MB first-run download stops
+   * with the button that started it instead of finishing in the background.
+   */
+  const loadAbortRef = useRef<AbortController | null>(null);
+
+  /** Ends the session and drops its transcript, for a field that cannot take it. */
+  const cancel = useCallback(() => {
+    pressGenerationRef.current += 1;
+    loadAbortRef.current?.abort();
+    loadAbortRef.current = null;
+    const session = sessionRef.current;
+    sessionRef.current = null;
+    lastTranscriptRef.current = "";
+    setPhase("idle");
+    setProgress(null);
+    session?.cancel();
+  }, []);
+
   useEffect(
     () => () => {
       // `SearchForm` is remounted the moment the query goes non-empty, so
       // dictating on the home page and pressing Search unmounts this button
       // mid-session. Without this the microphone track, the AudioContext and
-      // the worker all outlive it, with the recording indicator still on.
+      // the model all outlive it, with the recording indicator still on.
       pressGenerationRef.current += 1;
-      void sessionRef.current?.stop();
+      loadAbortRef.current?.abort();
+      sessionRef.current?.cancel();
       sessionRef.current = null;
     },
     [],
@@ -140,9 +168,8 @@ export default memo(function DictationButton({
     // Not guarded on `sessionRef`: during the load that is still null, and the
     // session arrives after the button is already gone.
     if (settings.enableDictation) return;
-    pressGenerationRef.current += 1;
-    void stop();
-  }, [settings.enableDictation, stop]);
+    cancel();
+  }, [settings.enableDictation, cancel]);
 
   useEffect(() => {
     // Same reasoning as the setting above, for a field that goes read-only
@@ -150,9 +177,8 @@ export default memo(function DictationButton({
     // press, so without this the transcript keeps landing in a field the
     // user can no longer correct, and the caller clears on its own schedule.
     if (!disabled) return;
-    pressGenerationRef.current += 1;
-    void stop();
-  }, [disabled, stop]);
+    cancel();
+  }, [disabled, cancel]);
 
   /**
    * An upgrading profile's stored settings lack this key until `App` merges
@@ -161,22 +187,28 @@ export default memo(function DictationButton({
    * unnoticed, so the derived default is applied here as well.
    */
   const preferLocalModel =
-    settings.enableLocalDictationModel ?? prefersLocalDictationModel();
+    settings.enableLocalDictationModel ??
+    defaultSettings.enableLocalDictationModel;
 
   const handleClick = useCallback(async () => {
+    if (phase === "loading" || phase === "transcribing") return;
     if (sessionRef.current) {
-      await stop();
+      await finish();
       return;
     }
-    if (phase === "loading") return;
 
     const generation = ++pressGenerationRef.current;
+    const loadAbort = new AbortController();
+    loadAbortRef.current = loadAbort;
     setPhase("loading");
     try {
       const session = await startDictation(
         {
           onTranscript: handleTranscript,
-          onProgress: (loaded, total) => setProgress({ loaded, total }),
+          onProgress: (loaded, total) => {
+            if (pressGenerationRef.current === generation)
+              setProgress({ loaded, total });
+          },
           onFallback: () =>
             notifications.show({
               title: "Using the browser's recognizer",
@@ -184,7 +216,7 @@ export default memo(function DictationButton({
                 "The on-device model could not run, so this browser's own speech recognition is transcribing instead. It may send the audio to the browser vendor.",
               color: "yellow",
             }),
-          onEnd: () => void stop(),
+          onEnd: () => void finish(),
           onError: (error) => {
             const denied = error.kind === "permission";
             notifications.show({
@@ -196,21 +228,27 @@ export default memo(function DictationButton({
                 : error.message,
               color: "red",
             });
-            void stop();
+            cancel();
           },
         },
         preferLocalModel,
+        loadAbort.signal,
       );
+      if (loadAbortRef.current === loadAbort) loadAbortRef.current = null;
       // The load takes seconds and the permission prompt can take minutes, so
       // the button may well be gone by now; whichever path removed it had no
       // session to stop when it ran.
       if (pressGenerationRef.current !== generation) {
-        void session.stop();
+        session.cancel();
         return;
       }
       sessionRef.current = session;
       setPhase("recording");
     } catch (error) {
+      if (loadAbortRef.current === loadAbort) loadAbortRef.current = null;
+      // An abandoned press has no button left to explain a failure on, and a
+      // newer press owns the phase now.
+      if (pressGenerationRef.current !== generation) return;
       setPhase("idle");
       setProgress(null);
       const denied =
@@ -227,7 +265,7 @@ export default memo(function DictationButton({
         color: "red",
       });
     }
-  }, [handleTranscript, stop, phase, preferLocalModel]);
+  }, [handleTranscript, finish, cancel, phase, preferLocalModel]);
 
   if (
     !settings.enableDictation ||
@@ -245,9 +283,11 @@ export default memo(function DictationButton({
   const label =
     phase === "loading"
       ? `Loading the dictation model${percent}`
-      : recording
-        ? `Stop dictating ${labelScope}`
-        : `Dictate ${labelScope}`;
+      : phase === "transcribing"
+        ? `Transcribing ${labelScope}`
+        : recording
+          ? `Stop dictating ${labelScope}`
+          : `Dictate ${labelScope}`;
 
   return (
     <Tooltip label={label} withArrow position="top">
@@ -273,7 +313,7 @@ export default memo(function DictationButton({
           width: dictationButtonWidth,
         }}
       >
-        {phase === "loading" ? (
+        {phase === "loading" || phase === "transcribing" ? (
           <Loader size={16} color="gray" />
         ) : recording ? (
           // A shape change, not only the red: an icon-only control whose

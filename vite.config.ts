@@ -11,7 +11,6 @@ import { cacheServerHook } from "./server/cacheServerHook.ts";
 import { compressionServerHook } from "./server/compressionServerHook.ts";
 import { configEndpointServerHook } from "./server/configEndpointServerHook.ts";
 import { crossOriginServerHook } from "./server/crossOriginServerHook.ts";
-import { dictationModelServerHook } from "./server/dictationModelServerHook.ts";
 import { internalApiEndpointServerHook } from "./server/internalApiEndpointServerHook.ts";
 import { pageContentEndpointServerHook } from "./server/pageContentEndpointServerHook.ts";
 import { rerankerServiceHook } from "./server/rerankerServiceHook.ts";
@@ -28,10 +27,8 @@ const __dirname = path.dirname(__filename);
 export default defineConfig((): UserConfig => {
   return {
     /**
-     * Both workers are created with `type: "module"`, and the dictation model's
-     * Emscripten glue uses a top-level await, which the default `iife` worker
-     * format cannot represent. Module workers need Chrome 80, Safari 15 or
-     * Firefox 114.
+     * The workers are created with `type: "module"`. Module workers need
+     * Chrome 80, Safari 15 or Firefox 114.
      */
     worker: { format: "es" as const },
     root: "./client",
@@ -87,11 +84,6 @@ export default defineConfig((): UserConfig => {
         name: "configure-server-cross-origin-isolation",
         configureServer: crossOriginServerHook,
         configurePreviewServer: crossOriginServerHook,
-      },
-      {
-        name: "configure-server-dictation-models",
-        configureServer: dictationModelServerHook,
-        configurePreviewServer: dictationModelServerHook,
       },
       {
         name: "configure-server-config-endpoint",
