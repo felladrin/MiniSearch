@@ -368,7 +368,20 @@ not a failure and never falls back.
 The catalogue is fetched at runtime from the published voice index rather than
 hardcoded: it already lists more voices than the package's own `VoiceId` union,
 and a stale copy would offer voices that fail to download. The settings form
-groups local voices for the current language separately from the OS voices.
+lists every local voice, grouped by language, with the browser's language
+first. It lists the OS voices only when the system engine is selected.
+
+With no voice chosen, `speak()` picks one for the language of the answer,
+which follows the question's language rather than the browser's. `franc-min`
+detects it, loaded on the first Listen press rather than with the page, and the
+first local voice of that language reads the answer. With the system engine,
+or when no local voice speaks that language (Japanese, Korean and Hindi have
+none), the language is passed to `speechSynthesis` so the OS picks its own
+voice. The browser's language is used instead when the detector cannot tell,
+fails to load, or does not know the browser's language at all (Danish, Finnish
+and Catalan among them), since it would then read an answer in that language
+as a neighbouring one. A chosen voice reads every answer, whatever its
+language.
 
 ### Third-party requests
 

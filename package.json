@@ -64,6 +64,7 @@
     "dexie": "^4.0.11",
     "dotenv": "^18.0.0",
     "embla-carousel-react": "^8.3.0",
+    "franc-min": "^6.2.0",
     "gpt-tokenizer": "^4.0.0",
     "hash-wasm": "4.12.0",
     "helper-git-hash": "^1.0.0",
