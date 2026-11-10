@@ -23,6 +23,8 @@ export interface VoiceOption {
   label: string;
   engine: TextToSpeechEngine;
   languageCode: string;
+  /** Set on local voices only, which the settings form groups by language. */
+  languageName?: string;
 }
 
 /** The markers come from user settings, so a character like `(` must not be read as syntax. */
@@ -69,6 +71,110 @@ function primaryLanguage(code: string): string {
   return code.replace("_", "-").split("-")[0].toLowerCase();
 }
 
+/**
+ * franc-min names languages in ISO 639-3, while the voices use the two-letter
+ * codes. Its languages without a two-letter code are left out.
+ */
+const LANGUAGE_BY_FRANC_CODE: Record<string, string> = {
+  amh: "am",
+  arb: "ar",
+  azj: "az",
+  bel: "be",
+  ben: "bn",
+  bos: "bs",
+  bul: "bg",
+  ces: "cs",
+  cmn: "zh",
+  deu: "de",
+  ell: "el",
+  eng: "en",
+  fra: "fr",
+  guj: "gu",
+  hau: "ha",
+  hin: "hi",
+  hrv: "hr",
+  hun: "hu",
+  ibo: "ig",
+  ind: "id",
+  ita: "it",
+  jav: "jv",
+  jpn: "ja",
+  kan: "kn",
+  kaz: "kk",
+  kin: "rw",
+  kor: "ko",
+  lin: "ln",
+  mal: "ml",
+  mar: "mr",
+  mya: "my",
+  nld: "nl",
+  npi: "ne",
+  nya: "ny",
+  pan: "pa",
+  pbu: "ps",
+  pes: "fa",
+  plt: "mg",
+  pol: "pl",
+  por: "pt",
+  ron: "ro",
+  run: "rn",
+  rus: "ru",
+  sin: "si",
+  som: "so",
+  spa: "es",
+  srp: "sr",
+  sun: "su",
+  swe: "sv",
+  swh: "sw",
+  tam: "ta",
+  tel: "te",
+  tgl: "tl",
+  tha: "th",
+  tur: "tr",
+  ukr: "uk",
+  urd: "ur",
+  uzn: "uz",
+  vie: "vi",
+  yor: "yo",
+  zlm: "ms",
+  zul: "zu",
+};
+
+const DETECTABLE_LANGUAGES = new Set(Object.values(LANGUAGE_BY_FRANC_CODE));
+
+/**
+ * The language an answer is written in, which can differ from the browser's:
+ * the model answers in the language of the question. Falls back to the browser
+ * language when the text is too short to tell, and keeps it outright when
+ * franc-min cannot recognize it (Danish, Finnish, Catalan...), because it would
+ * then read an answer in that language as a neighbouring one.
+ */
+async function detectAnswerLanguage(
+  text: string,
+  browserLanguage: string,
+): Promise<string> {
+  const browserPrimary = primaryLanguage(browserLanguage);
+  if (!DETECTABLE_LANGUAGES.has(browserPrimary)) return browserLanguage;
+
+  try {
+    const { franc } = await import("franc-min");
+    const detected =
+      LANGUAGE_BY_FRANC_CODE[
+        franc(text, { only: Object.keys(LANGUAGE_BY_FRANC_CODE) })
+      ];
+    return !detected || detected === browserPrimary
+      ? browserLanguage
+      : detected;
+  } catch (error) {
+    addLogEntry(
+      `Could not detect the answer's language, using the browser's: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`,
+    );
+    return browserLanguage;
+  }
+}
+
 let cachedLocalVoices: Promise<Voice[]> | null = null;
 
 /**
@@ -88,10 +194,11 @@ function getLocalVoices(): Promise<Voice[]> {
 }
 
 /**
- * Lists only the voices the given engine can actually play: the local voices for
- * the given language, or every `speechSynthesis` voice. Listing the local
- * voices means fetching the catalogue over the network, so it must not happen
- * when the user has opted out of the local engine.
+ * Lists only the voices the given engine can actually play: every local voice,
+ * those of the given language first and the rest by language name, or every
+ * `speechSynthesis` voice. Listing the local voices means fetching the
+ * catalogue over the network, so it must not happen when the user has opted
+ * out of the local engine.
  */
 export async function listVoices(
   languageCode: string = navigator.language,
@@ -102,13 +209,20 @@ export async function listVoices(
 
   if (engine !== "system") {
     try {
-      for (const voice of await getLocalVoices()) {
-        if (primaryLanguage(voice.language.code) !== wanted) continue;
+      const rank = (voice: Voice) =>
+        primaryLanguage(voice.language.code) === wanted ? 0 : 1;
+      const sorted = [...(await getLocalVoices())].sort(
+        (a, b) =>
+          rank(a) - rank(b) ||
+          a.language.name_english.localeCompare(b.language.name_english),
+      );
+      for (const voice of sorted) {
         options.push({
           value: `${LOCAL_VOICE_PREFIX}${voice.key}`,
           label: `${voice.name} • ${voice.language.name_english} (${voice.quality})`,
           engine: "local",
           languageCode: voice.language.code,
+          languageName: voice.language.name_english,
         });
       }
     } catch (error) {
@@ -188,6 +302,7 @@ export function stopSpeaking(): void {
 function speakWithSystemVoice(
   text: string,
   storedVoiceId: string,
+  languageCode: string,
   session: SpeechSession,
 ): Promise<void> {
   return new Promise((resolve) => {
@@ -198,6 +313,8 @@ function speakWithSystemVoice(
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
+    // Without a voice, the OS picks its own voice for this language.
+    utterance.lang = languageCode;
     const wantedUri = storedVoiceId.startsWith(SYSTEM_VOICE_PREFIX)
       ? storedVoiceId.slice(SYSTEM_VOICE_PREFIX.length)
       : storedVoiceId;
@@ -414,13 +531,15 @@ export async function speak(text: string): Promise<void> {
     const wantsSystemVoice =
       settings.textToSpeechEngine === "system" ||
       storedVoiceId.startsWith(SYSTEM_VOICE_PREFIX);
+    const languageCode = await detectAnswerLanguage(
+      spokenText,
+      navigator.language,
+    );
+    if (stopRequested) return;
 
     if (!wantsSystemVoice) {
       try {
-        const voiceId = await resolveLocalVoiceId(
-          storedVoiceId,
-          navigator.language,
-        );
+        const voiceId = await resolveLocalVoiceId(storedVoiceId, languageCode);
         if (stopRequested) return;
         if (voiceId) {
           // Returning here is what keeps a stop silent: `speakWithLocalVoice`
@@ -446,7 +565,12 @@ export async function speak(text: string): Promise<void> {
     }
 
     if (stopRequested) return;
-    await speakWithSystemVoice(spokenText, storedVoiceId, session);
+    await speakWithSystemVoice(
+      spokenText,
+      storedVoiceId,
+      languageCode,
+      session,
+    );
   } finally {
     // A session that has already been replaced must not clear the live one.
     if (activeSession === session) {

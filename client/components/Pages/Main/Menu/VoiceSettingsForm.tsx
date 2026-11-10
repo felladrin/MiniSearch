@@ -1,4 +1,11 @@
-import { Select, Stack, Switch, Text } from "@mantine/core";
+import {
+  type ComboboxItem,
+  type ComboboxItemGroup,
+  Select,
+  Stack,
+  Switch,
+  Text,
+} from "@mantine/core";
 import { useForm } from "@mantine/form";
 import getUnicodeFlagIcon from "country-flag-icons/unicode";
 import { usePubSub } from "create-pubsub/react";
@@ -52,6 +59,25 @@ export default function VoiceSettingsForm() {
     };
   }, [settings.textToSpeechEngine]);
 
+  // `listVoices` keeps each language's voices together, so a group only ever
+  // continues the one before it.
+  const voiceData: (ComboboxItem | ComboboxItemGroup<ComboboxItem>)[] = [];
+  for (const option of voiceOptions) {
+    const item = {
+      value: option.value,
+      label: `${getCountryFlag(option.languageCode)} ${option.label}`,
+    };
+    const previous = voiceData.at(-1);
+    if (!option.languageName) voiceData.push(item);
+    else if (
+      previous &&
+      "group" in previous &&
+      previous.group === option.languageName
+    )
+      previous.items.push(item);
+    else voiceData.push({ group: option.languageName, items: [item] });
+  }
+
   return (
     <Stack gap="xs">
       <Switch
@@ -88,8 +114,8 @@ export default function VoiceSettingsForm() {
           }));
         }}
         data={[
-          { value: "local", label: "Local neural voice (English-only)" },
-          { value: "system", label: "System voices (Multi-lingual)" },
+          { value: "local", label: "Local neural voice (many languages)" },
+          { value: "system", label: "System voices" },
         ]}
         allowDeselect={false}
       />
@@ -97,17 +123,15 @@ export default function VoiceSettingsForm() {
       <Text size="xs" c="dimmed">
         Choose the voice to use when reading AI responses aloud. Only the voices
         of the selected engine are listed. Leave it empty to pick one
-        automatically for your language.
+        automatically for the language of each response; a voice you choose
+        reads every response, whatever its language.
       </Text>
       <Select
         // Remounting drops the label Mantine keeps for the previous value, which
         // would otherwise filter the new engine's list as if it were typed.
         key={settings.textToSpeechEngine}
         {...form.getInputProps("selectedVoiceId")}
-        data={voiceOptions.map((option) => ({
-          value: option.value,
-          label: `${getCountryFlag(option.languageCode)} ${option.label}`,
-        }))}
+        data={voiceData}
         searchable
         nothingFoundMessage="No voices found"
         placeholder="Auto-detected"

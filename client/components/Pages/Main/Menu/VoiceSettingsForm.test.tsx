@@ -9,7 +9,16 @@ const localVoice: VoiceOption = {
   label: "lessac • English (high)",
   engine: "local",
   languageCode: "en_US",
+  languageName: "English",
 };
+
+const portugueseVoices: VoiceOption[] = ["pt_BR", "pt_PT"].map((code) => ({
+  value: `piper:${code}-voice-medium`,
+  label: `voice • Portuguese (medium)`,
+  engine: "local",
+  languageCode: code,
+  languageName: "Portuguese",
+}));
 
 const systemVoice: VoiceOption = {
   value: "system:os-voice",
@@ -99,6 +108,30 @@ describe("VoiceSettingsForm", () => {
     ]);
   });
 
+  it("groups the local voices by language, in the order they are listed", async () => {
+    listVoices.mockResolvedValue([...portugueseVoices, localVoice]);
+    renderForm();
+    await screen.findByText("Voice Selection");
+
+    const listbox = openSelect(voiceInput());
+    const groups = listbox
+      .getAllByRole("group", { hidden: true })
+      .map((group) => [
+        group.firstElementChild?.textContent,
+        within(group)
+          .getAllByRole("option", { hidden: true })
+          .map((option) => option.textContent),
+      ]);
+
+    expect(groups).toEqual([
+      [
+        "Portuguese",
+        ["🇧🇷 voice • Portuguese (medium)", "🇵🇹 voice • Portuguese (medium)"],
+      ],
+      ["English", ["🇺🇸 lessac • English (high)"]],
+    ]);
+  });
+
   it("lists only the system voices while the system engine is selected", async () => {
     settings.current.textToSpeechEngine = "system";
     renderForm();
@@ -146,7 +179,7 @@ describe("VoiceSettingsForm", () => {
     const engine = screen.getAllByRole("combobox")[0] as HTMLElement;
     fireEvent.click(
       openSelect(engine).getByRole("option", {
-        name: "System voices (Multi-lingual)",
+        name: "System voices",
         hidden: true,
       }),
     );

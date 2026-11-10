@@ -41,6 +41,37 @@ const englishVoice = {
   language: { code: "en_US", name_english: "English" },
 };
 
+const portugueseVoice = {
+  key: "pt_BR-faber-medium",
+  name: "faber",
+  quality: "medium",
+  language: { code: "pt_BR", name_english: "Portuguese" },
+};
+
+const germanVoice = {
+  key: "de_DE-thorsten-medium",
+  name: "thorsten",
+  quality: "medium",
+  language: { code: "de_DE", name_english: "German" },
+};
+
+const swedishVoice = {
+  key: "sv_SE-nst-medium",
+  name: "nst",
+  quality: "medium",
+  language: { code: "sv_SE", name_english: "Swedish" },
+};
+
+const danishVoice = {
+  key: "da_DK-talesyntese-medium",
+  name: "talesyntese",
+  quality: "medium",
+  language: { code: "da_DK", name_english: "Danish" },
+};
+
+const portugueseAnswer =
+  "A Torre Eiffel foi construída em 1889 para a Exposição Universal de Paris e tem cerca de 330 metros de altura.";
+
 /** A worker stub the test drives by hand, standing in for the real one. */
 function createFakeWorker() {
   const sent: WorkerRequest[] = [];
@@ -55,6 +86,7 @@ function createFakeWorker() {
 }
 
 let spoken: string[] = [];
+let spokenLanguages: string[] = [];
 let createdObjectUrls = 0;
 let handlersAtSourceClear: {
   onended: (() => void) | null;
@@ -65,6 +97,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   vi.resetModules();
   spoken = [];
+  spokenLanguages = [];
   settings.selectedVoiceId = "";
   settings.textToSpeechEngine = "local";
   mockVoices.mockResolvedValue([englishVoice]);
@@ -111,8 +144,13 @@ beforeEach(async () => {
       { voiceURI: "os-voice", name: "OS Voice", lang: "en-US" },
     ],
     cancel: vi.fn(),
-    speak: (utterance: { text: string; onend: (() => void) | null }) => {
+    speak: (utterance: {
+      text: string;
+      lang: string;
+      onend: (() => void) | null;
+    }) => {
       spoken.push(utterance.text);
+      spokenLanguages.push(utterance.lang);
       queueMicrotask(() => utterance.onend?.());
     },
   });
@@ -339,6 +377,74 @@ describe("speak", () => {
     expect(mockUpdateState).toHaveBeenLastCalledWith("idle");
   });
 
+  it("picks the local voice for the answer's language, not the browser's", async () => {
+    mockVoices.mockResolvedValue([englishVoice, portugueseVoice]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak(portugueseAnswer);
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("pt_BR-faber-medium");
+  });
+
+  it("keeps a chosen voice whatever the answer's language", async () => {
+    mockVoices.mockResolvedValue([englishVoice, portugueseVoice]);
+    settings.selectedVoiceId = "piper:en_US-lessac-high";
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak(portugueseAnswer);
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("en_US-lessac-high");
+  });
+
+  it("keeps the browser language when the detector cannot recognize it", async () => {
+    // franc-min has no Danish and reads this sentence as Swedish.
+    vi.stubGlobal("navigator", { language: "da-DK" });
+    mockVoices.mockResolvedValue([swedishVoice, danishVoice]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak(
+      "Eiffeltårnet blev bygget i 1889 til verdensudstillingen i Paris og er omkring 330 meter højt.",
+    );
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("da_DK-talesyntese-medium");
+  });
+
+  it("uses the browser language when the detector fails to load", async () => {
+    vi.doMock("franc-min", () => {
+      throw new Error("chunk failed to load");
+    });
+    try {
+      tts = await import("./textToSpeech");
+      mockVoices.mockResolvedValue([englishVoice, portugueseVoice]);
+      const worker = createFakeWorker();
+      tts.setWorkerFactory(() => worker as unknown as Worker);
+
+      void tts.speak(portugueseAnswer);
+      await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+      expect(worker.sent[0].voiceId).toBe("en_US-lessac-high");
+      expect(mockAddLogEntry).toHaveBeenCalledWith(
+        expect.stringContaining("Could not detect the answer's language"),
+      );
+    } finally {
+      vi.doUnmock("franc-min");
+    }
+  });
+
+  it("asks the system engine for the answer's language", async () => {
+    settings.textToSpeechEngine = "system";
+
+    await tts.speak(portugueseAnswer);
+
+    expect(spokenLanguages).toEqual(["pt"]);
+  });
+
   it("stops playback without falling back to the system voice", async () => {
     const worker = createFakeWorker();
     tts.setWorkerFactory(() => worker as unknown as Worker);
@@ -382,14 +488,17 @@ describe("no speech engine at all", () => {
 });
 
 describe("listVoices", () => {
-  it("offers only the local voices for the language", async () => {
-    const options = await tts.listVoices("en-US");
+  it("offers the local voices of every language, the given language first", async () => {
+    mockVoices.mockResolvedValue([germanVoice, englishVoice, portugueseVoice]);
 
-    expect(options).toEqual([
-      expect.objectContaining({
-        value: "piper:en_US-lessac-high",
-        engine: "local",
-      }),
+    const options = await tts.listVoices("pt-BR");
+
+    expect(
+      options.map(({ value, languageName }) => [value, languageName]),
+    ).toEqual([
+      ["piper:pt_BR-faber-medium", "Portuguese"],
+      ["piper:en_US-lessac-high", "English"],
+      ["piper:de_DE-thorsten-medium", "German"],
     ]);
   });
 
