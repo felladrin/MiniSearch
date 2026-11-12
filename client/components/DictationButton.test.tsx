@@ -421,6 +421,19 @@ describe("the disabled prop", () => {
     expect(startDictation).not.toHaveBeenCalled();
   });
 
+  it("keeps the fill off the field it sits in while disabled", () => {
+    // Mantine's disabled ActionIcon has a solid fill whatever the variant,
+    // which shows as an opaque block over the faded field.
+    // Read inline: jsdom loads no Mantine CSS, so a computed-style check
+    // would pass with or without the override.
+    renderButton({ disabled: true });
+
+    expect(
+      screen.getByRole("button", { name: "Dictate the search query" }).style
+        .backgroundColor,
+    ).toBe("transparent");
+  });
+
   it("stops a running session when the field becomes disabled", async () => {
     const user = userEvent.setup();
     const { rerender } = renderButton();

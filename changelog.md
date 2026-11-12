@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-12
+
+- The follow-up question field and its Send button now look like one control: the field has square right corners and shares a single border with the button. The microphone button no longer turns into a solid gray block while an answer is being generated, and its hover and recording fills stay inside the field's border, in the follow-up field and in the search field.
+
 ## 2026-11-09
 
 - The in-browser engine, wllama, moves from 3.8.1 to 3.13.0. It now handles a model download that stopped midway by itself, so MiniSearch no longer deletes those files before each load.

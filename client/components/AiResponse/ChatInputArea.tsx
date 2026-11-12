@@ -100,7 +100,13 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
         maxRows={8}
         style={{ flexGrow: 1, paddingRight: `${sendButtonWidth}px` }}
         styles={{
-          input: { paddingRight: dictationButtonWidth + dictationGutter },
+          // Square on the right, where the send button attaches, so the two
+          // read as one control instead of meeting at a rounded notch.
+          input: {
+            paddingRight: dictationButtonWidth + dictationGutter,
+            borderTopRightRadius: 0,
+            borderBottomRightRadius: 0,
+          },
         }}
         disabled={isGenerating}
       />
@@ -126,6 +132,7 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
           bottom: 0,
           borderTopLeftRadius: 0,
           borderBottomLeftRadius: 0,
+          borderLeft: 0,
         }}
       >
         <IconSend size={16} />
