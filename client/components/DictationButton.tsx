@@ -19,6 +19,12 @@ import {
  */
 export const dictationButtonWidth = 34;
 
+/**
+ * Mantine's input border. The button is inset by it so its hover and
+ * recording fills stay inside the field instead of painting over its border.
+ */
+const fieldBorderWidth = 1;
+
 interface DictationButtonProps {
   /** Reads the current field content, so dictation appends to it. */
   getValue: () => string;
@@ -29,7 +35,7 @@ interface DictationButtonProps {
    * "Stop dictating": "the search query", "a follow-up question".
    */
   labelScope: string;
-  /** Distance from the right edge of the positioned ancestor, in pixels. */
+  /** Distance from the field's right edge to the positioned ancestor's, in pixels. */
   rightOffset?: number;
   /** Blocks a new session and stops one already running. */
   disabled?: boolean;
@@ -306,11 +312,14 @@ export default memo(function DictationButton({
         data-dictation-phase={phase}
         style={{
           position: "absolute",
-          right: rightOffset,
-          top: 0,
-          bottom: 0,
-          height: "100%",
+          right: rightOffset + fieldBorderWidth,
+          top: fieldBorderWidth,
+          bottom: fieldBorderWidth,
+          height: `calc(100% - ${2 * fieldBorderWidth}px)`,
           width: dictationButtonWidth,
+          // Mantine paints a disabled ActionIcon with a solid fill whatever
+          // its variant, which shows as an opaque block over the faded field.
+          ...(disabled && { backgroundColor: "transparent" }),
         }}
       >
         {phase === "loading" || phase === "transcribing" ? (

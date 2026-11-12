@@ -67,9 +67,10 @@ it("places the dictation button left of the send button", () => {
   const send = screen.getByRole("button", { name: "Send message" });
 
   // Both float over the right end of the field, so only the offsets say
-  // which is where. Send keeps the edge; dictation sits inside the field.
+  // which is where. Send keeps the edge; dictation sits inside the field,
+  // clear of the 1px border it shares with send.
   expect(send).toHaveStyle({ right: "0px" });
-  expect(dictate).toHaveStyle({ right: "54px" });
+  expect(dictate).toHaveStyle({ right: "55px" });
 
   // And the tab order follows the same left-to-right reading.
   expect(
