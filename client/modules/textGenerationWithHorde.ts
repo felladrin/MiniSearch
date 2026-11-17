@@ -67,13 +67,16 @@ function buildHordeUrl(path: string) {
 /** Anonymous AI Horde API key; the lowest-priority tier when the horde is busy. */
 export const aiHordeDefaultApiKey = "0000000000";
 
-/** How many of the most-requested models an unpinned request asks the horde for. */
-const topHordeModelCount = 5;
+// How many of the most-requested models an unpinned request asks the horde for.
+const TOP_HORDE_MODEL_COUNT = 5;
 
-/** The monthly-request statistics weigh 226 KB gzipped, so the ranking is reused for a while. */
-const topHordeModelCacheMs = 5 * 60 * 1000;
+// The monthly-request statistics response is large, so the ranking is reused for a while.
+const TOP_HORDE_MODEL_CACHE_MS = 5 * 60 * 1000;
 
-const generationNotPossibleMessage =
+// A hung ranking endpoint must not stall the generation; it falls back instead.
+const HORDE_RANKING_FETCH_TIMEOUT_MS = 10 * 1000;
+
+const GENERATION_NOT_POSSIBLE_MESSAGE =
   "Generation not possible with the selected model";
 
 function getEffectiveHordeApiKey(
@@ -192,7 +195,7 @@ async function handleGenerationStatus(
     }
 
     if (!status.is_possible) {
-      throw new ChatGenerationError(generationNotPossibleMessage);
+      throw new ChatGenerationError(GENERATION_NOT_POSSIBLE_MESSAGE);
     }
 
     const generatedText = status.generations?.[0].text;
@@ -242,11 +245,14 @@ async function cancelGeneration(generationId: string): Promise<void> {
   }
 }
 
-export async function fetchHordeModels(): Promise<HordeModelInfo[]> {
+export async function fetchHordeModels(
+  signal?: AbortSignal,
+): Promise<HordeModelInfo[]> {
   const response = await fetch(
     buildHordeUrl("/status/models?type=text&model_state=all"),
     {
       method: "GET",
+      signal,
       headers: {
         [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
         [HTTP_HEADERS.ACCEPT]: "application/json",
@@ -261,11 +267,12 @@ export async function fetchHordeModels(): Promise<HordeModelInfo[]> {
   return response.json();
 }
 
-async function fetchHordeModelMonthlyRequests(): Promise<
-  Record<string, number>
-> {
+async function fetchHordeModelMonthlyRequests(
+  signal?: AbortSignal,
+): Promise<Record<string, number>> {
   const response = await fetch(buildHordeUrl("/stats/text/models"), {
     method: "GET",
+    signal,
     headers: {
       [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
       [HTTP_HEADERS.ACCEPT]: "application/json",
@@ -288,19 +295,18 @@ async function fetchHordeModelMonthlyRequests(): Promise<
 let topHordeModelsCache: { modelNames: string[]; expiresAt: number } | null =
   null;
 
-/**
- * The text models with online workers, ranked by requests this month: the
- * community's own vote on which models are worth using. Cached because the
- * statistics response is large and the ranking shifts slowly.
- */
+// The text models with online workers, ranked by requests this month: the
+// community's own vote on which models are worth using. Cached because the
+// statistics response is large and the ranking shifts slowly.
 async function getTopHordeModels(): Promise<string[]> {
   if (topHordeModelsCache && Date.now() < topHordeModelsCache.expiresAt) {
     return topHordeModelsCache.modelNames;
   }
 
+  const signal = AbortSignal.timeout(HORDE_RANKING_FETCH_TIMEOUT_MS);
   const [models, monthlyRequests] = await Promise.all([
-    fetchHordeModels(),
-    fetchHordeModelMonthlyRequests(),
+    fetchHordeModels(signal),
+    fetchHordeModelMonthlyRequests(signal),
   ]);
 
   const modelNames = models
@@ -308,12 +314,12 @@ async function getTopHordeModels(): Promise<string[]> {
     .sort(
       (a, b) => (monthlyRequests[b.name] ?? 0) - (monthlyRequests[a.name] ?? 0),
     )
-    .slice(0, topHordeModelCount)
+    .slice(0, TOP_HORDE_MODEL_COUNT)
     .map((model) => model.name);
 
   topHordeModelsCache = {
     modelNames,
-    expiresAt: Date.now() + topHordeModelCacheMs,
+    expiresAt: Date.now() + TOP_HORDE_MODEL_CACHE_MS,
   };
   return modelNames;
 }
@@ -462,6 +468,12 @@ async function executeHordeGeneration(
     );
   }
 
+  // The ranking fetch widened the window between the user pressing stop and
+  // the jobs being submitted; close it before submitting.
+  if (getTextGenerationState() === "interrupted") {
+    throw new ChatGenerationError("Generation interrupted");
+  }
+
   try {
     return await raceGenerations(
       messages,
@@ -472,7 +484,7 @@ async function executeHordeGeneration(
     if (
       topModels.length > 0 &&
       error instanceof ChatGenerationError &&
-      error.message === generationNotPossibleMessage
+      error.message === GENERATION_NOT_POSSIBLE_MESSAGE
     ) {
       addLogEntry(
         "None of the top AI Horde models could take the generation, retrying with any available model",

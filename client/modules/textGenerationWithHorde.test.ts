@@ -339,6 +339,22 @@ describe("textGenerationWithHorde", () => {
       );
     });
 
+    it("does not retry when the generation faults", async () => {
+      routeHordeFetch({
+        workerModels: [{ name: "m-a", count: 1 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: () => ({ done: true, faulted: true }),
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await expect(generateTextWithHorde()).rejects.toThrow(
+        "Generation failed",
+      );
+      expect(generationRequestBodies()).toHaveLength(2);
+    });
+
     it("reuses the cached ranking for the next generation", async () => {
       routeHordeFetch({
         workerModels: [{ name: "m-a", count: 1 }],
@@ -364,6 +380,30 @@ describe("textGenerationWithHorde", () => {
         ["m-a"],
         ["m-a"],
       ]);
+    });
+
+    it("refetches the ranking after the cache expires", async () => {
+      routeHordeFetch({
+        workerModels: [{ name: "m-a", count: 1 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: () => doneResponse,
+      });
+      const nowSpy = vi.spyOn(Date, "now").mockReturnValue(0);
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await generateTextWithHorde();
+      nowSpy.mockReturnValue(5 * 60 * 1000 + 1);
+      await generateTextWithHorde();
+      nowSpy.mockRestore();
+
+      const rankingFetches = mockFetch.mock.calls.filter(
+        ([url]) =>
+          String(url).includes("/status/models") ||
+          String(url).includes("/stats/text/models"),
+      );
+      expect(rankingFetches).toHaveLength(4);
     });
   });
 
