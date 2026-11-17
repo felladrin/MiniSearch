@@ -144,7 +144,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `allowAiModelDownload` | boolean | `false`                           | Allow automatic AI model downloads                                                                                                     |
 | `wllamaModelId`        | string  | WebGPU or CPU default, see above. | Default Wllama model ID, chosen by whether the browser has WebGPU                                                                      |
 | `hordeApiKey`          | string  | `'0000000000'`                    | AI Horde API key (default is anonymous)                                                                                                |
-| `hordeModel`           | string  | `''`                              | Specific AI Horde model to request                                                                                                     |
+| `hordeModel`           | string  | `''`                              | Specific AI Horde model to request; empty asks for the five most requested models this month                                           |
 | `openAiApiBaseUrl`     | string  | `''`                              | Base URL for the OpenAI-compatible API                                                                                                 |
 | `openAiApiKey`         | string  | `''`                              | API key for the OpenAI-compatible API                                                                                                  |
 | `openAiApiModel`       | string  | `''`                              | Model identifier for the OpenAI-compatible API                                                                                         |

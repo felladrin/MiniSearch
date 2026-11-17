@@ -122,11 +122,12 @@ Uses aihorde.net, a distributed volunteer GPU network.
 
 **How It Works:**
 
-1. Request sent to AI Horde API
-2. Distributed to volunteer workers
-3. Multiple workers may process in parallel
-4. First response wins (race condition handling)
-5. Results streamed back
+1. With no model selected, the five text models with online workers that have the most requests this month are picked (cached for 5 minutes)
+2. Request sent to AI Horde API
+3. Distributed to volunteer workers
+4. Multiple workers may process in parallel
+5. First response wins (race condition handling)
+6. Results streamed back
 
 **Features:**
 
@@ -141,7 +142,7 @@ Uses aihorde.net, a distributed volunteer GPU network.
 {
   inferenceType: 'horde',
   hordeApiKey: '0000000000', // Default anonymous key; set your own for priority
-  hordeModel: '' // Optional; empty races two random workers and uses the first response
+  hordeModel: '' // Optional; empty asks for the five most requested models this month and races two requests, using the first response
 }
 ```
 

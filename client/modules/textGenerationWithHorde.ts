@@ -38,6 +38,10 @@ interface HordeModelInfo {
   count: number;
 }
 
+interface HordeModelStatsResponse {
+  month?: Record<string, number>;
+}
+
 interface HordeUserInfo {
   username: string;
   kudos: number;
@@ -63,13 +67,26 @@ function buildHordeUrl(path: string) {
 /** Anonymous AI Horde API key; the lowest-priority tier when the horde is busy. */
 export const aiHordeDefaultApiKey = "0000000000";
 
+/** How many of the most-requested models an unpinned request asks the horde for. */
+const topHordeModelCount = 5;
+
+/** The monthly-request statistics weigh 226 KB gzipped, so the ranking is reused for a while. */
+const topHordeModelCacheMs = 5 * 60 * 1000;
+
+const generationNotPossibleMessage =
+  "Generation not possible with the selected model";
+
 function getEffectiveHordeApiKey(
   settings: ReturnType<typeof getSettings> = getSettings(),
 ) {
   return settings.hordeApiKey || aiHordeDefaultApiKey;
 }
 
-async function startGeneration(messages: ChatMessage[], signal?: AbortSignal) {
+async function startGeneration(
+  messages: ChatMessage[],
+  signal?: AbortSignal,
+  models?: string[],
+) {
   const settings = getSettings();
   const aiHordeApiKey = getEffectiveHordeApiKey(settings);
   const aiHordeMaxResponseLengthInTokens =
@@ -96,7 +113,7 @@ async function startGeneration(messages: ChatMessage[], signal?: AbortSignal) {
         stop_sequence: [userMarker, assistantMarker],
         validated_backends: false,
       },
-      models: settings.hordeModel ? [settings.hordeModel] : undefined,
+      models,
     }),
   });
 
@@ -175,9 +192,7 @@ async function handleGenerationStatus(
     }
 
     if (!status.is_possible) {
-      throw new ChatGenerationError(
-        "Generation not possible with the selected model",
-      );
+      throw new ChatGenerationError(generationNotPossibleMessage);
     }
 
     const generatedText = status.generations?.[0].text;
@@ -246,6 +261,63 @@ export async function fetchHordeModels(): Promise<HordeModelInfo[]> {
   return response.json();
 }
 
+async function fetchHordeModelMonthlyRequests(): Promise<
+  Record<string, number>
+> {
+  const response = await fetch(buildHordeUrl("/stats/text/models"), {
+    method: "GET",
+    headers: {
+      [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
+      [HTTP_HEADERS.ACCEPT]: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch AI Horde model request statistics");
+  }
+
+  const data = (await response.json()) as HordeModelStatsResponse;
+  if (!data.month) {
+    throw new Error(
+      "AI Horde model request statistics are missing the monthly counter",
+    );
+  }
+  return data.month;
+}
+
+let topHordeModelsCache: { modelNames: string[]; expiresAt: number } | null =
+  null;
+
+/**
+ * The text models with online workers, ranked by requests this month: the
+ * community's own vote on which models are worth using. Cached because the
+ * statistics response is large and the ranking shifts slowly.
+ */
+async function getTopHordeModels(): Promise<string[]> {
+  if (topHordeModelsCache && Date.now() < topHordeModelsCache.expiresAt) {
+    return topHordeModelsCache.modelNames;
+  }
+
+  const [models, monthlyRequests] = await Promise.all([
+    fetchHordeModels(),
+    fetchHordeModelMonthlyRequests(),
+  ]);
+
+  const modelNames = models
+    .filter((model) => model.count > 0)
+    .sort(
+      (a, b) => (monthlyRequests[b.name] ?? 0) - (monthlyRequests[a.name] ?? 0),
+    )
+    .slice(0, topHordeModelCount)
+    .map((model) => model.name);
+
+  topHordeModelsCache = {
+    modelNames,
+    expiresAt: Date.now() + topHordeModelCacheMs,
+  };
+  return modelNames;
+}
+
 export async function fetchHordeUserInfo(
   apiKey: string,
 ): Promise<HordeUserInfo> {
@@ -285,24 +357,18 @@ export async function generateChatWithHorde(
   return await executeHordeGeneration(messages, onUpdate);
 }
 
-async function executeHordeGeneration(
+async function raceGenerations(
   messages: ChatMessage[],
+  models: string[] | undefined,
   onUpdate: (text: string) => void,
 ): Promise<string> {
-  const settings = getSettings();
-
-  if (settings.hordeModel) {
-    const generation = await startGeneration(messages);
-    return await handleGenerationStatus(generation.id, onUpdate);
-  }
-
   const controllers: AbortController[] = [
     new AbortController(),
     new AbortController(),
   ];
   try {
     const startPromises = controllers.map(async (ctrl) => {
-      const generation = await startGeneration(messages, ctrl.signal);
+      const generation = await startGeneration(messages, ctrl.signal, models);
       return { id: generation.id, ctrl };
     });
 
@@ -370,6 +436,49 @@ async function executeHordeGeneration(
         addLogEntry(`Failed to abort controller: ${abortError}`);
       }
     });
+    throw error;
+  }
+}
+
+async function executeHordeGeneration(
+  messages: ChatMessage[],
+  onUpdate: (text: string) => void,
+): Promise<string> {
+  const settings = getSettings();
+
+  if (settings.hordeModel) {
+    const generation = await startGeneration(messages, undefined, [
+      settings.hordeModel,
+    ]);
+    return await handleGenerationStatus(generation.id, onUpdate);
+  }
+
+  let topModels: string[] = [];
+  try {
+    topModels = await getTopHordeModels();
+  } catch (error) {
+    addLogEntry(
+      `Failed to rank AI Horde models by requests this month, falling back to any available model: ${error}`,
+    );
+  }
+
+  try {
+    return await raceGenerations(
+      messages,
+      topModels.length > 0 ? topModels : undefined,
+      onUpdate,
+    );
+  } catch (error) {
+    if (
+      topModels.length > 0 &&
+      error instanceof ChatGenerationError &&
+      error.message === generationNotPossibleMessage
+    ) {
+      addLogEntry(
+        "None of the top AI Horde models could take the generation, retrying with any available model",
+      );
+      return await raceGenerations(messages, undefined, onUpdate);
+    }
     throw error;
   }
 }

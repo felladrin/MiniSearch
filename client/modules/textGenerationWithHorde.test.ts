@@ -56,6 +56,8 @@ function mockSettings(overrides: Partial<typeof defaultSettings> = {}) {
 describe("textGenerationWithHorde", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The module caches the model ranking; each test starts from a clean slate.
+    vi.resetModules();
     mockSettings({ hordeModel: "chosen-model" });
     vi.mocked(getTextGenerationState).mockReturnValue("idle");
   });
@@ -188,6 +190,180 @@ describe("textGenerationWithHorde", () => {
       expect(onUpdate).toHaveBeenCalledWith("Chat response");
       expect(canStartResponding).not.toHaveBeenCalled();
       expect(updateResponse).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("automatic model selection when no model is pinned", () => {
+    const doneResponse = {
+      done: true,
+      is_possible: true,
+      generations: [{ text: "Top model answer", model: "m-f" }],
+    };
+
+    function routeHordeFetch({
+      workerModels,
+      monthStats,
+      statsFails = false,
+      statusResponder,
+    }: {
+      workerModels: Array<{ name: string; count: number }>;
+      monthStats?: Record<string, number>;
+      statsFails?: boolean;
+      statusResponder: (pollIndex: number) => unknown;
+    }) {
+      let idCounter = 0;
+      let pollCounter = 0;
+      mockFetch.mockImplementation(
+        async (url: string, init?: { method?: string; body?: string }) => {
+          if (url.includes("/status/models")) {
+            return jsonResponse(
+              workerModels.map((model) => ({
+                performance: 1,
+                queued: 0,
+                jobs: 0,
+                eta: 0,
+                type: "text",
+                ...model,
+              })),
+            );
+          }
+          if (url.includes("/stats/text/models")) {
+            return statsFails
+              ? jsonResponse({}, 500)
+              : jsonResponse({ day: {}, month: monthStats ?? {}, total: {} });
+          }
+          if (url.includes("/generate/text/async")) {
+            return jsonResponse({ id: `gen-${++idCounter}` });
+          }
+          if (init?.method === "DELETE") {
+            return jsonResponse({});
+          }
+          return jsonResponse(statusResponder(pollCounter++));
+        },
+      );
+    }
+
+    function generationRequestBodies() {
+      return mockFetch.mock.calls
+        .filter(([url]) => String(url).includes("/generate/text/async"))
+        .map(([, init]) => JSON.parse((init as { body: string }).body));
+    }
+
+    beforeEach(() => {
+      mockSettings({ hordeModel: "" });
+    });
+
+    it("asks for the models with workers ranked by requests this month", async () => {
+      routeHordeFetch({
+        workerModels: [
+          { name: "m-a", count: 1 },
+          { name: "m-b", count: 2 },
+          { name: "m-c", count: 1 },
+          { name: "m-d", count: 1 },
+          { name: "m-e", count: 1 },
+          { name: "m-f", count: 1 },
+          { name: "m-offline", count: 0 },
+        ],
+        monthStats: {
+          "m-a": 400,
+          "m-b": 500,
+          "m-c": 600,
+          "m-d": 700,
+          "m-e": 800,
+          "m-f": 900,
+          "m-offline": 9999,
+        },
+        statusResponder: () => doneResponse,
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await generateTextWithHorde();
+
+      const bodies = generationRequestBodies();
+      expect(bodies).toHaveLength(2);
+      for (const body of bodies) {
+        expect(body.models).toEqual(["m-f", "m-e", "m-d", "m-c", "m-b"]);
+      }
+    });
+
+    it("falls back to any available model when the statistics fetch fails", async () => {
+      routeHordeFetch({
+        workerModels: [{ name: "m-a", count: 1 }],
+        statsFails: true,
+        statusResponder: () => doneResponse,
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await generateTextWithHorde();
+
+      const bodies = generationRequestBodies();
+      expect(bodies).toHaveLength(2);
+      for (const body of bodies) {
+        expect(body.models).toBeUndefined();
+      }
+      expect(addLogEntry).toHaveBeenCalledWith(
+        expect.stringContaining("falling back to any available model"),
+      );
+    });
+
+    it("retries with any available model when the top models cannot take the job", async () => {
+      routeHordeFetch({
+        workerModels: [{ name: "m-a", count: 1 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: (pollIndex) =>
+          pollIndex < 2 ? { done: true, is_possible: false } : doneResponse,
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await generateTextWithHorde();
+
+      expect(updateResponse).toHaveBeenCalledWith("Top model answer");
+      const bodies = generationRequestBodies();
+      expect(bodies).toHaveLength(4);
+      expect(bodies.slice(0, 2).map((body) => body.models)).toEqual([
+        ["m-a"],
+        ["m-a"],
+      ]);
+      expect(bodies.slice(2).map((body) => body.models)).toEqual([
+        undefined,
+        undefined,
+      ]);
+      expect(addLogEntry).toHaveBeenCalledWith(
+        expect.stringContaining("retrying with any available model"),
+      );
+    });
+
+    it("reuses the cached ranking for the next generation", async () => {
+      routeHordeFetch({
+        workerModels: [{ name: "m-a", count: 1 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: () => doneResponse,
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await generateTextWithHorde();
+      await generateTextWithHorde();
+
+      const rankingFetches = mockFetch.mock.calls.filter(
+        ([url]) =>
+          String(url).includes("/status/models") ||
+          String(url).includes("/stats/text/models"),
+      );
+      expect(rankingFetches).toHaveLength(2);
+      expect(generationRequestBodies().map((body) => body.models)).toEqual([
+        ["m-a"],
+        ["m-a"],
+        ["m-a"],
+        ["m-a"],
+      ]);
     });
   });
 
