@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-17
+
+- With the AI Horde engine and no model selected, the request no longer lands on a random model: it now goes to the five text models with online workers that have the most requests this month, so answers come from the models the community actually uses. The ranking refreshes every 5 minutes. If it cannot be fetched, or none of those models can take the job, the request falls back to any available model, as before.
+
 ## 2026-11-12
 
 - The follow-up question field and its Send button now look like one control: the field has square right corners and shares a single border with the button. The microphone button no longer turns into a solid gray block while an answer is being generated, and its hover and recording fills stay inside the field's border, in the follow-up field and in the search field.

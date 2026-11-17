@@ -33,7 +33,7 @@ export const HordeSettings = ({
       form.values.hordeApiKey !== aiHordeDefaultApiKey && (
         <Select
           label="Model"
-          description="Optional. When not selected, AI Horde will automatically choose an available model."
+          description="Optional. When not selected, the request goes to the five most requested models this month, and the first answer wins."
           placeholder="Auto-selected"
           data={hordeModels}
           {...form.getInputProps("hordeModel")}
