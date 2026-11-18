@@ -937,6 +937,25 @@ describe("mapping a result", () => {
     expect(results).toEqual([["Kept", EXCERPT, "https://example.com/kept"]]);
   });
 
+  it("drops a result whose url no browser can open", async () => {
+    const results = await run([
+      {
+        url: "http://go/v1/AaDmRyhv-lWKav4zVAE2W_ge7FBciQexLY2liBgXg",
+        title: "Single-label host",
+        excerpts: [EXCERPT],
+      },
+      { url: "go/v1/AaDmRyhv", title: "Relative", excerpts: [EXCERPT] },
+      {
+        url: "ftp://example.com/file",
+        title: "Not http",
+        excerpts: [EXCERPT],
+      },
+      { url: "https://example.com/kept", title: "Kept", excerpts: [EXCERPT] },
+    ]);
+
+    expect(results).toEqual([["Kept", EXCERPT, "https://example.com/kept"]]);
+  });
+
   it("drops duplicate urls in the endpoint's order", async () => {
     const results = await run([
       { url: "https://example.com/dup", title: "First", excerpts: [EXCERPT] },

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
 import debug from "debug";
+import { isOpenableUrl } from "./utils/openableUrl.ts";
 
 const fileName = basename(import.meta.url);
 const printMessage = debug(fileName);
@@ -682,7 +683,7 @@ function mapEntries<Entry extends { url?: string; title?: string | null }>(
       !entry ||
       typeof entry !== "object" ||
       typeof entry.url !== "string" ||
-      !entry.url ||
+      !isOpenableUrl(entry.url) ||
       seenUrls.has(entry.url)
     ) {
       continue;

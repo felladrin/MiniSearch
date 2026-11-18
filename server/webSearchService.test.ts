@@ -548,6 +548,41 @@ describe("graceful degradation", () => {
     expect(results).toEqual([]);
   });
 
+  it("drops results whose url no browser can open before applying the limit", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [
+            {
+              // Brave's encrypted redirect as SearXNG's brave engine passes it on.
+              title: "Brave redirect",
+              url: "http:///go/v1/Af4-n4JD9Yj2av455AGJNbFGZmTGbX6TnLNCloOngQVy",
+              content: "redirect content",
+              engine: "brave",
+            },
+            {
+              title: "example",
+              url: "https://example.com",
+              content: "example content",
+              engine: "duckduckgo",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const results = await fetchSearXNG(
+      "failure injection",
+      "text",
+      1,
+      new CircuitBreaker(breakerOptions),
+    );
+
+    expect(results).toEqual([
+      ["example", "example content", "https://example.com"],
+    ]);
+  });
+
   it("drops image results that carry no thumbnail URL", async () => {
     fetchMock.mockResolvedValue(
       createMockResponse(
