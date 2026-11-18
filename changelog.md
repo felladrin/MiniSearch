@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-18
+
+- On servers whose CPU has AVX512_VNNI (a feature of many modern datacenter CPUs), the reranker now loads the VNNI build of its model instead of the portable one: same weights, ranking quality within noise (0.8039 against 0.7992 nDCG@10 on the 240-query MIRACL set), and reranking measured 1.32x faster on a two-core pin of a desktop CPU. Other hosts load the portable build, as before.
+
 ## 2026-11-17
 
 - With the AI Horde engine and no model selected, the request no longer lands on a random model: it now goes to the five text models with online workers that have the most requests this month, so answers come from the models the community actually uses. The ranking refreshes every 5 minutes. If it cannot be fetched, or none of those models can take the job, the request falls back to any available model, as before.
