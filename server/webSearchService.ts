@@ -14,6 +14,7 @@ import {
   type UnresponsiveEngine,
 } from "./searchesSinceLastRestart.ts";
 import { CircuitBreaker } from "./utils/circuitBreaker.ts";
+import { isOpenableUrl } from "./utils/openableUrl.ts";
 
 const fileName = basename(import.meta.url);
 const printMessage = debug(fileName);
@@ -303,7 +304,7 @@ async function processSearchResults(
   const results = await breaker.execute("searxng", () =>
     performSearch(query, searchType),
   );
-  const consideredResults = deduplicateResults(results).slice(0, limit);
+  const consideredResults = openableUniqueResults(results).slice(0, limit);
 
   if (searchType === "text") {
     const textualResults = await Promise.all(
@@ -389,7 +390,7 @@ export async function fetchSupplementarySearXNG(
   const data = (await response.json()) as SearxngSearchResponse;
   const results = Array.isArray(data.results) ? data.results : [];
   const textualResults = await Promise.all(
-    deduplicateResults(results).slice(0, limit).map(processTextualResult),
+    openableUniqueResults(results).slice(0, limit).map(processTextualResult),
   );
   return filterNullResults(textualResults);
 }
@@ -455,15 +456,30 @@ async function processTextualResult(result: SearxngSearchResult) {
   }
 }
 
-function deduplicateResults(
+// Runs before the limit is applied, so a dropped link does not take the slot
+// of a result that would have made the cut.
+function openableUniqueResults(
   results: SearxngSearchResult[],
 ): SearxngSearchResult[] {
   const urls = new Set<string>();
-  return results.filter((result) => {
+  const unopenableEngines: string[] = [];
+  const kept = results.filter((result) => {
+    if (!isOpenableUrl(result.url)) {
+      unopenableEngines.push(result.engine ?? "unknown");
+      return false;
+    }
     if (urls.has(result.url)) return false;
     urls.add(result.url);
     return true;
   });
+  // Engine names only: the url is downstream of the query, which never reaches
+  // the log.
+  if (unopenableEngines.length > 0) {
+    printMessage(
+      `Dropped ${unopenableEngines.length} SearXNG result(s) whose link no browser can open, from: ${[...new Set(unopenableEngines)].join(", ")}.`,
+    );
+  }
+  return kept;
 }
 
 function filterNullResults<T>(results: (T | null)[]): T[] {

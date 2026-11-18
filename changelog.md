@@ -4,7 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-18
 
-- When SearXNG fails and a fallback provider serves the search, results whose link no browser can open are dropped: links on a host without a domain, such as `http://go/v1/...`, and links that are not `http` or `https`. Before, they reached the result list with "go" as the site name, and the AI response cited them as sources.
+- Search results whose link no browser can open are now dropped, from SearXNG and from the fallback providers alike: links on a host without a domain, and links that are not `http` or `https`. Brave Search now sends its result links through encrypted redirects, which SearXNG's Brave engine passes on as `http:///go/v1/...`. Those results reached the list with "go" as the site name, and the AI response cited them as sources. They are dropped before the result limit applies, so they do not take the place of a usable result, and the server log names the engine that sent them.
 - With the AI Horde engine and no model selected, the automatic pick now counts only models with at least one online worker that writes 1024 tokens or more. Models served only by workers capped at 256 or 512 tokens no longer make the top five.
 - On servers whose CPU has AVX512_VNNI (a feature of many modern datacenter CPUs), the reranker now loads the VNNI build of its model instead of the portable one: same weights, ranking quality within noise (0.8039 against 0.7992 nDCG@10 on the 240-query MIRACL set), and reranking measured 1.32x faster on a two-core pin of a desktop CPU. Other hosts load the portable build, as before.
 

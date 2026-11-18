@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
 import debug from "debug";
+import { isOpenableUrl } from "./utils/openableUrl.ts";
 
 const fileName = basename(import.meta.url);
 const printMessage = debug(fileName);
@@ -699,17 +700,6 @@ function mapEntries<Entry extends { url?: string; title?: string | null }>(
   }
 
   return mapped;
-}
-
-// A fallback endpoint has answered with links on a single-label host
-// ("http://go/v1/..."), which no public DNS resolves, so the result would
-// render as a link that leads nowhere and the model would cite it.
-function isOpenableUrl(url: string): boolean {
-  if (!URL.canParse(url)) return false;
-  const { protocol, hostname } = new URL(url);
-  return (
-    (protocol === "http:" || protocol === "https:") && hostname.includes(".")
-  );
 }
 
 /**
