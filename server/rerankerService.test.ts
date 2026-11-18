@@ -4,8 +4,10 @@ import { InferenceSession } from "onnxruntime-node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getRerankerStatus,
+  parseCpuFlags,
   rerank,
   sanitizeUnicodeSurrogates,
+  selectModelFile,
   startRerankerService,
   stopRerankerService,
   truncatePairTokens,
@@ -292,5 +294,66 @@ describe("truncatePairTokens", () => {
     const overLong = Array.from({ length: 900 }, (_, index) => index);
 
     expect(truncatePairTokens(overLong, 512)).toHaveLength(512);
+  });
+});
+
+describe("selectModelFile", () => {
+  const vnniFlags = ["avx2", "avx512f", "avx512_vnni"];
+  const plainFlags = ["avx2", "avx512f"];
+
+  it("picks the VNNI build on a Linux x64 host that reports avx512_vnni", () => {
+    expect(selectModelFile("linux", "x64", vnniFlags)).toBe(
+      "onnx/model_qint8_avx512_vnni.onnx",
+    );
+  });
+
+  it("picks the portable build when the flag is absent or unreadable", () => {
+    expect(selectModelFile("linux", "x64", plainFlags)).toBe(
+      "onnx/model_quint8_avx2.onnx",
+    );
+    expect(selectModelFile("linux", "x64", null)).toBe(
+      "onnx/model_quint8_avx2.onnx",
+    );
+  });
+
+  it("picks the portable build off Linux x64, flag or no flag", () => {
+    expect(selectModelFile("linux", "arm64", vnniFlags)).toBe(
+      "onnx/model_quint8_avx2.onnx",
+    );
+    expect(selectModelFile("darwin", "x64", vnniFlags)).toBe(
+      "onnx/model_quint8_avx2.onnx",
+    );
+  });
+});
+
+describe("parseCpuFlags", () => {
+  const flagsLine = (processor: number, flags: string) =>
+    `processor\t: ${processor}\nflags\t\t: ${flags}\n`;
+
+  it("returns the flags when every flags line reports them", () => {
+    const cpuinfo = `${flagsLine(0, "avx2 avx512_vnni")}${flagsLine(
+      1,
+      "avx2 avx512_vnni",
+    )}`;
+    expect(parseCpuFlags(cpuinfo)).toEqual(["avx2", "avx512_vnni"]);
+  });
+
+  it("drops a flag one flags line lacks, as on a hybrid CPU's E-cores", () => {
+    // A P-core line and an E-core line: the E-core has no AVX-512 at all, so
+    // the intersection must not carry avx512_vnni or the VNNI build would run
+    // a SIGILL on any thread the scheduler parks on an E-core.
+    const cpuinfo = `${flagsLine(0, "avx2 avx512f avx512_vnni")}${flagsLine(
+      1,
+      "avx2",
+    )}`;
+    const flags = parseCpuFlags(cpuinfo);
+    expect(flags).not.toContain("avx512_vnni");
+    expect(selectModelFile("linux", "x64", flags)).toBe(
+      "onnx/model_quint8_avx2.onnx",
+    );
+  });
+
+  it("returns null when no flags line is there", () => {
+    expect(parseCpuFlags("processor\t: 0\nFeatures\t: fp asimd\n")).toBeNull();
   });
 });

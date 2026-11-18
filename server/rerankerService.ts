@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import type { Tokenizer } from "@huggingface/tokenizers";
 import { type InferenceSession, Tensor } from "onnxruntime-node";
@@ -7,16 +8,78 @@ const printMessage = createModelLogger(path.basename(import.meta.url));
 
 const MODEL_HF_REPO = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1";
 
+const PORTABLE_MODEL_HF_FILE = "onnx/model_quint8_avx2.onnx";
+
 /**
- * The dynamically quantized export. The repository ships one build per CPU
- * kernel family (`qint8_arm64`, `qint8_avx512`, `qint8_avx512_vnni`,
- * `quint8_avx2`) from the same weights; this one is the portable choice, because
- * unsigned activations sidestep the signed-int8 saturation that x64 without VNNI
- * has to work around, and it measured no slower than the arm64 build on arm64.
- * Quantization costs nothing measurable: 0.7992 against 0.7973 nDCG@10 for fp32
- * on 240 MIRACL queries, for a quarter of the download and half the latency.
+ * The build for x64 hosts whose CPU has AVX512_VNNI. The repository ships one
+ * build per CPU kernel family (`qint8_arm64`, `qint8_avx512`,
+ * `qint8_avx512_vnni`, `quint8_avx2`) from the same weights. `quint8_avx2` is
+ * the portable default, because unsigned activations sidestep the signed-int8
+ * saturation that x64 without VNNI has to work around, and it measured no
+ * slower than the arm64 build on arm64. Quantization costs nothing measurable:
+ * 0.7992 against 0.7973 nDCG@10 for fp32 on 240 MIRACL queries, for a quarter
+ * of the download and half the latency.
+ *
+ * On a VNNI host the signed int8 kernels have the saturating multiply-add they
+ * need, so the saturation workaround is not paid for and the VNNI build runs
+ * the same weights through faster kernels. The swap is score-neutral: the
+ * qint8 builds score 0.8039 against the quint8 build's 0.7992 on the same set.
  */
-const MODEL_HF_FILE = "onnx/model_quint8_avx2.onnx";
+const VNNI_MODEL_HF_FILE = "onnx/model_qint8_avx512_vnni.onnx";
+
+/**
+ * Parses the CPU feature flags out of `/proc/cpuinfo` content. Every online
+ * processor gets its own `flags` line, and the lines are not always identical:
+ * on an Intel hybrid CPU the E-cores lack instructions the P-cores have, so a
+ * feature counts only when every line reports it. The intersection is the set
+ * the scheduler cannot dodge. Returns null when no flags line is there, which
+ * is the signal to keep the portable build rather than a guess at the
+ * instruction set.
+ */
+export function parseCpuFlags(cpuinfo: string): string[] | null {
+  const lines = [...cpuinfo.matchAll(/^flags[ \t]*:[ \t]*(.*)$/gm)];
+  if (lines.length === 0) return null;
+
+  const flagSets = lines.map((line) => new Set(line[1].split(/\s+/)));
+  return [...flagSets[0]].filter((flag) =>
+    flagSets.every((set) => set.has(flag)),
+  );
+}
+
+/**
+ * Reads the CPU feature flags from `/proc/cpuinfo`. Returns null when the file
+ * is not there or unreadable, which is the signal to keep the portable build
+ * rather than a guess at the instruction set.
+ */
+function readCpuFlags(): string[] | null {
+  try {
+    return parseCpuFlags(fs.readFileSync("/proc/cpuinfo", "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Picks the quantized build for this CPU: the VNNI build on a Linux x64 host
+ * that reports `avx512_vnni`, the portable build everywhere else.
+ */
+export function selectModelFile(
+  platform: string,
+  arch: string,
+  cpuFlags: string[] | null,
+): string {
+  return platform === "linux" &&
+    arch === "x64" &&
+    cpuFlags?.includes("avx512_vnni")
+    ? VNNI_MODEL_HF_FILE
+    : PORTABLE_MODEL_HF_FILE;
+}
+
+const MODEL_HF_FILE = selectModelFile(
+  process.platform,
+  process.arch,
+  readCpuFlags(),
+);
 
 /**
  * Hard ceiling rather than a tuning knob: the model has 514 learned position
@@ -71,7 +134,7 @@ export function sanitizeUnicodeSurrogates(input: string) {
 }
 
 export async function startRerankerService() {
-  printMessage("Preparing model...");
+  printMessage(`Preparing model (${MODEL_HF_FILE})...`);
   const loaded = await loadOnnxModel(MODEL_HF_REPO, MODEL_HF_FILE);
   session = loaded.session;
   tokenizer = loaded.tokenizer;
