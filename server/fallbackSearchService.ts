@@ -682,7 +682,7 @@ function mapEntries<Entry extends { url?: string; title?: string | null }>(
       !entry ||
       typeof entry !== "object" ||
       typeof entry.url !== "string" ||
-      !entry.url ||
+      !isOpenableUrl(entry.url) ||
       seenUrls.has(entry.url)
     ) {
       continue;
@@ -699,6 +699,17 @@ function mapEntries<Entry extends { url?: string; title?: string | null }>(
   }
 
   return mapped;
+}
+
+// A fallback endpoint has answered with links on a single-label host
+// ("http://go/v1/..."), which no public DNS resolves, so the result would
+// render as a link that leads nowhere and the model would cite it.
+function isOpenableUrl(url: string): boolean {
+  if (!URL.canParse(url)) return false;
+  const { protocol, hostname } = new URL(url);
+  return (
+    (protocol === "http:" || protocol === "https:") && hostname.includes(".")
+  );
 }
 
 /**
