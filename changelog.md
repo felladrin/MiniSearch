@@ -5,6 +5,7 @@ Notable changes, grouped by date, most recent first.
 ## 2026-11-18
 
 - With the AI Horde engine and no model selected, the automatic pick now counts only models with at least one online worker that writes 1024 tokens or more. Models served only by workers capped at 256 or 512 tokens no longer make the top five.
+- On servers whose CPU has AVX512_VNNI (a feature of many modern datacenter CPUs), the reranker now loads the VNNI build of its model instead of the portable one: same weights, ranking quality within noise (0.8039 against 0.7992 nDCG@10 on the 240-query MIRACL set), and reranking measured 1.32x faster on a two-core pin of a desktop CPU. Other hosts load the portable build, as before.
 
 ## 2026-11-17
 

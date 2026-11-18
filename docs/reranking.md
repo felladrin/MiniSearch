@@ -157,15 +157,15 @@ Reranking is applied to both text and image search results. For image results, t
 
 ## Model Details
 
-| Property            | Value                                                                  |
-| ------------------- | ---------------------------------------------------------------------- |
-| Model               | mmarco-mMiniLMv2-L12-H384-v1                                           |
-| Format              | ONNX, dynamically quantized (`onnx/model_quint8_avx2.onnx`, 119MB)     |
-| HuggingFace Repo    | cross-encoder/mmarco-mMiniLMv2-L12-H384-v1                             |
-| Type                | Cross-encoder reranker (XLM-RoBERTa, one relevance logit)              |
-| Size                | 12 layers, 118M parameters, of which 96M are the 250k-token vocabulary |
-| Max sequence length | 512 tokens, the model's own limit, enforced via `MAX_SEQUENCE_LENGTH`  |
-| Storage             | `server/models/cross-encoder/mmarco-mMiniLMv2-L12-H384-v1/`            |
+| Property            | Value                                                                                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Model               | mmarco-mMiniLMv2-L12-H384-v1                                                                                   |
+| Format              | ONNX, dynamically quantized (`model_quint8_avx2.onnx`, or `model_qint8_avx512_vnni.onnx` on VNNI hosts, 119MB) |
+| HuggingFace Repo    | cross-encoder/mmarco-mMiniLMv2-L12-H384-v1                                                                     |
+| Type                | Cross-encoder reranker (XLM-RoBERTa, one relevance logit)                                                      |
+| Size                | 12 layers, 118M parameters, of which 96M are the 250k-token vocabulary                                         |
+| Max sequence length | 512 tokens, the model's own limit, enforced via `MAX_SEQUENCE_LENGTH`                                          |
+| Storage             | `server/models/cross-encoder/mmarco-mMiniLMv2-L12-H384-v1/`                                                    |
 
 It is trained on mMARCO, the machine-translated multilingual MS MARCO, and is genuinely multilingual: a 250k-token sentencepiece vocabulary shared across languages, which is also where most of the parameter count goes.
 
@@ -173,7 +173,9 @@ The model it replaced, `jina-reranker-v1-tiny-en`, was chosen on the belief that
 
 ### Choosing the Quantized Export
 
-The repository ships one build per CPU kernel family from the same weights: `qint8_arm64`, `qint8_avx512`, `qint8_avx512_vnni` and `quint8_avx2`. `quint8_avx2` is the one used, because unsigned activations sidestep the signed-int8 saturation that x64 without VNNI otherwise has to work around, and it measured no slower than the arm64 build when run on arm64. The `qint8_arm64` and `qint8_avx512` builds are bit-identical in output and score 0.8039, marginally above `quint8_avx2`, but that margin is inside the noise of a 240-query set and does not buy predictable behaviour on hosts whose instruction set cannot be known in advance.
+The repository ships one build per CPU kernel family from the same weights: `qint8_arm64`, `qint8_avx512`, `qint8_avx512_vnni` and `quint8_avx2`. `quint8_avx2` is the portable default, because unsigned activations sidestep the signed-int8 saturation that x64 without VNNI otherwise has to work around, and it measured no slower than the arm64 build when run on arm64. The `qint8_arm64` and `qint8_avx512` builds are bit-identical in output and score 0.8039, marginally above `quint8_avx2`, but that margin is inside the noise of a 240-query set and does not buy predictable behaviour on hosts whose instruction set cannot be known in advance.
+
+On a host whose instruction set can be known in advance, the choice is made at startup: `selectModelFile()` reads the CPU flags from `/proc/cpuinfo` and picks `qint8_avx512_vnni` on a Linux x64 host that reports `avx512_vnni` on every processor's flags line (the intersection, because on a hybrid CPU an E-core without the instruction would take a `SIGILL`), where the signed-int8 kernels have the saturating multiply-add they need and the saturation workaround is not paid for. Measured on a 2-core pin of a Ryzen AI MAX+ 395, the VNNI build scored a 17-candidate text pool in 138ms against the portable build's 182ms, a 1.32x speedup on identical weights, with scores within noise (0.8039 against 0.7992 nDCG@10 on the MIRACL set). The Space runs on two shared vCPUs: the absolute milliseconds do not transfer, the ratio is what is claimed. Hosts without the flag, and anything that is not Linux x64, load the portable build exactly as before; the startup log line names the file that was chosen.
 
 Quantization costs nothing measurable here: 0.7992 against 0.7973 nDCG@10 for the fp32 export, for a quarter of the download and half the latency. That is a different conclusion from the one that held for the previous 33M-parameter model, where the `q8` export did measurably degrade ranking; the loss does not carry over to a model with 12 layers and a large embedding table.
 
@@ -181,7 +183,7 @@ The `O4` (fp16) export loads without complaint but is slower than fp32 on CPU, s
 
 ## Testing
 
-`server/rerankerService.test.ts` runs in the default suite and covers Unicode sanitization, token truncation, and that every document is sent as its own unpadded row, with the ONNX Runtime session, the tokenizer, and the model download all mocked. `server/rerankerServiceHook.test.ts` covers startup error handling and shutdown cleanup with the service dependencies mocked.
+`server/rerankerService.test.ts` runs in the default suite and covers Unicode sanitization, token truncation, which quantized build the host CPU's flags select, and that every document is sent as its own unpadded row, with the ONNX Runtime session, the tokenizer, and the model download all mocked. `server/rerankerServiceHook.test.ts` covers startup error handling and shutdown cleanup with the service dependencies mocked.
 
 `server/rerankerService.integration.test.ts` loads the real model and asserts ranking quality against English and Portuguese fixtures. It downloads ~136MB, the model plus a 17MB sentencepiece tokenizer, so it is excluded from the default suite:
 
