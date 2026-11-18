@@ -201,12 +201,12 @@ describe("textGenerationWithHorde", () => {
     };
 
     function routeHordeFetch({
-      workerModels,
+      workers,
       monthStats,
       statsFails = false,
       statusResponder,
     }: {
-      workerModels: Array<{ name: string; count: number }>;
+      workers: Array<{ models: string[]; max_length: number }>;
       monthStats?: Record<string, number>;
       statsFails?: boolean;
       statusResponder: (pollIndex: number) => unknown;
@@ -215,17 +215,8 @@ describe("textGenerationWithHorde", () => {
       let pollCounter = 0;
       mockFetch.mockImplementation(
         async (url: string, init?: { method?: string; body?: string }) => {
-          if (url.includes("/status/models")) {
-            return jsonResponse(
-              workerModels.map((model) => ({
-                performance: 1,
-                queued: 0,
-                jobs: 0,
-                eta: 0,
-                type: "text",
-                ...model,
-              })),
-            );
+          if (url.includes("/workers")) {
+            return jsonResponse(workers);
           }
           if (url.includes("/stats/text/models")) {
             return statsFails
@@ -255,14 +246,11 @@ describe("textGenerationWithHorde", () => {
 
     it("asks for the models with workers ranked by requests this month", async () => {
       routeHordeFetch({
-        workerModels: [
-          { name: "m-a", count: 1 },
-          { name: "m-b", count: 2 },
-          { name: "m-c", count: 1 },
-          { name: "m-d", count: 1 },
-          { name: "m-e", count: 1 },
-          { name: "m-f", count: 1 },
-          { name: "m-offline", count: 0 },
+        workers: [
+          { models: ["m-a", "m-b"], max_length: 1024 },
+          { models: ["m-b", "m-c"], max_length: 1024 },
+          { models: ["m-d"], max_length: 1024 },
+          { models: ["m-e", "m-f"], max_length: 2048 },
         ],
         monthStats: {
           "m-a": 400,
@@ -288,9 +276,31 @@ describe("textGenerationWithHorde", () => {
       }
     });
 
+    it("skips models whose workers all write fewer than 1024 tokens", async () => {
+      routeHordeFetch({
+        workers: [
+          { models: ["m-short"], max_length: 512 },
+          { models: ["m-mixed"], max_length: 256 },
+          { models: ["m-mixed"], max_length: 1024 },
+          { models: ["m-long"], max_length: 4096 },
+        ],
+        monthStats: { "m-short": 900, "m-mixed": 800, "m-long": 700 },
+        statusResponder: () => doneResponse,
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await generateTextWithHorde();
+
+      for (const body of generationRequestBodies()) {
+        expect(body.models).toEqual(["m-mixed", "m-long"]);
+      }
+    });
+
     it("falls back to any available model when the statistics fetch fails", async () => {
       routeHordeFetch({
-        workerModels: [{ name: "m-a", count: 1 }],
+        workers: [{ models: ["m-a"], max_length: 1024 }],
         statsFails: true,
         statusResponder: () => doneResponse,
       });
@@ -312,7 +322,7 @@ describe("textGenerationWithHorde", () => {
 
     it("retries with any available model when the top models cannot take the job", async () => {
       routeHordeFetch({
-        workerModels: [{ name: "m-a", count: 1 }],
+        workers: [{ models: ["m-a"], max_length: 1024 }],
         monthStats: { "m-a": 10 },
         statusResponder: (pollIndex) =>
           pollIndex < 2 ? { done: true, is_possible: false } : doneResponse,
@@ -341,7 +351,7 @@ describe("textGenerationWithHorde", () => {
 
     it("does not retry when the generation faults", async () => {
       routeHordeFetch({
-        workerModels: [{ name: "m-a", count: 1 }],
+        workers: [{ models: ["m-a"], max_length: 1024 }],
         monthStats: { "m-a": 10 },
         statusResponder: () => ({ done: true, faulted: true }),
       });
@@ -357,7 +367,7 @@ describe("textGenerationWithHorde", () => {
 
     it("reuses the cached ranking for the next generation", async () => {
       routeHordeFetch({
-        workerModels: [{ name: "m-a", count: 1 }],
+        workers: [{ models: ["m-a"], max_length: 1024 }],
         monthStats: { "m-a": 10 },
         statusResponder: () => doneResponse,
       });
@@ -370,7 +380,7 @@ describe("textGenerationWithHorde", () => {
 
       const rankingFetches = mockFetch.mock.calls.filter(
         ([url]) =>
-          String(url).includes("/status/models") ||
+          String(url).includes("/workers") ||
           String(url).includes("/stats/text/models"),
       );
       expect(rankingFetches).toHaveLength(2);
@@ -384,7 +394,7 @@ describe("textGenerationWithHorde", () => {
 
     it("refetches the ranking after the cache expires", async () => {
       routeHordeFetch({
-        workerModels: [{ name: "m-a", count: 1 }],
+        workers: [{ models: ["m-a"], max_length: 1024 }],
         monthStats: { "m-a": 10 },
         statusResponder: () => doneResponse,
       });
@@ -400,7 +410,7 @@ describe("textGenerationWithHorde", () => {
 
       const rankingFetches = mockFetch.mock.calls.filter(
         ([url]) =>
-          String(url).includes("/status/models") ||
+          String(url).includes("/workers") ||
           String(url).includes("/stats/text/models"),
       );
       expect(rankingFetches).toHaveLength(4);

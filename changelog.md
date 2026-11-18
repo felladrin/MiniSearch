@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-18
+
+- With the AI Horde engine and no model selected, the automatic pick now counts only models with at least one online worker that writes 1024 tokens or more. Models served only by workers capped at 256 or 512 tokens no longer make the top five.
+
 ## 2026-11-17
 
 - With the AI Horde engine and no model selected, the request no longer lands on a random model: it now goes to the five text models with online workers that have the most requests this month, so answers come from the models the community actually uses. The ranking refreshes every 5 minutes. If it cannot be fetched, or none of those models can take the job, the request falls back to any available model, as before.

@@ -122,7 +122,7 @@ Uses aihorde.net, a distributed volunteer GPU network.
 
 **How It Works:**
 
-1. With no model selected, the five text models with online workers that have the most requests this month are picked (cached for 5 minutes)
+1. With no model selected, the five text models with the most requests this month are picked, counting only models with an online worker that writes at least 1024 tokens (cached for 5 minutes)
 2. Request sent to AI Horde API
 3. Distributed to volunteer workers
 4. Multiple workers may process in parallel
