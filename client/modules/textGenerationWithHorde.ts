@@ -38,6 +38,11 @@ interface HordeModelInfo {
   count: number;
 }
 
+interface HordeWorkerInfo {
+  models: string[];
+  max_length: number;
+}
+
 interface HordeModelStatsResponse {
   month?: Record<string, number>;
 }
@@ -69,6 +74,10 @@ export const aiHordeDefaultApiKey = "0000000000";
 
 // How many of the most-requested models an unpinned request asks the horde for.
 const TOP_HORDE_MODEL_COUNT = 5;
+
+// A model whose workers all stop short of this cuts the answer off, so an
+// unpinned request never goes to it.
+const MIN_HORDE_MODEL_RESPONSE_TOKENS = 1024;
 
 // The monthly-request statistics response is large, so the ranking is reused for a while.
 const TOP_HORDE_MODEL_CACHE_MS = 5 * 60 * 1000;
@@ -267,6 +276,25 @@ export async function fetchHordeModels(
   return response.json();
 }
 
+async function fetchHordeTextWorkers(
+  signal?: AbortSignal,
+): Promise<HordeWorkerInfo[]> {
+  const response = await fetch(buildHordeUrl("/workers?type=text"), {
+    method: "GET",
+    signal,
+    headers: {
+      [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
+      [HTTP_HEADERS.ACCEPT]: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch AI Horde workers");
+  }
+
+  return response.json();
+}
+
 async function fetchHordeModelMonthlyRequests(
   signal?: AbortSignal,
 ): Promise<Record<string, number>> {
@@ -295,27 +323,31 @@ async function fetchHordeModelMonthlyRequests(
 let topHordeModelsCache: { modelNames: string[]; expiresAt: number } | null =
   null;
 
-// The text models with online workers, ranked by requests this month: the
-// community's own vote on which models are worth using. Cached because the
-// statistics response is large and the ranking shifts slowly.
+// The text models with an online worker that writes at least
+// MIN_HORDE_MODEL_RESPONSE_TOKENS, ranked by requests this month: the
+// community's own vote on which models are worth using. The horde never hands
+// a job to a worker whose max_length is below the request's, so one capable
+// worker is enough. Cached because the statistics response is large and the
+// ranking shifts slowly.
 async function getTopHordeModels(): Promise<string[]> {
   if (topHordeModelsCache && Date.now() < topHordeModelsCache.expiresAt) {
     return topHordeModelsCache.modelNames;
   }
 
   const signal = AbortSignal.timeout(HORDE_RANKING_FETCH_TIMEOUT_MS);
-  const [models, monthlyRequests] = await Promise.all([
-    fetchHordeModels(signal),
+  const [workers, monthlyRequests] = await Promise.all([
+    fetchHordeTextWorkers(signal),
     fetchHordeModelMonthlyRequests(signal),
   ]);
 
-  const modelNames = models
-    .filter((model) => model.count > 0)
-    .sort(
-      (a, b) => (monthlyRequests[b.name] ?? 0) - (monthlyRequests[a.name] ?? 0),
-    )
-    .slice(0, TOP_HORDE_MODEL_COUNT)
-    .map((model) => model.name);
+  const capableModelNames = new Set(
+    workers
+      .filter((worker) => worker.max_length >= MIN_HORDE_MODEL_RESPONSE_TOKENS)
+      .flatMap((worker) => worker.models),
+  );
+  const modelNames = [...capableModelNames]
+    .sort((a, b) => (monthlyRequests[b] ?? 0) - (monthlyRequests[a] ?? 0))
+    .slice(0, TOP_HORDE_MODEL_COUNT);
 
   topHordeModelsCache = {
     modelNames,
