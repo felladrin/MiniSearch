@@ -41,6 +41,15 @@ The read is started when the text results are in and awaited at the very end of
 `startTextSearch`, so the AI answer waits for it while the rendered results,
 the image search, and the history write all carry on.
 
+A follow-up question reads the pages behind its own new results too, through
+`readFollowUpPageContents` (`client/modules/chatHelpers.ts`), because a follow-up
+search often returns pages the first answer never saw. The pages it reads merge
+into the `pageContents` map by URL like the first read's, so a result both
+searches hold keeps one entry, with the excerpt picked for the follow-up's
+query, and a newer search that takes over while the read is in flight drops it.
+Like the first read, it starts when the text results are in and is awaited last,
+so the follow-up's image refresh does not wait for it.
+
 ## Prompt Shape
 
 ```

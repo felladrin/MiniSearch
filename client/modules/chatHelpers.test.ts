@@ -12,10 +12,15 @@ vi.mock("./history", () => ({
   updateSearchResults: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("./pubSub", () => ({
+  getPageContents: vi.fn(() => ({})),
   updateImageSearchResults: vi.fn(),
   updateLlmTextSearchResults: vi.fn(),
+  updatePageContents: vi.fn(),
   updateTextSearchResults: vi.fn(),
   updateTextSearchStale: vi.fn(),
+}));
+vi.mock("./pageContent", () => ({
+  fetchPageContents: vi.fn(() => Promise.resolve({})),
 }));
 vi.mock("./relatedSearchQuery", () => ({
   generateRelatedSearchQuery: vi.fn(() => Promise.resolve("")),
@@ -34,9 +39,12 @@ import {
   runFollowUpSearch,
 } from "./chatHelpers";
 import { saveChatMessageForQuery } from "./history";
+import { fetchPageContents } from "./pageContent";
 import {
+  getPageContents,
   updateImageSearchResults,
   updateLlmTextSearchResults,
+  updatePageContents,
   updateTextSearchResults,
   updateTextSearchStale,
 } from "./pubSub";
@@ -50,6 +58,9 @@ const mockUpdateText = vi.mocked(updateTextSearchResults);
 const mockUpdateImage = vi.mocked(updateImageSearchResults);
 const mockUpdateLlmText = vi.mocked(updateLlmTextSearchResults);
 const mockUpdateTextStale = vi.mocked(updateTextSearchStale);
+const mockFetchPageContents = vi.mocked(fetchPageContents);
+const mockGetPageContents = vi.mocked(getPageContents);
+const mockUpdatePageContents = vi.mocked(updatePageContents);
 
 describe("refreshTextSearchResults", () => {
   it("deduplicates by URL and appends fresh results", async () => {
@@ -154,9 +165,83 @@ describe("runFollowUpSearch", () => {
     ({
       enableTextSearch: true,
       enableImageSearch: true,
+      enablePageContentFetch: true,
       searchResultsLimit: 10,
       ...overrides,
     }) as unknown as Parameters<typeof runFollowUpSearch>[2];
+
+  it("reads the pages behind the fresh results and keeps the ones already read", async () => {
+    mockSearchText.mockResolvedValueOnce({
+      results: [
+        ["Title", "snippet", "https://new.com"],
+        ["Other", "snippet", "https://other.com"],
+      ],
+      stale: false,
+    });
+    mockFetchPageContents.mockResolvedValueOnce({
+      "https://new.com": "page text",
+    });
+    mockGetPageContents.mockReturnValueOnce({ "https://old.com": "old text" });
+
+    await runFollowUpSearch(
+      [{ role: "user", content: "hello" }],
+      "hello",
+      makeSettings(),
+      [],
+      [],
+    );
+
+    expect(mockFetchPageContents).toHaveBeenCalledWith("hello", [
+      "https://new.com",
+      "https://other.com",
+    ]);
+    expect(mockUpdatePageContents).toHaveBeenCalledWith({
+      "https://old.com": "old text",
+      "https://new.com": "page text",
+    });
+  });
+
+  it("does not read pages when page content fetching is disabled", async () => {
+    mockSearchText.mockResolvedValueOnce({
+      results: [["Title", "snippet", "https://new.com"]],
+      stale: false,
+    });
+
+    await runFollowUpSearch(
+      [{ role: "user", content: "hello" }],
+      "hello",
+      makeSettings({ enablePageContentFetch: false }),
+      [],
+      [],
+    );
+
+    expect(mockFetchPageContents).not.toHaveBeenCalled();
+  });
+
+  it("starts the image refresh without waiting for the page read", async () => {
+    mockSearchText.mockResolvedValueOnce({
+      results: [["Title", "snippet", "https://new.com"]],
+      stale: false,
+    });
+    let finishPageRead: (contents: Record<string, string>) => void = () => {};
+    mockFetchPageContents.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishPageRead = resolve;
+      }),
+    );
+
+    const followUpSearch = runFollowUpSearch(
+      [{ role: "user", content: "hello" }],
+      "hello",
+      makeSettings(),
+      [],
+      [],
+    );
+
+    await vi.waitFor(() => expect(mockSearchImages).toHaveBeenCalled());
+    finishPageRead({});
+    await followUpSearch;
+  });
 
   it("refreshes text results when enabled", async () => {
     mockSearchText.mockResolvedValueOnce({
