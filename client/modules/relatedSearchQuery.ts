@@ -1,5 +1,5 @@
 import { addLogEntry } from "./logEntries";
-import { generateChatResponse } from "./textGeneration";
+import { generateReplyToMessages } from "./textGeneration";
 import type { ChatMessage } from "./types";
 
 export async function generateRelatedSearchQuery(
@@ -18,12 +18,14 @@ export async function generateRelatedSearchQuery(
 
 ${question}
 
+The query must make sense on its own, without the rest of the conversation: if the question refers to something mentioned earlier, name that thing in the query.
+
 Ensure the generated web search query is in the same language as the question above.
 
 Respond with only the search query text, no quotes or additional text.`,
     };
 
-    const raw = await generateChatResponse(prompt, () => {});
+    const raw = await generateReplyToMessages(prompt);
 
     let webSearchQuery = raw.split("\n").reverse()[0]?.trim() ?? "";
 

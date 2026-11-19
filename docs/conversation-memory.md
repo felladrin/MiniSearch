@@ -22,6 +22,7 @@ Long-running chats can easily exceed the model context window. MiniSearch addres
 ## Settings & Extensibility
 
 - All inference types share the same summarization contract—no provider-specific logic beyond selecting the backend module at runtime.
+- The follow-up search query (`generateRelatedSearchQuery`) uses the same 75% budget through `generateReplyToMessages`, but not the rolling summary: in a conversation longer than the budget, a subject named only in the dropped turns does not reach the query.
 - The 75%-of-4096 conversation-memory budget in `generateChatResponse` is hardcoded against `defaultContextSize` (4096) and does not currently scale with the user-configurable `openAiContextLength` setting; that setting only caps the `max_tokens` of the outgoing API request, a separate concern from how many prior chat turns are kept in memory.
 - Future settings (e.g., toggling memory or adjusting the 75% ratio) should hook into the same budgeting helpers to keep behavior predictable.
 
