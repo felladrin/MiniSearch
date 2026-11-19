@@ -46,14 +46,13 @@ function countWords(text: string, script: Script): number {
 }
 
 /**
- * Brand names make Latin letters outnumber the Chinese ones in
- * "那 iPhone Pro Max 呢", so another script with two words or more wins over
- * Latin. Lone letters are symbols in an English question ("α and β error").
+ * Brand names make Latin letters outnumber the Chinese ones in "iPhone呢", so
+ * any other script with a word wins over Latin. Lone letters are symbols in
+ * an English question ("α and β error").
  */
 function questionScript(question: string): Script | undefined {
-  const latinLetters = countLetters(question, "Latin");
   let script: Script | undefined;
-  let most = latinLetters > 0 ? 1 : 0;
+  let most = 0;
   for (const candidate of SCRIPT_NAMES) {
     const count = countWords(question, candidate);
     if (candidate !== "Latin" && count > most) {
@@ -61,19 +60,22 @@ function questionScript(question: string): Script | undefined {
       most = count;
     }
   }
-  return script ?? (latinLetters > 0 ? "Latin" : undefined);
+  return script ?? (countLetters(question, "Latin") > 0 ? "Latin" : undefined);
 }
 
 /**
  * Latin letters are allowed anywhere, because correct Chinese queries carry
  * brand names ("iPhone价格"). Another script the question does not use marks
  * a drift, even next to the right one ("iPhone قیمت大概多少钱"), from three
- * letters on: one or two are a name or a symbol ("雷军", "Ω").
+ * letters on: one or two are a short name or a symbol ("Ω"). A Latin
+ * question has no language to translate into, so a native name next to its
+ * Latin words is kept ("Tencent founder 马化腾").
  */
 function isWrittenLike(query: string, question: string): boolean {
   const script = questionScript(question);
   if (!script) return true;
   if (countLetters(query, script) === 0) return false;
+  if (script === "Latin") return true;
   return SCRIPT_NAMES.every(
     (other) =>
       other === "Latin" ||

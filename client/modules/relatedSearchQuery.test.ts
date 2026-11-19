@@ -104,15 +104,26 @@ describe("generateRelatedSearchQuery", () => {
     expect(mockGenerateReplyToMessages).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps an English query that adds a name in another script", async () => {
-    mockGenerateReplyToMessages.mockResolvedValueOnce("Xiaomi founder 雷军");
+  it.each([["Xiaomi founder 雷军"], ["Tencent founder 马化腾"]])(
+    "keeps an English query that adds a native name: %s",
+    async (reply) => {
+      mockGenerateReplyToMessages.mockResolvedValueOnce(reply);
+
+      expect(
+        await generateRelatedSearchQuery([
+          { role: "user", content: "who founded it" },
+        ]),
+      ).toBe(reply);
+      expect(mockGenerateReplyToMessages).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("keeps a Chinese query for a question that is mostly a brand name", async () => {
+    mockGenerateReplyToMessages.mockResolvedValueOnce("苹果手机价格");
 
     expect(
-      await generateRelatedSearchQuery([
-        { role: "user", content: "who founded it" },
-      ]),
-    ).toBe("Xiaomi founder 雷军");
-    expect(mockGenerateReplyToMessages).toHaveBeenCalledTimes(1);
+      await generateRelatedSearchQuery([{ role: "user", content: "iPhone呢" }]),
+    ).toBe("苹果手机价格");
   });
 
   it("keeps a Japanese query that adds kanji to a question in kana", async () => {
