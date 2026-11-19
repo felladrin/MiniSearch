@@ -276,26 +276,75 @@ export function normalizeRelativeDates(
     selected.push(hit);
   }
 
-  if (selected.length === 0) return unchanged;
+  return appendAnchors(
+    query,
+    selected.map(({ phrase, anchor }) => ({ phrase, anchor })),
+    options?.maxLength,
+  );
+}
 
-  const replacements = selected.map(({ phrase, anchor }) => ({
-    phrase,
-    anchor,
-  }));
-
+function appendAnchors(
+  query: string,
+  replacements: RelativeDateReplacement[],
+  maxLength = Number.POSITIVE_INFINITY,
+): { searchQuery: string; replacements: RelativeDateReplacement[] } {
   // The search endpoint rejects an over-long query, so an anchor that would
   // push it past the limit is dropped rather than turning a search into a
   // failed request. No anchor left over means the query goes out untouched.
-  const limit = options?.maxLength ?? Number.POSITIVE_INFINITY;
   const appended: RelativeDateReplacement[] = [];
   let searchQuery = query.trimEnd();
   for (const replacement of replacements) {
     const candidate = `${searchQuery} ${replacement.anchor}`;
-    if (candidate.length > limit) break;
+    if (candidate.length > maxLength) break;
     searchQuery = candidate;
     appended.push(replacement);
   }
-  if (appended.length === 0) return unchanged;
+  if (appended.length === 0) return { searchQuery: query, replacements: [] };
 
   return { searchQuery, replacements: appended };
+}
+
+/**
+ * A year a model writes into a query, alone, as a range, after a month name,
+ * or glued to Chinese text: "2023", "2023-2025", "November 2026", "2026年11月".
+ */
+const WRITTEN_DATE = new RegExp(
+  `(?:\\b(?:${MONTH_NAMES.join("|")})\\s+)?(?<!\\d)(?:19|20)\\d{2}(?:\\s*[-–]\\s*(?:19|20)\\d{2})?(?!\\d)(?:年(?:\\d{1,2}月)?)?`,
+  "gi",
+);
+
+/**
+ * Anchors the relative dates of the question the user typed onto the query a
+ * model wrote for it. The model often replaces "last year" with a year of its
+ * own, and a wrong one ("2026" on 2026-11-19), which leaves nothing for the
+ * anchor to resolve. So when the question has a relative date, the dates the
+ * model wrote and the user did not are dropped, and the question's anchors
+ * are appended.
+ */
+export function normalizeFollowUpDates(
+  query: string,
+  question: string,
+  asOfDate: Date,
+  options?: { maxLength?: number },
+): { searchQuery: string; replacements: RelativeDateReplacement[] } {
+  const { replacements } = normalizeRelativeDates(question, asOfDate);
+  if (replacements.length === 0)
+    return normalizeRelativeDates(query, asOfDate, options);
+
+  const typedYears = question.match(/(?<!\d)(?:19|20)\d{2}(?!\d)/g) ?? [];
+  const queryWithoutModelDates = query
+    .replace(WRITTEN_DATE, (date) =>
+      typedYears.some((year) => date.includes(year)) ? date : "",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return appendAnchors(
+    queryWithoutModelDates,
+    replacements.filter(
+      ({ anchor }) =>
+        !queryWithoutModelDates.toLowerCase().includes(anchor.toLowerCase()),
+    ),
+    options?.maxLength,
+  );
 }

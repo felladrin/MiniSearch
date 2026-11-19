@@ -287,6 +287,32 @@ describe("runFollowUpSearch", () => {
     expect(mockSearchImages).toHaveBeenCalledWith(anchoredQuery, 10);
   });
 
+  it("replaces the year the model wrote with the one the question means", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-19T12:00:00Z"));
+    mockGenerateRelatedSearchQuery.mockResolvedValueOnce(
+      "who won world series 2026",
+    );
+    mockSearchText.mockResolvedValueOnce({ results: [], stale: false });
+
+    try {
+      await runFollowUpSearch(
+        [{ role: "user", content: "who won it last year" }],
+        "who won it last year",
+        makeSettings(),
+        [],
+        [],
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(mockSearchText).toHaveBeenCalledWith(
+      "who won world series 2025",
+      10,
+    );
+  });
+
   it("refreshes text results when enabled", async () => {
     mockSearchText.mockResolvedValueOnce({
       results: [["Title", "snippet", "https://new.com"]],
