@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { normalizeRelativeDates } from "./relativeDates";
+import {
+  normalizeFollowUpDates,
+  normalizeRelativeDates,
+} from "./relativeDates";
 
 /** 3 November 2026, midday. Every expectation below is relative to this. */
 const AS_OF = new Date(2026, 10, 3, 12);
@@ -241,5 +244,88 @@ describe("normalizeRelativeDates", () => {
     expect(searchQuery.endsWith("2027")).toBe(true);
     expect(searchQuery).not.toContain("December 2026");
     expect(searchQuery.length).toBeLessThanOrEqual(2000);
+  });
+});
+
+describe("normalizeFollowUpDates", () => {
+  it.each([
+    [
+      "who won it last year",
+      "who won world series 2026",
+      "who won world series 2025",
+    ],
+    [
+      "what comes out next month",
+      "Disney Plus new releases November 2026",
+      "Disney Plus new releases December 2026",
+    ],
+    [
+      "what comes out next month",
+      "disney plus new releases november 2026",
+      "disney plus new releases December 2026",
+    ],
+    ["明年的呢", "苹果 2025 新手机 发布时间", "苹果 新手机 发布时间 2027年"],
+    ["明年的呢", "iPhone 16发布时间 2027", "iPhone 16发布时间 2027年"],
+    ["明年的呢", "苹果 2026年11月 发布会", "苹果 发布会 2027年"],
+    ["明年的呢", "2025 年 iPhone 发布日期新闻", "iPhone 发布日期新闻 2027年"],
+    [
+      "what happened last year",
+      "WWE Crown Jewel incidents 2023-2025",
+      "WWE Crown Jewel incidents 2025",
+    ],
+    [
+      "who won it last year",
+      "Premier League winner 2024-25",
+      "Premier League winner 2025",
+    ],
+  ])("anchors %s onto %s", (question, query, searchQuery) => {
+    expect(normalizeFollowUpDates(query, [question], AS_OF).searchQuery).toBe(
+      searchQuery,
+    );
+  });
+
+  it("keeps a year the user typed in the question", () => {
+    expect(
+      normalizeFollowUpDates(
+        "2024 model vs 2023 model",
+        ["is the 2024 model better than last year's"],
+        AS_OF,
+      ).searchQuery,
+    ).toBe("2024 model vs model 2025");
+  });
+
+  it("keeps a year the user typed in an earlier message", () => {
+    expect(
+      normalizeFollowUpDates(
+        "Cyberpunk 2077 sales 2026",
+        ["cyberpunk 2077", "how did it sell last year"],
+        AS_OF,
+      ).searchQuery,
+    ).toBe("Cyberpunk 2077 sales 2025");
+  });
+
+  it("keeps a number after a spaced dash, which is not a season", () => {
+    expect(
+      normalizeFollowUpDates(
+        "best TVs 2026 - 55 inch",
+        ["what were the best TVs last year"],
+        AS_OF,
+      ).searchQuery,
+    ).toBe("best TVs - 55 inch 2025");
+  });
+
+  it("leaves the model's dates alone when the question has no relative date", () => {
+    expect(
+      normalizeFollowUpDates("world series 2023 winner", ["who won it"], AS_OF)
+        .searchQuery,
+    ).toBe("world series 2023 winner");
+  });
+
+  it("drops an anchor that would pass the length limit", () => {
+    expect(
+      normalizeFollowUpDates("who won 2026", ["who won it last year"], AS_OF, {
+        maxLength: 9,
+      }).searchQuery,
+    ).toBe("who won");
   });
 });
