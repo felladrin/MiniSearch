@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-19
+
+- When no voice is chosen in Voice Settings, the local engine now picks the best-sounding voice of the answer's language instead of the first one in the catalogue: medium quality first, then low, then x-low. Portuguese, for example, now gets `pt_BR-faber-medium` where it used to get `pt_BR-edresson-low`, at the same 63 MB download. High-quality voices are picked only when a language publishes nothing else, since they cost up to 137 MB against the 63 MB of a medium one. And when the answer is in the browser's language, a voice of the browser's region now wins among the ones of the same quality, so an `en-US` browser gets an American voice.
+
 ## 2026-11-18
 
 - Search results whose link no browser can open are now dropped, from SearXNG and from the fallback providers alike: links on a host without a domain, and links that are not `http` or `https`. Brave Search now sends its result links through encrypted redirects, which SearXNG's Brave engine passes on as `http:///go/v1/...`. Those results reached the list with "go" as the site name, and the AI response cited them as sources. They are dropped before the result limit applies, so they do not take the place of a usable result, and the server log names the engine that sent them.

@@ -249,9 +249,30 @@ export async function listVoices(
 }
 
 /**
+ * Quality order for the automatic pick: `medium` is the sweet spot of quality
+ * and download size, so `high` voices (up to twice as big) only serve
+ * languages that publish nothing else.
+ */
+const QUALITY_RANK: Record<Voice["quality"], number> = {
+  medium: 0,
+  low: 1,
+  x_low: 2,
+  high: 3,
+};
+
+/** `en-US` and `en_US` both give `us`; a bare `en` gives the empty string. */
+function regionOf(code: string): string {
+  const parts = code.replace("_", "-").split("-");
+  return (parts[1] ?? "").toLowerCase();
+}
+
+/**
  * Resolves the stored setting to a voice the catalogue actually publishes, or
  * null when there is none. A stored voice that has since been removed falls
- * back to the language match instead of failing at download time.
+ * back to the language match instead of failing at download time. That match
+ * prefers `medium` quality over `low` and `x_low`, and, when the answer is in
+ * the browser's language, a voice of the browser's region over one of another
+ * region at the same quality.
  */
 async function resolveLocalVoiceId(
   storedVoiceId: string,
@@ -268,10 +289,20 @@ async function resolveLocalVoiceId(
   }
 
   const wanted = primaryLanguage(languageCode);
-  const match = catalogue.find(
+  const wantedRegion = regionOf(languageCode);
+  const matches = catalogue.filter(
     (voice) => primaryLanguage(voice.language.code) === wanted,
   );
-  return match?.key ?? null;
+  // The sort is stable, so the catalogue order breaks remaining ties. With no
+  // region in the answer's language, every voice mismatches it alike.
+  const regionMismatch = (voice: Voice) =>
+    regionOf(voice.language.code) === wantedRegion ? 0 : 1;
+  matches.sort(
+    (a, b) =>
+      QUALITY_RANK[a.quality] - QUALITY_RANK[b.quality] ||
+      regionMismatch(a) - regionMismatch(b),
+  );
+  return matches[0]?.key ?? null;
 }
 
 let workerFactory = () =>

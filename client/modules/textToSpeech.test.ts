@@ -41,6 +41,51 @@ const englishVoice = {
   language: { code: "en_US", name_english: "English" },
 };
 
+const englishLowVoice = {
+  key: "en_GB-alan-low",
+  name: "alan",
+  quality: "low",
+  language: { code: "en_GB", name_english: "English" },
+};
+
+const englishMediumVoice = {
+  key: "en_GB-alan-medium",
+  name: "alan",
+  quality: "medium",
+  language: { code: "en_GB", name_english: "English" },
+};
+
+const americanMediumVoice = {
+  key: "en_US-amy-medium",
+  name: "amy",
+  quality: "medium",
+  language: { code: "en_US", name_english: "English" },
+};
+
+const portugueseFromPortugalVoice = {
+  key: "pt_PT-tugão-medium",
+  name: "tugão",
+  quality: "medium",
+  language: { code: "pt_PT", name_english: "Portuguese" },
+};
+
+const vietnameseLowVoice = {
+  key: "vi_VN-25hours_single-low",
+  name: "25hours_single",
+  quality: "low",
+  language: { code: "vi_VN", name_english: "Vietnamese" },
+};
+
+const vietnameseXLowVoice = {
+  key: "vi_VN-vivos-x_low",
+  name: "vivos",
+  quality: "x_low",
+  language: { code: "vi_VN", name_english: "Vietnamese" },
+};
+
+const vietnameseAnswer =
+  "Tháp Eiffel được xây dựng vào năm 1889 cho Hội chợ Thế giới ở Paris và cao khoảng 330 mét.";
+
 const portugueseVoice = {
   key: "pt_BR-faber-medium",
   name: "faber",
@@ -386,6 +431,65 @@ describe("speak", () => {
     await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
 
     expect(worker.sent[0].voiceId).toBe("pt_BR-faber-medium");
+  });
+
+  it("prefers a medium voice over a low one of the same language", async () => {
+    mockVoices.mockResolvedValue([englishLowVoice, englishMediumVoice]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak("Hello there.");
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("en_GB-alan-medium");
+  });
+
+  it("prefers a medium voice over a high one, which is a bigger download", async () => {
+    mockVoices.mockResolvedValue([englishVoice, englishMediumVoice]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak("Hello there.");
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("en_GB-alan-medium");
+  });
+
+  it("prefers the browser's region among voices of the same quality", async () => {
+    mockVoices.mockResolvedValue([englishMediumVoice, americanMediumVoice]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak("Hello there.");
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("en_US-amy-medium");
+  });
+
+  it("prefers a low voice over an x-low one of the same language", async () => {
+    vi.stubGlobal("navigator", { language: "vi-VN" });
+    mockVoices.mockResolvedValue([vietnameseXLowVoice, vietnameseLowVoice]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak(vietnameseAnswer);
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("vi_VN-25hours_single-low");
+  });
+
+  it("keeps the catalogue order when the answer's language has no region", async () => {
+    mockVoices.mockResolvedValue([
+      portugueseFromPortugalVoice,
+      portugueseVoice,
+    ]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak(portugueseAnswer);
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("pt_PT-tugão-medium");
   });
 
   it("keeps a chosen voice whatever the answer's language", async () => {
