@@ -31,13 +31,10 @@ Respond with only the search query text, no quotes or additional text.`,
 
     let webSearchQuery = raw.split("\n").reverse()[0]?.trim() ?? "";
 
-    if (webSearchQuery.startsWith('"') || webSearchQuery.startsWith("'")) {
-      webSearchQuery = webSearchQuery.slice(1);
-    }
-
-    if (webSearchQuery.endsWith('"') || webSearchQuery.endsWith("'")) {
-      webSearchQuery = webSearchQuery.slice(0, -1);
-    }
+    // Models also wrap the query in the quote marks of other languages.
+    webSearchQuery = webSearchQuery
+      .replace(/^["'“”‘’「」『』«»]/, "")
+      .replace(/["'“”‘’「」『』«»]$/, "");
 
     addLogEntry(`Generated follow-up search query: '${webSearchQuery}'`);
 

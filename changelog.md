@@ -12,6 +12,7 @@ Notable changes, grouped by date, most recent first.
 - A follow-up question with a relative date, such as "what comes out next month", now searches with the month and year written out ("December 2026"), as the first question already did, so the results match the right period.
 - When a search was still waiting for permission to download the in-browser model and a second one started (for example, by accepting the "Enable AI Responses?" prompt with AI responses already on), allowing the download loaded the model twice at the same time, and both answers failed with a file-lock error. Now only the newest search loads the model.
 - A follow-up question with a relative date ("who won it last year", "明年的呢") now keeps that date in its search query more often, so the date anchor turns it into the right year instead of the model writing a year itself ("2023" for last year). Measured with Gemma 3 4B in the browser on three such questions, three runs each: the relative date reached the anchor in 6 of 9 runs, against 3 of 9 before. When the model still writes the year itself, it can still be wrong.
+- The search query of a follow-up question no longer keeps the quote marks some models wrap it in (“ ”, 「 」, « »), as it already did with straight quotes.
 
 ## 2026-11-18
 

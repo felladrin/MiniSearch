@@ -54,6 +54,18 @@ describe("generateRelatedSearchQuery", () => {
     expect(messages[2].content).toContain("copy it word for word");
   });
 
+  it.each([
+    ["“Avengers: Doomsday release delay reasons”"],
+    ["「Avengers: Doomsday release delay reasons」"],
+    ["«Avengers: Doomsday release delay reasons»"],
+  ])("removes the quote marks around %s", async (reply) => {
+    mockGenerateReplyToMessages.mockResolvedValueOnce(reply);
+
+    expect(
+      await generateRelatedSearchQuery([{ role: "user", content: "why" }]),
+    ).toBe("Avengers: Doomsday release delay reasons");
+  });
+
   it("returns nothing when the generation fails", async () => {
     mockGenerateReplyToMessages.mockRejectedValueOnce(new Error("offline"));
 
