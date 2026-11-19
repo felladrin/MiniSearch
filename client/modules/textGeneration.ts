@@ -273,6 +273,10 @@ export async function searchAndRespond() {
     const settings = getSettings();
     if (needsModelDownloadGate()) {
       await canDownloadModels();
+      // Every search waiting here is released by the same allowance, and each
+      // would load its own copy of the model; two loads at once fail on the
+      // browser's file lock, so only the newest search goes on.
+      if (invocation !== searchInvocation) return;
       updateTextGenerationState("loadingModel");
     }
     const strategy = await getCurrentInferenceStrategy();

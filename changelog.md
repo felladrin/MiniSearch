@@ -10,6 +10,7 @@ Notable changes, grouped by date, most recent first.
 - The search query of a follow-up question now names what the question refers to: when the previous answer says Marvel moved Avengers: Doomsday to December 2026, "why did they delay the release" now searches for "Avengers: Doomsday release delay reasons" instead of a query that names nothing. The query is also written in the language of the question more often, because the model no longer sees the search results while writing it. Measured with Gemma 3 4B in the browser on seven conversations, three runs each: the query kept the subject in 21 of 21 runs (16 before) and the question's language in 20 of 21 (16 before).
 - The six search results an AI answer reads are now the six with the best relevance score, for the first question and for follow-ups. The result list still shows the search engine's first result at the top, but that result no longer takes one of the six places when its score is low.
 - A follow-up question with a relative date, such as "what comes out next month", now searches with the month and year written out ("December 2026"), as the first question already did, so the results match the right period.
+- When a search was still waiting for permission to download the in-browser model and a second one started (for example, by accepting the "Enable AI Responses?" prompt with AI responses already on), allowing the download loaded the model twice at the same time, and both answers failed with a file-lock error. Now only the newest search loads the model.
 
 ## 2026-11-18
 
