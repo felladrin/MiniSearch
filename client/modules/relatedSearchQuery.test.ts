@@ -92,6 +92,19 @@ describe("generateRelatedSearchQuery", () => {
     expect(messages[0].content).toContain("into Chinese");
   });
 
+  it("keeps an English query for a question with one Greek symbol", async () => {
+    mockGenerateReplyToMessages.mockResolvedValueOnce(
+      "beta blocker side effects",
+    );
+
+    expect(
+      await generateRelatedSearchQuery([
+        { role: "user", content: "what are the side effects of β-blockers" },
+      ]),
+    ).toBe("beta blocker side effects");
+    expect(mockGenerateReplyToMessages).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps an English query that adds a name in another script", async () => {
     mockGenerateReplyToMessages.mockResolvedValueOnce("Xiaomi founder 雷军");
 

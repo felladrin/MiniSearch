@@ -40,12 +40,13 @@ function countLetters(text: string, script: Script): number {
 
 /**
  * Brand names make Latin letters outnumber the Chinese ones in
- * "那 iPhone Pro Max 呢", so Latin is the question's script only when no
- * other script is there.
+ * "那 iPhone Pro Max 呢", so any other script with two letters or more wins
+ * over Latin. A single one is a symbol in an English question ("β-blockers").
  */
 function questionScript(question: string): Script | undefined {
+  const latinLetters = countLetters(question, "Latin");
   let script: Script | undefined;
-  let most = 0;
+  let most = latinLetters > 0 ? 1 : 0;
   for (const candidate of SCRIPT_NAMES) {
     const count = countLetters(question, candidate);
     if (candidate !== "Latin" && count > most) {
@@ -53,14 +54,14 @@ function questionScript(question: string): Script | undefined {
       most = count;
     }
   }
-  return script ?? (countLetters(question, "Latin") > 0 ? "Latin" : undefined);
+  return script ?? (latinLetters > 0 ? "Latin" : undefined);
 }
 
 /**
  * Latin letters are allowed anywhere, because correct Chinese queries carry
  * brand names ("iPhone价格"). Another script the question does not use marks
  * a drift, even next to the right one ("iPhone قیمت大概多少钱"), from three
- * letters on: one or two are a name or a symbol ("雷军", "β-blocker").
+ * letters on: one or two are a name or a symbol ("雷军", "Ω").
  */
 function isWrittenLike(query: string, question: string): boolean {
   const script = questionScript(question);
