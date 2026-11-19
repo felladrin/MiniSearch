@@ -113,7 +113,6 @@ const BLOCKED_RANGES = BLOCKED_CIDRS.map((cidr) => {
 });
 
 /**
- * Whether an IP literal falls inside a range MiniSearch refuses to fetch from.
  * Addresses that fail to parse are treated as blocked, since an address the
  * guard cannot reason about is not one it can clear.
  */
@@ -124,9 +123,6 @@ export function isBlockedAddress(address: string): boolean {
 }
 
 /**
- * Validates a URL the server is about to fetch on a client's behalf and
- * returns the address the fetch must connect to.
- *
  * Returning the vetted address is what makes pinning possible. A caller
  * that validates here and then dials the hostname again (a plain `fetch`)
  * re-resolves at connect time, and that second answer can differ from the
@@ -177,9 +173,6 @@ export async function resolvePublicUrlAndAddress(
 }
 
 /**
- * Validates a URL that the server is about to fetch on a client's behalf,
- * rejecting non-HTTP schemes and hosts that resolve into a blocked range.
- *
  * This check alone does not close the DNS-rebinding window: a caller that
  * fetches by hostname after validating here re-resolves at connect time,
  * so a name that answers publicly now and privately a moment later still

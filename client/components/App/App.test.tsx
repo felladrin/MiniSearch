@@ -106,8 +106,8 @@ describe("App", () => {
     );
   });
 
-  // Guards the fail-open regression: an unreachable /api/config used to look
-  // exactly like `accessKeysEnabled: false`, letting the app through the gate.
+  // An unreachable /api/config must not look like `accessKeysEnabled: false`,
+  // which would let the app through the gate.
   it("refuses to render the app when the config cannot be loaded", async () => {
     vi.mocked(getConfig).mockRejectedValue(new Error("Network error"));
 

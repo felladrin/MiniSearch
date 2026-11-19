@@ -55,9 +55,6 @@ async function fetchConfig(): Promise<ServerConfig> {
 }
 
 /**
- * Returns the runtime server config, fetching /api/config on the first call and
- * caching a successful response.
- *
  * Rejects when the config cannot be retrieved, leaving each caller to decide
  * whether continuing without it is safe. A failed attempt is not cached, so a
  * transient blip does not lock the session out of its real configuration.
@@ -86,9 +83,6 @@ export async function getConfig(): Promise<ServerConfig> {
 }
 
 /**
- * Drops the cached config so the next `getConfig` call goes back to
- * /api/config.
- *
  * Each server process mints its own search token, so a restart leaves an open
  * page holding a token the server never issued. The 401 handler in
  * `search.ts` calls this before asking for the token again, which is the only

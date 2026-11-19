@@ -87,8 +87,8 @@ describe("HistorySettings component", () => {
   });
 
   it("keeps the clear button enabled when only stored AI responses remain", () => {
-    // searches is empty (e.g. cleared before the three-table clear-all landed),
-    // but AI responses are still in IndexedDB and must stay reachable.
+    // Searches is empty, but AI responses are still in IndexedDB and must
+    // stay reachable.
     mockHistory({
       recentSearches: [],
       llmResponseCount: 2,

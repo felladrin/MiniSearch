@@ -448,7 +448,6 @@ describe("consumeRateLimitPoint", () => {
     const mockReq = makeMockRequest("192.168.1.100");
     await verifyTokenAndRateLimit(makeValidHash("valid"), mockReq);
     await consumeRateLimitPoint(mockReq);
-    // Both went through the one shared limiter, keyed on the same address.
     expect(consumeInstances.size).toBe(1);
     expect(mockConsume).toHaveBeenCalledTimes(2);
     expect(mockConsume).toHaveBeenNthCalledWith(1, "127.0.0.1");

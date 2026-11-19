@@ -76,7 +76,6 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-/** Let the debounce fire and any pending work flush. */
 async function settle() {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(FILTER_DEBOUNCE_MS + 50);
@@ -153,7 +152,6 @@ describe("useSearchHistory", () => {
     await settle();
     expect(fuzzySpy).not.toHaveBeenCalled();
 
-    // A burst of keystrokes with no quiet period: nothing filters yet.
     act(() => {
       result.current.searchHistory("w");
       result.current.searchHistory("we");

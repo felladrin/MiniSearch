@@ -473,8 +473,6 @@ describe("graceful degradation", () => {
       emptyBreaker,
     );
 
-    // The breaker still records which one was a failure, and now the caller
-    // can tell them apart from the outcome as well.
     expect(downBreaker.getState("searxng")).toBe("OPEN");
     expect(emptyBreaker.getState("searxng")).toBe("CLOSED");
     expect(noResults).toEqual([]);

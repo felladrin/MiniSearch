@@ -501,7 +501,6 @@ describe("internalApiEndpointServerHook", () => {
           return {
             stream: (async function* () {
               yield { type: "text-delta", text: "Half" } as never;
-              // Wait until the abort signal fires, then emit the abort part.
               await new Promise<void>((resolve) => {
                 const check = () => {
                   if (abortSignal?.aborted) {
@@ -560,10 +559,8 @@ describe("internalApiEndpointServerHook", () => {
         .mockReturnValueOnce("model-a")
         .mockReturnValueOnce("model-b");
 
-      // First call (model-a) stalls; second call (model-b) succeeds.
       vi.mocked(streamText).mockImplementationOnce(
         ({ abortSignal }: { abortSignal?: AbortSignal } = {}) => {
-          // Yields nothing, then emits an abort part when the signal fires.
           return {
             stream: (async function* () {
               await new Promise<void>((resolve) => {
@@ -604,7 +601,6 @@ describe("internalApiEndpointServerHook", () => {
         await vi.runAllTimersAsync();
         await pending;
 
-        // The ladder walked to model-b, which succeeded.
         expect(streamText).toHaveBeenCalledTimes(2);
         const writes = response.write.mock.calls.map((c) => c[0] as string);
         expect(writes.some((s: string) => s.includes("Recovered"))).toBe(true);
@@ -906,8 +902,6 @@ describe("internalApiEndpointServerHook", () => {
 
     it("re-lists the model pool when every model has been attempted", async () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-      // Only model-a in the initial pool; it fails, then the pool is refreshed
-      // to include model-b, which succeeds.
       vi.mocked(listOpenAiCompatibleModels)
         .mockResolvedValueOnce([{ id: "model-a" }])
         .mockResolvedValueOnce([{ id: "model-b" }]);
@@ -940,7 +934,6 @@ describe("internalApiEndpointServerHook", () => {
         await vi.runAllTimersAsync();
         await pending;
 
-        // The pool was refreshed once, and the new model succeeded.
         expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(2);
         expect(streamText).toHaveBeenCalledTimes(2);
         const writes = response.write.mock.calls.map((c) => c[0]).join("");
@@ -986,7 +979,6 @@ describe("internalApiEndpointServerHook", () => {
         await vi.runAllTimersAsync();
         await pending;
 
-        // model-b is still in the pool, so no re-list is needed.
         expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(1);
         expect(streamText).toHaveBeenCalledTimes(2);
       } finally {
@@ -996,7 +988,6 @@ describe("internalApiEndpointServerHook", () => {
 
     it("re-lists only once even when both the original and refetched pools fail", async () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-      // Only model-a in the initial pool; refetch yields model-b, which also fails.
       vi.mocked(listOpenAiCompatibleModels)
         .mockResolvedValueOnce([{ id: "model-a" }])
         .mockResolvedValueOnce([{ id: "model-b" }]);
@@ -1027,12 +1018,10 @@ describe("internalApiEndpointServerHook", () => {
         // The pool was refreshed once; even though both models failed we do not
         // loop on a failing /models endpoint.
         expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(2);
-        // The refetched pool feeds selection — the second call receives it.
         expect(vi.mocked(selectRandomModel).mock.calls[1][0]).toEqual([
           { id: "model-b" },
         ]);
         expect(response.statusCode).toBe(503);
-        // The counter moved from the successful refetch.
         expect(getInferenceStats().modelsRefetched).toBe(
           before.modelsRefetched + 1,
         );

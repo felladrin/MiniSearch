@@ -50,8 +50,8 @@ export class PageReadHostBreaker {
   }
 
   /**
-   * Whether a read from `host` may go ahead now. Every admitted read must be
-   * settled, or a half-open host keeps waiting for a probe that never ends.
+   * Every admitted read must be settled, or a half-open host keeps waiting for
+   * a probe that never ends.
    */
   admit(host: string): boolean {
     if (!this.circuits.allows(host)) return false;
@@ -64,7 +64,6 @@ export class PageReadHostBreaker {
     return true;
   }
 
-  /** Records how an admitted read from `host` ended. */
   settle(host: string, outcome: string): void {
     this.probing.delete(host);
 

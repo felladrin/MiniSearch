@@ -53,16 +53,13 @@ const INTENT_WORDS = new Set([
 ]);
 
 export interface OfficialLaneRequest {
-  /** The registrable domain the query named, as the second query scopes it. */
   domain: string;
-  /** The scoped query sent to the search engines. */
   query: string;
 }
 
 /**
- * The second query this search warrants, or null when it warrants none. The
- * domain is taken from the results (`namedDomain`), so this only fires when the
- * official site already appeared somewhere in the set.
+ * The domain is taken from the results (`namedDomain`), so this only fires when
+ * the official site already appeared somewhere in the set.
  */
 export function officialLaneRequest(
   query: string,

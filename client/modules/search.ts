@@ -421,15 +421,11 @@ db.ensureIntegrity().catch((error) => {
 });
 
 const searchService = {
-  /**
-   * Generates a SHA-256 hash for query caching.
-   * Includes the limit in the hash input so that different limits
-   * produce different cache keys (fixes stale results when limit changes).
-   */
+  /** The limit is part of the key, so a different limit never reads stale results. */
   async hashQuery(query: string, limit?: number): Promise<string> {
     const input = limit !== undefined ? `${query}::limit=${limit}` : query;
     const hash = await sha256(input);
-    // Return first 16 hex chars — enough for cache keys, shorter than full 64
+    // 16 hex chars are enough for a cache key.
     return hash.slice(0, 16);
   },
 

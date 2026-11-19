@@ -45,9 +45,8 @@ function makePassage(wordCount: number, seed: number): string {
 }
 
 /**
- * The per-text path this change replaced: one `session.run()` per text,
- * `[1, L]` tensors, mean pooling over the tokenizer's own mask. Kept here as
- * the reference the batched path must match.
+ * The per-text reference the batched path must match: one `session.run()` per
+ * text, `[1, L]` tensors, mean pooling over the tokenizer's own mask.
  */
 async function encodePerText(
   refSession: InferenceSession,
@@ -263,7 +262,7 @@ describe("biEncoderService batched scoring (#2715)", () => {
 /**
  * Runs one scoring request against a worker of its own and returns its reply.
  *
- * The session lives in the worker now, so a `session.run` spy on this thread
+ * The session lives in the worker, so a `session.run` spy on this thread
  * would see nothing. The worker reports the dims of each forward pass instead,
  * which is what the bucketing assertions read.
  */
@@ -365,10 +364,9 @@ describe("biEncoderService main-thread cost (#2730)", () => {
   });
 
   /**
-   * The acceptance measurement from #2730. On the main thread the same pass
-   * blocked for ~815 ms (x86_64, 32 logical cores); with the session in the
-   * worker it measures ~1.5 ms. The bar is left at the issue's 20 ms so the
-   * test reports a regression rather than host-to-host noise.
+   * On the main thread the same pass blocked for ~815 ms (x86_64, 32 logical
+   * cores); with the session in the worker it measures ~1.5 ms. The bar sits at
+   * 20 ms so the test reports a regression rather than host-to-host noise.
    */
   it("keeps the main-thread event-loop block under 20 ms for a 200-passage pass", async () => {
     const passages = Array.from({ length: 200 }, (_, i) =>

@@ -28,13 +28,12 @@ const PORTABLE_MODEL_HF_FILE = "onnx/model_quint8_avx2.onnx";
 const VNNI_MODEL_HF_FILE = "onnx/model_qint8_avx512_vnni.onnx";
 
 /**
- * Parses the CPU feature flags out of `/proc/cpuinfo` content. Every online
- * processor gets its own `flags` line, and the lines are not always identical:
- * on an Intel hybrid CPU the E-cores lack instructions the P-cores have, so a
- * feature counts only when every line reports it. The intersection is the set
- * the scheduler cannot dodge. Returns null when no flags line is there, which
- * is the signal to keep the portable build rather than a guess at the
- * instruction set.
+ * Every online processor gets its own `flags` line, and the lines are not
+ * always identical: on an Intel hybrid CPU the E-cores lack instructions the
+ * P-cores have, so a feature counts only when every line reports it. The
+ * intersection is the set the scheduler cannot dodge. Returns null when no
+ * flags line is there, which is the signal to keep the portable build rather
+ * than a guess at the instruction set.
  */
 export function parseCpuFlags(cpuinfo: string): string[] | null {
   const lines = [...cpuinfo.matchAll(/^flags[ \t]*:[ \t]*(.*)$/gm)];
@@ -46,11 +45,6 @@ export function parseCpuFlags(cpuinfo: string): string[] | null {
   );
 }
 
-/**
- * Reads the CPU feature flags from `/proc/cpuinfo`. Returns null when the file
- * is not there or unreadable, which is the signal to keep the portable build
- * rather than a guess at the instruction set.
- */
 function readCpuFlags(): string[] | null {
   try {
     return parseCpuFlags(fs.readFileSync("/proc/cpuinfo", "utf8"));
@@ -59,10 +53,6 @@ function readCpuFlags(): string[] | null {
   }
 }
 
-/**
- * Picks the quantized build for this CPU: the VNNI build on a Linux x64 host
- * that reports `avx512_vnni`, the portable build everywhere else.
- */
 export function selectModelFile(
   platform: string,
   arch: string,
@@ -85,8 +75,7 @@ const MODEL_HF_FILE = selectModelFile(
  * Hard ceiling rather than a tuning knob: the model has 514 learned position
  * embeddings, two of which XLM-RoBERTa reserves, so a 513-token pair fails
  * outright with `indices element out of data bounds` at the position-embedding
- * gather. Still more generous than what shipped before #2260, which cut
- * documents to 512 characters upstream.
+ * gather.
  */
 const MAX_SEQUENCE_LENGTH = 512;
 
@@ -94,11 +83,6 @@ let isReady = false;
 let session: InferenceSession | null = null;
 let tokenizer: Tokenizer | null = null;
 
-/**
- * Sanitizes Unicode surrogate pairs in input string
- * @param input - String to sanitize
- * @returns Sanitized string with valid Unicode surrogates
- */
 export function sanitizeUnicodeSurrogates(input: string) {
   let output = "";
 

@@ -1,6 +1,4 @@
 /**
- * Aggregate counters for the AI answers served through `/inference`.
- *
  * Counts and durations only. The obvious thing to record about an inference is
  * the conversation, and that is the whole of what the user typed, so none of it
  * is kept: no prompt, no message, no answer, no token, and no timestamp per
@@ -86,7 +84,6 @@ export function recordModelAbandoned(model: string): void {
   countsFor(model).abandoned++;
 }
 
-/** A retry moved to another model, which is the only reason the pool exists. */
 export function recordModelFallback(): void {
   modelFallbacks++;
 }
@@ -105,8 +102,8 @@ export function recordStreamEndedWithoutFinish(): void {
 }
 
 /**
- * Records one finished request. `firstTokenMs` is the wait the user actually
- * felt, so it is kept apart from `durationMs`, which covers the whole answer.
+ * `firstTokenMs` is the wait the user actually felt, so it is kept apart from
+ * `durationMs`, which covers the whole answer.
  */
 export function recordInference({
   outcome,

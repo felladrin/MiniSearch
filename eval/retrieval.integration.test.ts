@@ -32,10 +32,6 @@ import { goldenQueries } from "./goldenSet.ts";
 import { ndcgAtK, recallAtK } from "./metrics.ts";
 import { K, MIN_MEAN_NDCG, MIN_MEAN_RECALL } from "./thresholds.ts";
 
-// The floors (MIN_MEAN_NDCG / MIN_MEAN_RECALL) and the no-op ceilings that
-// keep them falsifiable live in thresholds.ts; see that file for the band
-// they're set in and why the headroom is intentional.
-
 interface PerQueryScore {
   id: string;
   ndcg: number;
@@ -58,11 +54,11 @@ describe("retrieval eval (real reranker)", () => {
       const candidates: [title: string, content: string, url: string][] =
         golden.results.map(({ title, snippet, url }) => [title, snippet, url]);
 
-      // preserveTopResults=true matches the app's text-search call.
       const ranked = await rankSearchResults(
         golden.query,
         "text",
         candidates,
+        // preserveTopResults, as in the app's text-search call.
         true,
       );
       expect(ranked.length, `${golden.id}: empty ranking`).toBeGreaterThan(0);

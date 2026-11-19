@@ -10,10 +10,9 @@ interface ExpandableLinkProps {
 const VIEWPORT_EDGE_MARGIN = 8;
 
 /**
- * One module-level ResizeObserver shared by every mounted ExpandableLink:
- * a 30-link answer used to register 30 window listeners, each forcing a
- * `scrollWidth` read. The registry maps each observed element to its callback,
- * and each link unregisters itself on unmount.
+ * One module-level ResizeObserver shared by every mounted ExpandableLink, so a
+ * 30-link answer does not register 30 listeners, each forcing a `scrollWidth`
+ * read.
  */
 const resizeCallbacks = new Map<Element, () => void>();
 let sharedObserver: ResizeObserver | null = null;

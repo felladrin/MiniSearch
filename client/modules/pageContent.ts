@@ -14,7 +14,7 @@ const REQUEST_TIMEOUT = 20000;
  * could be read.
  *
  * A failure here is not an error the user needs to see: the answer falls back
- * to search snippets, which is what it was grounded on before.
+ * to search snippets.
  */
 export async function fetchPageContents(
   query: string,

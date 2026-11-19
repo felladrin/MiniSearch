@@ -21,7 +21,6 @@ test("homepage loads, search runs, and results render", async ({ page }) => {
 
   await expect(settledSearch(page)).toBeVisible({ timeout: 60_000 });
 
-  // If results are present, verify they have valid URLs.
   const resultLink = page.getByTestId("search-result-link").first();
   if ((await resultLink.count()) > 0) {
     await expect(resultLink).toHaveAttribute("href", /https?:\/\//);

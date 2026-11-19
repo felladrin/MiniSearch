@@ -16,20 +16,14 @@ let processToken: string | null = null;
 let tokenFileWritten = false;
 
 /**
- * The search token this process verifies against, generated on first use and
- * written with 0600 permissions.
- *
  * Never adopted from the file. A token that survives into a published image is
  * one every container of that build shares, and anyone who pulls the image can
  * read it out of the layer, so the file is a record for the operator and for
  * `hasSearchTokenFileChanged`, not a source of truth.
  *
- * Held for the life of the process. Reading the file on every request let
- * anything that rewrote it re-key a running server: the clients holding the
- * previous token were rejected from that moment on, and so was every new page
- * load, because the token being handed out had been captured when the server
- * started. A server that keeps its own token instead can still verify the
- * clients it handed that token to.
+ * Held for the life of the process: reading the file on every request would let
+ * anything that can rewrite it re-key a running server, and every open page,
+ * which caches the token from `/api/config`, would fail its next search.
  */
 export function getSearchToken() {
   if (processToken !== null) return processToken;

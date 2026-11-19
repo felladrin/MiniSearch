@@ -30,10 +30,8 @@ import type {
 type Settings = typeof defaultSettings;
 
 /**
- * Fetches fresh text search results and merges them into existing results,
- * deduplicating by URL. Updates pubSub state for both LLM-visible and UI results.
- *
- * Returns the results the answer is grounded on (empty when nothing came back).
+ * Returns the fresh results the answer is grounded on (empty when nothing came
+ * back), not the merged list shown in the UI.
  */
 export async function refreshTextSearchResults(
   searchQuery: string,
@@ -80,10 +78,6 @@ export async function refreshTextSearchResults(
   return llmResults;
 }
 
-/**
- * Fetches fresh image search results and merges them into existing results,
- * deduplicating by URL. Fire-and-forget (returns Promise, caller catches errors).
- */
 export async function refreshImageSearchResults(
   searchQuery: string,
   resultsLimit: number,
@@ -123,14 +117,9 @@ export async function refreshImageSearchResults(
 }
 
 /**
- * Reads the pages behind the fresh follow-up results.
- *
- * The first search reads its pages before answering, but the follow-up path
- * only replaced the snippets: the new results arrived without page text, so
- * the answer fell back to titles and snippets, and a URL both searches
- * returned kept the excerpt picked for the previous question. Reading them
- * here keeps the answer grounded on the same kind of evidence for both
- * questions.
+ * Reads the follow-up results' pages, as the first search does, so the answer
+ * is not left with titles and snippets, and a URL both searches returned gets
+ * an excerpt picked for the new question.
  */
 async function readFollowUpPageContents(
   searchQuery: string,
@@ -150,9 +139,6 @@ async function readFollowUpPageContents(
   updatePageContents({ ...getPageContents(), ...contents });
 }
 
-/**
- * Saves a user message and its assistant response to chat history.
- */
 export async function persistChatMessages(
   query: string,
   userMessage: string,
@@ -162,10 +148,6 @@ export async function persistChatMessages(
   await saveChatMessageForQuery(query, "assistant", assistantMessage);
 }
 
-/**
- * Runs the follow-up search phase: generates a related search query from chat
- * history, then refreshes text and image results with deduplication.
- */
 export async function runFollowUpSearch(
   messages: ChatMessage[],
   currentInput: string,

@@ -106,11 +106,8 @@ class ArchitecturalLinter {
       this.addViolation("RELATIVE_IMPORT_DEEP", filePath);
     }
 
-    // Check for direct external API calls (excluding internal API endpoints)
     if (content.includes("fetch(") && !filePath.includes("server/")) {
-      // Look for URL patterns in fetch calls
       const fetchPatterns = [
-        // fetch with string URLs
         /fetch\(\s*['"`]([^'"`]+)['"`]/g,
         /fetch\([^)]+\)/g,
       ];

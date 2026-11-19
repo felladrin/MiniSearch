@@ -59,7 +59,6 @@ export function setWorkerFactory(factory: () => Worker) {
   workerFactory = factory;
 }
 
-/** Runs one allocation on a fresh worker and resolves with its answer. */
 function allocateExcerptsInWorker(
   contents: string[],
   tokenBudget: number,
@@ -89,8 +88,6 @@ function allocateExcerptsInWorker(
 }
 
 /**
- * Allocates the page excerpts off the main thread.
- *
  * Tokenizing the full body of every page read can take over several complete
  * articles, and this runs right at the handoff from search to generation -
  * exactly when the UI should stay responsive - so the work goes to
@@ -112,8 +109,7 @@ async function allocatePageExcerptsAsync(
     // A worker this environment cannot run - no `Worker` global, or one
     // whose construction or run failed - must not break generation. The
     // synchronous path costs the main thread what the worker was meant to
-    // take off it, which is what the handoff did before the worker existed;
-    // arriving late beats not arriving at all.
+    // take off it; arriving late beats not arriving at all.
     addLogEntry(
       `Page excerpt worker unavailable, tokenizing on the main thread: ${
         error instanceof Error ? error.message : "unknown error"
@@ -197,12 +193,7 @@ function getRelevanceTags(
   });
 }
 
-/**
- * Formats the results for the prompt, appending the excerpt read from each
- * page when one is available for it, and a relative relevance tag when the
- * results carry a reranker score. The excerpt tokenization runs in a worker,
- * so callers await the formatted string.
- */
+/** The excerpt tokenization runs in a worker, so callers await the formatted string. */
 export async function getFormattedSearchResults(
   shouldIncludeUrl: boolean,
 ): Promise<string> {

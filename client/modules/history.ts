@@ -72,7 +72,7 @@ export interface SearchEntry {
   searchRunId?: string;
   query: string;
   timestamp: number;
-  results?: TextResults | ImageResults; // Legacy field for backward compatibility
+  results?: TextResults | ImageResults;
   textResults?: TextResults;
   imageResults?: ImageResults;
   llmResponse?: string;

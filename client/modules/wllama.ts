@@ -35,10 +35,6 @@ export async function createWllamaInstance(
   }
 }
 
-/**
- * Initializes Wllama with a specific model from HuggingFace.
- * Performs a single-threaded warmup run before loading with the full config.
- */
 export async function initializeWllama(
   hfRepoId: string,
   hfFilePath: string,
@@ -106,7 +102,6 @@ export async function initializeWllama(
   }
 }
 
-/** Clears all cached model files from OPFS storage. */
 export async function clearWllamaCache(): Promise<Wllama> {
   addLogEntry("Clearing Wllama cache");
 

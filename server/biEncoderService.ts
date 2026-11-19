@@ -3,10 +3,9 @@
  * inference: it spawns `biEncoderWorker.ts`, forwards scoring requests to it
  * and matches the replies back to their callers.
  *
- * The four exported functions keep the signatures they had when the session
- * lived here, so no caller changed. What changed is that a scoring pass no
- * longer stops the event loop: a 200-passage pool blocked the main thread for
- * ~815 ms before and stays under 20 ms now (see docs/page-content.md).
+ * Inference stays off the main thread because a scoring pass run inline stops
+ * the event loop: a 200-passage pool blocks it for ~815 ms, against under 20 ms
+ * through the worker (see docs/page-content.md).
  */
 
 import path from "node:path";
@@ -23,7 +22,6 @@ let worker: Worker | null = null;
 let isReady = false;
 let nextRequestId = 0;
 
-/** Resolvers for requests the worker has not answered yet, keyed by their id. */
 const pendingScores = new Map<number, (scores: number[]) => void>();
 
 /**
@@ -125,10 +123,6 @@ export async function getBiEncoderStatus() {
   return isReady;
 }
 
-/**
- * Returns dense (semantic) scores for passages given a query.
- * Falls back to empty array when the worker is not running.
- */
 export async function scorePassages(
   query: string,
   passages: string[],

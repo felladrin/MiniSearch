@@ -80,7 +80,6 @@ describe("rankSearchResults", () => {
       ["B", "b", "https://b.com"],
       ["C", "c", "https://c.com"],
     ]);
-    // Results are sorted by score descending (B has higher score than A, C is dropped by score filter)
     expect(result[0][0]).toBe("B");
   });
 
@@ -175,7 +174,7 @@ describe("rankSearchResults", () => {
       [longTitle, "short", "https://a.com"],
     ]);
     const docs = mockRerank.mock.calls[0][1] as string[];
-    // Truncation is now token-based inside the reranker, so the full document
+    // Truncation is token-based inside the reranker, so the full document
     // reaches it; nothing is cut by character count upstream.
     expect(docs[0]).toBe(`${longTitle}\nshort`);
     expect(docs[0].length).toBeGreaterThan(512);

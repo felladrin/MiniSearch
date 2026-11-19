@@ -227,7 +227,6 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** Frees the model's memory; a failure here is logged, never thrown. */
 async function releaseModel(wllama: Wllama): Promise<void> {
   try {
     await wllama.exit();

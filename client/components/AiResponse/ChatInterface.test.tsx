@@ -412,7 +412,6 @@ describe("ChatInterface generation state", () => {
       await sendMessage("And how do I use it?");
     });
 
-    // Only the held call ever asked for a question.
     expect(generateFollowUpQuestion).toHaveBeenCalledTimes(1);
 
     await act(async () => {

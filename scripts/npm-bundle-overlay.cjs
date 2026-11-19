@@ -124,8 +124,8 @@ while (queue.length > 0) {
   for (const [dep, range] of Object.entries(pkg.dependencies || {})) {
     const copy = resolveCopy(dir, dep);
     if (!copy) {
-      const host = path.dirname(dir); // the node_modules that contains `dir`
-      const target = path.join(host, dep);
+      const containingNodeModules = path.dirname(dir);
+      const target = path.join(containingNodeModules, dep);
       if (!fs.existsSync(path.join(SCRATCH, dep, "package.json"))) {
         console.error(
           `Missing ${dep} required by ${pkg.name}, not in overlay: fail.`,

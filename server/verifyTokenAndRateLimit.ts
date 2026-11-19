@@ -40,7 +40,6 @@ export const thumbnailRateLimiter = new RateLimiterMemory({
   duration: THUMBNAIL_RATE_LIMIT_DURATION_SECONDS,
 });
 
-/** Why a request was turned away, named by the check that turned it away. */
 export type RejectionReason = "rateLimited" | "missingToken" | "invalidToken";
 
 /**
@@ -56,15 +55,12 @@ export type TokenVerificationResult =
       reason: RejectionReason;
     };
 
-/** Whether to trust proxy-set forwarding headers. Off unless `TRUST_PROXY` is `true`/`1`. */
 function isProxyTrusted(): boolean {
   const value = process.env.TRUST_PROXY?.trim().toLowerCase();
   return value === "true" || value === "1";
 }
 
 /**
- * Resolves the client IP used as the rate-limit key.
- *
  * `X-Forwarded-For` / `X-Real-IP` are only honored when `TRUST_PROXY` is
  * enabled. On a directly-exposed instance those headers are fully
  * client-controlled, so trusting them would let a caller forge a fresh IP per
@@ -98,11 +94,7 @@ export function getClientIp(request: IncomingMessage): string {
 }
 
 /**
- * Consume one point from the shared rate limiter for a request, keyed by the
- * client IP. Returns `true` when the request is within budget, `false` when the
- * limiter refuses it.
- *
- * It reuses the same limiter instance the token-verified endpoints consume
+ * Reuses the same limiter instance the token-verified endpoints consume
  * from, so a tokenless caller cannot get a second, independent budget by
  * hitting a different endpoint. (The one deliberate exception is /thumbnail,
  * which verifies a token like the rest and carries its own budget because a
@@ -144,11 +136,10 @@ export async function verifyTokenAndRateLimit(
   request?: IncomingMessage,
   limiter: RateLimiterMemory = rateLimiter,
 ): Promise<TokenVerificationResult> {
-  // Rate-limit before anything else. An invalid or missing token used to skip
-  // the limiter entirely, and every rejected request still pays for a full
-  // argon2 verification, which is expensive enough to be a DoS lever on a
-  // publicly reachable instance: a caller could send an endless stream of
-  // bogus tokens and pin the server's CPU without ever hitting the limiter.
+  // Rate-limit before anything else: every rejected request still pays for a
+  // full argon2 verification, which is expensive enough to be a DoS lever on a
+  // publicly reachable instance, so a stream of bogus tokens must hit the
+  // limiter before it can pin the server's CPU.
   const rateLimitKey = request ? getClientIp(request) : (token ?? "anonymous");
   try {
     await limiter.consume(rateLimitKey);

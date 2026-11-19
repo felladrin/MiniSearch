@@ -190,9 +190,8 @@ function clearConversationSummary() {
 /**
  * Extractive fallback summary: keep the newest parts that fit the token
  * budget. Each part is encoded exactly once and the count is carried
- * forward, so the loop is linear in total text instead of re-encoding the
- * joined candidate every iteration (which was quadratic in conversation
- * length).
+ * forward, so the loop stays linear in total text instead of re-encoding the
+ * joined candidate every iteration.
  *
  * Token counts do not distribute over a join — the "\n\n" separators
  * tokenize too — so the separator's cost is charged per join. BPE can also
@@ -236,10 +235,6 @@ function summarizeDroppedMessages(
 
 let searchInvocation = 0;
 
-/**
- * Runs the search for the current query and, when AI responses are enabled,
- * generates an answer with the configured backend after it completes.
- */
 export async function searchAndRespond() {
   if (getQuery() === "") return;
 
@@ -332,10 +327,6 @@ async function buildSystemPromptContent(summary: string): Promise<string> {
   return content;
 }
 
-/**
- * Keeps the newest messages that fit the token budget, starting on a user
- * message.
- */
 function keepNewestMessagesWithinBudget(
   messages: ChatMessage[],
   tokenBudget: number,

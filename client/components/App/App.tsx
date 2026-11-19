@@ -101,9 +101,6 @@ function useServerConfig(): ConfigState {
 }
 
 /**
- * A custom React hook that initializes the application settings.
- *
- * @remarks
  * Waits for the server config so its defaults can seed a fresh profile, and
  * for the WebGPU check, which picks between the GPU and the CPU default model.
  * Falling back to shipped defaults is safe here: unlike access control,

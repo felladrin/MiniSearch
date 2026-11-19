@@ -50,9 +50,6 @@ interface ParallelSearchDocument {
   results?: ParallelSearchResult[];
 }
 
-// You.com's tool output: the web results sit one level deeper, under
-// `results.web`, and each result carries a plain description plus, when the
-// query matched the page, query-relevant highlights.
 interface YoucomWebResult {
   url?: string;
   title?: string | null;
@@ -105,8 +102,6 @@ const PROVIDERS: readonly FallbackProvider[] = [
   {
     name: "youcom",
     apiKeyVariable: "SEARCH_FALLBACK_YOUCOM_API_KEY",
-    // The free profile needs no key at all, and the key, when present,
-    // selects the authenticated endpoint instead.
     endpointUrl: (apiKey) =>
       apiKey
         ? "https://api.you.com/mcp"
@@ -159,11 +154,7 @@ class RateLimitedError extends Error {
   }
 }
 
-/**
- * Whether the operator opted into the second text-search source. Off unless
- * `SEARCH_FALLBACK_ENABLED` is `true` or `1`, read at call time so tests can
- * toggle it.
- */
+/** Read at call time so tests can toggle it. */
 export function isSearchFallbackEnabled(): boolean {
   const value = (process.env.SEARCH_FALLBACK_ENABLED ?? "")
     .trim()
@@ -172,9 +163,6 @@ export function isSearchFallbackEnabled(): boolean {
 }
 
 /**
- * Checks the fallback configuration and throws on the first thing wrong with
- * it: a removed variable that is still set, an unknown provider name, a
- * provider list with no names in it, or a key with a control character in it.
  * Meant for server start, so a bad value stops the server instead of failing
  * every search that reaches the fallback.
  */
@@ -183,10 +171,9 @@ export function assertSearchFallbackConfiguration(): void {
 }
 
 /**
- * The providers the operator listed in `SEARCH_FALLBACK_PROVIDERS`, or every
- * built-in provider when it is unset or blank, as a fresh array the caller may
- * reorder. The listed order carries no meaning, since every call shuffles it.
- * Read at call time so tests can switch it.
+ * Returns a fresh array the caller may reorder. The listed order carries no
+ * meaning, since every call shuffles it. Read at call time so tests can
+ * switch it.
  */
 function readConfiguredProviders(): FallbackProvider[] {
   const stillSet = REMOVED_VARIABLES.filter(
@@ -392,10 +379,6 @@ function shuffle<Item>(items: Item[]): Item[] {
 const IMF_FIXDATE =
   /^[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/;
 
-/**
- * Reads Retry-After as delta-seconds or an IMF-fixdate HTTP-date, and clamps
- * the result to the bounds the module allows.
- */
 function rateLimitPauseMs(retryAfter: string | null): number {
   const value = retryAfter?.trim() ?? "";
   let pauseMs = DEFAULT_RATE_LIMIT_PAUSE_MS;
@@ -412,8 +395,8 @@ function rateLimitPauseMs(retryAfter: string | null): number {
 }
 
 /**
- * Throws the error the cascade pauses a provider on. Checked on every request
- * of the exchange, since any of them can be the one the limit lands on.
+ * Checked on every request of the exchange, since any of them can be the one
+ * the limit lands on.
  */
 async function rejectIfRateLimited(response: Response): Promise<void> {
   if (response.status !== 429) return;
@@ -422,12 +405,9 @@ async function rejectIfRateLimited(response: Response): Promise<void> {
 }
 
 /**
- * Runs one provider's MCP exchange: initialize, the initialized notification
- * when the endpoint opened a session, and the tool call. The session is
- * optional: with no session id on the initialize reply the endpoint is
- * stateless, so the notification and the session id are skipped, since there
- * is no session to acknowledge. The protocol version still goes on every
- * request after initialize.
+ * The session is optional: with no session id on the initialize reply the
+ * endpoint is stateless, so the initialized notification and the session id
+ * are skipped, since there is no session to acknowledge.
  */
 async function searchWithProvider(
   provider: FallbackProvider,
@@ -646,10 +626,6 @@ function mapParallelResults(
   };
 }
 
-/**
- * Maps You.com's `results.web` array by the same rules the Parallel path
- * follows, so the tuples reach ranking and rendering unchanged.
- */
 function mapYoucomResults(
   document: YoucomSearchDocument,
   limit: number,
@@ -720,10 +696,6 @@ function buildYoucomSnippet(result: YoucomWebResult): string {
   return buildSnippet(result.contents?.highlights);
 }
 
-/**
- * Turns the endpoint's markdown excerpts into the plain, single-line snippet
- * the SearXNG path hands to ranking.
- */
 function buildSnippet(excerpts: string[] | undefined): string {
   if (!Array.isArray(excerpts) || excerpts.length === 0) return "";
 
@@ -740,9 +712,8 @@ function buildSnippet(excerpts: string[] | undefined): string {
 }
 
 /**
- * Caps a finished snippet at the length the ranking path expects. Cuts at a
- * word boundary: a mid-word stump reads as a rendering bug, and the ellipsis
- * is what tells the reader the sentence was cut, not finished.
+ * Cuts at a word boundary: a mid-word stump reads as a rendering bug, and the
+ * ellipsis is what tells the reader the sentence was cut, not finished.
  */
 function truncateSnippet(snippet: string): string {
   if (snippet.length <= MAX_SNIPPET_LENGTH) return snippet;

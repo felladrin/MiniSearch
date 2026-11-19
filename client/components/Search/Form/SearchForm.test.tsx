@@ -138,8 +138,8 @@ describe("SearchForm component", () => {
     const textarea = await waitForPlaceholder();
     const probe = screen.getByTestId("dictation-probe");
 
-    // The point of the change: the button is anchored to the field, so it
-    // cannot drift when the row of buttons below the field changes.
+    // The button is anchored to the field, so it cannot drift when the row of
+    // buttons below the field changes.
     const fieldWrapper = probe.parentElement;
     expect(fieldWrapper).toContainElement(textarea);
     expect(fieldWrapper).toHaveStyle({ position: "relative" });

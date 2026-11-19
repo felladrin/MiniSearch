@@ -36,10 +36,6 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   });
 }
 
-/**
- * Shows a browser notification that the AI answer is ready, unless this page
- * already has the focus.
- */
 export function showAiCompleteNotification(query: string) {
   if (!("Notification" in window)) {
     return;

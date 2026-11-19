@@ -1,7 +1,4 @@
 /**
- * Whether a search result's url is a link a browser can open: `http` or
- * `https`, on a host with a dot in it.
- *
  * Brave Search turned its result links into encrypted redirects on
  * `search.brave.com/go/v1` (https://brave.com/blog/google-goto-anti-scraping/),
  * whose destination only a browser that asks Brave for the key can read.

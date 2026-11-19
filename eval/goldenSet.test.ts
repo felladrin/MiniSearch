@@ -20,7 +20,7 @@ const EXPECTED_QUERY_COUNT = 26;
 // substitutes the search results into the prompt via String.replace, and
 // getFormattedSearchResults puts the title, url, and snippet of every result
 // into that replacement string. A field containing one of these would silently
-// corrupt the prompt (a pre-existing bug in client/modules/systemPrompt.ts).
+// corrupt the prompt (a bug in client/modules/systemPrompt.ts).
 // Rejecting them here keeps the eval from ever grading a corrupted prompt.
 const REPLACE_SPECIAL_SEQUENCES = ["$&", "$`", "$'", "$$"];
 

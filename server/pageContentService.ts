@@ -365,12 +365,11 @@ function stripLinkHeavyBlocks(html: string): string {
 
 /**
  * Word and sentence boundaries come from ICU rather than from an expression
- * over character classes. `[^\p{L}\p{N}]+` cut Brahmic scripts and Thai at
- * every combining vowel mark and discarded the marks, turning a Hindi query
- * into one meaningless fragment, and no expression can find a boundary in
- * Chinese, Japanese or Thai, which write none: a whole sentence arrived as a
- * single token that matched nothing. Both segmenters are script-driven, so the
- * locale is left unset and the result is the same on every host.
+ * over character classes. `[^\p{L}\p{N}]+` cuts Brahmic scripts and Thai at
+ * every combining vowel mark and discards the marks, and no expression can find
+ * a boundary in Chinese, Japanese or Thai, which write none. Both segmenters
+ * are script-driven, so the locale is left unset and the result is the same on
+ * every host.
  */
 const wordSegmenter = new Intl.Segmenter(undefined, { granularity: "word" });
 const sentenceSegmenter = new Intl.Segmenter(undefined, {
@@ -402,7 +401,6 @@ const sentenceSegmenter = new Intl.Segmenter(undefined, {
 const MIN_PREFIX_MATCH_CHARS = 3;
 const MAX_INFLECTION_CHARS = 3;
 
-/** Extracted text for a single page, keyed by the URL it was read from. */
 export interface PageContent {
   url: string;
   content: string;
@@ -521,7 +519,6 @@ async function readHop(url: URL, deadline: AbortSignal): Promise<HopResult> {
 
   const contentType = response.headers.get("content-type") ?? "";
   if (!READABLE_CONTENT_TYPES.test(contentType.trim())) {
-    // PDF is not in READABLE_CONTENT_TYPES but we still want to read it.
     if (!contentType.trim().toLowerCase().startsWith("application/pdf")) {
       await response.body?.cancel().catch(() => {});
       return { outcome: "notADocument" };
@@ -903,10 +900,10 @@ function matchingPassages(
  * the current pool, and returns how much weight each passage matched along
  * with the total available.
  *
- * This is what replaced a stop-word list, which could only ever cover the one
- * language it was written in: a term found in most passages of a pool cannot
- * say which passage to quote, and a term confined to a few of them can, and
- * that holds whatever language the pool is in.
+ * A stop-word list could only cover the one language it was written in: a term
+ * found in most passages of a pool cannot say which passage to quote, and a
+ * term confined to a few of them can, and that holds whatever language the
+ * pool is in.
  */
 function weighTerms(
   queryTerms: string[],
@@ -1053,9 +1050,6 @@ function selectPassagesAcrossPages(
   maxCharsPerUrl: number,
 ): Map<string, string[]> {
   const selectedByUrl = new Map<string, string[]>();
-  // Track every selected passage's tokens for cross-URL dedup.
-  // Passages from the same page are allowed to coexist; dedup is only for
-  // syndicated paragraphs that appear on different pages.
   const selectedTokens: { url: string; tokens: Set<string> }[] = [];
   let usedChars = 0;
   const usedPerUrl = new Map<string, number>();
@@ -1068,11 +1062,12 @@ function selectPassagesAcrossPages(
     )
       continue;
 
-    // Check against all selected passages from other URLs.
-    // Size prefilter: Jaccard ≥ 0.9 requires sizes within 10×, so skip
-    // comparisons where the ratio is too small.
+    // Jaccard ≥ 0.9 requires the smaller set to be at least 90% of the larger,
+    // so skip comparisons where the size ratio is too small.
     let isDuplicate = false;
     for (const { url: otherUrl, tokens: otherTokens } of selectedTokens) {
+      // Dedup targets syndicated paragraphs across pages; one page's own
+      // passages may coexist.
       if (otherUrl === passage.url) continue;
       const minSize = Math.min(passage.tokens.size, otherTokens.size);
       const maxSize = Math.max(passage.tokens.size, otherTokens.size);
@@ -1127,8 +1122,6 @@ export async function selectPassages(
   passages: string[],
   maxChars: number,
 ): Promise<string[]> {
-  // Single-page wrapper over the production selector so tests exercise the
-  // real code path.
   const input = passages.map((text, index) => ({
     url: "",
     text,
@@ -1249,7 +1242,6 @@ export async function fetchPageContents(
     MAX_PAGE_CHARS,
   );
 
-  // Record page-read stats now that we know how many passages were kept.
   for (const page of pages) {
     const selected = selectedByUrl.get(page.url) ?? [];
     recordPageRead({

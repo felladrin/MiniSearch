@@ -1,10 +1,8 @@
 /**
- * Aggregate counters for the reranking stage.
- *
  * The reranker sees the query and every snippet, and none of that is kept: how
  * many results came in, how many survived the score filter, how long the model
  * took, and how often it was unavailable. Those are the numbers the filter's
- * two thresholds should be moved against, and today they have none.
+ * two thresholds should be moved against.
  */
 
 import type { SearchType } from "./searchesSinceLastRestart.ts";
