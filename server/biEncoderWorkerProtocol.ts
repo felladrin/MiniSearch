@@ -14,9 +14,10 @@
  * per-call setup. B=64 measured slower than the per-text path; the sweep
  * cannot separate the two plausible causes — a 64-row bucket spans a wider
  * length range, so padding waste grows, and at L=256 with 12 heads the
- * attention score tensor alone is ~192 MiB live, which pressures cache. B=16 (~48 MiB) measured fastest on
- * a 200-passage pool on this host (x86_64, 32 cpus): 1.88x wall time and a
- * 223ms worst event-loop block against 1560ms for the per-text path.
+ * attention score tensor alone is ~192 MiB live, which pressures cache. B=16
+ * (~48 MiB) measured fastest on a 200-passage pool on this host (x86_64, 32
+ * cpus): 1.88x wall time and a 223ms worst event-loop block against 1560ms for
+ * the per-text path.
  */
 export const BATCH_ROWS = 16;
 
