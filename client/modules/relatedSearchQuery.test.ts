@@ -92,16 +92,15 @@ describe("generateRelatedSearchQuery", () => {
     expect(messages[0].content).toContain("into Chinese");
   });
 
-  it("keeps an English query for a question with one Greek symbol", async () => {
-    mockGenerateReplyToMessages.mockResolvedValueOnce(
-      "beta blocker side effects",
-    );
+  it.each([
+    ["what are the side effects of β-blockers", "beta blocker side effects"],
+    ["difference between α and β error", "alpha beta error difference"],
+  ])("keeps the English query for %s", async (question, reply) => {
+    mockGenerateReplyToMessages.mockResolvedValueOnce(reply);
 
     expect(
-      await generateRelatedSearchQuery([
-        { role: "user", content: "what are the side effects of β-blockers" },
-      ]),
-    ).toBe("beta blocker side effects");
+      await generateRelatedSearchQuery([{ role: "user", content: question }]),
+    ).toBe(reply);
     expect(mockGenerateReplyToMessages).toHaveBeenCalledTimes(1);
   });
 
