@@ -100,6 +100,8 @@ When `preserveTopResults = true`, the ranking algorithm:
 
 This mode ensures the original top result is never displaced by the reranker, while still improving the ordering of subsequent results.
 
+The pin only affects the order the result list shows. The six results the AI answer reads are picked by score on the client (`client/modules/searchResultSelection.ts`), so a pinned result with a low score shows first but does not take one of the six places.
+
 ### Domain Priority
 
 A page from the site the query names gets a small bonus on its semantic score before the filter runs (`server/authorityRanking.ts`, applied in `server/rankSearchResults.ts`). The reranker never sees the URL, so a query like "disney plus next month" ranks a blog roundup and disneyplus.com on their prose alone; the bonus lets the named site overtake a page whose snippet merely talks about it.

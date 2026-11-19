@@ -116,6 +116,23 @@ describe("refreshTextSearchResults", () => {
 
     expect(mockUpdateTextStale).toHaveBeenCalledWith(true);
   });
+
+  it("orders the answer's evidence by score, not by the displayed order", async () => {
+    mockSearchText.mockResolvedValueOnce({
+      results: [
+        ["Pinned", "snippet", "https://pinned.com", 12],
+        ["Relevant", "snippet", "https://relevant.com", 91],
+        ["Weak", "snippet", "https://weak.com", 20],
+      ],
+      stale: false,
+    });
+
+    await refreshTextSearchResults("query", 10, []);
+
+    expect(
+      mockUpdateLlmText.mock.calls[0]?.[0].map(([title]) => title),
+    ).toEqual(["Relevant", "Weak", "Pinned"]);
+  });
 });
 
 describe("refreshImageSearchResults", () => {

@@ -22,8 +22,9 @@ and no page is read either way until AI responses are on.
 
 1. `startTextSearch` (`client/modules/textGeneration.ts`) finishes the text
    search and publishes the results the UI renders.
-2. The top `searchResultsToConsider` (6) URLs go to `/page-content`, together
-   with the query, via `client/modules/pageContent.ts`.
+2. The `searchResultsToConsider` (6) best-scored URLs go to `/page-content`,
+   together with the query, via `client/modules/pageContent.ts`. When no
+   result carries a reranker score, the first six are used.
 3. `server/pageContentService.ts` reads each page, extracts its readable text,
    splits it into passages, ranks all passages from all pages together, and
    selects from the pooled ranking with a per-URL cap and near-duplicate
@@ -49,6 +50,13 @@ searches hold keeps one entry, with the excerpt picked for the follow-up's
 query, and a newer search that takes over while the read is in flight drops it.
 Like the first read, it starts when the text results are in and is awaited last,
 so the follow-up's image refresh does not wait for it.
+
+The six results an answer reads, for the first question and for a follow-up,
+are the six best scored, not the first six of the order the result panel
+shows: the server keeps the engine's first result pinned at the top of the
+list, and a pinned result with a low score would otherwise take one of the six
+places. `client/modules/searchResultSelection.ts` holds that choice; the
+displayed order is untouched.
 
 ## Prompt Shape
 

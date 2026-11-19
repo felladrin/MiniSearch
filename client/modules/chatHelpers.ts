@@ -16,6 +16,7 @@ import {
   updateTextSearchStale,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
+import { selectLlmSearchResults } from "./searchResultSelection";
 import type { defaultSettings } from "./settings";
 import { searchResultsToConsider } from "./textGenerationUtilities";
 import type {
@@ -47,7 +48,10 @@ export async function refreshTextSearchResults(
 
   updateTextSearchStale(stale);
 
-  const llmResults = freshResults.slice(0, searchResultsToConsider);
+  const llmResults = selectLlmSearchResults(
+    freshResults,
+    searchResultsToConsider,
+  );
   updateLlmTextSearchResults(llmResults);
 
   const existingUrls = new Set(existingResults.map(([, , url]) => url));

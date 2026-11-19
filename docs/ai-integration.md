@@ -242,7 +242,7 @@ Stream response via selected inference type
 Update PubSub channels (response, textGenerationState)
 ```
 
-The AI context includes the top 6 text search results (a fixed value, `searchResultsToConsider` in `client/modules/textGenerationUtilities.ts`), not a user-configurable setting.
+The AI context includes the 6 best-scored text search results (a fixed value, `searchResultsToConsider` in `client/modules/textGenerationUtilities.ts`, picked by `client/modules/searchResultSelection.ts`), not a user-configurable setting. Without reranker scores, the first 6 are used.
 
 ### Chat Generation
 
