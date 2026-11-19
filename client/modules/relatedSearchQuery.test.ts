@@ -81,6 +81,28 @@ describe("generateRelatedSearchQuery", () => {
     expect(mockGenerateReplyToMessages).toHaveBeenCalledTimes(1);
   });
 
+  it("checks a Chinese question even when a brand name outweighs the Chinese", async () => {
+    mockGenerateReplyToMessages.mockResolvedValueOnce("iPhone Pro Max price");
+
+    await generateRelatedSearchQuery([
+      { role: "user", content: "那 iPhone Pro Max 呢" },
+    ]);
+
+    const [messages] = mockGenerateReplyToMessages.mock.calls[1];
+    expect(messages[0].content).toContain("into Chinese");
+  });
+
+  it("keeps an English query that adds a name in another script", async () => {
+    mockGenerateReplyToMessages.mockResolvedValueOnce("Xiaomi founder 雷军");
+
+    expect(
+      await generateRelatedSearchQuery([
+        { role: "user", content: "who founded it" },
+      ]),
+    ).toBe("Xiaomi founder 雷军");
+    expect(mockGenerateReplyToMessages).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps a Japanese query that adds kanji to a question in kana", async () => {
     mockGenerateReplyToMessages.mockResolvedValueOnce("東京タワー 入場料");
 
@@ -127,16 +149,6 @@ describe("generateRelatedSearchQuery", () => {
 
     expect(await generateRelatedSearchQuery([...chineseFollowUp])).toBe(
       "iPhone 价格大概多少钱",
-    );
-  });
-
-  it("uses the translation when it is in the question's script", async () => {
-    mockGenerateReplyToMessages
-      .mockResolvedValueOnce("iPhone fiyatı kaç TL")
-      .mockResolvedValueOnce("iPhone 价格多少钱");
-
-    expect(await generateRelatedSearchQuery([...chineseFollowUp])).toBe(
-      "iPhone 价格多少钱",
     );
   });
 

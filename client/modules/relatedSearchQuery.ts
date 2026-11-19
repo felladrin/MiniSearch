@@ -18,10 +18,13 @@ const SCRIPTS = {
 
 type Script = keyof typeof SCRIPTS;
 
+const SCRIPT_NAMES = Object.keys(SCRIPTS) as Script[];
+
 /**
- * Scripts written by one language only, so a retry can name it. Arabic,
- * Cyrillic and Devanagari each serve several languages, and naming the wrong
- * one would translate the query away from the user's language.
+ * Scripts that name the question's language, so a translation can ask for it.
+ * CJK is Chinese unless the question has kana. Arabic, Bengali, Cyrillic and
+ * Devanagari each serve several languages, and naming the wrong one would
+ * translate the query away from the user's language.
  */
 const LANGUAGE_BY_SCRIPT: Partial<Record<Script, string>> = {
   Greek: "Greek",
@@ -35,40 +38,46 @@ function countLetters(text: string, script: Script): number {
   return text.match(SCRIPTS[script])?.length ?? 0;
 }
 
-function dominantScript(text: string): Script | undefined {
-  let dominant: Script | undefined;
+/**
+ * Brand names make Latin letters outnumber the Chinese ones in
+ * "那 iPhone Pro Max 呢", so Latin is the question's script only when no
+ * other script is there.
+ */
+function questionScript(question: string): Script | undefined {
+  let script: Script | undefined;
   let most = 0;
-  for (const script of Object.keys(SCRIPTS) as Script[]) {
-    const count = countLetters(text, script);
-    if (count > most) {
-      dominant = script;
+  for (const candidate of SCRIPT_NAMES) {
+    const count = countLetters(question, candidate);
+    if (candidate !== "Latin" && count > most) {
+      script = candidate;
       most = count;
     }
   }
-  return dominant;
+  return script ?? (countLetters(question, "Latin") > 0 ? "Latin" : undefined);
 }
 
 /**
  * Latin letters are allowed anywhere, because correct Chinese queries carry
- * brand names ("iPhone价格"). Any other script the question does not use
- * marks a drift, even next to the right one ("iPhone قیمت大概多少钱").
+ * brand names ("iPhone价格"). Another script the question does not use marks
+ * a drift, even next to the right one ("iPhone قیمت大概多少钱"), from three
+ * letters on: one or two are a name or a symbol ("雷军", "β-blocker").
  */
 function isWrittenLike(query: string, question: string): boolean {
-  const script = dominantScript(question);
+  const script = questionScript(question);
   if (!script) return true;
   if (countLetters(query, script) === 0) return false;
-  return (Object.keys(SCRIPTS) as Script[]).every(
+  return SCRIPT_NAMES.every(
     (other) =>
       other === "Latin" ||
-      countLetters(query, other) === 0 ||
-      countLetters(question, other) > 0,
+      countLetters(question, other) > 0 ||
+      countLetters(query, other) < 3,
   );
 }
 
 function questionLanguage(question: string): string | undefined {
   if (/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(question))
     return "Japanese";
-  const script = dominantScript(question);
+  const script = questionScript(question);
   return script && LANGUAGE_BY_SCRIPT[script];
 }
 
