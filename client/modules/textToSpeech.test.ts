@@ -41,6 +41,27 @@ const englishVoice = {
   language: { code: "en_US", name_english: "English" },
 };
 
+const englishLowVoice = {
+  key: "en_GB-alan-low",
+  name: "alan",
+  quality: "low",
+  language: { code: "en_GB", name_english: "English" },
+};
+
+const englishMediumVoice = {
+  key: "en_GB-alan-medium",
+  name: "alan",
+  quality: "medium",
+  language: { code: "en_GB", name_english: "English" },
+};
+
+const americanMediumVoice = {
+  key: "en_US-amy-medium",
+  name: "amy",
+  quality: "medium",
+  language: { code: "en_US", name_english: "English" },
+};
+
 const portugueseVoice = {
   key: "pt_BR-faber-medium",
   name: "faber",
@@ -386,6 +407,39 @@ describe("speak", () => {
     await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
 
     expect(worker.sent[0].voiceId).toBe("pt_BR-faber-medium");
+  });
+
+  it("prefers a medium voice over a low one of the same language", async () => {
+    mockVoices.mockResolvedValue([englishLowVoice, englishMediumVoice]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak("Hello there.");
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("en_GB-alan-medium");
+  });
+
+  it("prefers a medium voice over a high one, which is a bigger download", async () => {
+    mockVoices.mockResolvedValue([englishVoice, englishMediumVoice]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak("Hello there.");
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("en_GB-alan-medium");
+  });
+
+  it("prefers the browser's region among voices of the same quality", async () => {
+    mockVoices.mockResolvedValue([englishMediumVoice, americanMediumVoice]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak("Hello there.");
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("en_US-amy-medium");
   });
 
   it("keeps a chosen voice whatever the answer's language", async () => {
