@@ -41,6 +41,19 @@ describe("generateRelatedSearchQuery", () => {
     expect(messages[2].content).toContain("name that thing in the query");
   });
 
+  it("asks the model to keep a relative date as written, for the date anchor to resolve", async () => {
+    await generateRelatedSearchQuery([
+      { role: "user", content: "who won the world series" },
+      { role: "assistant", content: "The Dodgers won the 2026 World Series." },
+      { role: "user", content: "who won it last year" },
+    ]);
+
+    const [messages] = mockGenerateReplyToMessages.mock.calls[0];
+    // Given today's date instead, Gemma 3 4B wrote "November 2026" for
+    // "next month" on 2026-11-19; `normalizeRelativeDates` gets it right.
+    expect(messages[2].content).toContain("copy it word for word");
+  });
+
   it("returns nothing when the generation fails", async () => {
     mockGenerateReplyToMessages.mockRejectedValueOnce(new Error("offline"));
 
