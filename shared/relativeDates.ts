@@ -309,10 +309,10 @@ const YEAR = "(?<!\\d)(?:19|20)\\d{2}(?!\\d)";
 /**
  * A year a model writes into a query, alone, as a range or a season, after a
  * month name, or glued to Chinese text: "2023", "2023-2025", "2024-25",
- * "November 2026", "2026年11月".
+ * "November 2026", "2026年11月", "2025 年".
  */
 const WRITTEN_DATE = new RegExp(
-  `(?:\\b(?:${MONTH_NAMES.join("|")})\\s+)?${YEAR}(?:\\s*[-–/]\\s*${YEAR}|[-–/]\\d{2}(?!\\d))?(?:年(?:\\d{1,2}月)?)?`,
+  `(?:\\b(?:${MONTH_NAMES.join("|")})\\s+)?${YEAR}(?:\\s*[-–/]\\s*${YEAR}|[-–/]\\d{2}(?!\\d))?(?:\\s*年(?:\\d{1,2}月)?)?`,
   "gi",
 );
 

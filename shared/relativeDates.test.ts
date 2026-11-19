@@ -267,6 +267,7 @@ describe("normalizeFollowUpDates", () => {
     ["明年的呢", "苹果 2025 新手机 发布时间", "苹果 新手机 发布时间 2027年"],
     ["明年的呢", "iPhone 16发布时间 2027", "iPhone 16发布时间 2027年"],
     ["明年的呢", "苹果 2026年11月 发布会", "苹果 发布会 2027年"],
+    ["明年的呢", "2025 年 iPhone 发布日期新闻", "iPhone 发布日期新闻 2027年"],
     [
       "what happened last year",
       "WWE Crown Jewel incidents 2023-2025",
