@@ -297,7 +297,14 @@ describe("runFollowUpSearch", () => {
 
     try {
       await runFollowUpSearch(
-        [{ role: "user", content: "who won it last year" }],
+        [
+          { role: "user", content: "who won the world series" },
+          {
+            role: "assistant",
+            content: "The Dodgers won the 2026 World Series.",
+          },
+          { role: "user", content: "who won it last year" },
+        ],
         "who won it last year",
         makeSettings(),
         [],

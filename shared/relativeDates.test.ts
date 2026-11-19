@@ -303,6 +303,16 @@ describe("normalizeFollowUpDates", () => {
     ).toBe("Cyberpunk 2077 sales 2025");
   });
 
+  it("keeps a number after a spaced dash, which is not a season", () => {
+    expect(
+      normalizeFollowUpDates(
+        "best TVs 2026 - 55 inch",
+        ["what were the best TVs last year"],
+        AS_OF,
+      ).searchQuery,
+    ).toBe("best TVs - 55 inch 2025");
+  });
+
   it("leaves the model's dates alone when the question has no relative date", () => {
     expect(
       normalizeFollowUpDates("world series 2023 winner", ["who won it"], AS_OF)
