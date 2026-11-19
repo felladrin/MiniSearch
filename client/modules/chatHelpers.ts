@@ -1,3 +1,4 @@
+import { normalizeRelativeDates } from "@shared/relativeDates";
 import {
   getCurrentSearchRunId,
   type ImageResults,
@@ -174,7 +175,13 @@ export async function runFollowUpSearch(
 ): Promise<void> {
   const { generateRelatedSearchQuery } = await import("./relatedSearchQuery");
   const relatedQuery = await generateRelatedSearchQuery([...messages]);
-  const searchQuery = relatedQuery || currentInput;
+  // Same anchor as the first search in `startTextSearch`: "next month" names no
+  // year to the engine, and only this machine's clock knows which one is meant.
+  const searchQuery = normalizeRelativeDates(
+    relatedQuery || currentInput,
+    new Date(),
+    { maxLength: 2000 },
+  ).searchQuery;
 
   const searchRunId = getCurrentSearchRunId();
   let pageContentsRead = Promise.resolve();
