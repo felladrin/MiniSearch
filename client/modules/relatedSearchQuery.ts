@@ -20,6 +20,8 @@ ${question}
 
 The query must make sense on its own, without the rest of the conversation: if the question refers to something mentioned earlier, name that thing in the query.
 
+If the question has a relative date, copy it word for word instead of writing a date.
+
 Ensure the generated web search query is in the same language as the question above.
 
 Respond with only the search query text, no quotes or additional text.`,
