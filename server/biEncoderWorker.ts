@@ -1,12 +1,9 @@
 /**
- * The bi-encoder's ONNX session, running off the main thread.
- *
  * `onnxruntime-node` runs inference synchronously on whichever JS thread calls
- * it, so scoring a 200-passage pool used to stop the server's event loop for
- * hundreds of milliseconds — no other request could be served while a single
- * page-content read was ranking its passages. Here that work blocks only this
- * thread. The model is loaded here for the same reason: the ~450 MB of weights
- * must live in the worker's memory, not the main thread's.
+ * it, and scoring a 200-passage pool takes hundreds of milliseconds, so it runs
+ * on this thread instead of the server's event loop. The model is loaded here
+ * for the same reason: the ~450 MB of weights must live in the worker's memory,
+ * not the main thread's.
  *
  * Node loads this file directly (type stripping), so keep it to syntax that
  * erases: no enums, no parameter properties, no namespaces.
@@ -37,9 +34,9 @@ const MODEL_HF_REPO =
 const MODEL_HF_FILE = "onnx/model.onnx";
 
 /**
- * Maximum tokens per encoding. The model was trained with a 256-token limit;
- * passages longer than that are truncated from the end, which is where the
- * passage content sits after the query prefix.
+ * The model was trained with a 256-token limit; passages longer than that are
+ * truncated from the end, which is where the passage content sits after the
+ * query prefix.
  */
 const MAX_SEQUENCE_LENGTH = 256;
 
@@ -71,9 +68,6 @@ interface EncodeResult {
 }
 
 /**
- * Encodes a batch of texts into normalized embedding vectors with one
- * `session.run()` per length bucket.
- *
  * Rows are sorted by token length and cut into buckets of at most
  * `BATCH_ROWS`, so each batch pads to its own near-uniform width instead of
  * the global max: attention is O(L^2), and padding a mixed-length chunk out
@@ -178,7 +172,6 @@ async function encodeBatch(
         }
       }
 
-      // L2 normalize.
       let norm = 0;
       for (let d = 0; d < dim; d++) {
         norm += pooled[d] * pooled[d];
@@ -197,10 +190,7 @@ async function encodeBatch(
   return { embeddings, runDimensions };
 }
 
-/**
- * Computes cosine similarity between a query embedding and passage embeddings.
- * Both are assumed to be L2-normalized, so cosine similarity = dot product.
- */
+/** Both are assumed to be L2-normalized, so cosine similarity = dot product. */
 function cosineSimilarities(
   query: Float32Array,
   passages: Float32Array[],

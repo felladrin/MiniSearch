@@ -21,9 +21,9 @@ export function incrementGraphicalSearchesSinceLastRestart() {
   graphicalSearchesSinceLastRestart++;
 }
 
-// The three counters below stand in for the per-search log lines that used to
-// carry the query text: how often each case happens is what anyone acts on, and
-// that survives without recording what was searched for.
+// The three counters below stand in for per-search log lines, which would carry
+// the query text: how often each case happens is what anyone acts on, and that
+// survives without recording what was searched for.
 
 let searchesWithoutResultsSinceLastRestart = 0;
 let searchesWithUnresponsiveEnginesSinceLastRestart = 0;
@@ -55,10 +55,9 @@ export function incrementSearchesWithAllResultsDiscardedSinceLastRestart() {
 
 // The fallback is only consulted after SearXNG has already failed, so these two
 // say whether the second source pulls its weight: served is a search the caller
-// got anyway, failed is one that ended as the 502 there was before it existed,
-// including a search whose SearXNG retries left the deadline too little time to
-// ask the fallback at all. A search with the fallback off, or an image search,
-// lands in neither.
+// got anyway, failed is one that still ended as a 502, including a search whose
+// SearXNG retries left the deadline too little time to ask the fallback at all.
+// A search with the fallback off, or an image search, lands in neither.
 let searchesServedByFallback = 0;
 let searchesFailedOnFallback = 0;
 
@@ -107,7 +106,6 @@ export function getOfficialLaneStats() {
   };
 }
 
-/** One engine SearXNG reported as unresponsive, with the reason it gave. */
 export interface UnresponsiveEngine {
   engine: string;
   reason: string;
@@ -128,7 +126,6 @@ export interface UnresponsiveEngine {
  */
 export type EngineFailure = "blocked" | "timeout" | "other";
 
-/** Which engines failed, how often, and what the last failure was. */
 const unresponsiveEngines = new Map<
   string,
   { failures: number; lastFailure: EngineFailure }
@@ -138,7 +135,7 @@ const unresponsiveEngines = new Map<
  * The search types whose last search was lost to unresponsive engines. Keyed by
  * type because text and image searches go out to different engine pools: with
  * one shared flag, the image search the client fires after a failed text search
- * cleared the degradation the text engines were still in.
+ * would clear the degradation the text engines are still in.
  */
 const searchTypesFailingOnEngines = new Set<SearchType>();
 

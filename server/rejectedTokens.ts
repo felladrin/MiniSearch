@@ -4,8 +4,8 @@
  * A process verifies against one search token for its whole life, so a token
  * that failed once cannot become valid again in this process: the lookup is
  * exact rather than a heuristic. A replay of a dead token then costs a Set
- * check instead of a full argon2id verification, which is what a stream of
- * dead search URLs from earlier deployments used to pay.
+ * check instead of a full argon2id verification, which a stream of dead search
+ * URLs from earlier deployments would otherwise pay.
  */
 const rejectedTokens = new Set<string>();
 

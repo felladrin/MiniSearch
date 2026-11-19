@@ -6,8 +6,6 @@ import type {
 } from "./pageExcerptWorkerProtocol";
 
 /**
- * Answers one allocation request with the worker's response message.
- *
  * Exported as a plain function so the handler can be tested directly under
  * jsdom - no bundler, no live worker - and so the worker's answer is
  * provably the same computation the synchronous fallback runs.

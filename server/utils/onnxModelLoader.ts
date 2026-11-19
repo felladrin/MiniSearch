@@ -13,10 +13,6 @@ const SERVER_DIR = path.resolve(
 
 const printMessage = createModelLogger(path.basename(import.meta.url));
 
-/**
- * Creates a debug logger with the same enabled-always behavior used by the
- * model services.
- */
 export function createModelLogger(moduleName: string) {
   const printMessage = debug(moduleName);
   printMessage.enabled = true;
@@ -123,8 +119,7 @@ function resolvePadTokenId(
 
 /**
  * Downloads model files from a Hugging Face repo and returns a ready
- * inference session, tokenizer, and the tokenizer's real pad token id. The
- * tokenizer files use the standard Hugging Face names when not overridden.
+ * inference session, tokenizer, and the tokenizer's real pad token id.
  */
 export async function loadOnnxModel(
   modelRepo: string,

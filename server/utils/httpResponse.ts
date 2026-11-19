@@ -21,9 +21,6 @@ export function sendJsonError(
   safeEndResponse(response, JSON.stringify(payload));
 }
 
-/**
- * Sends a 400 response with the first Zod validation error message.
- */
 export function sendValidationError(
   response: ServerResponse,
   error: ZodError,

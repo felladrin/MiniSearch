@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 
 /**
- * Changelog Guard
- *
  * The GitHub Release body is built from changelog.md, not from
  * --generate-notes (see .github/workflows/publish-docker-image.yml). That
  * mechanism publishes whatever the changelog contains and never notices a

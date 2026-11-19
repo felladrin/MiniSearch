@@ -38,7 +38,6 @@ describe("Search Module", () => {
       maxEntries: 100,
       enabled: true,
     });
-    // Clear the fake IndexedDB database so each test starts fresh.
     await searchModule.searchServiceInstance.clearSearchCache();
     // Clear mocks after clearSearchCache so addLogEntry starts empty.
     vi.clearAllMocks();
@@ -222,12 +221,9 @@ describe("Search Module", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    // Each row has to reach the branch it is named for. The three tests these
-    // replaced did not: one asserted `response.json()` on the fetch mock
-    // without ever calling `performSearch`, and the other two rejected with a
-    // plain Error, which matches neither `AbortError` nor the lowercase
-    // "network" the wrapper looks for, so both only watched a raw error
-    // propagate.
+    // Each row has to reach the branch it is named for. A plain Error matches
+    // neither `AbortError` nor the lowercase "network" the wrapper looks for,
+    // so a row that rejects with one only watches a raw error propagate.
     it.each([
       [
         "wraps a body it cannot parse",
@@ -409,12 +405,10 @@ describe("Search Module", () => {
         json: vi.fn().mockResolvedValue(mockResults),
       });
 
-      // First call — cache miss, fetches from network.
       const firstResults = await searchModule.searchText("cached query");
       expect(firstResults).toEqual({ results: mockResults, stale: false });
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
-      // Second call with the same query — should be a cache hit.
       const secondResults = await searchModule.searchText("cached query");
       expect(secondResults).toEqual({ results: mockResults, stale: false });
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -492,7 +486,6 @@ describe("Search Module", () => {
       await searchModule.searchText("ttl query");
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
-      // Expire the cache entry instantly.
       searchModule.searchServiceInstance.updateCacheConfig({ ttl: 0 });
 
       const secondResults = await searchModule.searchText("ttl query");
@@ -531,7 +524,6 @@ describe("Search Module", () => {
       await searchModule.searchImages("cross-store query");
       expect(mockFetch).toHaveBeenCalledTimes(2);
 
-      // Repeat the image query — should hit the image cache, not the network.
       await searchModule.searchImages("cross-store query");
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
@@ -547,12 +539,10 @@ describe("Search Module", () => {
         json: vi.fn().mockResolvedValue(mockResults),
       });
 
-      // First call: cache miss, fetches and caches.
       const first = await searchModule.searchText("stale query");
       expect(first).toEqual({ results: mockResults, stale: false });
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
-      // Expire the entry and make the live search fail.
       searchModule.searchServiceInstance.updateCacheConfig({ ttl: 0 });
       mockFetch.mockRejectedValue(new Error("upstream refused the connection"));
 
@@ -566,8 +556,6 @@ describe("Search Module", () => {
     });
 
     it("should still fail when the live search fails and nothing is cached to serve", async () => {
-      // No prior successful search for this query, so a failure has no stale
-      // result to fall back on and must surface as a failed search.
       mockFetch.mockRejectedValue(new Error("upstream refused the connection"));
 
       await expect(

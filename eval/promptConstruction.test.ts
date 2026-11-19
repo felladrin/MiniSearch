@@ -61,10 +61,8 @@ describe("answer eval: prompt construction", () => {
     expect(messages[2].content).toBe(golden.query);
 
     const systemTurn = messages[0].content;
-    // The {{searchResults}} and {{currentDate}} placeholders are filled.
     expect(systemTurn).not.toContain("{{searchResults}}");
     expect(systemTurn).not.toContain("{{currentDate}}");
-    // Every candidate result is present in the prompt.
     for (const { url } of golden.results) {
       expect(systemTurn).toContain(url);
     }

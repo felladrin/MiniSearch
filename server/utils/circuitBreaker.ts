@@ -30,7 +30,6 @@ export class CircuitBreaker {
     this.options = { ...defaultOptions, ...options };
   }
 
-  /** Runs `fn` under the named circuit, tripping it after repeated failures. */
   async execute<T>(key: string, fn: () => Promise<T>): Promise<T> {
     if (!this.allows(key)) {
       throw new Error(`Circuit breaker is open for ${key}`);
@@ -47,11 +46,10 @@ export class CircuitBreaker {
   }
 
   /**
-   * Whether a call under the named circuit may go ahead right now. An open
-   * circuit whose reset timeout has elapsed becomes half-open here, so the
-   * caller that asked is the one that probes it. With `recordSuccess` and
-   * `recordFailure` this is `execute` taken apart, for a caller whose
-   * failures are return values rather than exceptions.
+   * An open circuit whose reset timeout has elapsed becomes half-open here, so
+   * the caller that asked is the one that probes it. With `recordSuccess` and
+   * `recordFailure` this is `execute` taken apart, for a caller whose failures
+   * are return values rather than exceptions.
    */
   allows(key: string): boolean {
     const metrics = this.metrics.get(key);
@@ -63,7 +61,6 @@ export class CircuitBreaker {
     return true;
   }
 
-  /** A success under the named circuit: clears its failures, or closes it after a probe. */
   recordSuccess(key: string): void {
     // A circuit nothing has failed under is closed with no failures already,
     // so a success on it has nothing to record and no entry to create.
@@ -80,7 +77,6 @@ export class CircuitBreaker {
     }
   }
 
-  /** A failure under the named circuit, opening it at the threshold. */
   recordFailure(key: string): void {
     const metrics = this.getOrCreateMetrics(key);
 
@@ -107,9 +103,8 @@ export class CircuitBreaker {
   }
 
   /**
-   * How often this circuit has opened. A closed circuit says nothing about
-   * whether the instance spent the last hour serving no searches at all, which
-   * is what this answers.
+   * A closed circuit says nothing about whether the instance spent the last
+   * hour serving no searches at all, which is what this answers.
    */
   getOpens(key: string): number {
     return this.metrics.get(key)?.opens ?? 0;

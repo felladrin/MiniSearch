@@ -3,7 +3,6 @@ import { dcgAtK, ndcgAtK, recallAtK } from "./metrics.ts";
 
 describe("dcgAtK", () => {
   it("discounts relevance by position", () => {
-    // A single relevant result at rank 1 scores higher than at rank 2.
     expect(dcgAtK([1, 0], 2)).toBe(1 / Math.log2(2));
     expect(dcgAtK([0, 1], 2)).toBeCloseTo(1 / Math.log2(3));
   });
@@ -36,7 +35,6 @@ describe("ndcgAtK", () => {
   });
 
   it("scores against an ideal top-k when there are more relevant urls than k", () => {
-    // Three relevant urls, k=2: ideal top-2 is two relevant urls.
     const relevant = ["a", "b", "c"];
     const topTwoRelevant = ndcgAtK(["a", "b", "c"], relevant, 2);
     const oneRelevantInTopTwo = ndcgAtK(["c", "d", "a"], relevant, 2);

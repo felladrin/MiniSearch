@@ -17,8 +17,6 @@ function getSearchToken(): Promise<string> {
 }
 
 /**
- * Resolves the `src` of an image result's thumbnail.
- *
  * An empty string means the result carried no thumbnail and there is nothing
  * to load. A `data:` URL is used as is: entries cached by an older build
  * stored the thumbnail bytes in the result itself, and they would not pass

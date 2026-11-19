@@ -64,7 +64,6 @@ test("restoring a history entry closes the drawer and writes the query back", as
   const drawer = await openHistoryDrawer(page);
   await drawer.getByText(QUERY, { exact: true }).click();
 
-  // Selecting an entry fires onSearchSelect, which closes the drawer.
   await expect(page.getByRole("dialog")).toBeHidden();
   await expect(page.getByRole("textbox")).toHaveValue(QUERY);
 });

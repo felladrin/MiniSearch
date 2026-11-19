@@ -62,9 +62,8 @@ describe("statusEndpointServerHook", () => {
   it("publishes the web search verdict and the per-engine tally", async () => {
     const status = await callStatus();
 
-    // Passed through rather than recomputed: the hook used to derive this
-    // field itself from a liveness probe, which reported an open circuit as
-    // healthy.
+    // Passed through rather than recomputed: a liveness probe reports an open
+    // circuit as healthy.
     expect(status.webSearchServiceStatus).toBe("degraded");
     expect(status.searches).toMatchObject({
       degradedSearchTypes: [],

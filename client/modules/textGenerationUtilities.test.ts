@@ -102,7 +102,7 @@ function createDeadWorker() {
 
 beforeEach(() => {
   // No worker unless a test installs one: the other tests then take the
-  // synchronous fallback, which is what they verified before the worker.
+  // synchronous fallback.
   setWorkerFactory(() => {
     throw new Error("no worker factory configured");
   });
@@ -272,8 +272,7 @@ describe("getFormattedSearchResults", () => {
   });
 
   it("adds no tag or relevance note when the results carry no score", async () => {
-    // History-restored and eval results have no score; their prompt must stay
-    // exactly what it was before the score existed, disclaimer aside.
+    // History-restored and eval results have no score.
     const formatted = await getFormattedSearchResults(true);
 
     expect(formatted).toBe(

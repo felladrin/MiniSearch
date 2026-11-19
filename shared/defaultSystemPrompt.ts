@@ -9,9 +9,8 @@
  * client/modules/systemPrompt.ts.
  */
 /**
- * The citation example inside the prompt, on a placeholder domain: the
- * previous example, a real video link, was copied by small models as if it
- * were one of the sources.
+ * The citation example inside the prompt, on a placeholder domain: small
+ * models copy a real link in the example as if it were one of the sources.
  */
 export const CITATION_EXAMPLE = "[example.com](https://example.com/page)";
 

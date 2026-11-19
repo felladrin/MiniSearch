@@ -254,9 +254,8 @@ export function internalApiEndpointServerHook<
         let model = process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL;
         let availableModels: { id: string }[] = [];
         const attemptedModels = new Set<string>();
-        // Tracks whether a mid-request model-list re-fetch has already run.
         // Set before the try so a failing `/models` endpoint does not trigger
-        // another refetch on the next failed attempt — we already gave it a shot.
+        // another refetch on the next failed attempt.
         let hasRefetched = false;
 
         if (!model) {
@@ -399,10 +398,9 @@ export function internalApiEndpointServerHook<
             if (hasEmittedContent) break;
             if (attempt >= maxAttempts) break;
 
-            // Re-list when every model in the current pool has been attempted
-            // and we have not already re-listed this request. A provider whose
-            // pool changes mid-flight needs a fresh listing to recover; without
-            // the `!hasRefetched` guard we would loop on a stale list.
+            // A provider whose pool changes mid-flight needs a fresh listing to
+            // recover; without the `!hasRefetched` guard we would loop on a
+            // stale list.
             if (
               !process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL &&
               availableModels.every((m) => attemptedModels.has(m.id)) &&

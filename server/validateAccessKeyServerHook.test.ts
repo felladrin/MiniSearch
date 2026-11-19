@@ -135,7 +135,6 @@ describe("validateAccessKeyServerHook", () => {
     });
 
     expect(res.end).toHaveBeenCalledWith(JSON.stringify({ valid: true }));
-    // The request was within budget, so the limiter let it through.
     expect(mockConsumeRateLimitPoint).toHaveBeenCalledTimes(1);
   });
 

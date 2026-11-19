@@ -15,8 +15,7 @@ import { safeEndResponse } from "./utils/streamUtils.ts";
 import { thumbnailRateLimiter } from "./verifyTokenAndRateLimit.ts";
 
 /**
- * Security review for issue #2524 (audited 2026-09-17). What each item of
- * the audit checklist maps to:
+ * Where each SSRF defense of this endpoint lives:
  *
  * - Private ranges (10/8, 172.16/12, 192.168/16), link-local including
  *   the cloud metadata address 169.254.169.254, loopback (127/8, ::1),
@@ -45,20 +44,19 @@ import { thumbnailRateLimiter } from "./verifyTokenAndRateLimit.ts";
  *   plus the shared token gate bound the total, and a global cap would let
  *   one caller's grid starve every other user's tiles.
  *
- * Residual risk after this change: the endpoint still fetches arbitrary
- * public URLs, so a caller can use it to GET any public host — bounded by
- * the rate limiter, the size cap and the timeout, and useful only for
- * raster images. The pinned address is the one DNS gave at vetting time; a
- * host whose DNS later repoints stays unreachable here until its records
- * are re-checked, which is the pin working, not failing. Content itself is
- * untrusted: served same-origin, it carries `nosniff` and a sandbox CSP,
- * and only raster types pass the allowlist, so no script-carrying format
- * reaches a browser. `/page-content` has not adopted the pin yet and still
- * carries the old rebinding residual (see `resolvePublicUrl`'s docstring).
+ * Residual risk: the endpoint fetches arbitrary public URLs, so a caller can
+ * use it to GET any public host — bounded by the rate limiter, the size cap
+ * and the timeout, and useful only for raster images. The pinned address is
+ * the one DNS gave at vetting time; a host whose DNS later repoints stays
+ * unreachable here until its records are re-checked, which is the pin
+ * working, not failing. Content itself is untrusted: served same-origin, it
+ * carries `nosniff` and a sandbox CSP, and only raster types pass the
+ * allowlist, so no script-carrying format reaches a browser. `/page-content` does not pin, so it keeps the rebinding
+ * window (see `resolvePublicUrl`'s docstring).
  */
 
 /**
- * Off the critical path: the search response no longer waits on a thumbnail,
+ * Off the critical path: the search response does not wait on a thumbnail,
  * so the budget is set against how long a user tolerates a placeholder tile,
  * not against the whole grid. It bounds the redirect hops too, DNS included.
  */
@@ -71,8 +69,7 @@ const MAX_THUMBNAIL_URL_LENGTH = 2048;
 /**
  * Raster types only, by name: the response is served same-origin, and an SVG
  * loaded by direct navigation is a document whose scripts would run on this
- * origin. A data URL in an `<img>` (what the old search path produced) stays
- * inert; this endpoint must not open that door.
+ * origin.
  */
 const ACCEPTED_CONTENT_TYPES = [
   "image/avif",

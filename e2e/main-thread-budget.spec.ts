@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { expect, type Page, test } from "@playwright/test";
 
-// Issue #2571: keep long tasks off the main thread while an answer streams.
+// Keep long tasks off the main thread while an answer streams.
 //
 // A `longtask` PerformanceObserver is installed via addInitScript BEFORE the
 // app boots, so it sees every task the app runs. The streaming window is
@@ -41,8 +41,7 @@ test.use({ channel: "chromium" });
 
 // Multi-paragraph markdown with links but NO code block: this exercises the
 // per-frame markdown re-parse and the citation-link listeners without
-// triggering Shiki. The full-bundle Shiki load is a separate, known long
-// task (see the annotation below) addressed by perf/shiki-lazy-language-subset.
+// triggering Shiki.
 const ANSWER = [
   "MiniSearch runs the whole search-and-answer loop in your browser, so the",
   "answer streams token by token while the page stays interactive.",
@@ -300,7 +299,6 @@ test.describe("main-thread budget during answer streaming", () => {
 
     await page.goto("/?q=minisearch");
 
-    // The search settles with results on screen.
     await expect(page.getByTestId("search-result-link").first()).toBeVisible({
       timeout: 30_000,
     });
@@ -318,7 +316,6 @@ test.describe("main-thread budget during answer streaming", () => {
     // task ends; settle so the last entries are recorded before we read.
     await page.waitForTimeout(300);
 
-    // Close the streaming window in page-clock terms, then read the probe.
     const { tasks, window: streamWindow } = await page.evaluate(() => {
       const w = window as unknown as {
         __longTasks: Array<{
@@ -348,11 +345,6 @@ test.describe("main-thread budget during answer streaming", () => {
       { start: 0, duration: 0, attribution: "none" },
     );
 
-    // Known long task NOT on this path: the first code block in an answer
-    // pays for Shiki's full language bundle (client/modules/shiki.ts). This
-    // spec deliberately streams a code-block-free answer so the assertion
-    // stays enabled on the path that passes today. perf/shiki-lazy-language-subset
-    // removes that long task; when it lands, a code block can join this answer.
     test.info().annotations.push({
       type: "known-long-task",
       description:

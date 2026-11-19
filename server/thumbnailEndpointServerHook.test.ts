@@ -580,7 +580,6 @@ describe("thumbnailEndpointServerHook", () => {
     // load.
     await load(firstUrl);
     expect(fetched(firstUrl)).toBe(1);
-    // secondUrl (least recently used) was evicted and fetches again.
     await load(secondUrl);
     expect(fetched(secondUrl)).toBe(2);
   });

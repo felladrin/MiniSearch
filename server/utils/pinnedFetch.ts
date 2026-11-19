@@ -24,8 +24,6 @@ export interface CappedReadable extends AsyncIterable<Uint8Array> {
  * against the IP being dialled, and the `Host` header is set explicitly so
  * virtual-host routing is unaffected.
  *
- * @param url - The URL to fetch; its protocol picks http or https
- * @param address - The vetted IP literal to connect to, IPv4 or IPv6
  * @throws When the protocol is not http(s) or the request fails
  */
 export function requestPinnedToVettedAddress(

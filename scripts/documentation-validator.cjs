@@ -1,16 +1,8 @@
 #!/usr/bin/env node
 
-/**
- * Documentation Link Validator
- *
- * This script validates that all linked files in documentation exist.
- * It checks markdown files for internal links and verifies the targets exist.
- */
-
 const fs = require("node:fs");
 const path = require("node:path");
 
-// Configuration
 const defaultDocsDir = path.join(__dirname, "..");
 // The .yml issue forms are listed so a renamed or deleted template is caught;
 // they only link out today, so the link check finds nothing in them.
@@ -25,7 +17,6 @@ const documentationFiles = [
   ".github/ISSUE_TEMPLATE/security_vulnerability.yml",
 ];
 
-// Regex patterns for finding internal links
 const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
 const htmlLinkRegex = /<a[^>]+href="([^"]+)"[^>]*>/g;
 
@@ -35,7 +26,6 @@ function validateFile(filePath, docsDir = defaultDocsDir) {
     const relativePath = path.relative(docsDir, filePath);
     const issues = [];
 
-    // Find all markdown links
     let match;
     while (true) {
       match = markdownLinkRegex.exec(content);
@@ -43,7 +33,6 @@ function validateFile(filePath, docsDir = defaultDocsDir) {
       const linkText = match[1];
       const linkTarget = match[2];
 
-      // Skip external links, anchors, and email links
       if (
         linkTarget.startsWith("http") ||
         linkTarget.startsWith("mailto:") ||
@@ -53,10 +42,8 @@ function validateFile(filePath, docsDir = defaultDocsDir) {
         continue;
       }
 
-      // Resolve the target path
       const targetPath = path.resolve(path.dirname(filePath), linkTarget);
 
-      // Check if target exists
       if (!fs.existsSync(targetPath)) {
         issues.push({
           type: "missing-file",
@@ -67,13 +54,11 @@ function validateFile(filePath, docsDir = defaultDocsDir) {
       }
     }
 
-    // Find all HTML links
     while (true) {
       match = htmlLinkRegex.exec(content);
       if (match === null) break;
       const linkTarget = match[1];
 
-      // Skip external links and anchors
       if (
         linkTarget.startsWith("http") ||
         linkTarget.startsWith("mailto:") ||
@@ -82,10 +67,8 @@ function validateFile(filePath, docsDir = defaultDocsDir) {
         continue;
       }
 
-      // Resolve the target path
       const targetPath = path.resolve(path.dirname(filePath), linkTarget);
 
-      // Check if target exists
       if (!fs.existsSync(targetPath)) {
         issues.push({
           type: "missing-file",

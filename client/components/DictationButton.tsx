@@ -284,8 +284,8 @@ export default memo(function DictationButton({
 
   // One string for the tooltip and the accessible name, so the icon-only
   // button never says one thing on screen and another to a screen reader.
-  // The download progress rides on it too: it is the only feedback the button
-  // has left now that it has no text of its own.
+  // The download progress rides on it too: it is the only feedback a button
+  // with no text of its own has.
   const label =
     phase === "loading"
       ? `Loading the dictation model${percent}`
@@ -327,7 +327,7 @@ export default memo(function DictationButton({
         ) : recording ? (
           // A shape change, not only the red: an icon-only control whose
           // state is carried by color alone is unreadable to a colorblind
-          // user, and this one has no text left to fall back on.
+          // user, and this one has no text to fall back on.
           <IconPlayerStopFilled size={16} />
         ) : (
           <IconMicrophone size={18} />

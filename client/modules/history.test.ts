@@ -338,7 +338,6 @@ describe("History Module - Dexie CRUD", () => {
 
       const [entry] = await getRecentSearches();
       expect(entry.imageResults).toEqual(updatedResults);
-      // Verify spread preserves original textResults
       expect(entry.textResults).toEqual(initialResults);
     });
   });
@@ -393,7 +392,6 @@ describe("History Module - Dexie CRUD", () => {
       };
 
       await addSearchToHistory("multi llm", results);
-      // Save "second" first with a later timestamp, "first" second with earlier timestamp.
       vi.setSystemTime(new Date(2000, 0, 2));
       await saveLlmResponseForQuery("multi llm", "second", "m");
       vi.setSystemTime(new Date(2000, 0, 1));
@@ -409,7 +407,6 @@ describe("History Module - Dexie CRUD", () => {
         "./history"
       );
 
-      // Insert an LLM response with a known searchRunId directly
       await historyDatabase.llmResponses.add({
         searchRunId: "my-query-fallback",
         prompt: "legacy key test",
@@ -418,7 +415,6 @@ describe("History Module - Dexie CRUD", () => {
         timestamp: Date.now(),
       });
 
-      // Entry without searchRunId should resolve via entry.query fallback
       const entryWithoutRunId = {
         id: -1,
         query: "my-query-fallback",
@@ -481,9 +477,8 @@ describe("History Module - Dexie CRUD", () => {
         items: [{ title: "T", url: "https://t.com", snippet: "S" }],
       };
 
-      // Add entries; each triggers cleanup after the transaction completes.
-      // Before the fix, the creating hook ran cleanup inside the add transaction,
-      // and the async import caused a TransactionInactiveError.
+      // Cleanup must run after the add transaction completes: inside it, the
+      // async import causes a TransactionInactiveError.
       for (let i = 0; i < 8; i++) {
         const id = await addSearchToHistory(`query ${i}`, results);
         expect(id).toBeDefined();
@@ -511,7 +506,6 @@ describe("History Module - Dexie CRUD", () => {
 
       const { historyDatabase } = await import("./history");
 
-      // Two overlapping calls should share the same in-flight promise
       const p1 = historyDatabase.runCleanup();
       const p2 = historyDatabase.runCleanup();
       expect(p1).toBe(p2);

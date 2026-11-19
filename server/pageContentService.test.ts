@@ -402,8 +402,8 @@ describe("splitIntoPassages", () => {
   });
 
   it("breaks a long block at sentence boundaries in any script", () => {
-    // A regular expression over `[.!?]` finds no boundary here, so the block
-    // used to be cut at an arbitrary character in the middle of a sentence.
+    // A regular expression over `[.!?]` finds no boundary here, so it would
+    // cut the block at an arbitrary character in the middle of a sentence.
     const passages = splitIntoPassages(
       "猫每天睡十二到十六个小时，年长的猫睡得更久。".repeat(80),
     );
@@ -444,7 +444,6 @@ describe("splitIntoPassages", () => {
     for (const passage of passages) {
       expect(passage.length).toBeLessThanOrEqual(1200);
     }
-    // The overlap: the second piece starts with the tail of the first.
     const overlap = passages[0].slice(-long.length).trim();
     expect(passages[1].startsWith(overlap)).toBe(true);
   });
@@ -456,7 +455,6 @@ describe("splitIntoPassages", () => {
     for (const passage of passages) {
       expect(passage.length).toBeLessThanOrEqual(1200);
     }
-    // The overlap is a fixed tail, not a sentence.
     const overlap = passages[0].slice(-200);
     expect(passages[1].startsWith(overlap)).toBe(true);
   });
@@ -587,12 +585,12 @@ describe("selectPassages", () => {
 });
 
 /**
- * The picker used to score by splitting on `[^\p{L}\p{N}]+`, which finds no
- * boundary in scripts that write none and shredded the ones that write words
- * with combining marks. Every query below then matched nothing, scoring fell
- * through to document order, and the boilerplate placed first won. Each case
- * puts the off-topic passage first and allows a budget that fits exactly one,
- * so document order and relevance cannot both be right.
+ * Splitting on `[^\p{L}\p{N}]+` finds no boundary in scripts that write none
+ * and shreds the ones that write words with combining marks: every query below
+ * would match nothing, scoring would fall through to document order, and the
+ * boilerplate placed first would win. Each case puts the off-topic passage
+ * first and allows a budget that fits exactly one, so document order and
+ * relevance cannot both be right.
  */
 describe("selectPassages across scripts", () => {
   const cases = [
@@ -683,7 +681,6 @@ describe("selectPassages across scripts", () => {
 describe.each(["lexical", "dense"])(
   "selectPassagesAcrossPages (%s)",
   (mode) => {
-    // Helper to call the internal selector indirectly through fetchPageContents.
     async function selectFrom(urls: string[], htmls: string[]) {
       if (mode === "dense") {
         scorePassagesMock.mockImplementation(async (_query, pool: string[]) =>
@@ -728,12 +725,11 @@ describe.each(["lexical", "dense"])(
 
     it("drops a page whose passages are all near-duplicates of an earlier page", async () => {
       // Page A has one passage. Page B has one near-duplicate passage
-      // (Jaccard >= 0.9). The new global dedup should suppress B's copy,
-      // leaving B with no selected passages so it vanishes from the response.
-      // The old per-page code would have returned both pages.
-      // Note: with a query that matches no terms, A wins purely on flatten
-      // order (lower global index), not on relevance. The test guards the
-      // dedup drop path, not the ranking order.
+      // (Jaccard >= 0.9). The global dedup suppresses B's copy, leaving B with
+      // no selected passages so it vanishes from the response.
+      // With a query that matches no terms, A wins purely on flatten order
+      // (lower global index), not on relevance. The test guards the dedup drop
+      // path, not the ranking order.
       const base =
         "word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 ";
       const passageA = base.repeat(15);
@@ -747,7 +743,6 @@ describe.each(["lexical", "dense"])(
         ],
       );
 
-      // Only page A should survive; page B's sole passage is a near-duplicate.
       expect(contents).toHaveLength(1);
       expect(contents[0].url).toContain("/a");
     });
@@ -795,8 +790,8 @@ describe("page read counters", () => {
       httpOtherError: 1,
     });
 
-    // A PDF is no longer dropped as notADocument; it goes through the passage
-    // pipeline and is counted as read (or tooLittleText if the text is short).
+    // A PDF goes through the passage pipeline and is counted as read (or
+    // tooLittleText if the text is short), not as notADocument.
     pdfGetTextMock.mockResolvedValue({
       text: "CAT SLEEPS 16 HOURS A DAY. ".repeat(20),
     });
@@ -808,7 +803,6 @@ describe("page read counters", () => {
     );
     const pdfOutcome = await countOutcomes("https://example.com/a.pdf");
     expect(pdfOutcome.read).toBe(1);
-    // The notADocument case is still covered by a non-document type.
     fetchMock.mockResolvedValue(
       new Response("binary goo", {
         status: 200,

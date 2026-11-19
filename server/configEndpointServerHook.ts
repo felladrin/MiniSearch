@@ -9,9 +9,8 @@ import {
 import { getSearchToken } from "./searchToken.ts";
 
 /**
- * Vite server hook that serves runtime server config at /api/config.
- * Replaces the compile-time VITE_* defines so the published Docker image
- * is fully configurable via environment variables at runtime.
+ * Serves the server config at /api/config at runtime rather than compiling it
+ * in, so the published Docker image is configurable via environment variables.
  */
 export function configEndpointServerHook<
   T extends ViteDevServer | PreviewServer,

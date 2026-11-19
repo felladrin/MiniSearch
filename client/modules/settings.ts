@@ -62,7 +62,6 @@ export function getDefaultCpuThreads(
 }
 
 /**
- * Default application settings configuration.
  * Runtime server config is merged in via `applyServerConfig()` after
  * /api/config is fetched.
  */
@@ -146,8 +145,6 @@ export function upgradeUntouchedSystemPrompt(
 }
 
 /**
- * Applies the server-provided defaults to a settings object.
- *
  * These are defaults, not overrides: they seed a profile that has never been
  * saved and are ignored once the user has settings of their own, since a stored
  * value is a choice even when it matches what the code ships with.

@@ -65,23 +65,11 @@ function localKey(d: Date): string {
   return `${d.getFullYear()}-${month}-${day}`;
 }
 
-/**
- * Maps a day's count to an intensity level 0-4 relative to the busiest day.
- * @param count - Searches on the day
- * @param maxCount - Busiest single-day count in the window
- * @returns 0 (empty) through 4 (most intense)
- */
 export function intensityLevel(count: number, maxCount: number): number {
   if (count <= 0 || maxCount <= 0) return 0;
   return Math.min(4, Math.ceil((count / maxCount) * 4));
 }
 
-/**
- * Builds the heatmap grid and summary stats from raw search timestamps.
- * @param timestamps - Search timestamps in milliseconds (any order)
- * @param now - Reference "today" timestamp (defaults to current time)
- * @returns Grid columns, month labels, and streak/activity stats
- */
 export function buildActivity(
   timestamps: number[],
   now: number = Date.now(),

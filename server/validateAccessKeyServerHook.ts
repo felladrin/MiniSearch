@@ -10,7 +10,6 @@ import { consumeRateLimitPoint } from "./verifyTokenAndRateLimit.ts";
  */
 const MAX_BODY_BYTES = 4 * 1024;
 
-/** POST /api/validate-access-key: checks an argon2id hash against the configured `ACCESS_KEYS`. */
 export function validateAccessKeyServerHook<
   T extends ViteDevServer | PreviewServer,
 >(server: T) {

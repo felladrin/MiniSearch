@@ -86,7 +86,6 @@ describe("MarkdownRenderer rendered output", () => {
     const highlight = getByTestId("code-highlight");
     expect(highlight).toHaveAttribute("data-language", "js");
     expect(highlight).toHaveAttribute("data-copy", "true");
-    // The trailing newline is stripped, as before.
     expect(highlight.textContent).toBe("const x = 1;");
   });
 

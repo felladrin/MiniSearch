@@ -27,8 +27,6 @@ const SERVICE_BASE_URL = `http://${SERVICE_HOST}:${SERVICE_PORT}`;
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY = 1000;
 
-// successThreshold: 1 preserves the previous breaker's single-success reset:
-// once resetTimeout elapses, one healthy request closes the circuit again.
 const searxngCircuitBreaker = new CircuitBreaker({
   failureThreshold: 5,
   resetTimeout: 60_000,
@@ -163,7 +161,6 @@ export function parseUnresponsiveEngines(
   );
 }
 
-/** A concise, human-readable summary of the engines that failed. */
 export function formatUnresponsiveEngines(engines: UnresponsiveEngine[]) {
   return engines
     .map(({ engine, reason }) => (reason ? `${engine} (${reason})` : engine))

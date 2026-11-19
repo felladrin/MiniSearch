@@ -44,7 +44,6 @@ export async function readCappedBytes(
   return { bytes, truncated: !reachedEnd };
 }
 
-/** Calculates the backoff delay for a retry attempt, with jitter. */
 export function calculateBackoffTime(
   attempt: number,
   baseDelayMs = 100,

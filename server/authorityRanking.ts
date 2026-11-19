@@ -91,7 +91,6 @@ const SUFFIX_LIST_OPTIONS = { allowPrivateDomains: true };
 const SINGLE_TOKEN_BONUS = 0.5;
 const DERIVED_LABEL_BONUS = 0.75;
 
-/** The default for callers that have no words to set aside. */
 const NO_IGNORED_WORDS: ReadonlySet<string> = new Set();
 
 // A label split into the query's words only counts when at least one of those

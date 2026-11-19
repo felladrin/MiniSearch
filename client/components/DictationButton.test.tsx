@@ -364,7 +364,7 @@ describe("the icon-only render", () => {
     const { onProgress } = vi.mocked(startDictation).mock.calls[0][0];
     act(() => onProgress?.(12_000_000, undefined));
 
-    // The button has no text of its own any more, so the progress has to
+    // The button has no text of its own, so the progress has to
     // reach a screen reader through the label or it reaches nobody.
     await waitFor(() =>
       expect(screen.getByRole("button")).toHaveAttribute(

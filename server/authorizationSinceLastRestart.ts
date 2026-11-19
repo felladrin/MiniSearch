@@ -1,6 +1,4 @@
 /**
- * Aggregate counters for the requests that reached token verification.
- *
  * The rate limiter keys on the client IP, so that is the one thing these must
  * not keep: no address, no token, no query, and no timestamp per request. What
  * is left says whether the instance is being abused, whether a client is
@@ -21,9 +19,8 @@ import {
 } from "./verifyTokenAndRateLimit.ts";
 
 /**
- * Which endpoint family a request was aimed at. `other` is what keeps the
- * totals closed when a new endpoint starts using the same verification funnel
- * and nobody extends this list.
+ * `other` is what keeps the totals closed when a new endpoint starts using the
+ * same verification funnel and nobody extends this list.
  */
 export type AuthorizationSurface =
   | "search"

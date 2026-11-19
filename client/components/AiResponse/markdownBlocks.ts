@@ -1,4 +1,3 @@
-/** A line with nothing but whitespace on it. */
 const BLANK_LINE_RE = /^[ \t\r]*$/;
 
 /** A code fence delimiter: 3+ backticks or tildes at up to 3 spaces of indent. */
@@ -75,13 +74,11 @@ export function splitMarkdownBlocks(content: string): string[] {
     }
 
     if (BLANK_LINE_RE.test(line)) {
-      // Leading blank lines are dropped, not kept inside a block.
       if (current.length === 0) continue;
 
-      // Look past the run of blank lines to the next content line.
       let next = i + 1;
       while (next < lines.length && BLANK_LINE_RE.test(lines[next])) next++;
-      if (next >= lines.length) break; // trailing blank lines are dropped
+      if (next >= lines.length) break;
 
       const nextLine = lines[next];
       const continuesBlock =

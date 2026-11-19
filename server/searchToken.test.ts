@@ -39,9 +39,9 @@ afterEach(() => {
 
 describe("searchToken", () => {
   it("should generate a fresh token instead of adopting one already in the file", async () => {
-    // The published image used to ship a token in the temp directory, and a
-    // container that read it shared one token with every other container built
-    // from that image, and with anyone who pulled the image and read the layer.
+    // A token baked into the image's temp directory would be shared by every
+    // container built from that image, and by anyone who pulled the image and
+    // read the layer.
     mockExistsSync.mockReturnValue(true);
     mockReadFileSync.mockReturnValue("token-baked-into-the-image");
 

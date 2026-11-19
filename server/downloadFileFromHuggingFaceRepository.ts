@@ -27,10 +27,9 @@ async function getRemoteFileSize(hfRepo: string, hfRepoFile: string) {
 }
 
 /**
- * Downloads a repository file to `localFilePath`, skipping the transfer when the
- * cached copy already matches the size the Hub reports. A cached file of the
- * wrong size is replaced instead of trusted, so a truncated model recovers on
- * the next startup rather than failing to load forever.
+ * A cached file of the wrong size is replaced instead of trusted, so a
+ * truncated model recovers on the next startup rather than failing to load
+ * forever.
  */
 export async function downloadFileFromHuggingFaceRepository(
   hfRepo: string,

@@ -101,11 +101,8 @@ Respond with just the question, no additional text or explanations.`,
       return "";
     }
 
-    // Strips leading bullets, numbering, and quotes without touching the
-    // question text itself. The old [^a-zA-Z] class matched every character
-    // of a non-Latin question (Chinese, Japanese, Korean, Arabic, ...) and
-    // wiped it to an empty string, even though the prompt above requires the
-    // follow-up question to be in the same language as the original.
+    // Match any letter, not just a-z: an ASCII-only class wipes a non-Latin
+    // question (Chinese, Arabic, ...) to an empty string.
     let questionLine = lines.replace(/^[^\p{L}]+/u, "");
 
     questionLine = questionLine.charAt(0).toUpperCase() + questionLine.slice(1);

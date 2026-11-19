@@ -140,7 +140,6 @@ describe("ExpandableLink", () => {
       </MantineProvider>,
     );
 
-    // One observer instance for the whole module, three observed targets.
     expect(createdObservers).toHaveLength(1);
     expect(observedTargets).toHaveLength(3);
     for (const overlay of screen.getAllByTestId("expandable-link-full")) {
@@ -149,7 +148,6 @@ describe("ExpandableLink", () => {
 
     view.unmount();
     expect(observedTargets).toHaveLength(0);
-    // Unmounting and remounting never creates a second observer.
     renderLink();
     expect(createdObservers).toHaveLength(1);
     expect(observedTargets).toHaveLength(1);
@@ -185,7 +183,6 @@ describe("ExpandableLink", () => {
       "https://example.com",
     );
 
-    // The auto-collapse timer still works without the observer.
     act(() => {
       vi.advanceTimersByTime(3000);
     });
