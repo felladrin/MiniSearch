@@ -131,6 +131,7 @@ Need to:
 - `client/modules/webGpu.ts` - Whether the GPU can run wllama's shaders (API, `subgroup_id`, a real adapter with `subgroups`); decides GPU or CPU and the default model
 - `client/modules/querySuggestions.ts` - Search suggestion UI, stored in IndexedDB
 - `client/modules/relatedSearchQuery.ts` - Generates related search queries
+- `client/modules/searchResultSelection.ts` - Picks the results the answer reads, by score when they carry one
 - `client/modules/followUpQuestions.ts` - Generates follow-up questions via `followUpQuestionPubSub`
 - `client/modules/accessKey.ts` - Validates and stores access keys using argon2id hashing and localStorage
 - `client/modules/parentWindow.ts` - PostMessage API for embedding in parent windows

@@ -30,6 +30,7 @@ import {
   updateTextSearchState,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
+import { selectLlmSearchResults } from "./searchResultSelection";
 import { getSystemPrompt } from "./systemPrompt";
 import {
   ChatGenerationError,
@@ -521,7 +522,10 @@ async function startTextSearch(query: string, invocation: number) {
       updateTextSearchState("completed");
       updateTextSearchResults(textResults);
 
-      const resultsForLlm = textResults.slice(0, searchResultsToConsider);
+      const resultsForLlm = selectLlmSearchResults(
+        textResults,
+        searchResultsToConsider,
+      );
       updateLlmTextSearchResults(resultsForLlm);
 
       updateSearchResults(getCurrentSearchRunId(), {

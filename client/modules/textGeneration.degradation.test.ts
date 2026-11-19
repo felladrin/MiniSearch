@@ -201,6 +201,28 @@ describe("search degradation", () => {
     expect(harness.state.textSearchState).toBe("completed");
   });
 
+  it("grounds the answer on the best-scored results while the list keeps the pinned one first", async () => {
+    const scoredResults: TextSearchResults = [
+      ["Pinned", "A snippet", "https://pinned.example", 12],
+      ["Relevant", "A snippet", "https://relevant.example", 91],
+      ["Weak", "A snippet", "https://weak.example", 20],
+    ];
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: scoredResults,
+      stale: false,
+    });
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(harness.state.textSearchResults).toEqual(scoredResults);
+    expect(
+      (harness.state.llmTextSearchResults as TextSearchResults).map(
+        ([title]) => title,
+      ),
+    ).toEqual(["Relevant", "Weak", "Pinned"]);
+  });
+
   it("keeps the text search completed when the keyword fallback is also empty", async () => {
     vi.mocked(searchText).mockResolvedValue({ results: [], stale: false });
 
