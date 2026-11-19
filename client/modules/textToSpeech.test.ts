@@ -62,6 +62,30 @@ const americanMediumVoice = {
   language: { code: "en_US", name_english: "English" },
 };
 
+const portugueseFromPortugalVoice = {
+  key: "pt_PT-tugão-medium",
+  name: "tugão",
+  quality: "medium",
+  language: { code: "pt_PT", name_english: "Portuguese" },
+};
+
+const vietnameseLowVoice = {
+  key: "vi_VN-25hours_single-low",
+  name: "25hours_single",
+  quality: "low",
+  language: { code: "vi_VN", name_english: "Vietnamese" },
+};
+
+const vietnameseXLowVoice = {
+  key: "vi_VN-vivos-x_low",
+  name: "vivos",
+  quality: "x_low",
+  language: { code: "vi_VN", name_english: "Vietnamese" },
+};
+
+const vietnameseAnswer =
+  "Tháp Eiffel được xây dựng vào năm 1889 cho Hội chợ Thế giới ở Paris và cao khoảng 330 mét.";
+
 const portugueseVoice = {
   key: "pt_BR-faber-medium",
   name: "faber",
@@ -440,6 +464,32 @@ describe("speak", () => {
     await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
 
     expect(worker.sent[0].voiceId).toBe("en_US-amy-medium");
+  });
+
+  it("prefers a low voice over an x-low one of the same language", async () => {
+    vi.stubGlobal("navigator", { language: "vi-VN" });
+    mockVoices.mockResolvedValue([vietnameseXLowVoice, vietnameseLowVoice]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak(vietnameseAnswer);
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("vi_VN-25hours_single-low");
+  });
+
+  it("keeps the catalogue order when the answer's language has no region", async () => {
+    mockVoices.mockResolvedValue([
+      portugueseFromPortugalVoice,
+      portugueseVoice,
+    ]);
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    void tts.speak(portugueseAnswer);
+    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+
+    expect(worker.sent[0].voiceId).toBe("pt_PT-tugão-medium");
   });
 
   it("keeps a chosen voice whatever the answer's language", async () => {
