@@ -179,7 +179,9 @@ export async function runFollowUpSearch(
   // year to the engine, and only this machine's clock knows which one is meant.
   const searchQuery = normalizeFollowUpDates(
     relatedQuery || currentInput,
-    currentInput,
+    messages
+      .filter(({ role }) => role === "user")
+      .map(({ content }) => content),
     new Date(),
     { maxLength: 2000 },
   ).searchQuery;

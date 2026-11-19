@@ -259,6 +259,11 @@ describe("normalizeFollowUpDates", () => {
       "Disney Plus new releases November 2026",
       "Disney Plus new releases December 2026",
     ],
+    [
+      "what comes out next month",
+      "disney plus new releases november 2026",
+      "disney plus new releases December 2026",
+    ],
     ["明年的呢", "苹果 2025 新手机 发布时间", "苹果 新手机 发布时间 2027年"],
     ["明年的呢", "iPhone 16发布时间 2027", "iPhone 16发布时间 2027年"],
     ["明年的呢", "苹果 2026年11月 发布会", "苹果 发布会 2027年"],
@@ -267,42 +272,47 @@ describe("normalizeFollowUpDates", () => {
       "WWE Crown Jewel incidents 2023-2025",
       "WWE Crown Jewel incidents 2025",
     ],
+    [
+      "who won it last year",
+      "Premier League winner 2024-25",
+      "Premier League winner 2025",
+    ],
   ])("anchors %s onto %s", (question, query, searchQuery) => {
-    expect(normalizeFollowUpDates(query, question, AS_OF).searchQuery).toBe(
+    expect(normalizeFollowUpDates(query, [question], AS_OF).searchQuery).toBe(
       searchQuery,
     );
   });
 
-  it("keeps a year the user typed", () => {
+  it("keeps a year the user typed in the question", () => {
     expect(
       normalizeFollowUpDates(
         "2024 model vs 2023 model",
-        "is the 2024 model better than last year's",
+        ["is the 2024 model better than last year's"],
         AS_OF,
       ).searchQuery,
     ).toBe("2024 model vs model 2025");
   });
 
-  it("anchors a relative date the model kept, as before", () => {
+  it("keeps a year the user typed in an earlier message", () => {
     expect(
       normalizeFollowUpDates(
-        "world series winner last year",
-        "who won it last year",
+        "Cyberpunk 2077 sales 2026",
+        ["cyberpunk 2077", "how did it sell last year"],
         AS_OF,
       ).searchQuery,
-    ).toBe("world series winner last year 2025");
+    ).toBe("Cyberpunk 2077 sales 2025");
   });
 
   it("leaves the model's dates alone when the question has no relative date", () => {
     expect(
-      normalizeFollowUpDates("world series 2023 winner", "who won it", AS_OF)
+      normalizeFollowUpDates("world series 2023 winner", ["who won it"], AS_OF)
         .searchQuery,
     ).toBe("world series 2023 winner");
   });
 
   it("drops an anchor that would pass the length limit", () => {
     expect(
-      normalizeFollowUpDates("who won 2026", "who won it last year", AS_OF, {
+      normalizeFollowUpDates("who won 2026", ["who won it last year"], AS_OF, {
         maxLength: 9,
       }).searchQuery,
     ).toBe("who won");

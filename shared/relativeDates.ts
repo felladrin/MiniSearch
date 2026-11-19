@@ -304,12 +304,15 @@ function appendAnchors(
   return { searchQuery, replacements: appended };
 }
 
+const YEAR = "(?<!\\d)(?:19|20)\\d{2}(?!\\d)";
+
 /**
- * A year a model writes into a query, alone, as a range, after a month name,
- * or glued to Chinese text: "2023", "2023-2025", "November 2026", "2026年11月".
+ * A year a model writes into a query, alone, as a range or a season, after a
+ * month name, or glued to Chinese text: "2023", "2023-2025", "2024-25",
+ * "November 2026", "2026年11月".
  */
 const WRITTEN_DATE = new RegExp(
-  `(?:\\b(?:${MONTH_NAMES.join("|")})\\s+)?(?<!\\d)(?:19|20)\\d{2}(?:\\s*[-–]\\s*(?:19|20)\\d{2})?(?!\\d)(?:年(?:\\d{1,2}月)?)?`,
+  `(?:\\b(?:${MONTH_NAMES.join("|")})\\s+)?${YEAR}(?:\\s*[-–/]\\s*(?:19|20)?\\d{2}(?!\\d))?(?:年(?:\\d{1,2}月)?)?`,
   "gi",
 );
 
@@ -317,21 +320,23 @@ const WRITTEN_DATE = new RegExp(
  * Anchors the relative dates of the question the user typed onto the query a
  * model wrote for it. The model often replaces "last year" with a year of its
  * own, and a wrong one ("2026" on 2026-11-19), which leaves nothing for the
- * anchor to resolve. So when the question has a relative date, the dates the
- * model wrote and the user did not are dropped, and the question's anchors
- * are appended.
+ * anchor to resolve. So when the question (the last of `userMessages`) has a
+ * relative date, the years the model wrote are dropped, and the question's
+ * anchors are appended. A year the user typed in any message is kept, since
+ * it can be part of a name ("Cyberpunk 2077", "RTX 2080").
  */
 export function normalizeFollowUpDates(
   query: string,
-  question: string,
+  userMessages: readonly string[],
   asOfDate: Date,
   options?: { maxLength?: number },
 ): { searchQuery: string; replacements: RelativeDateReplacement[] } {
+  const question = userMessages.at(-1) ?? "";
   const { replacements } = normalizeRelativeDates(question, asOfDate);
   if (replacements.length === 0)
     return normalizeRelativeDates(query, asOfDate, options);
 
-  const typedYears = question.match(/(?<!\d)(?:19|20)\d{2}(?!\d)/g) ?? [];
+  const typedYears = userMessages.join("\n").match(new RegExp(YEAR, "g")) ?? [];
   const queryWithoutModelDates = query
     .replace(WRITTEN_DATE, (date) =>
       typedYears.some((year) => date.includes(year)) ? date : "",
@@ -341,10 +346,7 @@ export function normalizeFollowUpDates(
 
   return appendAnchors(
     queryWithoutModelDates,
-    replacements.filter(
-      ({ anchor }) =>
-        !queryWithoutModelDates.toLowerCase().includes(anchor.toLowerCase()),
-    ),
+    replacements,
     options?.maxLength,
   );
 }
