@@ -95,6 +95,7 @@ describe("generateRelatedSearchQuery", () => {
   it.each([
     ["what are the side effects of β-blockers", "beta blocker side effects"],
     ["difference between α and β error", "alpha beta error difference"],
+    ["what are γδ T cells", "gamma delta T cells function"],
   ])("keeps the English query for %s", async (question, reply) => {
     mockGenerateReplyToMessages.mockResolvedValueOnce(reply);
 

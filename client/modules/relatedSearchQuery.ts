@@ -38,17 +38,21 @@ function countLetters(text: string, script: Script): number {
   return text.match(SCRIPTS[script])?.length ?? 0;
 }
 
-/** A CJK character is a word on its own; a letter of an alphabet is not. */
+/**
+ * A CJK character or a Hangul syllable is a word on its own. In the other
+ * scripts it takes three letters, because English questions write Greek
+ * letters as symbols, alone or in pairs ("α and β error", "γδ T cells").
+ */
 function countWords(text: string, script: Script): number {
-  if (script === "CJK") return countLetters(text, script);
-  const word = new RegExp(`(?:${SCRIPTS[script].source}){2,}`, "gu");
+  if (script === "CJK" || script === "Hangul")
+    return countLetters(text, script);
+  const word = new RegExp(`(?:${SCRIPTS[script].source}){3,}`, "gu");
   return text.match(word)?.length ?? 0;
 }
 
 /**
  * Brand names make Latin letters outnumber the Chinese ones in "iPhone呢", so
- * any other script with a word wins over Latin. Lone letters are symbols in
- * an English question ("α and β error").
+ * any other script with a word wins over Latin.
  */
 function questionScript(question: string): Script | undefined {
   let script: Script | undefined;
