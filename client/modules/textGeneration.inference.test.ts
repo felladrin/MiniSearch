@@ -49,9 +49,18 @@ vi.mock("gpt-tokenizer", () => ({
 vi.mock("pretty-ms", () => ({
   default: vi.fn(() => "100ms"),
 }));
+vi.mock("./textGenerationWithWllama", () => ({
+  generateTextWithWllama: vi.fn(() => Promise.resolve()),
+  generateChatWithWllama: vi.fn(() => Promise.resolve("")),
+}));
 
+import gptTokenizer from "gpt-tokenizer";
 import { getSettings } from "./pubSub";
-import { textGenerationFunctions } from "./textGeneration";
+import {
+  generateReplyToMessages,
+  textGenerationFunctions,
+} from "./textGeneration";
+import { generateChatWithWllama } from "./textGenerationWithWllama";
 
 const mockGetSettings = vi.mocked(getSettings);
 
@@ -68,5 +77,28 @@ describe("needsModelDownloadGate", () => {
     mockGetSettings.mockReturnValueOnce({ inferenceType } as never);
 
     expect(textGenerationFunctions.needsModelDownloadGate()).toBe(expected);
+  });
+});
+
+describe("generateReplyToMessages", () => {
+  it("drops the oldest messages that do not fit the context, starting on a user message", async () => {
+    vi.mocked(gptTokenizer.encode).mockImplementation((text: string) =>
+      Array.from(text, () => 1),
+    );
+
+    try {
+      await generateReplyToMessages([
+        { role: "user", content: "x".repeat(4000) },
+        { role: "assistant", content: "ok" },
+        { role: "user", content: "question" },
+      ]);
+    } finally {
+      vi.mocked(gptTokenizer.encode).mockImplementation(() => [1, 2, 3]);
+    }
+
+    expect(generateChatWithWllama).toHaveBeenCalledWith(
+      [{ role: "user", content: "question" }],
+      expect.any(Function),
+    );
   });
 });

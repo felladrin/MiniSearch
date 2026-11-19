@@ -264,6 +264,8 @@ Update PubSub (chatMessages, response)
 Save to history database
 ```
 
+Before the answer, a follow-up question gets its own web search, and the query for it is written by `generateRelatedSearchQuery` (`client/modules/relatedSearchQuery.ts`). That call goes through `generateReplyToMessages`, not `generateChatResponse`: it sends the conversation with the same 75% token budget, but without the system prompt and the search results. Those carry pages in many languages: with them in front and the instruction to name the subject, Gemma 3 4B wrote the query for a Chinese question in another language (Turkish, Persian) in 4 of 9 runs, and without them in 2 of 9 (the old prompt, which did not ask for the subject, stayed in Chinese in 9 of 9). The prompt also asks for a query that makes sense on its own, so "why did they delay the release" becomes a query that names what "they" delayed.
+
 ### Text Generation State Machine
 
 `textGenerationStatePubSub` drives the AI response UI through these states:

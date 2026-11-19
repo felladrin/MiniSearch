@@ -327,6 +327,54 @@ async function buildSystemPromptContent(summary: string): Promise<string> {
   return content;
 }
 
+/**
+ * Keeps the newest messages that fit the token budget, starting on a user
+ * message.
+ */
+function keepNewestMessagesWithinBudget(
+  messages: ChatMessage[],
+  tokenBudget: number,
+): ChatMessage[] {
+  const keptMessages: ChatMessage[] = [];
+  let tokenCount = 0;
+
+  for (const message of [...messages].reverse()) {
+    const messageTokens = gptTokenizer.encode(message.content).length;
+
+    if (tokenCount + messageTokens > tokenBudget) break;
+
+    keptMessages.unshift(message);
+    tokenCount += messageTokens;
+  }
+
+  if (keptMessages.length > 0 && keptMessages[0].role !== "user") {
+    keptMessages.shift();
+  }
+
+  return keptMessages;
+}
+
+/**
+ * Generates a reply from the given messages alone. Unlike
+ * `generateChatResponse`, it puts no system prompt and no search results in
+ * front of them, for tasks that work on the conversation itself.
+ */
+export async function generateReplyToMessages(
+  messages: ChatMessage[],
+): Promise<string> {
+  const keptMessages = keepNewestMessagesWithinBudget(
+    messages,
+    defaultContextSize * 0.75,
+  );
+
+  if (keptMessages.length === 0) {
+    throw new Error("The newest message alone does not fit the context");
+  }
+
+  const strategy = await getCurrentInferenceStrategy();
+  return strategy.generateChat(keptMessages, () => {});
+}
+
 export async function generateChatResponse(
   newMessages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
@@ -349,30 +397,10 @@ export async function generateChatResponse(
     ).length;
     const reservedTokens = systemPromptTokens + initialResponseTokens;
     const availableTokenBudget = defaultContextSize * 0.75 - reservedTokens;
-    const processedMessages: ChatMessage[] = [];
-    const reversedMessages = [...newMessages].reverse();
-
-    let currentTokenCount = 0;
-
-    for (let i = 0; i < reversedMessages.length; i++) {
-      const message = reversedMessages[i];
-      const messageTokens = gptTokenizer.encode(message.content).length;
-
-      if (currentTokenCount + messageTokens > availableTokenBudget) {
-        break;
-      }
-
-      processedMessages.unshift(message);
-      currentTokenCount += messageTokens;
-    }
-
-    if (processedMessages.length > 0) {
-      const expectedFirstRole = "user";
-
-      if (processedMessages[0].role !== expectedFirstRole) {
-        processedMessages.shift();
-      }
-    }
+    const processedMessages = keepNewestMessagesWithinBudget(
+      newMessages,
+      availableTokenBudget,
+    );
 
     if (newMessages.length > processedMessages.length) {
       const droppedCount = newMessages.length - processedMessages.length;
