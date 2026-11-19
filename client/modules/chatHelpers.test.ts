@@ -48,6 +48,7 @@ import {
   updateTextSearchResults,
   updateTextSearchStale,
 } from "./pubSub";
+import { generateRelatedSearchQuery } from "./relatedSearchQuery";
 import { searchImages, searchText } from "./search";
 import type { ImageSearchResults, TextSearchResults } from "./types";
 
@@ -61,6 +62,7 @@ const mockUpdateTextStale = vi.mocked(updateTextSearchStale);
 const mockFetchPageContents = vi.mocked(fetchPageContents);
 const mockGetPageContents = vi.mocked(getPageContents);
 const mockUpdatePageContents = vi.mocked(updatePageContents);
+const mockGenerateRelatedSearchQuery = vi.mocked(generateRelatedSearchQuery);
 
 describe("refreshTextSearchResults", () => {
   it("deduplicates by URL and appends fresh results", async () => {
@@ -258,6 +260,31 @@ describe("runFollowUpSearch", () => {
     await vi.waitFor(() => expect(mockSearchImages).toHaveBeenCalled());
     finishPageRead({});
     await followUpSearch;
+  });
+
+  it("anchors a relative date in the follow-up query to the current year", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-19T12:00:00Z"));
+    mockGenerateRelatedSearchQuery.mockResolvedValueOnce(
+      "new series on disney plus next month",
+    );
+    mockSearchText.mockResolvedValueOnce({ results: [], stale: false });
+
+    try {
+      await runFollowUpSearch(
+        [{ role: "user", content: "what about next month" }],
+        "what about next month",
+        makeSettings(),
+        [],
+        [],
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const anchoredQuery = "new series on disney plus next month December 2026";
+    expect(mockSearchText).toHaveBeenCalledWith(anchoredQuery, 10);
+    expect(mockSearchImages).toHaveBeenCalledWith(anchoredQuery, 10);
   });
 
   it("refreshes text results when enabled", async () => {
