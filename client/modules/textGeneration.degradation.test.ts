@@ -134,11 +134,17 @@ vi.mock("gpt-tokenizer", () => ({
   default: { encode: vi.fn(() => [1, 2, 3]) },
 }));
 
+vi.mock("./textGenerationWithWllama", () => ({
+  generateTextWithWllama: vi.fn(() => Promise.resolve()),
+  generateChatWithWllama: vi.fn(() => Promise.resolve("")),
+}));
+
 import { saveLlmResponseForQuery } from "./history";
 import { fetchPageContents } from "./pageContent";
-import { updateTextSearchStale } from "./pubSub";
+import { listenToSettingsChanges, updateTextSearchStale } from "./pubSub";
 import { searchImages, searchText } from "./search";
 import { searchAndRespond } from "./textGeneration";
+import { generateTextWithWllama } from "./textGenerationWithWllama";
 import type { ImageSearchResults, TextSearchResults } from "./types";
 
 const mockFetch = vi.fn();
@@ -561,6 +567,32 @@ describe("inference degradation", () => {
     harness.state.settings.enableTextSearch = false;
     harness.stateTransitions.length = 0;
     harness.onResponseUpdate.current = () => {};
+  });
+
+  it("loads the browser model once when two searches wait for the download allowance", async () => {
+    const settings = harness.state.settings;
+    settings.inferenceType = "browser";
+    settings.allowAiModelDownload = false;
+    const listeners: ((value: typeof settings) => void)[] = [];
+    vi.mocked(listenToSettingsChanges).mockImplementation((listener) => {
+      listeners.push(listener as (value: typeof settings) => void);
+      return vi.fn();
+    });
+
+    try {
+      const first = searchAndRespond();
+      const second = searchAndRespond();
+      await vi.waitFor(() => expect(listeners).toHaveLength(2));
+
+      settings.allowAiModelDownload = true;
+      for (const listener of listeners) listener(settings);
+      await Promise.all([first, second]);
+    } finally {
+      settings.inferenceType = "internal";
+      settings.allowAiModelDownload = true;
+    }
+
+    expect(generateTextWithWllama).toHaveBeenCalledTimes(1);
   });
 
   it("ends in a failed state when /inference answers 503", async () => {
