@@ -377,15 +377,15 @@ which follows the question's language rather than the browser's. `franc-min`
 detects it, loaded on the first Listen press rather than with the page. The
 pick prefers a `medium` voice of that language over `low` and `x_low`, and
 takes a `high` one only when the language publishes nothing else, since a high
-voice costs up to twice the download; among voices of the same quality, one of
-the browser's region wins when the answer is in the browser's language. With
-the system engine, or when no local voice speaks that language (Japanese,
-Korean and Hindi have none), the language is passed to `speechSynthesis` so
-the OS picks its own voice. The browser's language is used instead when the
-detector cannot tell, fails to load, or does not know the browser's language
-at all (Danish, Finnish and Catalan among them), since it would then read an
-answer in that language as a neighbouring one. A chosen voice reads every
-answer, whatever its language.
+voice costs up to 137 MB against the 63 MB of a typical medium one; among
+voices of the same quality, one of the browser's region wins when the answer
+is in the browser's language. With the system engine, or when no local voice
+speaks that language (Japanese, Korean and Hindi have none), the language is
+passed to `speechSynthesis` so the OS picks its own voice. The browser's
+language is used instead when the detector cannot tell, fails to load, or does
+not know the browser's language at all (Danish, Finnish and Catalan among
+them), since it would then read an answer in that language as a neighbouring
+one. A chosen voice reads every answer, whatever its language.
 
 ### Third-party requests
 
