@@ -30,8 +30,8 @@ RUN npm install --global npm@12.0.2 && \
   npm install --prefix /tmp/overlay --no-audit --no-fund --ignore-scripts \
     tar@7.5.22 \
     brace-expansion@5.0.12 \
-    ip-address@10.7.2 \
-    undici@6.28.1 \
+    ip-address@10.7.6 \
+    undici@6.29.1 \
     postcss-selector-parser@7.1.6 && \
   node /tmp/npm-bundle-overlay.cjs && \
   node -e "const r=require, p='/usr/local/lib/node_modules/npm/node_modules/'; for (const m of ['tar','brace-expansion','ip-address','undici','postcss-selector-parser']) r(p+m); console.log('overlay require smoke ok')" && \
