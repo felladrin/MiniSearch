@@ -5,6 +5,7 @@ Notable changes, grouped by date, most recent first.
 ## 2026-11-19
 
 - When no voice is chosen in Voice Settings, the local engine now picks the best-sounding voice of the answer's language instead of the first one in the catalogue: medium quality first, then low, then x-low. Portuguese, for example, now gets `pt_BR-faber-medium` where it used to get `pt_BR-edresson-low`, at the same 63 MB download. High-quality voices are picked only when a language publishes nothing else, since they cost up to 137 MB against the 63 MB of a medium one. And when the answer is in the browser's language, a voice of the browser's region now wins among the ones of the same quality, so an `en-US` browser gets an American voice.
+- Raon-1 nano 3B (2083 MB, Apache-2.0, Korean and English) joins the Wllama catalog, labeled "(wllama support pending)": its architecture is not yet in the llama.cpp build the browser engine ships, so it cannot answer until upstream support lands ([ggml-org/llama.cpp#32200](https://github.com/ggml-org/llama.cpp/pull/32200) is open). The sharded copy is published and the entry is ready, so it starts working the day the engine updates.
 
 ## 2026-11-18
 
