@@ -1066,6 +1066,8 @@ function selectPassagesAcrossPages(
     // so skip comparisons where the size ratio is too small.
     let isDuplicate = false;
     for (const { url: otherUrl, tokens: otherTokens } of selectedTokens) {
+      // Dedup targets syndicated paragraphs across pages; one page's own
+      // passages may coexist.
       if (otherUrl === passage.url) continue;
       const minSize = Math.min(passage.tokens.size, otherTokens.size);
       const maxSize = Math.max(passage.tokens.size, otherTokens.size);

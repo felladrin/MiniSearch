@@ -22,9 +22,8 @@ let tokenFileWritten = false;
  * `hasSearchTokenFileChanged`, not a source of truth.
  *
  * Held for the life of the process: reading the file on every request would let
- * anything that rewrote it re-key a running server, rejecting the clients
- * holding the previous token and every new page load, since the token handed
- * out is captured when the server starts.
+ * anything that can rewrite it re-key a running server, and every open page,
+ * which caches the token from `/api/config`, would fail its next search.
  */
 export function getSearchToken() {
   if (processToken !== null) return processToken;

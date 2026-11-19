@@ -58,6 +58,7 @@ describe("retrieval eval (real reranker)", () => {
         golden.query,
         "text",
         candidates,
+        // preserveTopResults, as in the app's text-search call.
         true,
       );
       expect(ranked.length, `${golden.id}: empty ranking`).toBeGreaterThan(0);

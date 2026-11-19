@@ -30,6 +30,7 @@ const BASE_RETRY_DELAY = 1000;
 const searxngCircuitBreaker = new CircuitBreaker({
   failureThreshold: 5,
   resetTimeout: 60_000,
+  // Once resetTimeout elapses, one healthy request closes the circuit again.
   successThreshold: 1,
 });
 

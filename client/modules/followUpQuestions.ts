@@ -101,8 +101,8 @@ Respond with just the question, no additional text or explanations.`,
       return "";
     }
 
-    // Match any letter, not just a-z: an ASCII-only class wipes a non-Latin
-    // question (Chinese, Arabic, ...) to an empty string.
+    // Stop at the first letter of any script, not just a-z: an ASCII-only
+    // class wipes a non-Latin question (Chinese, Arabic, ...) to an empty string.
     let questionLine = lines.replace(/^[^\p{L}]+/u, "");
 
     questionLine = questionLine.charAt(0).toUpperCase() + questionLine.slice(1);

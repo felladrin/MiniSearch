@@ -51,8 +51,9 @@ import { thumbnailRateLimiter } from "./verifyTokenAndRateLimit.ts";
  * unreachable here until its records are re-checked, which is the pin
  * working, not failing. Content itself is untrusted: served same-origin, it
  * carries `nosniff` and a sandbox CSP, and only raster types pass the
- * allowlist, so no script-carrying format reaches a browser. `/page-content` does not pin, so it keeps the rebinding
- * window (see `resolvePublicUrl`'s docstring).
+ * allowlist, so no script-carrying format reaches a browser. `/page-content`
+ * does not pin, so it keeps the rebinding window (see `resolvePublicUrl`'s
+ * docstring).
  */
 
 /**
