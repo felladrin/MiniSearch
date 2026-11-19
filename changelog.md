@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-19
+
+- Raon-1 nano 3B (2083 MB, Apache-2.0, Korean and English) joins the Wllama catalog, labeled "(wllama support pending)": its architecture is not yet in the llama.cpp build the browser engine ships, so it cannot answer until upstream support lands ([ggml-org/llama.cpp#32200](https://github.com/ggml-org/llama.cpp/pull/32200) is open). The sharded copy is published and the entry is ready, so it starts working the day the engine updates.
+
 ## 2026-11-18
 
 - Search results whose link no browser can open are now dropped, from SearXNG and from the fallback providers alike: links on a host without a domain, and links that are not `http` or `https`. Brave Search now sends its result links through encrypted redirects, which SearXNG's Brave engine passes on as `http:///go/v1/...`. Those results reached the list with "go" as the site name, and the AI response cited them as sources. They are dropped before the result limit applies, so they do not take the place of a usable result, and the server log names the engine that sent them.

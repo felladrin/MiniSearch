@@ -366,6 +366,17 @@ export const wllamaModels: Readonly<Record<string, WllamaModel>> = {
     hfFilePath: "model.shard-00001-of-00007.gguf",
     fileSizeInMegabytes: 1930,
   },
+  // Loads only once wllama ships a llama.cpp build with the raon1nano
+  // architecture (upstream ggml-org/llama.cpp#32200 is open); the sharded
+  // repo is published so the entry starts working the moment the wasm does.
+  "raon-1-nano-3b": {
+    ...createDefaultModelConfig(),
+    label: "Raon-1 nano 3B (wllama support pending)",
+    hfRepoId: "Felladrin/gguf-sharded-Q4_K_M-raon-1-nano",
+    hfFilePath: "raon-1-nano-Q4_K_M-00001-of-00005.gguf",
+    fileSizeInMegabytes: 2083,
+    reasoningBudgetTokens: 1024,
+  },
   "granite-4.2-3b": {
     ...createDefaultModelConfig(),
     label: "Granite 4.2 3B",
