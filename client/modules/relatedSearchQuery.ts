@@ -89,9 +89,12 @@ function isWrittenLike(query: string, question: string): boolean {
 }
 
 function questionLanguage(question: string): string | undefined {
-  if (/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(question))
-    return "Japanese";
   const script = questionScript(question);
+  if (
+    script === "CJK" &&
+    /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(question)
+  )
+    return "Japanese";
   return script && LANGUAGE_BY_SCRIPT[script];
 }
 
