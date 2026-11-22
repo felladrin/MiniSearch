@@ -102,6 +102,30 @@ export function recordStreamEndedWithoutFinish(): void {
 }
 
 /**
+ * Why an attempt failed, which decides the fix: a rate limit wants fewer or
+ * slower requests, a server error a retry, a stall a different model. Counted
+ * per attempt, like `streamsEndedWithoutFinish`, which lands in `other`.
+ */
+export type AttemptFailureReason =
+  | "rateLimited"
+  | "serverError"
+  | "otherHttpError"
+  | "stalled"
+  | "other";
+
+const attemptFailures: Record<AttemptFailureReason, number> = {
+  rateLimited: 0,
+  serverError: 0,
+  otherHttpError: 0,
+  stalled: 0,
+  other: 0,
+};
+
+export function recordAttemptFailure(reason: AttemptFailureReason): void {
+  attemptFailures[reason]++;
+}
+
+/**
  * `firstTokenMs` is the wait the user actually felt, so it is kept apart from
  * `durationMs`, which covers the whole answer.
  */
@@ -156,6 +180,7 @@ export function getInferenceStats() {
     modelFallbacks,
     modelsRefetched,
     streamsEndedWithoutFinish,
+    attemptFailures: { ...attemptFailures },
     failed,
     byModel: Object.fromEntries(
       [...byModel].map(([model, counts]) => [model, { ...counts }]),
