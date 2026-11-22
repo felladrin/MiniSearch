@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-22
+
+- The in-browser AI answers several times faster: the browser engine, wllama, is now version 4.0.0. Measured with Qwen 3.5 0.8B on CPU (four threads, headless Chromium on a Ryzen AI MAX+ 395) over 15 questions run twice: the model reads the prompt 4.1x faster (81 against 20 tokens per second, median), writes the answer 3.7x faster (34 against 9), and loads from the cache in 3.4 seconds instead of 9.4. Models already downloaded stay in the cache and are not downloaded again. A new browser model under 2000 MiB can now ship as the single GGUF file from its original HuggingFace repo, because wllama 4 loads a GGUF as-is; bigger models stay split, since an incognito window stops each file at 2000 MiB.
+
 ## 2026-11-19
 
 - When no voice is chosen in Voice Settings, the local engine now picks the best-sounding voice of the answer's language instead of the first one in the catalogue: medium quality first, then low, then x-low. Portuguese, for example, now gets `pt_BR-faber-medium` where it used to get `pt_BR-edresson-low`, at the same 63 MB download. High-quality voices are picked only when a language publishes nothing else, since they cost up to 137 MB against the 63 MB of a medium one. And when the answer is in the browser's language, a voice of the browser's region now wins among the ones of the same quality, so an `en-US` browser gets an American voice.

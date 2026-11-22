@@ -21,12 +21,14 @@ describe("wllamaModels catalog", () => {
     expect(new Set(labels).size).toBe(labels.length);
   });
 
-  it("points every model at a sharded Felladrin repository", () => {
+  it("splits every model of 2000 MiB or more", () => {
+    // In an incognito window, Chromium's OPFS stops each file at 2000 MiB
+    // (no limit in a normal profile), so a model above that size must be
+    // split. Below it, a single GGUF is fine.
     for (const [id, model] of models) {
-      expect(model.hfRepoId, id).toMatch(/^Felladrin\/gguf-sharded-/);
-      // Chromium's OPFS silently truncates files past 2000 MiB, so every
-      // catalog file must be a shard, never a monolithic GGUF.
-      expect(model.hfFilePath, id).toMatch(/-\d{5}-of-\d{5}\.gguf$/);
+      if (model.fileSizeInMegabytes >= 2000) {
+        expect(model.hfFilePath, id).toMatch(/-\d{5}-of-\d{5}\.gguf$/);
+      }
     }
   });
 

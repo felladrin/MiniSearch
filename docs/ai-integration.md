@@ -34,18 +34,18 @@ Uses `@wllama/wllama` for browser-based inference. Automatically uses WebGPU whe
 5. Streams tokens via the OAI-compatible `createChatCompletion` API
 
 **Pre-configured Models:**
-Several, stored at `Felladrin/gguf-sharded-*` on HuggingFace. The full, authoritative list with HuggingFace repo IDs and sizes lives in `client/modules/wllama.ts` (`wllamaModels`) and is rendered in the Settings dropdown; refer to that file rather than a static table here, since models are added/swapped frequently.
+Several, on HuggingFace. The full, authoritative list with HuggingFace repo IDs and sizes lives in `client/modules/wllama.ts` (`wllamaModels`) and is rendered in the Settings dropdown; refer to that file rather than a static table here, since models are added/swapped frequently.
 
 Two constraints decide what can join that list, both measured against the shipped wasm build:
 
-- **Every model file must be a shard.** Chromium's OPFS storage silently truncates files past 2000 MiB, so a monolithic GGUF above that size arrives corrupted in the browser. Shards also keep progressive download working.
+- **Every model file must stay under 2000 MiB.** In an incognito window, Chromium's OPFS stops each file at 2000 MiB, and wllama fails the download with `QuotaExceededError`. The limit is per file: in the same window, eight 512 MiB files (4000 MiB in all) were written without error, and a normal profile took a single 4000 MiB file. A model under 2000 MiB can therefore be the single GGUF from its original HuggingFace repo, since wllama 4 loads a GGUF as-is. A bigger one must be split (`llama-gguf-split --split --size`) and published to a `Felladrin/gguf-sharded-<QUANT>-<Name>` repo. The existing sharded entries stay as they are: moving them to single files would make every user download those models again.
 - **The wasm linear memory ceiling is 4 GiB.** Models at ~3.5 GB and above OOM during buffer reserve, so the practical catalog ceiling is around 3.7 GB of weights.
 
 One entry is the exception to "measured against the shipped wasm": Raon-1 nano 3B sits in the catalog and the dropdown, labeled "(wllama support pending)", because the `raon1nano` architecture is not yet in the llama.cpp build the wasm ships (upstream [ggml-org/llama.cpp#32200](https://github.com/ggml-org/llama.cpp/pull/32200) is open). It cannot answer until wllama ships that support; the sharded files and the entry are published so it starts working the day it does.
 
 Models whose chat template thinks by default (Granite 4.2, Gemma 4, Spark X2.6, Qwen 3 and 3.5, Polaris, DeepSeek R1 Distill, LittleLamb, Raon-1 nano) keep thinking: wllama splits their chain of thought into a `reasoning_content` channel, and MiniSearch wraps it in the configured reasoning markers so the thinking UI shows it while the answer follows. Thinking spends the same token budget as the answer, so these models are slower. To keep a long-winded model from thinking its way out of the context window without ever answering, thinking models ship with `reasoningBudgetTokens` (wllama's `reasoning_budget_tokens`, currently 1024): once the chain of thought runs that long, the engine closes the reasoning channel and forces the final answer. A cut-off chain of thought degrades the answer, so the budget is a backstop, not a target: every model also gets `reasoning_effort: "low"` in its chat template variables, which templates that support it (Granite 4.2, Spark X2.6) answer by thinking less, and the others ignore.
 
-`node scripts/wllama-catalog-check.cjs` HEADs every shard of every catalog model on HuggingFace and verifies the claimed sizes; run it after adding or re-sharding a model.
+`node scripts/wllama-catalog-check.cjs` HEADs every file of every catalog model on HuggingFace (each shard of a split model) and verifies the claimed sizes; run it after adding or re-sharding a model.
 
 **Configuration:**
 
