@@ -156,7 +156,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 
 - Several pre-configured models, listed in `client/modules/wllama.ts`
 - All quantized to a Q3/Q4-class quant (Q4_K_S, Q4_K_M, Q3_K_S, UD-Q3_K_XL or UD-Q4_K_XL)
-- Stored at: `Felladrin/gguf-sharded-*` on HuggingFace, always as sharded GGUFs
+- Stored on HuggingFace: a model under 2000 MiB can be a single GGUF from its original repo, a bigger one is sharded in a `Felladrin/gguf-sharded-*` repo
 
 **OpenAI/Internal:**
 
