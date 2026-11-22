@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-22
 
+- Search results are ranked much faster on servers with few CPUs, such as a 2-vCPU Hugging Face Space. The reranker's model now uses at most four threads, and no more than the CPUs the server is allowed to use. It used to start one thread per core of the host machine, even inside a container limited to two CPUs, so the threads fought over those two. Under a 2-CPU limit, scoring one result went from 138ms to 5.6ms; the public demo averaged 2.1 seconds per text rerank before this change. Rankings stay the same.
 - The in-browser AI answers several times faster: the browser engine, wllama, is now version 4.0.0. Measured with Qwen 3.5 0.8B on CPU (four threads, headless Chromium on a Ryzen AI MAX+ 395) over 15 questions run twice: the model reads the prompt 4.1x faster (81 against 20 tokens per second, median), writes the answer 3.7x faster (34 against 9), and loads from the cache in 3.4 seconds instead of 9.4. Models already downloaded stay in the cache and are not downloaded again. A new browser model under 2000 MiB can now ship as the single GGUF file from its original HuggingFace repo, because wllama 4 loads a GGUF as-is; bigger models stay split, since an incognito window stops each file at 2000 MiB.
 
 ## 2026-11-19

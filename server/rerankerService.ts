@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type { Tokenizer } from "@huggingface/tokenizers";
 import { type InferenceSession, Tensor } from "onnxruntime-node";
@@ -79,6 +80,23 @@ const MODEL_HF_FILE = selectModelFile(
  */
 const MAX_SEQUENCE_LENGTH = 512;
 
+/**
+ * Upper bound on the session's intra-op threads, which otherwise default to the
+ * host's core count even inside a container with a CPU quota. One 60-token
+ * pair, median over 15 reranks of 13 pairs on a Ryzen AI MAX+ 395:
+ *
+ *   CPU quota   ORT default   min(CPUs, 4)
+ *   2           138.4 ms      5.6 ms
+ *   4            60.9 ms      3.8 ms
+ *   8            23.8 ms      3.8 ms
+ *   none (32)     5.6 ms      3.8 ms
+ *
+ * `availableParallelism()` follows the quota, so the cap holds on a 2-vCPU
+ * Space as well as on a large host, where more threads did not help a pair
+ * this small.
+ */
+const MAX_INTRA_OP_THREADS = 4;
+
 let isReady = false;
 let session: InferenceSession | null = null;
 let tokenizer: Tokenizer | null = null;
@@ -119,7 +137,14 @@ export function sanitizeUnicodeSurrogates(input: string) {
 
 export async function startRerankerService() {
   printMessage(`Preparing model (${MODEL_HF_FILE})...`);
-  const loaded = await loadOnnxModel(MODEL_HF_REPO, MODEL_HF_FILE);
+  const loaded = await loadOnnxModel(MODEL_HF_REPO, MODEL_HF_FILE, {
+    sessionOptions: {
+      intraOpNumThreads: Math.min(
+        os.availableParallelism(),
+        MAX_INTRA_OP_THREADS,
+      ),
+    },
+  });
   session = loaded.session;
   tokenizer = loaded.tokenizer;
 

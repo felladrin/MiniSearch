@@ -55,6 +55,10 @@ Dynamic quantization computes each activation tensor's scale from that tensor's 
 
 Scoring one pair at a time removes the padding, and with it the coupling. It also suits the reason batching was introduced in the first place: `onnxruntime-node` wraps a synchronous native call, and one pair holds the event loop for about 13ms instead of the 50ms a batch of 10 takes. The cost is throughput, roughly 12% more wall time for 30 documents on two threads and up to 47% more where there are cores to spare.
 
+### Thread Count
+
+The session runs on `min(availableParallelism(), 4)` intra-op threads. Left at its default, ONNX Runtime sizes the pool from the host's cores and ignores a container's CPU quota, so on a 2-vCPU host its threads fight over two CPUs: one pair took 138ms there, against 5.6ms with two threads. The public demo, on a 2-vCPU Hugging Face Space, averaged 2131ms per text rerank before the cap. Above four threads a pair this small gets no faster: on 32 unconstrained cores, four threads scored a pair in 3.8ms and the default in 5.6ms. The measurements are in a comment above `MAX_INTRA_OP_THREADS` in `server/rerankerService.ts`.
+
 ### Shutdown
 
 On server close, `stopRerankerService()` clears the readiness flag and releases the inference session.
