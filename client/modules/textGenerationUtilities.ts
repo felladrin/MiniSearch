@@ -35,18 +35,29 @@ export class ChatGenerationError extends Error {
  */
 const pageContentTokenBudgetRatio = 0.35;
 
-function getPageContentTokenBudget() {
+/**
+ * The context window, in tokens, of the selected backend. Every budget carved
+ * out of the prompt (page excerpts, chat history) measures against this one
+ * number, so the parts are sized for the same window and fit together.
+ */
+export function getEffectiveContextSize() {
   const { inferenceType, openAiContextLength } = getSettings();
   // `openAiContextLength` describes one backend's endpoint. Every other one
   // runs at `defaultContextSize` (the browser models are built with it), and
   // the setting outlives a switch between them, so it only counts where it
-  // applies.
-  const contextSize =
-    inferenceType === "openai"
-      ? (openAiContextLength ?? defaultContextSize)
-      : defaultContextSize;
+  // applies. A value that is not a positive number cannot size a window.
+  if (
+    inferenceType === "openai" &&
+    typeof openAiContextLength === "number" &&
+    openAiContextLength > 0
+  ) {
+    return openAiContextLength;
+  }
+  return defaultContextSize;
+}
 
-  return Math.floor(contextSize * pageContentTokenBudgetRatio);
+function getPageContentTokenBudget() {
+  return Math.floor(getEffectiveContextSize() * pageContentTokenBudgetRatio);
 }
 
 let workerFactory = () =>
