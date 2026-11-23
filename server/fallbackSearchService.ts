@@ -68,7 +68,6 @@ type ProviderName = "parallel" | "youcom";
 
 interface MappedResults {
   results: TextualResult[];
-  received: number;
   /** The provider's longer text per result URL, kept for `/page-content`. */
   pageTexts?: Map<string, string>;
 }
@@ -505,11 +504,7 @@ async function searchWithProvider(
   }
 
   const document = await readSearchDocument<object>(callResponse, 2);
-  const mapped = provider.mapResults(document, limit);
-  printMessage(
-    `Fallback search usable text results from ${provider.name}: ${mapped.results.length} of ${mapped.received}.`,
-  );
-  return mapped;
+  return provider.mapResults(document, limit);
 }
 
 /**
@@ -633,7 +628,7 @@ function mapParallelResults(
     return toSnippet(text);
   });
 
-  return { results, received: document.results.length, pageTexts };
+  return { results, pageTexts };
 }
 
 function mapYoucomResults(
@@ -648,7 +643,6 @@ function mapYoucomResults(
 
   return {
     results: mapEntries(document.results.web, limit, buildYoucomSnippet),
-    received: document.results.web.length,
   };
 }
 

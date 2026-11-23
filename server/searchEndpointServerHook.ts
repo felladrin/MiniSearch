@@ -242,9 +242,6 @@ export function searchEndpointServerHook<
                 remainingMs,
               );
               incrementSearchesServedByFallback();
-              console.log(
-                "SearXNG failed, served text results from the fallback search",
-              );
             } catch (fallbackError) {
               incrementSearchesFailedOnFallback();
               // Fixed text plus the error's message, which by construction

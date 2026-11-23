@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { basename } from "node:path";
+import debug from "debug";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
 import {
@@ -13,6 +15,10 @@ import {
 import { resolvePublicUrlAndAddress } from "./utils/publicUrl.ts";
 import { safeEndResponse } from "./utils/streamUtils.ts";
 import { thumbnailRateLimiter } from "./verifyTokenAndRateLimit.ts";
+
+const fileName = basename(import.meta.url);
+const printMessage = debug(fileName);
+printMessage.enabled = true;
 
 /**
  * Where each SSRF defense of this endpoint lives:
@@ -376,7 +382,7 @@ export function thumbnailEndpointServerHook<
 
       if (outcome.kind === "failed") {
         recordThumbnailDropped();
-        console.warn(`Thumbnail fetch failed: ${outcome.reason}`);
+        printMessage(`Thumbnail fetch failed: ${outcome.reason}`);
         serveError(response, 502, "Thumbnail could not be fetched");
         return;
       }

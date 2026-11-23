@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import debug from "debug";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const lookupMock = vi.hoisted(() => vi.fn());
@@ -112,6 +113,9 @@ function imageResponse(
 }
 
 describe("thumbnailEndpointServerHook", () => {
+  let logLines: string[];
+  let originalLog: typeof debug.log;
+
   beforeEach(() => {
     vi.clearAllMocks();
     pinnedRequestMock.mockReset();
@@ -119,10 +123,15 @@ describe("thumbnailEndpointServerHook", () => {
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: true,
     });
-    vi.spyOn(console, "warn").mockImplementation(() => {});
+    logLines = [];
+    originalLog = debug.log;
+    debug.log = (...args: unknown[]) => {
+      logLines.push(args.map(String).join(" "));
+    };
   });
 
   afterEach(() => {
+    debug.log = originalLog;
     vi.restoreAllMocks();
   });
 
@@ -359,6 +368,24 @@ describe("thumbnailEndpointServerHook", () => {
       JSON.stringify({ error: "Thumbnail could not be fetched" }),
     );
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs why a fetch failed, never the thumbnail URL or its host", async () => {
+    pinnedRequestMock.mockResolvedValue(
+      fakeIncoming(new Uint8Array(), 403, {}),
+    );
+    const handler = getRegisteredHandler();
+    const thumbnailUrl = publicThumbnailUrl();
+
+    await handler(
+      createRequest(requestUrlFor(thumbnailUrl)),
+      createResponse(),
+      vi.fn(),
+    );
+
+    const output = logLines.join("\n");
+    expect(output).toContain("Thumbnail fetch failed: HTTP 403");
+    expect(output).not.toContain(new URL(thumbnailUrl).hostname);
   });
 
   it("answers 502 when the upstream answer is not an accepted image type", async () => {
