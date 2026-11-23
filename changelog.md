@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-23
 
+- The "Clear all data" confirmation now says everything it deletes: besides resetting the settings and the cached files (including downloaded AI models), it permanently deletes the saved searches, AI responses and chat messages. It used to mention only the settings and the cache. The note under the button says the same.
 - A follow-up question typed with more than 2000 characters now searches with its first 2000 characters. It used to send the whole text, which the server rejects, so the follow-up got no new search results and only a line in the log. The same limit now also holds for the keyword search the first question falls back to.
 - The "Thinking" indicator of the reasoning section no longer keeps animating after an answer stops while the model is still reasoning, for example when you interrupt it, it reaches the token limit or the connection drops. The unfinished reasoning now shows as a collapsed "Thought Process", as do older chat messages that end the same way.
 - The in-app log now keeps the newest 1000 entries and drops older ones. It used to grow for as long as the tab stayed open, copying the whole log on every new line, so a long session slowed down logging and the Logs window. The download from the Logs window holds those 1000 entries.
