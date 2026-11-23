@@ -3,7 +3,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useSyncExternalStore } from "react";
 import ChatInputArea from "@/components/AiResponse/ChatInputArea";
-import { chatGenerationStatePubSub, chatInputPubSub } from "@/modules/pubSub";
+import {
+  chatGenerationStatePubSub,
+  chatInputPubSub,
+  followUpQuestionPubSub,
+  settingsPubSub,
+} from "@/modules/pubSub";
+import { defaultSettings } from "@/modules/settings";
 import { getDictationEngine, startDictation } from "@/modules/speechToText";
 
 vi.mock("@/modules/speechToText", async () => {
@@ -144,4 +150,40 @@ it("stops a running session when a response starts generating", async () => {
   // clears it: a session still running would splice its transcript onto an
   // input the user cannot see or correct.
   await waitFor(() => expect(cancelFn).toHaveBeenCalledTimes(1));
+});
+
+describe("sending the suggested follow-up question", () => {
+  afterEach(() => {
+    followUpQuestionPubSub[0]("");
+    settingsPubSub[0]({ ...defaultSettings });
+  });
+
+  it.each([
+    [true, "{Enter}", true],
+    [true, "{Shift>}{Enter}{/Shift}", false],
+    [false, "{Shift>}{Enter}{/Shift}", true],
+    [false, "{Enter}", false],
+  ])(
+    "with enterToSubmit %s, pressing %s sends it: %s",
+    async (enterToSubmit, keys, sends) => {
+      settingsPubSub[0]({ ...defaultSettings, enterToSubmit });
+      followUpQuestionPubSub[0]("What happened next?");
+      const handleSend = vi.fn();
+      const user = userEvent.setup();
+      render(
+        <MantineProvider>
+          <ChatInputArea onKeyDown={() => {}} handleSend={handleSend} />
+        </MantineProvider>,
+      );
+
+      await user.click(screen.getByRole("textbox"));
+      await user.keyboard(keys);
+
+      if (sends) {
+        expect(handleSend).toHaveBeenCalledWith("What happened next?");
+      } else {
+        expect(handleSend).not.toHaveBeenCalled();
+      }
+    },
+  );
 });
