@@ -15,25 +15,28 @@ export async function readCappedBytes(
 
   const chunks: Uint8Array[] = [];
   let bytesRead = 0;
-  let reachedEnd = false;
+  let truncated = false;
 
-  while (bytesRead < maxBytes) {
-    const { done, value } = await reader.read();
-    if (done) {
-      reachedEnd = true;
-      break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const remaining = maxBytes - bytesRead;
+      if (value.byteLength > remaining) {
+        if (remaining > 0) {
+          chunks.push(value.subarray(0, remaining));
+          bytesRead = maxBytes;
+        }
+        truncated = true;
+        break;
+      }
+      chunks.push(value);
+      bytesRead += value.byteLength;
     }
-
-    const remaining = maxBytes - bytesRead;
-    const chunk =
-      value.byteLength > remaining ? value.subarray(0, remaining) : value;
-    bytesRead += chunk.byteLength;
-    chunks.push(chunk);
-
-    if (chunk.byteLength < value.byteLength) break;
+  } finally {
+    await reader.cancel().catch(() => {});
   }
-
-  await reader.cancel().catch(() => {});
 
   const bytes = new Uint8Array(bytesRead);
   let offset = 0;
@@ -41,7 +44,7 @@ export async function readCappedBytes(
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return { bytes, truncated: !reachedEnd };
+  return { bytes, truncated };
 }
 
 export function calculateBackoffTime(
