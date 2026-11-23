@@ -82,7 +82,7 @@ Need to:
 ### Entry Points
 
 - `client/index.tsx` - React app initialization
-- `vite.config.ts` - Vite dev server with hooks
+- `vite.config.ts` - Vite dev server with hooks. There is no standalone server entry point: every `server/*ServerHook.ts` is a connect middleware this file mounts through `configureServer` (dev) and/or `configurePreviewServer` (preview and production). To exercise an endpoint locally, run `npm run dev`, or `npm run build && npm run preview`; the Docker image serves `npm start`, which is `vite preview`.
 - `Dockerfile` - Single-stage container build
 
 ### Business Logic Modules
@@ -161,6 +161,7 @@ Need to:
 - `server/statusEndpointServerHook.ts` - `/status` health check endpoint
 - `server/configEndpointServerHook.ts` - `/api/config` runtime client configuration
 - `server/rerankerServiceHook.ts` - Reranker model lifecycle management
+- `server/biEncoderServiceHook.ts` - Starts and stops the bi-encoder service with the server; the bi-encoder scores query-passage relevance for page reading (`server/pageContentService.ts`)
 - `server/compressionServerHook.ts` - gzip/brotli compression for responses
 - `server/crossOriginServerHook.ts` - COOP/COEP headers for SharedArrayBuffer
 - `server/cacheServerHook.ts` - Cache-Control headers (preview server only)
@@ -226,11 +227,12 @@ Before any change:
 
 ```bash
 npm run lint
+npx vitest run
 ```
 
-Inside the dev container, the same command is `docker compose exec development-server npm run lint`.
+Inside the dev container, prefix either command with `docker compose exec development-server`.
 
-This runs:
+`npm run lint` runs:
 
 - Biome (formatting/linting)
 - TypeScript (type checking)
@@ -250,6 +252,19 @@ The project is split across three TypeScript configs, and the default one covers
 | `tsconfig.eval.json` | `eval`, `shared`                                                    |
 
 So `npx tsc --noEmit` reports success while type errors sit in `server/` or `eval/`, and CI then fails on a change that looked clean locally. Only `npm run lint` runs all three configs. Never treat a bare `tsc` as a green typecheck.
+
+### node_modules can be stale relative to the lockfile
+
+When you verify behavior by reading a dependency's source in `node_modules`, check the installed version against the lockfile first:
+
+```bash
+node -p "require('./node_modules/<dep>/package.json').version"
+node -p "require('./package-lock.json').packages['node_modules/<dep>'].version"
+```
+
+A checkout can lag the lockfile by a major version, and the behavior you read is then not the behavior CI runs. Run `npm ci` when the two disagree.
+
+Some dependencies also ship their own `AGENTS.md` (for example `node_modules/@wllama/wllama/AGENTS.md`). That is the dependency's contributor guide, not this repository's. Ignore it.
 
 ## Agent-First Principles
 
