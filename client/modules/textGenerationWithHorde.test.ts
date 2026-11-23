@@ -467,6 +467,24 @@ describe("textGenerationWithHorde", () => {
       const [, init] = mockFetch.mock.calls[0];
       expect(init.headers.apikey).toBe("test-api-key");
     });
+
+    it.each([
+      ["kudos is missing", { username: "bob" }],
+      ["username is missing", { kudos: 1000 }],
+      ["kudos is not a number", { username: "bob", kudos: "1000" }],
+      ["the body is null", null],
+    ])("returns null and logs when %s", async (_, body) => {
+      const { fetchHordeUserInfo } = await import("./textGenerationWithHorde");
+
+      mockFetch.mockResolvedValueOnce(jsonResponse(body));
+
+      const userInfo = await fetchHordeUserInfo("test-api-key");
+
+      expect(userInfo).toBeNull();
+      expect(addLogEntry).toHaveBeenCalledWith(
+        expect.stringContaining("malformed user info"),
+      );
+    });
   });
 
   it("logs a message that names the model used once generation completes", async () => {
