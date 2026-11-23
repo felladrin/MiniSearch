@@ -16,6 +16,7 @@ describe("useReasoningContent hook", () => {
       const { result } = renderHook(() =>
         useReasoningContent(
           "<think>Let me think about this</think>\nHere is the answer.",
+          false,
         ),
       );
 
@@ -29,13 +30,13 @@ describe("useReasoningContent hook", () => {
       ["whitespace-only text", "   "],
       ["no text at all", null as unknown as string],
     ])("should report nothing to show for %s", (_, content) => {
-      const { result } = renderHook(() => useReasoningContent(content));
+      const { result } = renderHook(() => useReasoningContent(content, false));
       expectEmptyState(result);
     });
 
     it("should return text as main content when no markers present", () => {
       const { result } = renderHook(() =>
-        useReasoningContent("This is a normal response."),
+        useReasoningContent("This is a normal response.", false),
       );
 
       expect(result.current.reasoningContent).toBe("");
@@ -45,12 +46,22 @@ describe("useReasoningContent hook", () => {
 
     it("should detect generating state when end marker is missing", () => {
       const { result } = renderHook(() =>
-        useReasoningContent("<think>I'm still thinking"),
+        useReasoningContent("<think>I'm still thinking", true),
       );
 
       expect(result.current.reasoningContent).toBe("I'm still thinking");
       expect(result.current.mainContent).toBe("");
       expect(result.current.isGenerating).toBe(true);
+    });
+
+    it("should treat a missing end marker as a finished thought once generation stops", () => {
+      const { result } = renderHook(() =>
+        useReasoningContent("<think>I was interrupted", false),
+      );
+
+      expect(result.current.reasoningContent).toBe("I was interrupted");
+      expect(result.current.mainContent).toBe("");
+      expect(result.current.isGenerating).toBe(false);
     });
   });
 });

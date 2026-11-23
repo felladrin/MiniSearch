@@ -4,10 +4,15 @@ import { settingsPubSub } from "@/modules/pubSub";
 
 /**
  * Splits a streamed AI response into the part between the reasoning markers
- * and the rest, flagging `isGenerating` while the closing marker has not
- * arrived yet.
+ * and the rest. `isGenerating` is reported only while the closing marker has
+ * not arrived yet and `isResponseGenerating` says the response is still being
+ * written; once generation stops (finished, interrupted, truncated), an
+ * unterminated reasoning block is a finished thought.
  */
-export function useReasoningContent(text: string) {
+export function useReasoningContent(
+  text: string,
+  isResponseGenerating: boolean,
+) {
   const [settings] = usePubSub(settingsPubSub);
 
   const extractReasoningAndMainContent = useCallback(
@@ -27,7 +32,7 @@ export function useReasoningContent(text: string) {
         return {
           reasoningContent: trimmedText.slice(startIndex + startMarker.length),
           mainContent: "",
-          isGenerating: true,
+          isGenerating: isResponseGenerating,
         };
       }
 
@@ -40,7 +45,7 @@ export function useReasoningContent(text: string) {
         isGenerating: false,
       };
     },
-    [],
+    [isResponseGenerating],
   );
 
   if (text && text.trim() === "") {

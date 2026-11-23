@@ -35,6 +35,7 @@ import { getSystemPrompt } from "./systemPrompt";
 import {
   ChatGenerationError,
   defaultContextSize,
+  getEffectiveContextSize,
   getFormattedSearchResults,
   imageResultTag,
   searchResultsToConsider,
@@ -327,6 +328,12 @@ async function buildSystemPromptContent(summary: string): Promise<string> {
   return content;
 }
 
+/** Share of the context window that the conversation itself may occupy. */
+const historyBudgetRatio = 0.75;
+
+const newestMessageTooLongMessage =
+  "The newest message alone does not fit the context";
+
 function keepNewestMessagesWithinBudget(
   messages: ChatMessage[],
   tokenBudget: number,
@@ -360,11 +367,11 @@ export async function generateReplyToMessages(
 ): Promise<string> {
   const keptMessages = keepNewestMessagesWithinBudget(
     messages,
-    defaultContextSize * 0.75,
+    defaultContextSize * historyBudgetRatio,
   );
 
   if (keptMessages.length === 0) {
-    throw new Error("The newest message alone does not fit the context");
+    throw new Error(newestMessageTooLongMessage);
   }
 
   const strategy = await getCurrentInferenceStrategy();
@@ -378,6 +385,18 @@ export async function generateChatResponse(
   let response = "";
 
   try {
+    const contextSize = getEffectiveContextSize();
+    // The newest message is the question being answered. It always goes out,
+    // so the one case with no usable prompt is a question larger than the
+    // whole window; that fails here, before anything is generated.
+    const question = newMessages.at(-1);
+    const questionTokens = question
+      ? gptTokenizer.encode(question.content).length
+      : 0;
+    if (questionTokens > contextSize) {
+      throw new Error(newestMessageTooLongMessage);
+    }
+
     const conversationId = getConversationId(newMessages);
     const existingSummary = loadConversationSummary(conversationId);
     const systemPromptContent = await buildSystemPromptContent(existingSummary);
@@ -392,11 +411,23 @@ export async function generateChatResponse(
       initialResponse.content,
     ).length;
     const reservedTokens = systemPromptTokens + initialResponseTokens;
-    const availableTokenBudget = defaultContextSize * 0.75 - reservedTokens;
-    const processedMessages = keepNewestMessagesWithinBudget(
-      newMessages,
-      availableTokenBudget,
+    // Only the turns before the question compete for what the system prompt
+    // and the question leave. Search results, page excerpts and the summary
+    // can outgrow the history's share, so the budget is clamped at zero:
+    // then every earlier turn is folded into the summary, never the question.
+    const earlierTurnsBudget = Math.max(
+      0,
+      contextSize * historyBudgetRatio - reservedTokens - questionTokens,
     );
+    const processedMessages = question
+      ? [
+          ...keepNewestMessagesWithinBudget(
+            newMessages.slice(0, -1),
+            earlierTurnsBudget,
+          ),
+          question,
+        ]
+      : [];
 
     if (newMessages.length > processedMessages.length) {
       const droppedCount = newMessages.length - processedMessages.length;
