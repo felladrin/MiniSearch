@@ -32,6 +32,7 @@ import {
   PageReadHostBreaker,
 } from "./pageReadHostBreaker";
 import { getPageReadStats } from "./pageReadsSinceLastRestart";
+import { rememberSearchExcerpts } from "./searchExcerptStore";
 
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
@@ -1090,6 +1091,55 @@ describe("host circuit breaker", () => {
     // asked, and sending a redirect did not count against the host that sent it.
     expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(breaker.getOpens()).toBe(1);
+  });
+});
+
+describe("pages the fallback search already sent", () => {
+  // The store outlives each test, so each one uses its own URL.
+  let url: string;
+  let nextPage = 0;
+  beforeEach(() => {
+    url = `https://example.com/heat-pumps-${nextPage++}`;
+  });
+  const excerpts = [
+    "A heat pump moves heat from the outside air into the house instead of generating it, which is why it uses less electricity than a resistive heater for the same warmth.",
+    "In cooling mode the same refrigerant cycle runs in reverse and carries the heat from the house back to the outside unit, the way an air conditioner does.",
+  ].join("\n\n");
+
+  it("grounds on the excerpts without reading the page", async () => {
+    rememberSearchExcerpts("how does a heat pump work", url, excerpts);
+    const before = getPageReadStats();
+
+    const contents = await fetchPageContents("how does a heat pump work", [
+      url,
+    ]);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(contents).toHaveLength(1);
+    expect(contents[0].content).toContain("refrigerant cycle");
+    const after = getPageReadStats();
+    expect(after.servedFromSearchExcerpts).toBe(
+      before.servedFromSearchExcerpts + 1,
+    );
+    expect(after.requested).toBe(before.requested);
+  });
+
+  it("reads the page when the excerpts were sent for another query", async () => {
+    rememberSearchExcerpts("heat pump prices", url, excerpts);
+    respondWithHtml(articlePage);
+
+    await fetchPageContents("how does a heat pump work", [url]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the page when the excerpts are too short to ground on", async () => {
+    rememberSearchExcerpts("short excerpts", url, "Too short to ground on.");
+    respondWithHtml(articlePage);
+
+    await fetchPageContents("short excerpts", [url]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

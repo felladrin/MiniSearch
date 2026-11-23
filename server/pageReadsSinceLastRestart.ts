@@ -50,6 +50,10 @@ const outcomes: Record<PageReadOutcome, number> = {
 let groundingRequests = 0;
 let groundingRequestsWithContent = 0;
 
+// Pages whose text came with the search results, so no read was made. Kept out
+// of `requested`, so `readRate` keeps measuring the reads that went out.
+let servedFromSearchExcerpts = 0;
+
 let totalReadMs = 0;
 let bodiesTruncated = 0;
 let totalPassagesKept = 0;
@@ -79,6 +83,10 @@ export function recordPageRead({
   totalPassagesAvailable += passagesAvailable;
 }
 
+export function recordPageServedFromSearchExcerpts(): void {
+  servedFromSearchExcerpts++;
+}
+
 /** One `/page-content` request, and whether any of its pages yielded text. */
 export function recordGroundingOutcome(hadContent: boolean): void {
   groundingRequests++;
@@ -100,6 +108,7 @@ export function getPageReadStats() {
     requested,
     read,
     readRate: Number(((read / requested) * 100 || 0).toFixed(1)),
+    servedFromSearchExcerpts,
     averageReadMs: Math.round(totalReadMs / requested || 0),
     bodiesTruncated,
     // A ratio rather than a count of pages that overflowed: an article almost

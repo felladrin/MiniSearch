@@ -9,7 +9,9 @@ import {
 import {
   type PageReadOutcome,
   recordPageRead,
+  recordPageServedFromSearchExcerpts,
 } from "./pageReadsSinceLastRestart.ts";
+import { recallSearchExcerpts } from "./searchExcerptStore.ts";
 import { resolvePublicUrl } from "./utils/publicUrl.ts";
 import { readCappedBytes } from "./utils/streamUtils.ts";
 
@@ -421,6 +423,8 @@ interface FetchedPage {
   contextTerms: string[];
   durationMs: number;
   bodyTruncated: boolean;
+  /** Text the search provider already sent, so no request was made. */
+  fromSearchExcerpts?: boolean;
 }
 
 function isRedirect(status: number): boolean {
@@ -1194,6 +1198,30 @@ async function fetchPageContent(
 }
 
 /**
+ * The excerpts the fallback search received for this query and URL, as a page,
+ * when they hold enough text to ground on. Otherwise the page is read.
+ */
+function pageFromSearchExcerpts(
+  query: string,
+  url: string,
+): FetchedPage | null {
+  const text = recallSearchExcerpts(query, url);
+  if (text === undefined) return null;
+
+  const passages = splitIntoPassages(text);
+  if (passages.join("\n").length < MIN_USEFUL_CHARS) return null;
+
+  return {
+    url,
+    passages,
+    contextTerms: [],
+    durationMs: 0,
+    bodyTruncated: false,
+    fromSearchExcerpts: true,
+  };
+}
+
+/**
  * Reads the given pages and returns the passages most relevant to the query.
  * Pages that fail, time out, or carry no readable text are left out instead of
  * failing the batch: a partial set of excerpts still grounds the answer.
@@ -1203,7 +1231,9 @@ async function fetchPageContent(
  * appear on several pages reach the prompt once.
  *
  * A host that refused enough recent reads is skipped without a request, under
- * `breaker`, and that skip is counted like any other outcome.
+ * `breaker`, and that skip is counted like any other outcome. A page the
+ * fallback search already sent excerpts of for this query is not requested
+ * either: those excerpts stand in for its text.
  *
  * Nothing here is logged. Every read is counted instead, by outcome, in
  * `pageReadsSinceLastRestart`, since a line naming the query or the URL would
@@ -1219,7 +1249,10 @@ export async function fetchPageContents(
   breaker: PageReadHostBreaker = pageReadHostBreaker,
 ): Promise<PageContent[]> {
   const results = await Promise.all(
-    urls.map((url) => fetchPageContent(url, breaker)),
+    urls.map(
+      (url) =>
+        pageFromSearchExcerpts(query, url) ?? fetchPageContent(url, breaker),
+    ),
   );
 
   const pages = results.filter((r): r is FetchedPage => r !== null);
@@ -1243,6 +1276,10 @@ export async function fetchPageContents(
   );
 
   for (const page of pages) {
+    if (page.fromSearchExcerpts) {
+      recordPageServedFromSearchExcerpts();
+      continue;
+    }
     const selected = selectedByUrl.get(page.url) ?? [];
     recordPageRead({
       outcome: "read",

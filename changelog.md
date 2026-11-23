@@ -5,6 +5,7 @@ Notable changes, grouped by date, most recent first.
 ## 2026-11-23
 
 - The Docker image now switches on Mojeek in its SearXNG settings. Since the last SearXNG update, the Brave web engine is off by default, which left DuckDuckGo and Google CSE as the only general web engines, and DuckDuckGo often answers a CAPTCHA to servers. Mojeek runs its own index: in a test run it returned 10 results on each of 10 queries, and 7 to 9 of them per query came from no other engine. To keep the old engine set, replace the settings file as described in "Tuning the Search Engines" in `docs/configuration.md`.
+- When SearXNG fails and the fallback search answers through Parallel, the AI answer now grounds on the text Parallel already sent with each result instead of downloading those pages. Parallel picks excerpts that match the query, a median of about 2,500 characters per result (measured over 30 results), and the result's snippet showed only 400 of them. So those answers wait for no page downloads, and they no longer lose the pages that refuse the server (on the public demo, 48% of page reads failed). `/status` counts these pages under `pageReads.servedFromSearchExcerpts`.
 
 ## 2026-11-22
 

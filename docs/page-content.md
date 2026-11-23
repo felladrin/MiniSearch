@@ -38,6 +38,15 @@ and no page is read either way until AI responses are on.
    the same allocation (`client/modules/pageExcerptAllocation.ts`) falls
    back to running synchronously.
 
+When SearXNG has failed and the fallback search served the results from
+Parallel, the server already holds query-relevant excerpts for each of them, a
+median of about 2,500 characters against the 400 its snippet keeps.
+`server/searchExcerptStore.ts` keeps that text for five minutes, and
+`fetchPageContents` uses it in place of a read for a URL it holds under the
+same query, so those pages are never requested. The excerpts go through the
+same passage splitting, ranking and selection as a page that was read. Text
+under 200 characters is not used, and that page is read instead.
+
 The read is started when the text results are in and awaited at the very end of
 `startTextSearch`, so the AI answer waits for it while the rendered results,
 the image search, and the history write all carry on.
@@ -362,6 +371,7 @@ this limit set where it should be", not "who read what":
 | Counter                    | The question it settles                                                                                                                                                         |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `readRate`                 | Is the feature worth its latency at all                                                                                                                                         |
+| `servedFromSearchExcerpts` | How many reads the fallback's excerpts saved. Kept out of `requested`, so `readRate` still measures the reads that went out                                                     |
 | `averageReadMs`            | Is a 6 s deadline generous or stingy                                                                                                                                            |
 | `skipped.timedOut`         | How much is being lost to that deadline                                                                                                                                         |
 | `skipped.tooLittleText`    | Is the 200-character floor discarding real pages, or is the extractor missing their text                                                                                        |
@@ -379,6 +389,11 @@ A counter can only be read in aggregate, so a single search cannot be recovered
 from it. The weakest point is an instance nobody else is using, where one search
 moves the numbers on its own; that reveals how many pages were read and how they
 failed, never which pages or what was asked.
+
+Besides the host breaker, the excerpt store is the one place that holds
+anything from a search: page text, under a SHA-256 of the query and the URL, for five minutes and at most
+500 entries. It keeps no query or URL in clear text, and it answers only a
+caller that sends the same query and URL again, who learns nothing new from it.
 
 ## Failure Behavior
 

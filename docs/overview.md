@@ -307,6 +307,7 @@ is counted at all (see `docs/page-content.md`):
 | `requested`                | number | Nothing; the denominator for the rest                                                                                                                            |
 | `read`                     | number | Nothing; how often the feature contributed anything                                                                                                              |
 | `readRate`                 | number | Nothing; `read` as a percentage of `requested`                                                                                                                   |
+| `servedFromSearchExcerpts` | number | Nothing; pages whose text came with the fallback search's results, so no read was made. Outside `requested`                                                      |
 | `averageReadMs`            | number | `REQUEST_TIMEOUT_MS`, including the reads that hit it                                                                                                            |
 | `bodiesTruncated`          | number | `MAX_RESPONSE_BYTES`                                                                                                                                             |
 | `excerptKeptRate`          | number | `MAX_PAGE_CHARS` and the 0.9 dedup threshold, as the share of pooled passages that survive                                                                       |
