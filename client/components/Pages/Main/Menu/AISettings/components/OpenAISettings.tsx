@@ -60,8 +60,8 @@ export const OpenAISettings = ({
       description={`Maximum number of tokens the model can consider. Defaults to ${defaultSettings.openAiContextLength}.`}
       defaultValue={defaultSettings.openAiContextLength}
       {...form.getInputProps("openAiContextLength")}
-      step={defaultSettings.openAiContextLength}
-      min={defaultSettings.openAiContextLength}
+      step={1024}
+      min={512}
     />
   </>
 );
