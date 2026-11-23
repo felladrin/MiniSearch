@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
 import debug from "debug";
+import { rememberSearchExcerpts } from "./searchExcerptStore.ts";
 import { isOpenableUrl } from "./utils/openableUrl.ts";
 
 const fileName = basename(import.meta.url);
@@ -68,6 +69,8 @@ type ProviderName = "parallel" | "youcom";
 interface MappedResults {
   results: TextualResult[];
   received: number;
+  /** The provider's longer text per result URL, kept for `/page-content`. */
+  pageTexts?: Map<string, string>;
 }
 
 interface FallbackProvider {
@@ -307,7 +310,7 @@ export async function fetchFallbackTextResults(
     const attemptMs = Math.ceil(remainingMs / eligibleCount);
 
     try {
-      const results = await searchWithProvider(
+      const { results, pageTexts } = await searchWithProvider(
         provider,
         query,
         limit,
@@ -317,6 +320,9 @@ export async function fetchFallbackTextResults(
       if (results.length > 0) {
         countFor(provider.name).served++;
         printMessage(`Fallback search served by ${provider.name}.`);
+        for (const [url, text] of pageTexts ?? []) {
+          rememberSearchExcerpts(query, url, text);
+        }
         return results;
       }
       countFor(provider.name).empty++;
@@ -414,7 +420,7 @@ async function searchWithProvider(
   query: string,
   limit: number,
   signal: AbortSignal,
-): Promise<TextualResult[]> {
+): Promise<MappedResults> {
   const apiKey = (process.env[provider.apiKeyVariable] ?? "").trim();
   const endpointUrl = provider.endpointUrl(apiKey);
 
@@ -499,11 +505,11 @@ async function searchWithProvider(
   }
 
   const document = await readSearchDocument<object>(callResponse, 2);
-  const { results, received } = provider.mapResults(document, limit);
+  const mapped = provider.mapResults(document, limit);
   printMessage(
-    `Fallback search usable text results from ${provider.name}: ${results.length} of ${received}.`,
+    `Fallback search usable text results from ${provider.name}: ${mapped.results.length} of ${mapped.received}.`,
   );
-  return results;
+  return mapped;
 }
 
 /**
@@ -618,12 +624,16 @@ function mapParallelResults(
     );
   }
 
-  return {
-    results: mapEntries(document.results, limit, (result) =>
-      buildSnippet(result.excerpts),
-    ),
-    received: document.results.length,
-  };
+  // The snippet keeps 400 characters of the excerpts; the rest is what the
+  // page read would have gone looking for, so it is kept for `/page-content`.
+  const pageTexts = new Map<string, string>();
+  const results = mapEntries(document.results, limit, (result) => {
+    const text = cleanExcerpts(result.excerpts);
+    if (text && typeof result.url === "string") pageTexts.set(result.url, text);
+    return toSnippet(text);
+  });
+
+  return { results, received: document.results.length, pageTexts };
 }
 
 function mapYoucomResults(
@@ -697,18 +707,26 @@ function buildYoucomSnippet(result: YoucomWebResult): string {
 }
 
 function buildSnippet(excerpts: string[] | undefined): string {
+  return toSnippet(cleanExcerpts(excerpts));
+}
+
+/**
+ * One kept line per paragraph, separated by blank lines, which is where
+ * `splitIntoPassages` cuts when the text is read as page content.
+ */
+function cleanExcerpts(excerpts: string[] | undefined): string {
   if (!Array.isArray(excerpts) || excerpts.length === 0) return "";
 
-  const snippet = excerpts
+  return excerpts
     .join("\n")
     .split("\n")
     .map(stripMarkdown)
     .filter((line) => line.length >= MIN_SNIPPET_LINE_LENGTH)
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .join("\n\n");
+}
 
-  return truncateSnippet(snippet);
+function toSnippet(text: string): string {
+  return truncateSnippet(text.replace(/\s+/g, " ").trim());
 }
 
 /**

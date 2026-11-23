@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-23
+
+- When SearXNG fails and the fallback search answers through Parallel, the AI answer now grounds on the text Parallel already sent with each result instead of downloading those pages. Parallel picks excerpts that match the query, a median of about 2,500 characters per result (measured over 30 results), and the result's snippet showed only 400 of them. So those answers wait for no page downloads, and they no longer lose the pages that refuse the server (on the public demo, 48% of page reads failed). `/status` counts these pages under `pageReads.servedFromSearchExcerpts`.
+
 ## 2026-11-22
 
 - `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` now takes several models, separated by commas, in order of preference. When a model fails before the answer starts, the server moves to the next one, and after the last one it starts the list over once. A server with a single model used to give up on the first error; that model now gets one retry, so a short outage of the upstream no longer fails the answer. `/status` also counts each failed attempt by reason (`inference.attemptFailures`: rate limit, server error, other HTTP error, stall, or other), which tells whether the upstream wants fewer requests, a retry or another model.
