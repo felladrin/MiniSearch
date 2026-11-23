@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import { Tokenizer } from "@huggingface/tokenizers";
 import { InferenceSession } from "onnxruntime-node";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -101,6 +102,7 @@ describe("sanitizeUnicodeSurrogates", () => {
 
 describe("startRerankerService", () => {
   const requestedExecutionProviders: string[][] = [];
+  const requestedIntraOpThreads: (number | undefined)[] = [];
 
   const sessionStub = {
     run: async () => ({ logits: { data: new Float32Array([0.5]) } }),
@@ -110,9 +112,10 @@ describe("startRerankerService", () => {
   function mockSessionCreation(respond: () => Promise<InferenceSession>) {
     vi.mocked(InferenceSession.create).mockImplementation(((
       _modelPath: string,
-      options: { executionProviders: string[] },
+      options: { executionProviders: string[]; intraOpNumThreads?: number },
     ) => {
       requestedExecutionProviders.push(options.executionProviders);
+      requestedIntraOpThreads.push(options.intraOpNumThreads);
       return respond();
     }) as unknown as typeof InferenceSession.create);
   }
@@ -124,7 +127,23 @@ describe("startRerankerService", () => {
   afterEach(async () => {
     await stopRerankerService();
     requestedExecutionProviders.length = 0;
+    requestedIntraOpThreads.length = 0;
     vi.restoreAllMocks();
+  });
+
+  // Under a CPU quota, ONNX Runtime's default pool still counts the host's
+  // cores: on a 2-CPU quota that made scoring 25x slower than two threads.
+  it.each([
+    [2, 2],
+    [4, 4],
+    [32, 4],
+  ])("uses %i CPUs as %i intra-op threads", async (cpus, threads) => {
+    vi.spyOn(os, "availableParallelism").mockReturnValue(cpus);
+    mockSessionCreation(async () => sessionStub);
+
+    await startRerankerService();
+
+    expect(requestedIntraOpThreads).toEqual([threads]);
   });
 
   // No GPU provider is requested: the quantized graph has no integer-matmul
