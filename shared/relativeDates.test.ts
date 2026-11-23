@@ -245,6 +245,31 @@ describe("normalizeRelativeDates", () => {
     expect(searchQuery).not.toContain("December 2026");
     expect(searchQuery.length).toBeLessThanOrEqual(2000);
   });
+
+  it("cuts an over-long query with no relative date to the limit", () => {
+    const long = "x".repeat(2100);
+
+    expect(
+      normalizeRelativeDates(long, new Date(2026, 10, 3), { maxLength: 2000 }),
+    ).toEqual({ searchQuery: "x".repeat(2000), replacements: [] });
+  });
+
+  it("cuts an over-long query whose anchor no longer fits to the limit", () => {
+    const long = `${"x".repeat(2095)} next year`;
+
+    expect(
+      normalizeRelativeDates(long, new Date(2026, 10, 3), { maxLength: 2000 }),
+    ).toEqual({ searchQuery: "x".repeat(2000), replacements: [] });
+  });
+
+  it("drops the trailing space left by the cut", () => {
+    const long = `${"x".repeat(1999)} ${"y".repeat(100)}`;
+
+    expect(
+      normalizeRelativeDates(long, new Date(2026, 10, 3), { maxLength: 2000 })
+        .searchQuery,
+    ).toBe("x".repeat(1999));
+  });
 });
 
 describe("normalizeFollowUpDates", () => {
@@ -327,5 +352,19 @@ describe("normalizeFollowUpDates", () => {
         maxLength: 9,
       }).searchQuery,
     ).toBe("who won");
+  });
+
+  it("cuts an over-long query to the limit", () => {
+    const long = "x".repeat(2100);
+
+    expect(
+      normalizeFollowUpDates(long, [long], AS_OF, { maxLength: 2000 })
+        .searchQuery,
+    ).toBe("x".repeat(2000));
+    expect(
+      normalizeFollowUpDates(long, ["who won it last year"], AS_OF, {
+        maxLength: 2000,
+      }).searchQuery,
+    ).toHaveLength(2000);
   });
 });
