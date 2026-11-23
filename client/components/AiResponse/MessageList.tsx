@@ -64,7 +64,9 @@ const Message = memo(
           p="sm"
           style={{ flex: 1, overflow: "auto" }}
         >
-          <FormattedMarkdown>{message.content}</FormattedMarkdown>
+          <FormattedMarkdown isGenerating={isGenerating && isLastAssistant}>
+            {message.content}
+          </FormattedMarkdown>
         </Paper>
 
         {canRegenerate && (
