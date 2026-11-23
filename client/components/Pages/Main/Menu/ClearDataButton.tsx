@@ -18,7 +18,7 @@ export default function ClearDataButton() {
 
   const handleClearDataButtonClick = async () => {
     const sureToDelete = self.confirm(
-      "Are you sure you want to reset the settings and delete all files in cache?",
+      "Are you sure you want to clear all data? This resets the settings, deletes the cached files (including downloaded AI models) and permanently deletes all your saved searches, AI responses and chat messages. This cannot be undone.",
     );
 
     if (!sureToDelete) return;
@@ -77,7 +77,8 @@ export default function ClearDataButton() {
         {state.hasClearedData ? "Data cleared" : "Clear all data"}
       </Button>
       <Text size="xs" c="dimmed">
-        Reset settings and delete all files in cache to free up space.
+        Reset settings, delete cached files and erase your search and chat
+        history.
       </Text>
     </Stack>
   );
