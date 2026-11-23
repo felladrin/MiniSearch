@@ -53,4 +53,35 @@ describe("MessageList", () => {
     );
     expect(renderedQuestions).toHaveLength(2);
   });
+
+  describe("unterminated reasoning", () => {
+    const messages: ChatMessage[] = [
+      { role: "user", content: "system instructions" },
+      { role: "assistant", content: "Ok!" },
+      { role: "user", content: "why?" },
+      { role: "assistant", content: "<think>cut off mid-thought" },
+    ];
+
+    it("shows no Thinking loader on a message that is not being generated", () => {
+      renderMessageList({ messages, isGenerating: false });
+
+      expect(screen.queryByText("Thinking")).toBeNull();
+      expect(screen.getByText("Thought Process")).toBeInTheDocument();
+    });
+
+    it("shows the Thinking loader on the last assistant message while it is generated", () => {
+      renderMessageList({ messages, isGenerating: true });
+
+      expect(screen.getByText("Thinking")).toBeInTheDocument();
+    });
+
+    it("shows no Thinking loader on an older message while a later one is generated", () => {
+      renderMessageList({
+        messages: [...messages, { role: "user", content: "and then?" }],
+        isGenerating: true,
+      });
+
+      expect(screen.queryByText("Thinking")).toBeNull();
+    });
+  });
 });

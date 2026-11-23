@@ -17,8 +17,19 @@ vi.mock("@/modules/textToSpeech", () => ({
 }));
 
 vi.mock("./FormattedMarkdown", () => ({
-  default: ({ children }: { children: string }) => (
-    <div data-testid="formatted-markdown">{children}</div>
+  default: ({
+    children,
+    isGenerating,
+  }: {
+    children: string;
+    isGenerating?: boolean;
+  }) => (
+    <div
+      data-testid="formatted-markdown"
+      data-generating={String(Boolean(isGenerating))}
+    >
+      {children}
+    </div>
   ),
 }));
 
@@ -69,6 +80,22 @@ describe("AiResponseContent", () => {
       .closest("[aria-live]");
     expect(liveRegion).toHaveAttribute("aria-busy", "false");
   });
+
+  it.each([
+    ["generating", "true"],
+    ["interrupted", "false"],
+    ["completed", "false"],
+  ])(
+    "tells the markdown whether the response is generating (%s)",
+    (state, expected) => {
+      renderContent(state);
+
+      expect(screen.getByTestId("formatted-markdown")).toHaveAttribute(
+        "data-generating",
+        expected,
+      );
+    },
+  );
 
   it("gives the toolbar action icons accessible names while generating", () => {
     renderContent("generating");
