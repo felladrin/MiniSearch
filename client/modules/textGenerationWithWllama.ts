@@ -266,18 +266,16 @@ function handleWllamaCompletion(
     return currentText;
   }
 
-  const stopIndex = model.stopStrings.findIndex((stopString) =>
-    currentText.slice(-(stopString.length * 2)).includes(stopString),
-  );
+  for (const stopString of model.stopStrings) {
+    const windowStart = Math.max(0, currentText.length - stopString.length * 2);
+    const stopPosition = currentText.indexOf(stopString, windowStart);
 
-  if (stopIndex !== -1) {
-    abortSignal();
-    const cleanedText = currentText.slice(
-      0,
-      -model.stopStrings[stopIndex].length,
-    );
-    onUpdate(cleanedText);
-    return cleanedText;
+    if (stopPosition !== -1) {
+      abortSignal();
+      const cleanedText = currentText.slice(0, stopPosition);
+      onUpdate(cleanedText);
+      return cleanedText;
+    }
   }
 
   onUpdate(currentText);

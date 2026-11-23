@@ -8,6 +8,7 @@ import {
 } from "./pubSub";
 import {
   composeStreamedText,
+  generateChatWithWllama,
   generateTextWithWllama,
 } from "./textGenerationWithWllama";
 import { initializeWllama } from "./wllama";
@@ -70,6 +71,16 @@ vi.mock("./wllama", () => ({
       fileSizeInMegabytes: 999,
       shouldIncludeUrlsOnPrompt: false,
       getSampling: () => ({}),
+    },
+    "stop-model": {
+      label: "Stop Model",
+      hfRepoId: "repo",
+      hfFilePath: "stop.gguf",
+      contextSize: 512,
+      fileSizeInMegabytes: 1,
+      shouldIncludeUrlsOnPrompt: false,
+      getSampling: () => ({}),
+      stopStrings: ["STOP", "<|end|>"],
     },
   },
 }));
@@ -144,6 +155,72 @@ describe("generateTextWithWllama", () => {
 
     expect(updateModelLoadingProgress).not.toHaveBeenCalled();
     expect(updateModelSizeInMegabytes).not.toHaveBeenCalledWith(0);
+  });
+});
+
+describe("stop strings", () => {
+  async function streamWithStopModel(chunks: string[]) {
+    const savedSettings = getSettings();
+    vi.mocked(getSettings).mockReturnValue({
+      ...savedSettings,
+      wllamaModelId: "stop-model",
+    });
+    vi.mocked(initializeWllama).mockImplementation(
+      async () =>
+        ({
+          createChatCompletion: vi.fn().mockResolvedValue(
+            (async function* () {
+              for (const content of chunks) {
+                yield { choices: [{ delta: { content } }] };
+              }
+            })(),
+          ),
+          exit: vi.fn().mockResolvedValue(undefined),
+          // biome-ignore lint/suspicious/noExplicitAny: minimal Wllama stub
+        }) as any,
+    );
+    const onUpdate = vi.fn();
+
+    try {
+      const result = await generateChatWithWllama(
+        [{ role: "user", content: "hi" }],
+        onUpdate,
+      );
+      return { result, onUpdate };
+    } finally {
+      vi.mocked(getSettings).mockReturnValue(savedSettings);
+    }
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("cuts at the stop string when text follows it in the same chunk", async () => {
+    const { result, onUpdate } = await streamWithStopModel([
+      "abcdefghijklSTOPxyz",
+    ]);
+
+    expect(result).toBe("abcdefghijkl");
+    expect(onUpdate).toHaveBeenLastCalledWith("abcdefghijkl");
+  });
+
+  it("removes a stop string that ends the text", async () => {
+    const { result } = await streamWithStopModel(["Hello ", "world", "STOP"]);
+
+    expect(result).toBe("Hello world");
+  });
+
+  it("cuts at the stop string that is found, not at the first one in the list", async () => {
+    const { result } = await streamWithStopModel(["answer<|end|>tail"]);
+
+    expect(result).toBe("answer");
+  });
+
+  it("leaves the text alone when no stop string appears", async () => {
+    const { result } = await streamWithStopModel(["no stop ", "here"]);
+
+    expect(result).toBe("no stop here");
   });
 });
 
