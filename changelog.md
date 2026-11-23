@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-23
+
+- The Docker image now switches on Mojeek in its SearXNG settings. Since the last SearXNG update, the Brave web engine is off by default, which left DuckDuckGo and Google CSE as the only general web engines, and DuckDuckGo often answers a CAPTCHA to servers. Mojeek runs its own index: in a test run it returned 10 results on each of 10 queries, and 7 to 9 of them per query came from no other engine. To keep the old engine set, replace the settings file as described in "Tuning the Search Engines" in `docs/configuration.md`.
+
 ## 2026-11-22
 
 - `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` now takes several models, separated by commas, in order of preference. When a model fails before the answer starts, the server moves to the next one, and after the last one it starts the list over once. A server with a single model used to give up on the first error; that model now gets one retry, so a short outage of the upstream no longer fails the answer. `/status` also counts each failed attempt by reason (`inference.attemptFailures`: rate limit, server error, other HTTP error, stall, or other), which tells whether the upstream wants fewer requests, a retry or another model.

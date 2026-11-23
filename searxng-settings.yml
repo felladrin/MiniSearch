@@ -4,6 +4,7 @@
 # file only declares what MiniSearch overrides:
 #   - a placeholder secret_key
 #   - JSON output format (consumed by server/webSearchService.ts)
+#   - Mojeek switched on for text search
 #
 # Docs: https://docs.searxng.org/admin/settings/settings_use_default_settings.html
 use_default_settings: true
@@ -15,3 +16,12 @@ server:
 search:
   formats:
     - json
+
+engines:
+  # Upstream ships Mojeek `inactive: true`, which only `inactive: false` undoes
+  # (`disabled: false` leaves it unloaded). It runs its own index, so its
+  # results are mostly ones the other engines do not return, and it keeps
+  # answering where DuckDuckGo shows a CAPTCHA. See docs/configuration.md,
+  # "Tuning the Search Engines".
+  - name: mojeek
+    inactive: false

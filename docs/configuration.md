@@ -284,7 +284,7 @@ client.
 
 ## Tuning the Search Engines
 
-The bundled SearXNG instance decides which engines answer a query. MiniSearch ships a thin overlay for it (`searxng-settings.yml`) that declares two things: the JSON output format that `server/webSearchService.ts` consumes, and a `secret_key` that the Dockerfile rewrites with a random value at build time. Everything else about the engine list comes from the pinned SearXNG build, so read the set from the running instance rather than from this page: the command below shows which engines answered and which came back unresponsive. Whatever that set turns out to be, one engine that is rate-limited or CAPTCHA-challenged from your server's IP thins every result page, because the other engines have to carry the query on their own.
+The bundled SearXNG instance decides which engines answer a query. MiniSearch ships a thin overlay for it (`searxng-settings.yml`) that declares three things: the JSON output format that `server/webSearchService.ts` consumes, a `secret_key` that the Dockerfile rewrites with a random value at build time, and Mojeek switched on for text search. Everything else about the engine list comes from the pinned SearXNG build, so read the set from the running instance rather than from this page: the command below shows which engines answered and which came back unresponsive. Whatever that set turns out to be, one engine that is rate-limited or CAPTCHA-challenged from your server's IP thins every result page, because the other engines have to carry the query on their own.
 
 Diagnose before you change anything. `/status` needs no token and publishes `searches.unresponsiveEngines`, each engine classified `blocked`, `timeout` or `other`, and the server log prints the same names through the always-on `debug` in `server/webSearchService.ts`. See [Debugging Configuration](#debugging-configuration). To see the engine set itself, ask SearXNG directly, with the same parameters the app sends:
 
@@ -383,6 +383,10 @@ Then run the query command from the top of this section again and compare which 
 Engine choice does not change the privacy posture. SearXNG still makes the request, from your server's address, so the engine sees the instance and not the user, and no query goes to any third party that SearXNG did not already talk to.
 
 None of this reaches MiniSearch's code. The app asks SearXNG for one JSON document and reranks whatever comes back, so nothing in `server/webSearchService.ts` changes when you retune the engines, and the circuit breaker, the retries and the `unresponsive_engines` reporting keep working over the new set.
+
+### Why the image switches Mojeek on
+
+Since the SearXNG commit pinned on 2026-11-23, upstream ships the Brave web engine disabled (its result links went through a redirect), which leaves DuckDuckGo and Google CSE as the only general web engines on by default, plus Wikipedia and Wikidata, which added no result in the run below. DuckDuckGo answers a CAPTCHA to many server addresses. On the public instance, in the days before that update, Brave, DuckDuckGo and Google CSE were all blocked at once on 219 of 371 text searches (59%), which sent those searches to the fallback providers. Mojeek runs its own index and is switched on in the bundled overlay. In a run of the image on 2026-11-23 (10 queries, 8 seconds apart, from a residential address), Mojeek returned 10 results on every query, while DuckDuckGo answered a CAPTCHA on 2 of the 10. In a second run of 5 queries, 7 to 9 of Mojeek's results per query came from no other engine. Qwant was tried in the same run and refused the first query with `access denied`, so it stays off.
 
 ## Runtime Configuration
 
