@@ -331,6 +331,9 @@ export function thumbnailEndpointServerHook<
 >(server: T) {
   server.middlewares.use(async (request, response, next) => {
     if (!request.url?.startsWith("/thumbnail")) return next();
+    if (new URL(request.url, "http://localhost").pathname !== "/thumbnail") {
+      return next();
+    }
 
     try {
       const url = new URL(request.url, `http://${request.headers.host}`);

@@ -178,6 +178,25 @@ describe("internalApiEndpointServerHook", () => {
       expect(response.end).not.toHaveBeenCalled();
     });
 
+    it.each([
+      ["GET", "/inferences"],
+      ["POST", "/inferenceX?token=abc"],
+      ["POST", "/inference/extra?token=abc"],
+    ])(
+      "passes through %s %s, which is not the /inference route",
+      async (method, url) => {
+        const handler = getRegisteredHandler();
+        const next = vi.fn();
+        const response = createResponse();
+        const request = createRequest({}, method);
+        request.url = url;
+        await handler(request, response, next);
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(response.end).not.toHaveBeenCalled();
+        expect(handleTokenVerification).not.toHaveBeenCalled();
+      },
+    );
+
     it("passes on a request without a URL instead of answering for it", async () => {
       const handler = getRegisteredHandler();
       const next = vi.fn();

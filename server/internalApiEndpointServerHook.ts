@@ -138,6 +138,11 @@ export function internalApiEndpointServerHook<
         return next();
       }
 
+      // The gate above is only cheap; the route is the exact pathname.
+      if (new URL(request.url, "http://localhost").pathname !== "/inference") {
+        return next();
+      }
+
       if (request.method !== "POST") {
         response.setHeader("Allow", "POST");
         sendJsonError(response, 405, { error: "Method Not Allowed" });
