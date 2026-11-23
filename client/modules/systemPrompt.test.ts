@@ -52,4 +52,28 @@ describe("systemPrompt", () => {
     const result = getSystemPrompt("");
     expect(result).toBe("");
   });
+
+  it("should insert search results containing dollar patterns verbatim without expansion", () => {
+    mockGetSettings.mockReturnValue({
+      systemPrompt: "BEFORE {{searchResults}} AFTER",
+    });
+    const result = getSystemPrompt("a $& b $` c $' d $$ e $1 f");
+    expect(result).toBe("BEFORE a $& b $` c $' d $$ e $1 f AFTER");
+  });
+
+  it("should replace multiple searchResults occurrences", () => {
+    mockGetSettings.mockReturnValue({
+      systemPrompt: "{{searchResults}} and {{searchResults}}",
+    });
+    const result = getSystemPrompt("RESULT");
+    expect(result).toBe("RESULT and RESULT");
+  });
+
+  it("should not expand placeholders appearing inside search results", () => {
+    mockGetSettings.mockReturnValue({
+      systemPrompt: "Prompt: {{searchResults}}",
+    });
+    const result = getSystemPrompt("snippet with {{currentDate}} inside");
+    expect(result).toBe("Prompt: snippet with {{currentDate}} inside");
+  });
 });
