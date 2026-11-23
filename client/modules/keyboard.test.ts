@@ -4,13 +4,16 @@ import { handleEnterKeyDown } from "./keyboard";
 
 function mockEvent(
   shift: boolean,
+  overrides: { key?: string; code?: string } = {},
 ): Partial<KeyboardEvent<HTMLTextAreaElement>> {
   return {
+    key: "Enter",
     code: "Enter",
     shiftKey: shift,
     keyCode: 13,
     preventDefault: vi.fn(),
     nativeEvent: { isComposing: false },
+    ...overrides,
   } as unknown as Partial<KeyboardEvent<HTMLTextAreaElement>>;
 }
 
@@ -61,6 +64,30 @@ describe("handleEnterKeyDown", () => {
     );
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("submits on numpad Enter when enterToSubmit is true", () => {
+    const onSubmit = vi.fn();
+    const event = mockEvent(false, { code: "NumpadEnter" });
+    handleEnterKeyDown(
+      event as KeyboardEvent<HTMLTextAreaElement>,
+      { enterToSubmit: true },
+      onSubmit,
+    );
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(onSubmit).toHaveBeenCalled();
+  });
+
+  it("submits on Shift+numpad Enter when enterToSubmit is false", () => {
+    const onSubmit = vi.fn();
+    const event = mockEvent(true, { code: "NumpadEnter" });
+    handleEnterKeyDown(
+      event as KeyboardEvent<HTMLTextAreaElement>,
+      { enterToSubmit: false },
+      onSubmit,
+    );
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(onSubmit).toHaveBeenCalled();
   });
 
   it("does not submit when Enter confirms an IME composition candidate", () => {
