@@ -10,10 +10,13 @@ export const logEntriesPubSub = createPubSub<LogEntry[]>([]);
 
 const [updateLogEntries, , getLogEntries] = logEntriesPubSub;
 
-/** Appends a timestamped entry to the in-app log. */
+/** The in-app log keeps only this many of the newest entries. */
+export const MAX_LOG_ENTRIES = 1000;
+
+/** Appends a timestamped entry to the in-app log, dropping the oldest past the cap. */
 export function addLogEntry(message: string) {
   updateLogEntries([
-    ...getLogEntries(),
+    ...getLogEntries().slice(-(MAX_LOG_ENTRIES - 1)),
     {
       timestamp: new Date().toISOString(),
       message,

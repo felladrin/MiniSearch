@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-23
 
+- The in-app log now keeps the newest 1000 entries and drops older ones. It used to grow for as long as the tab stayed open, copying the whole log on every new line, so a long session slowed down logging and the Logs window. The download from the Logs window holds those 1000 entries.
 - The AI settings panel no longer crashes when AI Horde answers the user lookup with incomplete data, such as a username without kudos. The answer is now logged as malformed and the API key field shows the anonymous-access hint, as it does for the default key.
 - A local model that declares stop strings now has its answer cut at the stop string. Before, the answer was trimmed by the stop string's length from the end of the text, so `abcdefghijklSTOPxyz` with the stop string `STOP` came out as `abcdefghijklSTO`: three characters of the marker stayed in and the text after it was lost. No bundled model declares stop strings yet, so nobody saw this.
 - Page bodies of exactly 1,500,000 bytes are no longer counted as truncated in `/status`'s `pageReads.bodiesTruncated`. The text was always complete, only the counter was wrong.
