@@ -1,31 +1,66 @@
 import { addLogEntry } from "./logEntries";
 import { getQuerySuggestions, updateQuerySuggestions } from "./pubSub";
 
-export async function getRandomQuerySuggestion() {
-  if (getQuerySuggestions().length === 0) await refillQuerySuggestions(25);
+/** Shown in the search box when no stored or fetched suggestion is usable. */
+export const DEFAULT_QUERY_SUGGESTION = "Anything you need!";
 
-  const querySuggestions = getQuerySuggestions();
+/** Keeps the non-empty strings of a list read from storage or the network. */
+function toNonEmptyStrings(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (entry): entry is string =>
+      typeof entry === "string" && entry.trim().length > 0,
+  );
+}
 
-  const randomQuerySuggestion = querySuggestions.pop() as string;
+/** Pops a stored suggestion, refilling the store when it is empty; never resolves to an empty string. */
+export async function getRandomQuerySuggestion(): Promise<string> {
+  let querySuggestions = toNonEmptyStrings(getQuerySuggestions());
+
+  if (querySuggestions.length === 0)
+    querySuggestions = await refillQuerySuggestions(25);
+
+  const randomQuerySuggestion = querySuggestions.pop();
 
   updateQuerySuggestions(querySuggestions);
 
-  return randomQuerySuggestion;
+  return randomQuerySuggestion ?? DEFAULT_QUERY_SUGGESTION;
 }
 
-async function refillQuerySuggestions(limit?: number) {
+async function refillQuerySuggestions(limit: number): Promise<string[]> {
   const querySuggestionsFileUrl = new URL(
     "/query-suggestions.json",
     self.location.origin,
   );
 
-  const fetchResponse = await fetch(querySuggestionsFileUrl.toString());
+  try {
+    const fetchResponse = await fetch(querySuggestionsFileUrl.toString());
 
-  const querySuggestionsList: string[] = await fetchResponse.json();
+    if (!fetchResponse.ok) {
+      throw new Error(`HTTP ${fetchResponse.status}`);
+    }
 
-  updateQuerySuggestions(
-    querySuggestionsList.sort(() => Math.random() - 0.5).slice(0, limit),
-  );
+    const body: unknown = await fetchResponse.json();
 
-  addLogEntry(`Query suggestions refilled with ${limit} suggestions`);
+    if (!Array.isArray(body)) {
+      throw new Error("the response is not a list");
+    }
+
+    const querySuggestionsList = toNonEmptyStrings(body)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, limit);
+
+    addLogEntry(
+      `Query suggestions refilled with ${querySuggestionsList.length} suggestions`,
+    );
+
+    return querySuggestionsList;
+  } catch (error) {
+    addLogEntry(
+      `Failed to refill query suggestions: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return [];
+  }
 }
