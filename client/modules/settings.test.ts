@@ -3,7 +3,7 @@ import {
   DEFAULT_SYSTEM_PROMPT,
 } from "@shared/defaultSystemPrompt";
 import { describe, expect, it, vi } from "vitest";
-import type { ServerConfig } from "./config";
+import { FALLBACK_CONFIG, type ServerConfig } from "./config";
 import {
   applyServerConfig,
   defaultSettings,
@@ -84,6 +84,7 @@ describe("Settings Module", () => {
     const config = {
       ...mockConfig,
       wllamaDefaultModelId: "custom-model",
+      internalApiEnabled: true,
       defaultInferenceType: "internal",
     };
     const applied = applyServerConfig(defaultSettings, config, false, false);
@@ -130,6 +131,76 @@ describe("Settings Module", () => {
     const applied = applyServerConfig(defaultSettings, config, true, true);
     expect(applied.wllamaModelId).toBe(defaultSettings.wllamaModelId);
     expect(applied.inferenceType).toBe(defaultSettings.inferenceType);
+  });
+
+  describe("an inference type the server no longer offers", () => {
+    const storedInternal = { ...defaultSettings, inferenceType: "internal" };
+
+    it("switches a stored type to the server default", () => {
+      const config = { ...mockConfig, defaultInferenceType: "openai" };
+      const applied = applyServerConfig(storedInternal, config, true, true);
+      expect(applied.inferenceType).toBe("openai");
+      expect(applied.wllamaModelId).toBe(storedInternal.wllamaModelId);
+    });
+
+    it("uses the shipped default when the server default is not offered either", () => {
+      // DEFAULT_INFERENCE_TYPE=internal left in place after the internal API
+      // was removed: the server still names "internal" as its default.
+      const config = { ...mockConfig, defaultInferenceType: "internal" };
+      expect(
+        applyServerConfig(storedInternal, config, true, true).inferenceType,
+      ).toBe("browser");
+      expect(
+        applyServerConfig(defaultSettings, config, false, true).inferenceType,
+      ).toBe("browser");
+    });
+
+    it("keeps a stored type the server still offers", () => {
+      const config = { ...mockConfig, internalApiEnabled: true };
+      expect(applyServerConfig(storedInternal, config, true, true)).toBe(
+        storedInternal,
+      );
+    });
+
+    it("keeps a stored type when the server config could not be loaded", () => {
+      // The fallback is not the server's answer, so it must not overwrite a
+      // choice that the next successful load may confirm.
+      expect(
+        applyServerConfig(storedInternal, FALLBACK_CONFIG, true, true),
+      ).toBe(storedInternal);
+    });
+
+    it("always leaves the settings select with a matching option", () => {
+      for (const internalApiEnabled of [true, false]) {
+        for (const defaultInferenceType of ["browser", "internal", "unknown"]) {
+          for (const stored of [
+            "browser",
+            "openai",
+            "horde",
+            "internal",
+            "gone",
+          ]) {
+            const config = {
+              ...mockConfig,
+              internalApiEnabled,
+              defaultInferenceType,
+            };
+            const offered = getInferenceTypes(config).map(
+              (t) => t.value as string,
+            );
+            for (const wasStored of [true, false]) {
+              const applied = applyServerConfig(
+                { ...defaultSettings, inferenceType: stored },
+                config,
+                wasStored,
+                true,
+              );
+              expect(offered).toContain(applied.inferenceType);
+            }
+          }
+        }
+      }
+    });
   });
 });
 
