@@ -380,6 +380,7 @@ answer are about the upstream and about the wait, not about what was asked:
 | `modelFallbacks`                | number | Times a retry moved to another model                                                                                                                                |
 | `modelsRefetched`               | number | Times the model pool was re-listed mid-retry                                                                                                                        |
 | `streamsEndedWithoutFinish`     | number | Attempts whose stream closed with no finish part, counted per attempt because the retry can still succeed                                                           |
+| `attemptFailures`               | object | Failed attempts by reason: `rateLimited` (429), `serverError` (5xx), `otherHttpError`, `stalled` (no part within the idle timeout) and `other`                      |
 | `failed.failedBeforeFirstToken` | number | Every model failed before a token was sent, answered 503                                                                                                            |
 | `failed.failedMidStream`        | number | The answer broke after content was already sent, so no retry was possible                                                                                           |
 | `failed.abandoned`              | number | The client was gone before or during the answer; the only outcome with no response to observe it by                                                                 |
@@ -398,12 +399,19 @@ before either counter is reached. So `inference.requests` should equal
 `authorization.bySurface.inference.authorized`, and a gap between the two is a
 request that never finished at all.
 
-Two fields read differently on a single-model deployment. With
-`INTERNAL_OPENAI_COMPATIBLE_API_MODEL` set there is no pool to fall back to, so
-the loop stops after the first failure: `averageAttempts` cannot exceed 1 and
-`modelFallbacks` stays at 0 however badly the upstream behaves. The pool also
-never refreshes in that mode, so `modelsRefetched` stays at 0; read
-`failed.failedBeforeFirstToken` for that case instead.
+With `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` set, the models tried are the ones
+it lists, in its order, and then the same list once more, so a single model
+gets one retry. A retry of the same model counts in `averageAttempts` but not
+in `modelFallbacks`, which only counts moves to another model, so a
+single-model deployment keeps `modelFallbacks` at 0. The list is never
+re-fetched in that mode, so `modelsRefetched` stays at 0 too.
+
+`attemptFailures` says what to change when `failed.failedBeforeFirstToken`
+grows: mostly `rateLimited` means the upstream wants fewer or slower requests,
+`serverError` that a retry or another model can help, and `stalled` that the
+model takes longer than the idle timeout to start. An attempt whose stream
+closed without a finish part lands in `other`, and is also counted in
+`streamsEndedWithoutFinish`.
 
 Model ids are configuration rather than user data, and `/inference` already
 sends the id to the browser in every chunk, so naming them here publishes

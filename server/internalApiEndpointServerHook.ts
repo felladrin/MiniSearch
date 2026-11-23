@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { streamText } from "ai";
+import { APICallError, streamText } from "ai";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { z } from "zod";
 import {
@@ -10,7 +10,9 @@ import {
 import { getModelConfig } from "./config/modelConfig.ts";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
 import {
+  type AttemptFailureReason,
   type InferenceOutcome,
+  recordAttemptFailure,
   recordInference,
   recordModelAbandoned,
   recordModelAttempt,
@@ -108,6 +110,18 @@ function hasJsonContentType(request: IncomingMessage): boolean {
   const contentType = request.headers["content-type"];
   if (typeof contentType !== "string") return false;
   return contentType.toLowerCase().includes("application/json");
+}
+
+function classifyAttemptFailure(
+  error: unknown,
+  stalled: boolean,
+): AttemptFailureReason {
+  if (stalled) return "stalled";
+  if (!APICallError.isInstance(error) || error.statusCode === undefined) {
+    return "other";
+  }
+  if (error.statusCode === 429) return "rateLimited";
+  return error.statusCode >= 500 ? "serverError" : "otherHttpError";
 }
 
 /** Self-hosted `/inference` endpoint: streams an OpenAI-compatible chat completion from the internal API, retrying across models. */
@@ -251,7 +265,16 @@ export function internalApiEndpointServerHook<
           name: "openai",
         });
 
-        let model = process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL;
+        const configuredModels = (
+          process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL ?? ""
+        )
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean);
+        // Each configured model, in order of preference, then the same list
+        // once more, so a single configured model also gets one retry.
+        const configuredLadder = [...configuredModels, ...configuredModels];
+        let model: string | undefined = configuredModels[0];
         let availableModels: { id: string }[] = [];
         const attemptedModels = new Set<string>();
         // Set before the try so a failing `/models` endpoint does not trigger
@@ -390,6 +413,9 @@ export function internalApiEndpointServerHook<
             clearTimeout(idleTimeoutId);
             lastError = error;
             recordModelFailure(model);
+            recordAttemptFailure(
+              classifyAttemptFailure(error, abortController.signal.aborted),
+            );
             console.error(
               "Error during streaming:",
               error instanceof Error ? error.message : error,
@@ -402,7 +428,7 @@ export function internalApiEndpointServerHook<
             // recover; without the `!hasRefetched` guard we would loop on a
             // stale list.
             if (
-              !process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL &&
+              configuredModels.length === 0 &&
               availableModels.every((m) => attemptedModels.has(m.id)) &&
               !hasRefetched
             ) {
@@ -423,13 +449,13 @@ export function internalApiEndpointServerHook<
               }
             }
 
-            const nextModel = selectRandomModel(
-              availableModels,
-              attemptedModels,
-            );
+            const nextModel =
+              configuredModels.length > 0
+                ? configuredLadder[attempt]
+                : selectRandomModel(availableModels, attemptedModels);
             if (!nextModel) break;
+            if (nextModel !== model) recordModelFallback();
             model = nextModel;
-            recordModelFallback();
 
             const backoffMs = calculateBackoffTime(attempt);
             await new Promise((resolve) => setTimeout(resolve, backoffMs));

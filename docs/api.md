@@ -326,9 +326,10 @@ data: [DONE]
 ```
 
 When a model stalls or fails before the first token, the server retries with
-another model from the provider's list, up to 5 attempts. That ladder needs the
-list: with `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` pinned there is no second
-model to try, so the first failure is the last attempt. Once bytes have been
+another model, up to 5 attempts. With `INTERNAL_OPENAI_COMPATIBLE_API_MODEL`
+empty, the next model is a random one from the provider's list. With it set,
+the next model is the next one in that comma-separated list, and the list is
+walked twice, so a single configured model gets one retry. Once bytes have been
 written the status line is already sent, so a later failure arrives as a data
 frame carrying an `error` field, followed by `[DONE]`, rather than as a status
 code.

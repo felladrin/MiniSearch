@@ -35,7 +35,7 @@ vi.mock("../shared/openaiModels", async (importOriginal) => ({
 }));
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { streamText } from "ai";
+import { APICallError, streamText } from "ai";
 import {
   listOpenAiCompatibleModels,
   selectRandomModel,
@@ -310,6 +310,84 @@ describe("internalApiEndpointServerHook", () => {
     };
 
     beforeEach(setupStreaming);
+
+    async function callWithFakeTimers(response = createResponse()) {
+      vi.useFakeTimers();
+      try {
+        const pending = getRegisteredHandler()(
+          createRequest({ messages: [{ role: "user", content: "hi" }] }),
+          response,
+          vi.fn(),
+        );
+        await vi.runAllTimersAsync();
+        await pending;
+      } finally {
+        vi.useRealTimers();
+      }
+      return response;
+    }
+
+    function requestedModels() {
+      const provider = vi.mocked(createOpenAICompatible).mock.results[0]
+        .value as { chatModel: ReturnType<typeof vi.fn> };
+      return provider.chatModel.mock.calls.map((call) => call[0]);
+    }
+
+    it("tries the configured models in their order", async () => {
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", " model-a , model-b ");
+      vi.mocked(streamText)
+        .mockImplementationOnce(() => streamOf([]) as never)
+        .mockImplementationOnce(
+          () =>
+            streamOf([
+              { type: "text-delta", text: "Recovered" },
+              { type: "finish" },
+            ]) as never,
+        );
+
+      const response = await callWithFakeTimers();
+
+      expect(requestedModels()).toEqual(["model-a", "model-b"]);
+      expect(listOpenAiCompatibleModels).not.toHaveBeenCalled();
+      expect(selectRandomModel).not.toHaveBeenCalled();
+      const writes = response.write.mock.calls.map((c) => c[0]).join("");
+      expect(writes).toContain("Recovered");
+    });
+
+    it("walks the configured list a second time before giving up", async () => {
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "model-a,model-b");
+      vi.mocked(streamText).mockImplementation(() => streamOf([]) as never);
+
+      const response = await callWithFakeTimers();
+
+      expect(requestedModels()).toEqual([
+        "model-a",
+        "model-b",
+        "model-a",
+        "model-b",
+      ]);
+      expect(response.statusCode).toBe(503);
+    });
+
+    // A single pinned model used to fail on its first error, since there was no
+    // other model to move to.
+    it("retries a single configured model once", async () => {
+      vi.mocked(streamText)
+        .mockImplementationOnce(() => streamOf([]) as never)
+        .mockImplementationOnce(
+          () =>
+            streamOf([
+              { type: "text-delta", text: "Second try" },
+              { type: "finish" },
+            ]) as never,
+        );
+
+      const response = await callWithFakeTimers();
+
+      expect(requestedModels()).toEqual(["test-model", "test-model"]);
+      const writes = response.write.mock.calls.map((c) => c[0]).join("");
+      expect(writes).toContain("Second try");
+    });
 
     it("emits SSE frames on successful stream", async () => {
       vi.mocked(streamText).mockImplementation(
@@ -785,7 +863,8 @@ describe("internalApiEndpointServerHook", () => {
         "text/event-stream",
       );
       expect(response.write).not.toHaveBeenCalled();
-      expect(vi.mocked(streamText)).toHaveBeenCalledTimes(1);
+      // The first attempt and its one retry.
+      expect(vi.mocked(streamText)).toHaveBeenCalledTimes(2);
     });
 
     it("responds 503 JSON when the only model cannot start", async () => {
@@ -810,7 +889,7 @@ describe("internalApiEndpointServerHook", () => {
         lastError: "upstream down",
       });
       expect(response.write).not.toHaveBeenCalled();
-      expect(vi.mocked(streamText)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(streamText)).toHaveBeenCalledTimes(2);
     });
 
     it("retries on model failure and succeeds on second attempt", async () => {
@@ -1288,12 +1367,53 @@ describe("internalApiEndpointServerHook", () => {
       expect(after.failed.failedBeforeFirstToken).toBe(
         before.failed.failedBeforeFirstToken + 1,
       );
+      // Per attempt: the single configured model was tried twice.
       expect(after.streamsEndedWithoutFinish).toBe(
-        before.streamsEndedWithoutFinish + 1,
+        before.streamsEndedWithoutFinish + 2,
       );
       expect(after.byModel["test-model"].failed).toBe(
-        (before.byModel["test-model"]?.failed ?? 0) + 1,
+        (before.byModel["test-model"]?.failed ?? 0) + 2,
       );
+      // A retry of the same model is not a move to another model.
+      expect(after.modelFallbacks).toBe(before.modelFallbacks);
+    });
+
+    it("counts each failed attempt under its reason", async () => {
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "model-a,model-b");
+      const httpError = (statusCode: number) =>
+        new APICallError({
+          message: `HTTP ${statusCode}`,
+          url: "http://test-api/chat/completions",
+          requestBodyValues: {},
+          statusCode,
+        });
+      for (const error of [
+        httpError(429),
+        httpError(503),
+        httpError(400),
+        new Error("socket hang up"),
+      ]) {
+        vi.mocked(streamText).mockImplementationOnce(
+          () => streamOf([{ type: "error", error }]) as never,
+        );
+      }
+      const before = getInferenceStats().attemptFailures;
+
+      vi.useFakeTimers();
+      try {
+        const pending = callInference();
+        await vi.runAllTimersAsync();
+        await pending;
+      } finally {
+        vi.useRealTimers();
+      }
+
+      const after = getInferenceStats().attemptFailures;
+      expect(after.rateLimited).toBe(before.rateLimited + 1);
+      expect(after.serverError).toBe(before.serverError + 1);
+      expect(after.otherHttpError).toBe(before.otherHttpError + 1);
+      expect(after.other).toBe(before.other + 1);
+      expect(after.stalled).toBe(before.stalled);
     });
 
     it("counts a failure after content as a mid-stream failure", async () => {

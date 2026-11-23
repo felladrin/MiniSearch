@@ -55,7 +55,7 @@ For self-hosted OpenAI-compatible APIs:
 | ----------------------------------------- | -------------- | ------------------------------------------------------------------ |
 | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL` | `''`           | Base URL of your API (e.g., `https://api.internal.company.com/v1`) |
 | `INTERNAL_OPENAI_COMPATIBLE_API_KEY`      | `''`           | API key for authentication                                         |
-| `INTERNAL_OPENAI_COMPATIBLE_API_MODEL`    | `''`           | Model ID to use (auto-detected if empty)                           |
+| `INTERNAL_OPENAI_COMPATIBLE_API_MODEL`    | `''`           | Model ID, or a comma-separated list (random model if empty)        |
 | `INTERNAL_OPENAI_COMPATIBLE_API_NAME`     | `Internal API` | Display name shown in UI                                           |
 
 **Example:**
@@ -66,6 +66,8 @@ INTERNAL_OPENAI_COMPATIBLE_API_KEY="sk-internal-xxx"
 INTERNAL_OPENAI_COMPATIBLE_API_MODEL="llama-3.1-8b"
 INTERNAL_OPENAI_COMPATIBLE_API_NAME="Company LLM"
 ```
+
+`INTERNAL_OPENAI_COMPATIBLE_API_MODEL` takes several models, separated by commas, in order of preference (`"llama-3.1-8b,qwen-3-8b"`). When a model fails before sending the first token, the server moves to the next one, and after the last one it starts the list over once, up to 5 attempts in all. So a single model gets one retry. Left empty, each request picks a random model from the API's `/models` list, which includes every model the API serves.
 
 ### Default Behavior
 
