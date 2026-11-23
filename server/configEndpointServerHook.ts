@@ -6,6 +6,7 @@ import {
   DEFAULT_WLLAMA_MODEL_ID,
   type ServerConfig,
 } from "../shared/serverConfig.ts";
+import { parseCommaSeparatedList } from "./parseCommaSeparatedList.ts";
 import { getSearchToken } from "./searchToken.ts";
 
 /**
@@ -21,7 +22,8 @@ export function configEndpointServerHook<
     }
 
     const config: ServerConfig = {
-      accessKeysEnabled: Boolean(process.env.ACCESS_KEYS),
+      accessKeysEnabled:
+        parseCommaSeparatedList(process.env.ACCESS_KEYS).length > 0,
       accessKeyTimeoutHours: Number(process.env.ACCESS_KEY_TIMEOUT_HOURS) || 0,
       wllamaDefaultModelId:
         process.env.WLLAMA_DEFAULT_MODEL_ID || DEFAULT_WLLAMA_MODEL_ID,

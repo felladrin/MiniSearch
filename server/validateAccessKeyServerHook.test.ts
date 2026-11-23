@@ -138,6 +138,58 @@ describe("validateAccessKeyServerHook", () => {
     expect(mockConsumeRateLimitPoint).toHaveBeenCalledTimes(1);
   });
 
+  it("ignores spaces and empty entries in the configured ACCESS_KEYS list", async () => {
+    process.env.ACCESS_KEYS = "test-key, other-key,";
+    mockArgon2Verify.mockImplementation(
+      async ({ password }: { password: string }) => {
+        if (password === "") throw new Error("Password must be specified");
+        return password === "other-key";
+      },
+    );
+    const { validateAccessKeyServerHook } = await import(
+      "./validateAccessKeyServerHook"
+    );
+    const use = vi.fn();
+    validateAccessKeyServerHook({
+      middlewares: { use },
+    } as never);
+    const handler = use.mock.calls[0][0] as (
+      req: {
+        url: string;
+        method: string;
+        on: (event: string, cb: (chunk: string) => void) => void;
+      },
+      res: {
+        setHeader: ReturnType<typeof vi.fn>;
+        end: ReturnType<typeof vi.fn>;
+      },
+      next: () => void,
+    ) => void;
+
+    const res = makeMockResponse();
+    const req = makeMockRequest(
+      "/api/validate-access-key",
+      "POST",
+      JSON.stringify({ accessKeyHash: makeValidAccessKeyHash("valid") }),
+    );
+
+    await new Promise<void>((resolve) => {
+      void handler(req as never, res as never, () => {});
+      setImmediate(() => {
+        for (const cb of req.endCallbacks) {
+          cb();
+        }
+        setTimeout(resolve, 50);
+      });
+    });
+
+    expect(res.end).toHaveBeenCalledWith(JSON.stringify({ valid: true }));
+    const verifiedPasswords = mockArgon2Verify.mock.calls.map(
+      ([options]) => (options as { password: string }).password,
+    );
+    expect(verifiedPasswords).toEqual(["test-key", "other-key"]);
+  });
+
   it("responds 429 and skips the argon2 loop when the limiter refuses", async () => {
     process.env.ACCESS_KEYS = "test-key";
     mockConsumeRateLimitPoint.mockResolvedValue(false);
