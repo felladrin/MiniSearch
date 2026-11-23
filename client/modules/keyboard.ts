@@ -17,8 +17,8 @@ export const handleEnterKeyDown = (
   }
 
   if (
-    (event.code === "Enter" && !event.shiftKey && settings.enterToSubmit) ||
-    (event.code === "Enter" && event.shiftKey && !settings.enterToSubmit)
+    (event.key === "Enter" && !event.shiftKey && settings.enterToSubmit) ||
+    (event.key === "Enter" && event.shiftKey && !settings.enterToSubmit)
   ) {
     event.preventDefault();
     onSubmit();

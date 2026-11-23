@@ -145,6 +145,23 @@ describe("thumbnailEndpointServerHook", () => {
     expect(pinnedRequestMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "/thumbnails",
+    "/thumbnailX?token=abc",
+    "/thumbnail/extra?token=abc",
+  ])("passes through %s, which is not the /thumbnail route", async (url) => {
+    const handler = getRegisteredHandler();
+    const next = vi.fn();
+    const response = createResponse();
+
+    await handler(createRequest(url), response, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(response.end).not.toHaveBeenCalled();
+    expect(handleTokenVerification).not.toHaveBeenCalled();
+    expect(pinnedRequestMock).not.toHaveBeenCalled();
+  });
+
   it("stops processing when token verification fails", async () => {
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: false,

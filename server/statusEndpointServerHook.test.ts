@@ -59,6 +59,53 @@ function callStatus(): Promise<Record<string, unknown>> {
 }
 
 describe("statusEndpointServerHook", () => {
+  it.each(["/statuses", "/statusX?token=abc", "/status/extra"])(
+    "passes through %s, which is not the /status route",
+    async (url) => {
+      const use = vi.fn();
+      statusEndpointServerHook({
+        middlewares: { use },
+        config: { define: { VITE_BUILD_DATE_TIME: new Date().toISOString() } },
+      } as unknown as Parameters<typeof statusEndpointServerHook>[0]);
+      const response = {
+        setHeader: vi.fn(),
+        end: vi.fn(),
+      } as unknown as RecordedResponse;
+      const next = vi.fn();
+
+      await (use.mock.calls[0][0] as Handler)(
+        { url, headers: {} } as unknown as IncomingMessage,
+        response,
+        next,
+      );
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(response.end).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still answers /status with a query string", async () => {
+    const use = vi.fn();
+    statusEndpointServerHook({
+      middlewares: { use },
+      config: { define: { VITE_BUILD_DATE_TIME: new Date().toISOString() } },
+    } as unknown as Parameters<typeof statusEndpointServerHook>[0]);
+    const response = {
+      setHeader: vi.fn(),
+      end: vi.fn(),
+    } as unknown as RecordedResponse;
+    const next = vi.fn();
+
+    await (use.mock.calls[0][0] as Handler)(
+      { url: "/status?probe=1", headers: {} } as unknown as IncomingMessage,
+      response,
+      next,
+    );
+
+    expect(next).not.toHaveBeenCalled();
+    expect(response.end).toHaveBeenCalledTimes(1);
+  });
+
   it("publishes the web search verdict and the per-engine tally", async () => {
     const status = await callStatus();
 

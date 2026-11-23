@@ -39,6 +39,9 @@ export function statusEndpointServerHook<
 >(server: T) {
   server.middlewares.use(async (request, response, next) => {
     if (!request.url?.startsWith("/status")) return next();
+    if (new URL(request.url, "http://localhost").pathname !== "/status") {
+      return next();
+    }
 
     const sessions = getVerifiedTokensAmount();
     const textualSearches = getTextualSearchesSinceLastRestart();
