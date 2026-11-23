@@ -71,12 +71,24 @@ describe("Access Key Module", () => {
       expect(result).toBe("invalid");
     });
 
-    it("should return invalid on network error", async () => {
+    it("should return unreachable on network error", async () => {
       const { validateAccessKey } = await import("./accessKey");
       mockFetch.mockRejectedValue(new Error("Network error"));
 
       const result = await validateAccessKey("test-key");
-      expect(result).toBe("invalid");
+      expect(result).toBe("unreachable");
+    });
+
+    it("should return unreachable when the server reply is not JSON", async () => {
+      const { validateAccessKey } = await import("./accessKey");
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: vi.fn().mockRejectedValue(new SyntaxError("Unexpected token <")),
+      });
+
+      const result = await validateAccessKey("test-key");
+      expect(result).toBe("unreachable");
     });
 
     it("should send a hash the server can verify against the access key", async () => {

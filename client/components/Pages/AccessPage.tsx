@@ -21,21 +21,22 @@ export default function AccessPage({
   const handleSubmit = async (formEvent: FormEvent<HTMLFormElement>) => {
     formEvent.preventDefault();
     setState((prev) => ({ ...prev, error: "" }));
-    try {
-      const isValid = await validateAccessKey(state.accessKey);
-      if (isValid === "valid") {
-        addLogEntry("Valid access key entered");
-        onAccessKeyValid();
-      } else if (isValid === "rateLimited") {
-        // The module already raised the refusal notice; no wrong-key error.
-        addLogEntry("Access key validation rate-limited");
-      } else {
-        setState((prev) => ({ ...prev, error: "Invalid access key" }));
-        addLogEntry("Invalid access key attempt");
-      }
-    } catch (error) {
-      setState((prev) => ({ ...prev, error: "Error validating access key" }));
-      addLogEntry(`Error validating access key: ${error}`);
+    // validateAccessKey never rejects: every failure comes back as a result.
+    const result = await validateAccessKey(state.accessKey);
+    if (result === "valid") {
+      addLogEntry("Valid access key entered");
+      onAccessKeyValid();
+    } else if (result === "rateLimited") {
+      // The module already raised the refusal notice; no wrong-key error.
+      addLogEntry("Access key validation rate-limited");
+    } else if (result === "unreachable") {
+      setState((prev) => ({
+        ...prev,
+        error: "Could not reach the server. Please try again.",
+      }));
+    } else {
+      setState((prev) => ({ ...prev, error: "Invalid access key" }));
+      addLogEntry("Invalid access key attempt");
     }
   };
 
