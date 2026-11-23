@@ -186,6 +186,9 @@ async function handleGenerationStatus(
       }
 
       if (getTextGenerationState() === "interrupted") {
+        // Stop only ends the polling here; without a cancel the queued job
+        // would keep running on the Horde and keep spending kudos.
+        await cancelGeneration(generationId).catch(() => {});
         throw new ChatGenerationError("Generation interrupted");
       }
     } while (
@@ -390,6 +393,11 @@ export async function generateTextWithHorde() {
   const messages = getDefaultChatMessages(
     await getFormattedSearchResults(true),
   );
+  // Horde answers only once the queued job is done, so the first text
+  // arrives on the poll that ends the loop. Entering "generating" before the
+  // job is submitted shows the response card and its Stop button for the
+  // whole queue wait, which is what makes an interrupt possible at all.
+  updateTextGenerationState("generating");
   await executeHordeGeneration(messages, (text) => {
     updateResponse(text);
   });
