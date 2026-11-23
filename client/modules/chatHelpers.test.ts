@@ -337,6 +337,22 @@ describe("runFollowUpSearch", () => {
     expect(mockSearchText).toHaveBeenCalled();
   });
 
+  it("searches with at most 2000 characters when the chat input is longer", async () => {
+    const longInput = "x".repeat(2001);
+    mockSearchText.mockResolvedValueOnce({ results: [], stale: false });
+
+    await runFollowUpSearch(
+      [{ role: "user", content: longInput }],
+      longInput,
+      makeSettings({ enableImageSearch: false }),
+      [],
+      [],
+    );
+
+    const [query] = mockSearchText.mock.calls[0];
+    expect(query.length).toBeLessThanOrEqual(2000);
+  });
+
   it("skips text search when disabled", async () => {
     await runFollowUpSearch(
       [{ role: "user", content: "hello" }],
