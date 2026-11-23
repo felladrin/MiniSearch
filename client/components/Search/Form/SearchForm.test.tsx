@@ -50,6 +50,7 @@ vi.mock("../../../modules/textGeneration", () => ({
 }));
 
 vi.mock("../../../modules/querySuggestions", () => ({
+  DEFAULT_QUERY_SUGGESTION: "Anything you need!",
   getRandomQuerySuggestion: vi.fn(async () => "Anything you need!"),
 }));
 

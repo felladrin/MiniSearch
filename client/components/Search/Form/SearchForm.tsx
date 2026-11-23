@@ -27,7 +27,10 @@ import {
   settingsPubSub,
   textSearchResultsPubSub,
 } from "@/modules/pubSub";
-import { getRandomQuerySuggestion } from "@/modules/querySuggestions";
+import {
+  DEFAULT_QUERY_SUGGESTION,
+  getRandomQuerySuggestion,
+} from "@/modules/querySuggestions";
 import { sleepUntilIdle } from "@/modules/sleep";
 import { searchAndRespond } from "@/modules/textGeneration";
 import HistoryButton from "../History/HistoryButton";
@@ -81,10 +84,9 @@ export default memo(function SearchForm({
   useEffect(() => {
     pendingDictationRef.current = null;
   });
-  const defaultSuggestedQuery = "Anything you need!";
   const [state, setState] = useState<SearchFormState>({
     textAreaValue: query,
-    suggestedQuery: defaultSuggestedQuery,
+    suggestedQuery: DEFAULT_QUERY_SUGGESTION,
   });
 
   const [, navigate] = useLocation();
@@ -102,7 +104,7 @@ export default memo(function SearchForm({
     try {
       return await getRandomQuerySuggestion();
     } catch {
-      return defaultSuggestedQuery;
+      return DEFAULT_QUERY_SUGGESTION;
     }
   }, []);
 
@@ -163,7 +165,7 @@ export default memo(function SearchForm({
         .catch(() => {
           setState((prev) => ({
             ...prev,
-            suggestedQuery: defaultSuggestedQuery,
+            suggestedQuery: DEFAULT_QUERY_SUGGESTION,
           }));
         });
     }
@@ -182,7 +184,7 @@ export default memo(function SearchForm({
         addLogEntry("Failed to get query suggestion");
         setState((prev) => ({
           ...prev,
-          suggestedQuery: defaultSuggestedQuery,
+          suggestedQuery: DEFAULT_QUERY_SUGGESTION,
         }));
       }
     }
