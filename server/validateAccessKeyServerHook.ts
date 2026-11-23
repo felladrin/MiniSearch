@@ -1,6 +1,7 @@
 import { argon2Verify } from "hash-wasm";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { ARGON2_HASH_PREFIX } from "../shared/argon2Parameters.ts";
+import { parseCommaSeparatedList } from "./parseCommaSeparatedList.ts";
 import { consumeRateLimitPoint } from "./verifyTokenAndRateLimit.ts";
 
 /**
@@ -31,7 +32,7 @@ export function validateAccessKeyServerHook<
       return;
     }
 
-    const accessKeys = process.env.ACCESS_KEYS?.split(",") ?? [];
+    const accessKeys = parseCommaSeparatedList(process.env.ACCESS_KEYS);
 
     const chunks: Buffer[] = [];
     let bodyBytes = 0;
