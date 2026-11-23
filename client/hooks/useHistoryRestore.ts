@@ -81,7 +81,9 @@ export function useHistoryRestore(
       }
 
       if (hasImageResults(entry)) {
-        const results = getResultsFromEntry(entry);
+        const results =
+          entry.imageResults ??
+          (entry.results?.type === "image" ? entry.results : null);
         if (results && results.type === "image") {
           const imageTuples: ImageSearchResults = results.items.map((it) => [
             it.title,
