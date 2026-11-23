@@ -353,8 +353,7 @@ Failures before the stream starts:
 
 ### `GET /status`
 
-The hook claims the `/status` prefix, so `/status/anything` answers the same
-way.
+The path is matched exactly, so `/status/anything` falls through.
 
 Unauthenticated and not rate-limited: uptime, the counters accumulated since
 the last restart, and the health of the reranker, the bi-encoder and SearXNG.
