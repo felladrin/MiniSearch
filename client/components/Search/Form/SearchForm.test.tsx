@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import SearchForm, {
   resetAutoSearchedQuery,
 } from "@/components/Search/Form/SearchForm";
+import { settingsPubSub } from "@/modules/pubSub";
+import { defaultSettings } from "@/modules/settings";
 import { searchAndRespond } from "@/modules/textGeneration";
 
 vi.mock("create-pubsub/react", () => ({
@@ -96,6 +98,37 @@ describe("SearchForm component", () => {
     const mockUpdate = vi.fn();
     renderSearchForm("", mockUpdate);
     await waitForPlaceholder();
+  });
+
+  describe("Enter and Shift+Enter", () => {
+    afterEach(() => {
+      settingsPubSub[0]({ ...defaultSettings });
+    });
+
+    it.each([
+      [true, "{Enter}", true],
+      [true, "{Shift>}{Enter}{/Shift}", false],
+      [false, "{Shift>}{Enter}{/Shift}", true],
+      [false, "{Enter}", false],
+    ])(
+      "with enterToSubmit %s, pressing %s submits: %s",
+      async (enterToSubmit, keys, submits) => {
+        settingsPubSub[0]({ ...defaultSettings, enterToSubmit });
+        const mockUpdate = vi.fn();
+        const user = userEvent.setup();
+        renderSearchForm("", mockUpdate);
+
+        const textarea = await waitForPlaceholder();
+        await user.type(textarea, "test query");
+        await user.keyboard(keys);
+
+        if (submits) {
+          expect(mockUpdate).toHaveBeenCalledWith("test query");
+        } else {
+          expect(mockUpdate).not.toHaveBeenCalled();
+        }
+      },
+    );
   });
 
   it("calls updateQuery on submit", async () => {

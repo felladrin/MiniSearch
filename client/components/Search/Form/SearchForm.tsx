@@ -260,9 +260,7 @@ export default memo(function SearchForm({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      handleEnterKeyDown(event, pubSubSettings, startSearching);
-    }
+    handleEnterKeyDown(event, pubSubSettings, startSearching);
   };
 
   return (

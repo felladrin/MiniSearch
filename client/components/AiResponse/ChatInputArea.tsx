@@ -4,12 +4,14 @@ import { usePubSub } from "create-pubsub/react";
 import DictationButton, {
   dictationButtonWidth,
 } from "@/components/DictationButton";
+import { handleEnterKeyDown } from "@/modules/keyboard";
 import {
   chatGenerationStatePubSub,
   chatInputPubSub,
   followUpQuestionPubSub,
   getChatInput,
   isRestoringFromHistoryPubSub,
+  settingsPubSub,
   suppressNextFollowUpPubSub,
 } from "@/modules/pubSub";
 
@@ -34,6 +36,7 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
   const [followUpQuestion] = usePubSub(followUpQuestionPubSub);
   const [isRestoringFromHistory] = usePubSub(isRestoringFromHistoryPubSub);
   const [suppressNextFollowUp] = usePubSub(suppressNextFollowUpPubSub);
+  const [settings] = usePubSub(settingsPubSub);
 
   const isGenerating =
     generationState.isGeneratingResponse &&
@@ -51,23 +54,17 @@ function ChatInputArea({ onKeyDown, handleSend }: ChatInputAreaProps) {
   const handleKeyDownWithPlaceholder = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
-    // Same IME guard as handleEnterKeyDown: the Enter that confirms a
-    // composition candidate must not fire the follow-up question while the
-    // composition text has not reached the input value yet.
-    const isComposing = event.nativeEvent.isComposing || event.keyCode === 229;
-
+    // With an empty input the suggested follow-up question is sent on the
+    // same keys that submit typed text, so the Enter setting and the IME
+    // guard both apply; handleEnterKeyDown prevents the default when it sends.
     if (
       input.trim() === "" &&
       followUpQuestion &&
       !isRestoringFromHistory &&
-      !suppressNextFollowUp &&
-      !isComposing
+      !suppressNextFollowUp
     ) {
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        handleSend(followUpQuestion);
-        return;
-      }
+      handleEnterKeyDown(event, settings, () => handleSend(followUpQuestion));
+      if (event.defaultPrevented) return;
     }
 
     onKeyDown(event);
