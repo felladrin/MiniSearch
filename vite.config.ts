@@ -13,6 +13,7 @@ import { configEndpointServerHook } from "./server/configEndpointServerHook.ts";
 import { crossOriginServerHook } from "./server/crossOriginServerHook.ts";
 import { internalApiEndpointServerHook } from "./server/internalApiEndpointServerHook.ts";
 import { pageContentEndpointServerHook } from "./server/pageContentEndpointServerHook.ts";
+import { parseCommaSeparatedList } from "./server/parseCommaSeparatedList.ts";
 import { rerankerServiceHook } from "./server/rerankerServiceHook.ts";
 import { searchEndpointServerHook } from "./server/searchEndpointServerHook.ts";
 import { statusEndpointServerHook } from "./server/statusEndpointServerHook.ts";
@@ -63,10 +64,9 @@ export default defineConfig((): UserConfig => {
     preview: {
       host: process.env.HOST,
       port: process.env.PORT ? Number(process.env.PORT) : undefined,
-      allowedHosts:
-        process.env.ALLOWED_HOSTS && process.env.ALLOWED_HOSTS.length > 0
-          ? process.env.ALLOWED_HOSTS.split(",")
-          : true,
+      allowedHosts: process.env.ALLOWED_HOSTS
+        ? parseCommaSeparatedList(process.env.ALLOWED_HOSTS)
+        : true,
     },
     build: {
       target: "esnext",
