@@ -7,15 +7,20 @@ interface FormattedMarkdownProps {
   children: string;
   className?: string;
   enableCopy?: boolean;
+  /** Whether this response is still being generated. */
+  isGenerating?: boolean;
 }
 
 export default function FormattedMarkdown({
   children,
   className = "",
   enableCopy = true,
+  isGenerating: isResponseGenerating = false,
 }: FormattedMarkdownProps) {
-  const { reasoningContent, mainContent, isGenerating } =
-    useReasoningContent(children);
+  const { reasoningContent, mainContent, isGenerating } = useReasoningContent(
+    children,
+    isResponseGenerating,
+  );
 
   if (!children && !reasoningContent) {
     return null;
