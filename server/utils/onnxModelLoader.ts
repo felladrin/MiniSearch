@@ -21,7 +21,8 @@ export function createModelLogger(moduleName: string) {
 
 /**
  * Session knobs a caller may override. Left unset, ONNX Runtime picks its own
- * defaults, which is what every caller but the bi-encoder worker wants.
+ * defaults, and its intra-op thread count then follows the host's cores even
+ * under a container's CPU quota, so both callers set it.
  */
 interface OnnxSessionOptions {
   intraOpNumThreads?: number;
