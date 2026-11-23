@@ -26,7 +26,11 @@ async function hashAccessKey(accessKey: string): Promise<string> {
  * Validates the key against the server; on success the hash is stored locally
  * so later loads can go through `verifyStoredAccessKey`.
  */
-export type AccessKeyResult = "valid" | "invalid" | "rateLimited";
+export type AccessKeyResult =
+  | "valid"
+  | "invalid"
+  | "rateLimited"
+  | "unreachable";
 
 export async function validateAccessKey(
   accessKey: string,
@@ -66,6 +70,8 @@ export async function validateAccessKey(
 
     return "invalid";
   } catch (error) {
+    // The server never judged the key (no connection, or a reply that is not
+    // the expected JSON), so access stays closed without calling it wrong.
     addLogEntry(`Error validating access key: ${error}`);
     notifications.show({
       title: "Error validating access key",
@@ -73,7 +79,7 @@ export async function validateAccessKey(
       color: "red",
       position: "top-right",
     });
-    return "invalid";
+    return "unreachable";
   }
 }
 
