@@ -12,6 +12,7 @@ import {
   Text,
   TextInput,
   Tooltip,
+  UnstyledButton,
 } from "@mantine/core";
 import { useReducedMotion } from "@mantine/hooks";
 import {
@@ -95,22 +96,30 @@ export default function HistoryDrawer({
       onClick={() => handleSearchSelect(search)}
     >
       <Group justify="space-between" align="flex-start" wrap="nowrap">
-        <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-          <Tooltip label={search.query} multiline withArrow>
-            <Text size="sm" fw={search.pinned ? 600 : 400} truncate>
-              {search.query}
-            </Text>
-          </Tooltip>
+        <UnstyledButton
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSearchSelect(search);
+          }}
+          style={{ flex: 1, minWidth: 0, textAlign: "left" }}
+        >
+          <Stack gap={2}>
+            <Tooltip label={search.query} multiline withArrow>
+              <Text size="sm" fw={search.pinned ? 600 : 400} truncate>
+                {search.query}
+              </Text>
+            </Tooltip>
 
-          <Text
-            size="xs"
-            c="dimmed"
-            style={{ display: "flex", alignItems: "center", gap: 4 }}
-          >
-            <IconClock size={12} />
-            {formatRelativeTime(search.timestamp)}
-          </Text>
-        </Stack>
+            <Text
+              size="xs"
+              c="dimmed"
+              style={{ display: "flex", alignItems: "center", gap: 4 }}
+            >
+              <IconClock size={12} />
+              {formatRelativeTime(search.timestamp)}
+            </Text>
+          </Stack>
+        </UnstyledButton>
 
         <Group gap="xs" style={{ flexShrink: 0 }}>
           <ActionIcon

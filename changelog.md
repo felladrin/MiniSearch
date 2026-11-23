@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-23
 
+- Saved searches in the History drawer can now be restored with the keyboard. The query used to be a plain card that only a click could activate, so Tab skipped it; it is now a button that Enter and Space activate, separate from the pin and delete buttons.
 - When the access key cannot be checked because the server is unreachable, the access page now says "Could not reach the server. Please try again." instead of "Invalid access key", so a network problem no longer looks like a wrong key. Access still stays closed until the key is checked.
 - With the AI Horde engine, the answer card and its Stop button now appear as soon as the request is queued, instead of a loading skeleton for the whole wait, which can take minutes. Stop now works during that wait, and it also cancels the queued job on the Horde, so a stopped answer no longer keeps spending kudos.
 - The search box placeholder now always shows a suggestion. When the suggestion list could not be loaded, came back empty, or held empty entries in the browser's storage, the placeholder could end up blank; it now falls back to "Anything you need!". The log now names why the list failed to load and how many suggestions were actually stored.
