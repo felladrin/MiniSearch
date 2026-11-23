@@ -880,6 +880,27 @@ describe("mapping a result", () => {
     expect(LONG_EXCERPT[kept.length]).toBe(" ");
   });
 
+  // The page read for this result would go looking for the text the snippet
+  // cut, so the whole of it is kept for `/page-content`, under the query.
+  it("keeps the whole cleaned excerpt text for the page read", async () => {
+    const results = await run([
+      {
+        url: "https://example.com/long",
+        title: "Long",
+        excerpts: ["Skip to main content", `## ${LONG_EXCERPT}`, EXCERPT],
+      },
+    ]);
+    const { recallSearchExcerpts } = await import("./searchExcerptStore");
+
+    expect(results[0][1].length).toBeLessThanOrEqual(400);
+    expect(recallSearchExcerpts(QUERY, "https://example.com/long")).toBe(
+      `${LONG_EXCERPT}\n\n${EXCERPT}`,
+    );
+    expect(
+      recallSearchExcerpts("another query", "https://example.com/long"),
+    ).toBeUndefined();
+  });
+
   it("leaves a snippet that fits untouched", async () => {
     expect(EXCERPT.length).toBeLessThanOrEqual(400);
 
