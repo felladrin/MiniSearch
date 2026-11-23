@@ -5,6 +5,7 @@ Notable changes, grouped by date, most recent first.
 ## 2026-11-23
 
 - The in-app log now keeps the newest 1000 entries and drops older ones. It used to grow for as long as the tab stayed open, copying the whole log on every new line, so a long session slowed down logging and the Logs window. The download from the Logs window holds those 1000 entries.
+- Page bodies of exactly 1,500,000 bytes are no longer counted as truncated in `/status`'s `pageReads.bodiesTruncated`. The text was always complete, only the counter was wrong.
 - `ACCESS_KEYS` and `ALLOWED_HOSTS` now ignore spaces around each entry and empty entries, so `key1, key2,` works as written. Before, a key after a comma and a space was never accepted, `ALLOWED_HOSTS="localhost, example.com"` blocked `example.com`, and `ACCESS_KEYS=","` made the app ask every visitor for an access key that no one could enter.
 - `/inference`, `/status` and `/thumbnail` now answer only on their exact path. Before, any path that started with the route, such as `/inferences`, `/statuses` or `/thumbnails`, was claimed by the endpoint instead of falling through to the app.
 - Search result snippets now reach the AI prompt exactly as written. Before, the prompt's own template rules rewrote them: LaTeX like `$$x^2$$` lost a dollar sign, and a crafted page could inject text that looked like the app's own instructions. Custom prompts that repeat a placeholder now fill every occurrence too.
