@@ -358,7 +358,7 @@ async function getTopHordeModels(): Promise<string[]> {
 
 export async function fetchHordeUserInfo(
   apiKey: string,
-): Promise<HordeUserInfo> {
+): Promise<HordeUserInfo | null> {
   const response = await fetch(buildHordeUrl("/find_user"), {
     headers: {
       [HTTP_HEADERS.API_KEY]: apiKey,
@@ -371,6 +371,13 @@ export async function fetchHordeUserInfo(
   }
 
   const data = await response.json();
+  if (typeof data?.username !== "string" || typeof data?.kudos !== "number") {
+    addLogEntry(
+      "AI Horde returned a malformed user info response; treating the key as anonymous",
+    );
+    return null;
+  }
+
   return {
     username: data.username,
     kudos: data.kudos,

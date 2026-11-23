@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-23
 
+- The AI settings panel no longer crashes when AI Horde answers the user lookup with incomplete data, such as a username without kudos. The answer is now logged as malformed and the API key field shows the anonymous-access hint, as it does for the default key.
 - Search result snippets now reach the AI prompt exactly as written. Before, the prompt's own template rules rewrote them: LaTeX like `$$x^2$$` lost a dollar sign, and a crafted page could inject text that looked like the app's own instructions. Custom prompts that repeat a placeholder now fill every occurrence too.
 - The Context Length field in the OpenAI-compatible settings now accepts values below 4096, down to 512, so a model with a 2048-token context can be set up. It used to snap any smaller value back to 4096 when the field lost focus. Its arrows now move in steps of 1024 instead of 4096. The default stays 4096.
 - The numpad Enter key now submits the search and sends chat messages, like the main Enter key. Before, it inserted a new line into the text box instead, because the Enter check looked at the physical key (`event.code`) and numpad Enter reports `NumpadEnter`. Shift+Enter behaves the same way for both keys.
