@@ -223,7 +223,7 @@ export function normalizeRelativeDates(
   options?: { maxLength?: number },
 ): { searchQuery: string; replacements: RelativeDateReplacement[] } {
   const unchanged = {
-    searchQuery: query,
+    searchQuery: clampToMaxLength(query, options?.maxLength),
     replacements: [] as RelativeDateReplacement[],
   };
 
@@ -283,23 +283,35 @@ export function normalizeRelativeDates(
   );
 }
 
+/**
+ * The query cut to `maxLength` characters, so the result never exceeds the
+ * limit the search endpoint enforces. A query within the limit is returned
+ * as is.
+ */
+function clampToMaxLength(query: string, maxLength?: number): string {
+  if (maxLength === undefined || query.length <= maxLength) return query;
+  return query.slice(0, maxLength).trimEnd();
+}
+
 function appendAnchors(
   query: string,
   replacements: RelativeDateReplacement[],
   maxLength = Number.POSITIVE_INFINITY,
 ): { searchQuery: string; replacements: RelativeDateReplacement[] } {
-  // The search endpoint rejects an over-long query, so an anchor that would
-  // push it past the limit is dropped rather than turning a search into a
-  // failed request. No anchor left over means the query goes out untouched.
+  // The search endpoint rejects an over-long query, so the query itself is cut
+  // to the limit, and an anchor that would push it past the limit is dropped
+  // rather than turning a search into a failed request. No anchor left over
+  // means the query goes out as it came, cut only when it was too long.
+  const base = clampToMaxLength(query, maxLength);
   const appended: RelativeDateReplacement[] = [];
-  let searchQuery = query.trimEnd();
+  let searchQuery = base.trimEnd();
   for (const replacement of replacements) {
     const candidate = `${searchQuery} ${replacement.anchor}`;
     if (candidate.length > maxLength) break;
     searchQuery = candidate;
     appended.push(replacement);
   }
-  if (appended.length === 0) return { searchQuery: query, replacements: [] };
+  if (appended.length === 0) return { searchQuery: base, replacements: [] };
 
   return { searchQuery, replacements: appended };
 }
