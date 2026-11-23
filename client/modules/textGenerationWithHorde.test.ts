@@ -9,7 +9,7 @@ import {
 import { defaultSettings } from "./settings";
 import { sleep } from "./sleep";
 import { canStartResponding } from "./textGenerationUtilities";
-import type { ChatMessage } from "./types";
+import type { ChatMessage, TextGenerationState } from "./types";
 
 vi.mock("./logEntries", () => ({
   addLogEntry: vi.fn(),
@@ -81,9 +81,16 @@ describe("textGenerationWithHorde", () => {
       await generateTextWithHorde();
 
       expect(canStartResponding).toHaveBeenCalled();
-      expect(updateTextGenerationState).toHaveBeenCalledWith(
-        "preparingToGenerate",
-      );
+      expect(vi.mocked(updateTextGenerationState).mock.calls).toEqual([
+        ["preparingToGenerate"],
+        ["generating"],
+      ]);
+      // "generating" is entered before the first status poll, so the Stop
+      // button is there for the whole queue wait.
+      const generatingOrder = vi.mocked(updateTextGenerationState).mock
+        .invocationCallOrder[1];
+      const firstStatusPollOrder = mockFetch.mock.invocationCallOrder[1];
+      expect(generatingOrder).toBeLessThan(firstStatusPollOrder);
       expect(updateResponse).toHaveBeenCalledWith("Hello world");
 
       const [startUrl, startInit] = mockFetch.mock.calls[0];
@@ -143,6 +150,36 @@ describe("textGenerationWithHorde", () => {
       expect(sleep).toHaveBeenCalled();
     });
 
+    it("can be interrupted once it is generating, and cancels the queued job", async () => {
+      // The UI only offers Stop while the state is "generating", so the
+      // interrupt can only happen after the engine has entered it.
+      let state: TextGenerationState = "idle";
+      vi.mocked(updateTextGenerationState).mockImplementation((next) => {
+        state = next;
+      });
+      vi.mocked(getTextGenerationState).mockImplementation(() =>
+        state === "generating" ? "interrupted" : state,
+      );
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse({ id: "gen-queued" }))
+        .mockResolvedValueOnce(
+          jsonResponse({ done: false, is_possible: true, generations: [] }),
+        )
+        .mockResolvedValueOnce(jsonResponse({}));
+
+      await expect(generateTextWithHorde()).rejects.toThrow(
+        "Generation interrupted",
+      );
+
+      const [cancelUrl, cancelInit] = mockFetch.mock.calls[2];
+      expect(cancelUrl).toContain("/generate/text/status/gen-queued");
+      expect(cancelInit.method).toBe("DELETE");
+    });
+
     it("includes the configured model in the generation request body", async () => {
       mockSettings({ hordeModel: "custom-model" });
       const { generateTextWithHorde } = await import(
@@ -190,6 +227,7 @@ describe("textGenerationWithHorde", () => {
       expect(onUpdate).toHaveBeenCalledWith("Chat response");
       expect(canStartResponding).not.toHaveBeenCalled();
       expect(updateResponse).not.toHaveBeenCalled();
+      expect(updateTextGenerationState).not.toHaveBeenCalled();
     });
   });
 
