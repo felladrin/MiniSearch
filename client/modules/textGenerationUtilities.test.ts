@@ -36,6 +36,7 @@ vi.mock("./systemPrompt", () => ({
 }));
 
 import {
+  getEffectiveContextSize,
   getFormattedSearchResults,
   setWorkerFactory,
 } from "./textGenerationUtilities";
@@ -315,6 +316,31 @@ describe("getFormattedSearchResults", () => {
     expect(formatted).toContain(
       "• [C](https://c.example/) | c (relevance: low)",
     );
+  });
+});
+
+describe("getEffectiveContextSize", () => {
+  it("follows the configured context on the OpenAI-compatible backend", () => {
+    state.settings = { inferenceType: "openai", openAiContextLength: 32768 };
+
+    expect(getEffectiveContextSize()).toBe(32768);
+  });
+
+  it("stays at the default on every other backend, whatever the setting says", () => {
+    for (const inferenceType of ["browser", "horde", "internal"]) {
+      state.settings = { inferenceType, openAiContextLength: 32768 };
+
+      expect(getEffectiveContextSize()).toBe(4096);
+    }
+  });
+
+  it("falls back to the default when the setting cannot size a window", () => {
+    // A cleared numeric input can persist as an empty string.
+    for (const openAiContextLength of [undefined, 0, -1, "" as never]) {
+      state.settings = { inferenceType: "openai", openAiContextLength };
+
+      expect(getEffectiveContextSize()).toBe(4096);
+    }
   });
 });
 
