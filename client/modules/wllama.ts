@@ -42,8 +42,10 @@ export async function initializeWllama(
 ): Promise<Wllama> {
   addLogEntry("Initializing Wllama");
 
+  let wllama: Wllama | undefined;
+
   try {
-    const wllama = await createWllamaInstance(config?.wllama);
+    wllama = await createWllamaInstance(config?.wllama);
 
     await wllama.loadModelFromHF(
       { repo: hfRepoId, file: hfFilePath },
@@ -98,6 +100,18 @@ export async function initializeWllama(
         error instanceof Error ? error.message : "Unknown error"
       }`,
     );
+
+    // The caller never receives the instance when this throws, so release the
+    // worker and the model memory here. A failed cleanup must not hide the
+    // original error.
+    await wllama?.exit().catch((exitError: unknown) => {
+      addLogEntry(
+        `Failed to release Wllama after initialization failed: ${
+          exitError instanceof Error ? exitError.message : "Unknown error"
+        }`,
+      );
+    });
+
     throw error;
   }
 }
