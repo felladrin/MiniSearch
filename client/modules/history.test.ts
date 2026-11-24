@@ -278,6 +278,36 @@ describe("History Module - Dexie CRUD", () => {
     });
   });
 
+  describe("getPinnedSearches", () => {
+    it("returns only pinned entries, newest first, however old", async () => {
+      const { addSearchToHistory, getPinnedSearches, historyDatabase } =
+        await import("./history");
+      const results = {
+        type: "text" as const,
+        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+      };
+
+      vi.setSystemTime(new Date(2000, 0, 1));
+      const oldest = await addSearchToHistory("pinned long ago", results);
+      vi.setSystemTime(new Date(2000, 0, 2));
+      await addSearchToHistory("never pinned", results);
+      vi.setSystemTime(new Date(2000, 0, 3));
+      const newest = await addSearchToHistory("pinned lately", results);
+      for (const id of [oldest, newest]) {
+        await historyDatabase.searches.update(id as number, {
+          pinned: true,
+          pinnedAt: Date.now(),
+        });
+      }
+
+      const pinned = await getPinnedSearches();
+      expect(pinned.map((search) => search.query)).toEqual([
+        "pinned lately",
+        "pinned long ago",
+      ]);
+    });
+  });
+
   describe("addSearchToHistory + getRecentSearches round-trip", () => {
     it("should preserve query, source, and searchRunId through a write/read cycle", async () => {
       const { addSearchToHistory, getRecentSearches, getCurrentSearchRunId } =
@@ -904,5 +934,46 @@ describe("History Module - a search takes its answers and chats with it", () => 
     expect(answers.map((row) => row.response)).toEqual(["kept"]);
     expect(chats.map((row) => row.content)).toEqual(["kept"]);
     expect(await historyDatabase.searches.count()).toBe(1);
+  });
+
+  it("indexes the searches pinned before a version 2 database is upgraded", async () => {
+    const { getPinnedSearches, historyDatabase } = await import("./history");
+    historyDatabase.close({ disableAutoOpen: false });
+    await Dexie.delete("History");
+
+    const v2Schema = {
+      searches: "++id, searchRunId, query, timestamp, source, pinned, results",
+      llmResponses: "++id, searchId, searchRunId, timestamp, model",
+      chatHistory:
+        "++id, conversationId, timestamp, [conversationId+timestamp]",
+    };
+    const v2 = new Dexie("History");
+    v2.version(1).stores(v2Schema);
+    v2.version(2).stores(v2Schema);
+    await v2.table("searches").bulkAdd([
+      { query: "pinned long ago", timestamp: 1_000, pinned: true },
+      { query: "never pinned", timestamp: 2_000, pinned: false },
+      { query: "pinned lately", timestamp: 3_000, pinned: true },
+    ]);
+    v2.close();
+
+    await historyDatabase.open();
+
+    const pinned = await getPinnedSearches();
+    expect(pinned.map((search) => [search.query, search.pinnedAt])).toEqual([
+      ["pinned lately", 3_000],
+      ["pinned long ago", 1_000],
+    ]);
+    const unpinned = await historyDatabase.searches
+      .where("query")
+      .equals("never pinned")
+      .first();
+    expect(unpinned && "pinnedAt" in unpinned).toBe(false);
+    // The boolean index never held an entry, so version 3 drops it.
+    const indexNames = historyDatabase.searches.schema.indexes.map(
+      (index) => index.name,
+    );
+    expect(indexNames).toContain("pinnedAt");
+    expect(indexNames).not.toContain("pinned");
   });
 });

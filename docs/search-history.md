@@ -12,6 +12,8 @@ The `HistoryDatabase` Dexie instance stores three related tables:
 2. `llmResponses` – snapshot of every AI answer tied to its originating search run, enabling restoration of the assistant output.
 3. `chatHistory` – chronological record of chat turns (user/assistant roles) scoped by `conversationId` (the `searchRunId`).
 
+A pinned search carries `pinned: true` and a `pinnedAt` timestamp, and `togglePin` writes both in one update. Schema version 3 indexes `pinnedAt` in place of `pinned`: IndexedDB does not index boolean values, so the `pinned` index never held an entry, while an entry without `pinnedAt` simply stays out of its index. The version 3 upgrade gives searches pinned before it a `pinnedAt` equal to their own `timestamp`, since their real pin time is unknown.
+
 All three tables share a `searchRunId` foreign key so restoring a specific run can bring back the search results, saved AI response, and chat transcript atomically.
 
 ## Disabled History
@@ -34,6 +36,7 @@ Cleanup is gated by `historyAutoCleanup`, so advanced users can opt out. These k
 
 - Fetches recent searches (optionally paginated) and exposes filtered/grouped views.
 - Provides fuzzy search, pin toggling, delete/clear operations, and error retry helpers.
+- With `includeAllPinned`, also loads every pinned entry through `getPinnedSearches()` and keeps it in the filtered list past `limit`, however many newer searches exist. Cleanup never deletes a pinned entry, so a recent-only window would hide old ones for good. The read uses the `pinnedAt` index, which holds pinned entries only, so it does not grow with the history; only the History Drawer, which mounts while open, asks for it.
 - Keeps derived state such as grouped sections (Today/Yesterday/etc.) in sync with the settings flag `historyGroupByDate`.
 - Refreshes itself on an interval so the History UI stays live even if other tabs mutate the DB.
 
@@ -41,7 +44,7 @@ Because the hook writes via Dexie directly, any component can call `addSearchToH
 
 ## UI Surfaces
 
-- **History Drawer** – wraps the hook data in a drawer with filtering, pin/delete affordances, grouped stacks, and an Analytics tab powered by `SearchStats` in compact mode. The drawer guards against disabled history settings and mirrors the hook filtered list in real time.
+- **History Drawer** – wraps the hook data in a drawer with filtering, pin/delete affordances, grouped stacks, and an Analytics tab powered by `SearchStats` in compact mode. The drawer guards against disabled history settings, mirrors the hook filtered list in real time, and lists every pinned search in its Pinned section, however old.
 - **History Button** – lazy-loads the drawer and logs open/close events for observability.
 - **History Restore** – the `useHistoryRestore` hook recreates full search state (query string, search results, AI response, and chat transcript) when a user replays an entry.
 

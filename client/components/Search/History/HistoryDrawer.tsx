@@ -53,7 +53,11 @@ export default function HistoryDrawer({
     togglePin,
     deleteEntry,
     searchHistory,
-  } = useSearchHistory({ limit: 100, enableGrouping: true });
+  } = useSearchHistory({
+    limit: 100,
+    enableGrouping: true,
+    includeAllPinned: true,
+  });
 
   useEffect(() => {
     searchHistory(searchQuery);
