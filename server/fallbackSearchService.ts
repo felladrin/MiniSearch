@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
 import debug from "debug";
+import { shuffle } from "../shared/shuffle.ts";
 import { rememberSearchExcerpts } from "./searchExcerptStore.ts";
 import { isOpenableUrl } from "./utils/openableUrl.ts";
 
@@ -422,14 +423,6 @@ function isPaused(name: ProviderName): boolean {
 
 function countFor(name: ProviderName): ProviderCounters {
   return providerCounters.get(name) as ProviderCounters;
-}
-
-function shuffle<Item>(items: Item[]): Item[] {
-  for (let index = items.length - 1; index > 0; index--) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
-  }
-  return items;
 }
 
 // RFC 9110's IMF-fixdate. Date.parse alone is too lenient: V8 turns strings
