@@ -162,7 +162,7 @@ describe("numeric settings never hold an empty string", () => {
       getDefaultChatCompletionCreateParamsStreaming,
       getEffectiveContextSize,
     } = await import("./textGenerationUtilities");
-    expect(getDefaultChatCompletionCreateParamsStreaming().max_tokens).toBe(
+    expect(getDefaultChatCompletionCreateParamsStreaming([]).max_tokens).toBe(
       defaultSettings.openAiContextLength,
     );
     expect(getEffectiveContextSize()).toBe(defaultSettings.openAiContextLength);
