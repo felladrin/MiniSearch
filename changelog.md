@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- A failed access key check on load no longer deletes the saved key. When the app had loaded its configuration but the check of the saved key then got no usable answer, such as a dropped connection, a proxy's error page on that request, or a server restarting between the two, the key was deleted and had to be entered again even though it had time left. It is now deleted only when the server says it is invalid, when it has expired, or when the saved value is unreadable. Otherwise it is kept and checked again on the next load.
 - A page load where the server configuration could not be fetched no longer saves the shipped defaults as the browser's settings. On a first visit that failure used to lock in the built-in model and inference type, so the server's own defaults were never applied to that browser afterwards. The model the app switches to when the saved one has left the catalog follows the same rule: it is saved only when the server's configuration was available.
 - The suggestion shown in an empty search box now uses up one stored suggestion each time the box is emptied, and the suggestions are drawn evenly from the whole list. Deleting the last character or pressing Clear used to use up two and show one, and when none were stored it fetched the list twice at the same moment. The shuffle also favoured entries near the top of the list, so some suggestions came up far more often than others.
 
