@@ -47,7 +47,7 @@ async function createOpenAiStream({
     apiKey: settings.openAiApiKey,
   });
 
-  const params = getDefaultChatCompletionCreateParamsStreaming();
+  const params = getDefaultChatCompletionCreateParamsStreaming(messages);
 
   let effectiveModel = settings.openAiApiModel;
   let availableModels: { id: string }[] = [];
