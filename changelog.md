@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-24
+
+- A relative date in a search query is now recognised the way people type it. "next year’s champion" with a curly apostrophe, the default on iPhone and Mac, no longer gets a year added, and a non-breaking or double space no longer hides "next year". A date the query already carries in another spelling ("2026 December", "Dec 2026", "2026-12") is not appended again, and a year inside a longer number such as "120265" is no longer taken for one. A follow-up search that is only a year no longer starts with a space, which gave the same search two cache entries.
+
 ## 2026-11-23
 
 - A request with a malformed `Host` header, such as `Host: bad host`, no longer shuts the server down. The search, page content, thumbnail and AI inference endpoints used to build the request URL from that header, so one unauthenticated request made the server exit; they now answer 400 and keep serving. The thumbnail endpoint answered 500 for the same request before. The `/status` endpoint also answers a 500 instead of exiting when the build's commit hash define is malformed.
