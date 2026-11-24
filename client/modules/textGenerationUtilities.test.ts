@@ -1,3 +1,4 @@
+import gptTokenizer from "gpt-tokenizer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { handleExcerptRequest } from "./pageExcerptWorker";
 import type {
@@ -36,10 +37,14 @@ vi.mock("./systemPrompt", () => ({
 }));
 
 import {
+  getDefaultChatCompletionCreateParamsStreaming,
+  getDefaultChatMessages,
   getEffectiveContextSize,
   getFormattedSearchResults,
+  minimumOutputTokens,
   setWorkerFactory,
 } from "./textGenerationUtilities";
+import type { ChatMessage } from "./types";
 
 const results: TextSearchResults = [
   ["First", "first snippet", "https://a.example/"],
@@ -341,6 +346,66 @@ describe("getEffectiveContextSize", () => {
 
       expect(getEffectiveContextSize()).toBe(4096);
     }
+  });
+});
+
+describe("getDefaultChatCompletionCreateParamsStreaming", () => {
+  function countPromptTokens(messages: ChatMessage[]) {
+    return messages.reduce(
+      (total, message) => total + gptTokenizer.encode(message.content).length,
+      0,
+    );
+  }
+
+  /** Search results of `tokens` tokens, the way excerpts fill them. */
+  function searchResultsOf(tokens: number) {
+    const text = Array.from({ length: tokens }, (_, i) => `word${i}`).join(" ");
+    return gptTokenizer.decode(gptTokenizer.encode(text).slice(0, tokens));
+  }
+
+  beforeEach(() => {
+    state.settings = { inferenceType: "openai", openAiContextLength: 4096 };
+  });
+
+  it("leaves the prompt room in the window instead of asking for all of it", () => {
+    const messages = getDefaultChatMessages(searchResultsOf(2500));
+    const promptTokens = countPromptTokens(messages);
+    expect(promptTokens).toBeGreaterThan(2000);
+
+    const { max_tokens } =
+      getDefaultChatCompletionCreateParamsStreaming(messages);
+
+    expect(promptTokens + max_tokens).toBeLessThanOrEqual(4096);
+    expect(max_tokens).toBeGreaterThan(1000);
+  });
+
+  it("still asks for a short answer when the prompt nearly fills the window", () => {
+    const messages = getDefaultChatMessages(searchResultsOf(4090));
+
+    expect(
+      getDefaultChatCompletionCreateParamsStreaming(messages).max_tokens,
+    ).toBe(minimumOutputTokens);
+  });
+
+  it("sizes the budget from the configured context on the OpenAI-compatible backend", () => {
+    state.settings = { inferenceType: "openai", openAiContextLength: 32768 };
+    const messages = getDefaultChatMessages(searchResultsOf(8000));
+
+    const { max_tokens } =
+      getDefaultChatCompletionCreateParamsStreaming(messages);
+
+    expect(max_tokens).toBeGreaterThan(20000);
+    expect(countPromptTokens(messages) + max_tokens).toBeLessThanOrEqual(32768);
+  });
+
+  it("sizes the budget from the default context on the internal API", () => {
+    state.settings = { inferenceType: "internal", openAiContextLength: 32768 };
+    const messages = getDefaultChatMessages(searchResultsOf(1000));
+
+    const { max_tokens } =
+      getDefaultChatCompletionCreateParamsStreaming(messages);
+
+    expect(countPromptTokens(messages) + max_tokens).toBeLessThanOrEqual(4096);
   });
 });
 

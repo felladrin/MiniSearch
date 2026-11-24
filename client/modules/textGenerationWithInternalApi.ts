@@ -67,7 +67,7 @@ async function processStreamResponse(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      ...getDefaultChatCompletionCreateParamsStreaming(),
+      ...getDefaultChatCompletionCreateParamsStreaming(messages),
       messages,
     }),
   });

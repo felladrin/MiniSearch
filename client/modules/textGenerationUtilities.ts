@@ -1,3 +1,4 @@
+import gptTokenizer from "gpt-tokenizer";
 import { addLogEntry } from "./logEntries";
 import { allocatePageExcerpts } from "./pageExcerptAllocation";
 import type {
@@ -254,11 +255,47 @@ export async function canStartResponding() {
   await getSearchPromise();
 }
 
-export function getDefaultChatCompletionCreateParamsStreaming() {
-  const settings = getSettings();
+/**
+ * The smallest answer budget a request asks for. A prompt that nearly fills
+ * the window still gets room for a short answer instead of a zero or negative
+ * `max_tokens`, which backends reject outright.
+ */
+export const minimumOutputTokens = 64;
+
+/**
+ * Tokens each message spends on its role and delimiters in the chat template,
+ * on top of its content (ChatML's `<|im_start|>role\n...<|im_end|>\n`).
+ */
+const tokensPerMessageOverhead = 4;
+
+/**
+ * The output budget left in the window once the prompt is in it. Backends
+ * count `max_tokens` on top of the prompt, so asking for the whole window
+ * overflows it on every request and gets rejected or truncated. The count
+ * uses the same tokenizer as the other prompt budgets; the model's own may
+ * differ a little either way.
+ */
+function getMaxOutputTokens(messages: ChatMessage[]) {
+  const contextSize = getEffectiveContextSize();
+  const promptTokens = messages.reduce(
+    (total, message) =>
+      total +
+      gptTokenizer.encode(message.content).length +
+      tokensPerMessageOverhead,
+    0,
+  );
+  return Math.min(
+    contextSize,
+    Math.max(minimumOutputTokens, contextSize - promptTokens),
+  );
+}
+
+export function getDefaultChatCompletionCreateParamsStreaming(
+  messages: ChatMessage[],
+) {
   return {
     stream: true,
-    max_tokens: settings.openAiContextLength ?? defaultContextSize,
+    max_tokens: getMaxOutputTokens(messages),
     temperature: 0.35,
     top_p: 1.0,
     min_p: 0.0,

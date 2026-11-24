@@ -150,7 +150,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `openAiApiBaseUrl`     | string  | `''`                              | Base URL for the OpenAI-compatible API                                                                                                 |
 | `openAiApiKey`         | string  | `''`                              | API key for the OpenAI-compatible API                                                                                                  |
 | `openAiApiModel`       | string  | `''`                              | Model identifier for the OpenAI-compatible API                                                                                         |
-| `openAiContextLength`  | number  | `4096`                            | Context window size for OpenAI-compatible models, sent as `max_tokens`                                                                 |
+| `openAiContextLength`  | number  | `4096`                            | Context window size for OpenAI-compatible models; `max_tokens` is what is left of it after the prompt (at least 64)                    |
 
 ### Model Selection
 
