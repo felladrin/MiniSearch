@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- A page load where the server configuration could not be fetched no longer saves the shipped defaults as the browser's settings. On a first visit that failure used to lock in the built-in model and inference type, so the server's own defaults were never applied to that browser afterwards. The model the app switches to when the saved one has left the catalog follows the same rule: it is saved only when the server's configuration was available.
 - The suggestion shown in an empty search box now uses up one stored suggestion each time the box is emptied, and the suggestions are drawn evenly from the whole list. Deleting the last character or pressing Clear used to use up two and show one, and when none were stored it fetched the list twice at the same moment. The shuffle also favoured entries near the top of the list, so some suggestions came up far more often than others.
 
 - Changing a setting in one section of the menu no longer undoes a change made in another. The AI, Search, Interface, History and Voice forms each kept a copy of every setting from the moment the menu opened and wrote the whole copy back on each change, so turning off Text Search and then switching Enter to Submit switched Text Search back on, and a model the app had fallen back to during a search was replaced by the one the menu opened with. Each form now writes only the settings it changed.

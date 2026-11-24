@@ -22,11 +22,7 @@ import {
 import { webGpuSupport } from "@/modules/webGpu";
 import "@mantine/notifications/styles.css";
 import { verifyStoredAccessKey } from "@/modules/accessKey";
-import {
-  FALLBACK_CONFIG,
-  getConfig,
-  type ServerConfig,
-} from "@/modules/config";
+import { getConfig, type ServerConfig } from "@/modules/config";
 import MainPage from "../Pages/Main/MainPage";
 
 const AccessPage = lazy(() => import("../Pages/AccessPage"));
@@ -103,9 +99,9 @@ function useServerConfig(): ConfigState {
 /**
  * Waits for the server config so its defaults can seed a fresh profile, and
  * for the WebGPU check, which picks between the GPU and the CPU default model.
- * Falling back to shipped defaults is safe here: unlike access control,
- * guessing wrong only means the user sees the settings they can already
- * change themselves.
+ * When the config could not be loaded nothing is written: the app shows an
+ * error instead, and settings seeded from shipped defaults would be taken for
+ * the user's own choices on every later load.
  */
 function useInitializeSettings(config: ConfigState) {
   const [settings, setSettings] = usePubSub(settingsPubSub);
@@ -120,6 +116,7 @@ function useInitializeSettings(config: ConfigState) {
     if (
       settingsInitialized ||
       config === "loading" ||
+      config === "unavailable" ||
       hasWebGpu === undefined
     ) {
       return;
@@ -128,7 +125,7 @@ function useInitializeSettings(config: ConfigState) {
     setSettings(
       applyServerConfig(
         upgradeUntouchedSystemPrompt({ ...defaultSettings, ...settings }),
-        config === "unavailable" ? FALLBACK_CONFIG : config,
+        config,
         hasStoredUserSettings,
         hasWebGpu,
       ),

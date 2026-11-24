@@ -191,8 +191,8 @@ async function getSelectedWllamaModel(): Promise<WllamaModel> {
   const model = wllamaModels[wllamaModelId];
   if (model) return model;
 
-  // Safe without the server: the fallback is only a model to switch to.
-  const config = await getConfig().catch(() => FALLBACK_CONFIG);
+  const serverConfig = await getConfig().catch(() => undefined);
+  const config = serverConfig ?? FALLBACK_CONFIG;
   const defaultId = (await webGpuSupport)
     ? config.wllamaDefaultGpuModelId
     : config.wllamaDefaultModelId;
@@ -206,7 +206,11 @@ async function getSelectedWllamaModel(): Promise<WllamaModel> {
   addLogEntry(
     `Model "${wllamaModelId}" is no longer available; switched to "${defaultId}"`,
   );
-  updateSettings({ ...getSettings(), wllamaModelId: defaultId });
+  // The shipped default serves this answer only: saved, it would stand in for
+  // the server's own default on every later load.
+  if (serverConfig) {
+    updateSettings({ ...getSettings(), wllamaModelId: defaultId });
+  }
   return defaultModel;
 }
 

@@ -1,5 +1,5 @@
 import type { ServerConfig } from "@shared/serverConfig";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getConfig } from "@/modules/config";
 import App from "./App";
@@ -62,9 +62,12 @@ describe("App", () => {
    * Renders a fresh module instance so the settings module reads the profile
    * seeded here, since it captures localStorage once at import.
    */
-  async function renderWithStoredSettings(stored: Record<string, unknown>) {
+  async function renderWithStoredSettings(
+    stored?: Record<string, unknown>,
+    config: ServerConfig = serverConfig,
+  ) {
     vi.resetModules();
-    localStorage.setItem("settings", JSON.stringify(stored));
+    if (stored) localStorage.setItem("settings", JSON.stringify(stored));
 
     const [
       { getConfig: freshGetConfig },
@@ -75,7 +78,7 @@ describe("App", () => {
       import("./App"),
       import("@/modules/pubSub"),
     ]);
-    vi.mocked(freshGetConfig).mockResolvedValue(serverConfig);
+    vi.mocked(freshGetConfig).mockResolvedValue(config);
 
     render(<FreshApp />);
     await screen.findByTestId("main-page");
@@ -104,6 +107,59 @@ describe("App", () => {
     await waitFor(() =>
       expect(getSettings().enablePageContentFetch).toBe(false),
     );
+  });
+
+  /** Renders a fresh module instance against a server whose config fails to load. */
+  async function renderWithoutConfig(stored?: Record<string, unknown>) {
+    vi.resetModules();
+    if (stored) localStorage.setItem("settings", JSON.stringify(stored));
+
+    const [
+      { getConfig: freshGetConfig },
+      { default: FreshApp },
+      { webGpuSupport },
+    ] = await Promise.all([
+      import("@/modules/config"),
+      import("./App"),
+      import("@/modules/webGpu"),
+    ]);
+    vi.mocked(freshGetConfig).mockRejectedValue(new Error("Network error"));
+
+    render(<FreshApp />);
+    await screen.findByText(/could not load the server configuration/i);
+    // Settings are initialized once the WebGPU check is in, so let it finish.
+    await webGpuSupport;
+    await act(async () => {});
+  }
+
+  describe("when the config cannot be loaded", () => {
+    it("saves no settings on a first visit", async () => {
+      await renderWithoutConfig();
+
+      expect(localStorage.getItem("settings")).toBeNull();
+    });
+
+    it("leaves a stored profile as it was", async () => {
+      const stored = { enableAiResponse: true };
+
+      await renderWithoutConfig(stored);
+
+      expect(localStorage.getItem("settings")).toBe(JSON.stringify(stored));
+    });
+
+    // Settings saved from shipped defaults would count as the user's own
+    // choices, and the server's defaults could never seed them again.
+    it("lets a later load seed the server's defaults", async () => {
+      await renderWithoutConfig();
+      cleanup();
+
+      const getSettings = await renderWithStoredSettings(undefined, {
+        ...serverConfig,
+        defaultInferenceType: "openai",
+      });
+
+      await waitFor(() => expect(getSettings().inferenceType).toBe("openai"));
+    });
   });
 
   // An unreachable /api/config must not look like `accessKeysEnabled: false`,

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getConfig } from "./config";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
@@ -37,7 +38,10 @@ vi.mock("./config", () => ({
     wllamaDefaultModelId: "test-model",
     wllamaDefaultGpuModelId: "test-gpu-model",
   }),
-  FALLBACK_CONFIG: {},
+  FALLBACK_CONFIG: {
+    wllamaDefaultModelId: "test-model",
+    wllamaDefaultGpuModelId: "test-gpu-model",
+  },
 }));
 
 vi.mock("./systemPrompt", () => ({
@@ -146,6 +150,27 @@ describe("generateTextWithWllama", () => {
     expect(addLogEntry).toHaveBeenCalledWith(
       expect.stringContaining("removed-model"),
     );
+  });
+
+  it("uses the default model without saving it when the server config cannot be loaded", async () => {
+    const savedSettings = getSettings();
+    vi.mocked(getSettings).mockReturnValue({
+      ...savedSettings,
+      wllamaModelId: "removed-model",
+    });
+    const serverConfig = await getConfig();
+    vi.mocked(getConfig).mockRejectedValue(new Error("Network error"));
+    mockDownload([]);
+
+    try {
+      await generateTextWithWllama();
+    } finally {
+      vi.mocked(getSettings).mockReturnValue(savedSettings);
+      vi.mocked(getConfig).mockResolvedValue(serverConfig);
+    }
+
+    expect(vi.mocked(initializeWllama).mock.calls[0]?.[0]).toBe("repo");
+    expect(updateSettings).not.toHaveBeenCalled();
   });
 
   it("keeps the last known size when the total is not available yet", async () => {
