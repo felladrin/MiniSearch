@@ -44,7 +44,6 @@ export function useHistoryRestore(
       setCurrentSearchRunId(searchRunId);
 
       updateIsRestoringFromHistory(true);
-      updateSuppressNextFollowUp(true);
       // Excerpts belong to the search that fetched them; a follow-up on the
       // restored entry must not be grounded on the live search's pages.
       updatePageContents({});
@@ -104,9 +103,11 @@ export function useHistoryRestore(
 
       const savedResponse = await getLatestLlmResponseForEntry(entry);
       if (savedResponse && savedResponse.trim().length > 0) {
+        updateSuppressNextFollowUp(true);
         updateResponse(savedResponse);
         updateTextGenerationState("completed");
       } else {
+        updateSuppressNextFollowUp(false);
         updateResponse("");
         updateTextGenerationState("idle");
       }

@@ -5,6 +5,7 @@ import {
   chatGenerationStatePubSub,
   chatInputPubSub,
   followUpQuestionPubSub,
+  getSuppressNextFollowUp,
   suppressNextFollowUpPubSub,
 } from "@/modules/pubSub";
 import type { ChatMessage } from "@/modules/types";
@@ -688,5 +689,51 @@ describe("ChatInterface generation state", () => {
       expect.stringContaining("Error persisting chat messages"),
     );
     expect(generateFollowUpQuestion).toHaveBeenCalled();
+  });
+
+  it("clears suppressNextFollowUp after skipping the restored answer's follow-up so later sends generate one", async () => {
+    updateSuppressNextFollowUp(true);
+
+    renderChatInterface({ suppressInitialFollowUp: false });
+
+    await act(async () => {});
+
+    expect(generateFollowUpQuestion).not.toHaveBeenCalled();
+    expect(getSuppressNextFollowUp()).toBe(false);
+
+    await act(async () => {
+      await sendMessage("Tell me more about wake locks");
+    });
+
+    expect(generateFollowUpQuestion).toHaveBeenCalledTimes(1);
+    expect(getFollowUpQuestion()).toBe("A question?");
+  });
+
+  it("drops an in-flight follow-up question when a restore suppresses follow-ups", async () => {
+    const inFlightQuestion = deferred<string>();
+    vi.mocked(generateFollowUpQuestion).mockReturnValueOnce(
+      inFlightQuestion.promise,
+    );
+
+    renderChatInterface({ suppressInitialFollowUp: false });
+
+    await act(async () => {});
+
+    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+
+    await act(async () => {
+      updateSuppressNextFollowUp(true);
+    });
+
+    expect(getSuppressNextFollowUp()).toBe(false);
+    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(false);
+    expect(getFollowUpQuestion()).toBe("");
+
+    await act(async () => {
+      inFlightQuestion.resolve("Question from the previous search?");
+    });
+
+    expect(getFollowUpQuestion()).toBe("");
+    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(false);
   });
 });

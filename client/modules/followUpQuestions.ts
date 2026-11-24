@@ -1,6 +1,5 @@
 import { historyDatabase } from "./history";
 import { addLogEntry } from "./logEntries";
-import { getSuppressNextFollowUp } from "./pubSub";
 import { generateChatResponse } from "./textGeneration";
 import type { ChatMessage } from "./types";
 
@@ -32,10 +31,6 @@ export async function generateFollowUpQuestion({
   previousQuestions = [],
 }: FollowUpQuestionParams): Promise<string> {
   try {
-    if (getSuppressNextFollowUp()) {
-      return "";
-    }
-
     addLogEntry("Generating a follow-up question");
 
     await saveChatHistoryEntry("user", topic);
