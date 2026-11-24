@@ -282,15 +282,16 @@ because it would be a scriptable document on this origin. Responses carry
 and `Cache-Control: private, max-age=3600`.
 
 The fetch is bounded by a 3 s deadline covering DNS and every hop, at most 3
-redirects, each of them re-validated, and 500 KB of body. Successful fetches are
-held in an in-process LRU (100 entries, 50 MB); failures never are.
+redirects, each of them re-validated, and 500 KB of body; a larger image is
+refused rather than served cut off. Successful fetches are held in an
+in-process LRU (100 entries, 50 MB); failures never are.
 
 | Status | Body                                                                                  | When                                                                                                                                                                                  |
 | ------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `400`  | `{"error":"Missing thumbnail URL"}`                                                   | `u` missing                                                                                                                                                                           |
 | `400`  | `{"error":"Thumbnail URL too long"}`                                                  | `u` over 2048 characters                                                                                                                                                              |
 | `403`  | `{"error":"Refusing to fetch a thumbnail from a non-public or unresolvable address"}` | The host is in private space, does not resolve, or `u` is not a parseable `http`/`https` URL. `/page-content` answers `400` for that last case; this endpoint does not distinguish it |
-| `502`  | `{"error":"Thumbnail could not be fetched"}`                                          | Upstream failed, timed out, redirected more than 3 times, answered with a type outside the list, or sent an empty body                                                                |
+| `502`  | `{"error":"Thumbnail could not be fetched"}`                                          | Upstream failed, timed out, redirected more than 3 times, answered with a type outside the list, or sent an empty body or one over 500 KB                                             |
 | `500`  | `{"error":"Internal server error"}`                                                   | Anything the hook itself threw, caught so Vite's connect stack does not see an unhandled rejection                                                                                    |
 
 Error responses carry `Cache-Control: no-store`, since neither a refusal nor an
