@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- Keenable is now one of the three default search fallback providers, alongside Parallel and You.com. When SearXNG fails, an instance that runs the fallback now tries Keenable too without any setup: with no key it uses Keenable's keyless endpoint, and setting `SEARCH_FALLBACK_KEENABLE_API_KEY` switches it to the authenticated one. To leave it out, name the providers you want with `SEARCH_FALLBACK_PROVIDERS`.
 - A page load where the server configuration could not be fetched no longer saves the shipped defaults as the browser's settings. On a first visit that failure used to lock in the built-in model and inference type, so the server's own defaults were never applied to that browser afterwards. The model the app switches to when the saved one has left the catalog follows the same rule: it is saved only when the server's configuration was available.
 - The suggestion shown in an empty search box now uses up one stored suggestion each time the box is emptied, and the suggestions are drawn evenly from the whole list. Deleting the last character or pressing Clear used to use up two and show one, and when none were stored it fetched the list twice at the same moment. The shuffle also favoured entries near the top of the list, so some suggestions came up far more often than others.
 
