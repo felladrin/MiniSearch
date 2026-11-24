@@ -5,6 +5,7 @@ import {
   getRecentSearches,
   historyDatabase,
   type ImageResults,
+  isHistoryEnabled,
   type SearchEntry,
   type TextResults,
 } from "../modules/history";
@@ -93,6 +94,15 @@ export function useSearchHistory(
       isLoadingRef.current = true;
       setIsLoading(true);
       setError(null);
+
+      // Reading would open the database too, so a disabled history is shown
+      // as empty without touching IndexedDB.
+      if (!isHistoryEnabled()) {
+        setLlmResponseCount(0);
+        setChatMessageCount(0);
+        setEntries([]);
+        return;
+      }
 
       const searches = await getRecentSearches(
         enablePagination ? 1000 : limit * 2,
