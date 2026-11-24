@@ -170,6 +170,7 @@ Need to:
 - `server/pageContentService.ts` - Reads result pages and extracts query-relevant passages
 - `server/pageReadHostBreaker.ts` - Per-host circuit breaker for page reads: skips a host that refused the last three reads, then probes it once
 - `server/utils/publicUrl.ts` - Blocks private and reserved addresses before a server-side fetch
+- `server/utils/requestUrl.ts` - Parses a request URL against a fixed base and refuses a malformed `Host` header, so the endpoint hooks cannot crash on one
 - `server/rerankerService.ts` - Reranker service (ONNX Runtime inference)
 - `server/rankSearchResults.ts` - Score-based filtering and result reordering
 - `server/searchToken.ts` - CSRF token generation and storage

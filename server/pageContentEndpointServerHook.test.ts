@@ -235,3 +235,31 @@ describe("pageContentEndpointServerHook", () => {
     expect(getPageReadStats().grounding.requests).toBe(before.requests + 2);
   });
 });
+
+describe("pageContentEndpointServerHook with a malformed Host header", () => {
+  it("answers 400 and keeps the handler promise from rejecting", async () => {
+    vi.clearAllMocks();
+    const use = vi.fn();
+    pageContentEndpointServerHook({
+      middlewares: { use },
+    } as unknown as Parameters<typeof pageContentEndpointServerHook>[0]);
+    const response = {
+      statusCode: 200,
+      setHeader: vi.fn(),
+      end: vi.fn(),
+    } as unknown as RecordedResponse;
+    const next = vi.fn();
+    const request = {
+      url: "/page-content?url=http://example.com&token=abc",
+      headers: { host: "bad host" },
+    } as unknown as IncomingMessage;
+
+    await expect(
+      (use.mock.calls[0][0] as Handler)(request, response, next),
+    ).resolves.toBeUndefined();
+
+    expect(response.statusCode).toBe(400);
+    expect(handleTokenVerification).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+});

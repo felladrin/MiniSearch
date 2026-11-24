@@ -22,6 +22,7 @@ import {
   getThumbnailStats,
   getUnresponsiveEngineStats,
 } from "./searchesSinceLastRestart.ts";
+import { sendJsonError } from "./utils/httpResponse.ts";
 import {
   getActiveSessionsAmount,
   getVerifiedTokensAmount,
@@ -69,7 +70,12 @@ export function statusEndpointServerHook<
         server.config.define?.VITE_COMMIT_SHORT_HASH || '""',
       );
     } catch {
-      throw new Error("Malformed VITE_COMMIT_SHORT_HASH build define");
+      // Throwing here would reject the async middleware, which Node treats as
+      // an unhandled rejection and exits the process.
+      sendJsonError(response, 500, {
+        error: "Malformed VITE_COMMIT_SHORT_HASH build define",
+      });
+      return;
     }
 
     const status = {

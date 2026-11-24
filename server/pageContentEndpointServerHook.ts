@@ -3,7 +3,8 @@ import { z } from "zod";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
 import { fetchPageContents } from "./pageContentService.ts";
 import { recordGroundingOutcome } from "./pageReadsSinceLastRestart.ts";
-import { sendValidationError } from "./utils/httpResponse.ts";
+import { sendJsonError, sendValidationError } from "./utils/httpResponse.ts";
+import { parseRequestUrl } from "./utils/requestUrl.ts";
 
 const MAX_QUERY_LENGTH = 2000;
 const MAX_URL_LENGTH = 2048;
@@ -50,7 +51,11 @@ export function pageContentEndpointServerHook<
   server.middlewares.use(async (request, response, next) => {
     if (!request.url?.startsWith("/page-content")) return next();
 
-    const url = new URL(request.url, `http://${request.headers.host}`);
+    const url = parseRequestUrl(request);
+    if (!url) {
+      sendJsonError(response, 400, { error: "Malformed request" });
+      return;
+    }
     if (url.pathname !== "/page-content") return next();
 
     // Verified before the parameters are read, so malformed requests from an

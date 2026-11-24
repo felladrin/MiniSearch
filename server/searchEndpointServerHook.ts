@@ -28,7 +28,8 @@ import {
   recordSearchDuration,
   type SearchType,
 } from "./searchesSinceLastRestart.ts";
-import { sendValidationError } from "./utils/httpResponse.ts";
+import { sendJsonError, sendValidationError } from "./utils/httpResponse.ts";
+import { parseRequestUrl } from "./utils/requestUrl.ts";
 import { fetchSearXNG, fetchSupplementarySearXNG } from "./webSearchService.ts";
 
 const DEFAULT_SEARCH_LIMIT = 30;
@@ -178,7 +179,11 @@ export function searchEndpointServerHook<
   server.middlewares.use(async (request, response, next) => {
     if (!request.url?.startsWith("/search/")) return next();
 
-    const url = new URL(request.url, `http://${request.headers.host}`);
+    const url = parseRequestUrl(request);
+    if (!url) {
+      sendJsonError(response, 400, { error: "Malformed request" });
+      return;
+    }
 
     // Verified before the parameters are read, matching `/page-content`: a
     // malformed query from an unauthenticated caller has to cost the caller a

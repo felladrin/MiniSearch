@@ -68,6 +68,7 @@ below are the same on every token-gated endpoint:
 | Status | Body                             | When                                                 |
 | ------ | -------------------------------- | ---------------------------------------------------- |
 | `429`  | `{"error":"Too many requests."}` | The bucket for this client is empty                  |
+| `400`  | `{"error":"Malformed request"}`  | Malformed `Host` header, checked before the token    |
 | `400`  | `{"error":"Missing token."}`     | No `token` parameter                                 |
 | `401`  | `{"error":"Invalid token."}`     | The hash does not verify against this server's token |
 

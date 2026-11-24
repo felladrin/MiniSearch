@@ -628,3 +628,23 @@ describe("thumbnailEndpointServerHook", () => {
     expect(fetched(secondUrl)).toBe(2);
   });
 });
+
+describe("thumbnailEndpointServerHook with a malformed Host header", () => {
+  it("answers 400 instead of 500", async () => {
+    vi.mocked(handleTokenVerification).mockClear();
+    const request = {
+      url: "/thumbnail?u=https%3A%2F%2Fexample.com%2Fa.png&token=abc",
+      headers: { host: "bad host" },
+    } as unknown as IncomingMessage;
+    const response = createResponse();
+    const next = vi.fn();
+
+    await expect(
+      getRegisteredHandler()(request, response, next),
+    ).resolves.toBeUndefined();
+
+    expect(response.statusCode).toBe(400);
+    expect(handleTokenVerification).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+});

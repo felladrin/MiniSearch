@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-23
 
+- A request with a malformed `Host` header, such as `Host: bad host`, no longer shuts the server down. The search, page content, thumbnail and AI inference endpoints used to build the request URL from that header, so one unauthenticated request made the server exit; they now answer 400 and keep serving. The thumbnail endpoint answered 500 for the same request before. The `/status` endpoint also answers a 500 instead of exiting when the build's commit hash define is malformed.
 - When the access key cannot be checked because the server is unreachable, the access page now says "Could not reach the server. Please try again." instead of "Invalid access key", so a network problem no longer looks like a wrong key. Access still stays closed until the key is checked.
 - With the AI Horde engine, the answer card and its Stop button now appear as soon as the request is queued, instead of a loading skeleton for the whole wait, which can take minutes. Stop now works during that wait, and it also cancels the queued job on the Horde, so a stopped answer no longer keeps spending kudos.
 - The search box placeholder now always shows a suggestion. When the suggestion list could not be loaded, came back empty, or held empty entries in the browser's storage, the placeholder could end up blank; it now falls back to "Anything you need!". The log now names why the list failed to load and how many suggestions were actually stored.
