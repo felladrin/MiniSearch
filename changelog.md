@@ -4,6 +4,8 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- An AI Horde answer no longer fails, or submits extra jobs, because of a passing rate limit or server error while it waits. A 429 or 5xx on a status check was read as "Generation not possible with the selected model", and in automatic mode that sent two fresh jobs to any model, doubling the kudos spent. Such a check is now retried, waiting a little longer each time, and the answer fails only after five in a row, with the server's reason and without the extra jobs. A job that is gone ends right away with Horde's message, a finished job with no text says "No text generated", and a refused API key now shows Horde's reason instead of "Failed to start generation".
+
 - Editing a question or regenerating the last answer now works when an earlier AI answer in the chat is empty. An empty answer, which is saved when a response stream ends with no text, shifted the positions the chat used, so the Re-generate button disappeared from the last answer and Edit on a later question loaded a different, earlier question and cut the chat back to it.
 - A collapsed citation link in an AI answer now shows the right first character. A link whose text is bold or code, such as **Reuters**, showed `[` instead of `R`, and a link starting with an emoji showed `�`. The pill now takes the first visible character, and keeps an emoji, a flag or a combined emoji such as 👩‍💻 whole.
 - Daily Average in the History analytics now counts days by your local calendar, like Most Active Hour and the activity heatmap. It used to split days at UTC midnight, so outside UTC, searches made late at night or early in the morning could land on a different day, lower the average and disagree with the heatmap's active days.

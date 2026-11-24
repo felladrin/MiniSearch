@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
@@ -201,6 +201,124 @@ describe("textGenerationWithHorde", () => {
       const [, startInit] = mockFetch.mock.calls[0];
       expect(JSON.parse(startInit.body).models).toEqual(["custom-model"]);
     });
+
+    describe("status poll failures", () => {
+      // clearAllMocks keeps queued responses and implementations, and a poll
+      // that stops early would leave them for the next test.
+      afterEach(() => {
+        mockFetch.mockReset();
+      });
+
+      const done = (text: string) =>
+        jsonResponse({
+          done: true,
+          is_possible: true,
+          generations: [{ text, model: "chosen-model" }],
+        });
+
+      it("keeps polling through a rate limit and finishes the generation", async () => {
+        const { generateTextWithHorde } = await import(
+          "./textGenerationWithHorde"
+        );
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse({ id: "gen-rate" }))
+          .mockResolvedValueOnce(
+            jsonResponse({ message: "Too many requests" }, 429),
+          )
+          .mockResolvedValueOnce(done("After the rate limit"));
+
+        await generateTextWithHorde();
+
+        expect(updateResponse).toHaveBeenCalledWith("After the rate limit");
+      });
+
+      it("recovers when a gateway answers a poll with an HTML error page", async () => {
+        const { generateTextWithHorde } = await import(
+          "./textGenerationWithHorde"
+        );
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse({ id: "gen-gateway" }))
+          .mockResolvedValueOnce(
+            new Response("<html><body>502 Bad Gateway</body></html>", {
+              status: 502,
+            }),
+          )
+          .mockResolvedValueOnce(done("After the gateway error"));
+
+        await generateTextWithHorde();
+
+        expect(updateResponse).toHaveBeenCalledWith("After the gateway error");
+      });
+
+      it("gives up on a status check that keeps failing without calling the model impossible", async () => {
+        const { generateTextWithHorde } = await import(
+          "./textGenerationWithHorde"
+        );
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse({ id: "gen-down" }))
+          .mockImplementation(async () =>
+            jsonResponse({ message: "Service unavailable" }, 503),
+          );
+
+        const error = await generateTextWithHorde().catch(
+          (caught: Error) => caught,
+        );
+
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toContain("Service unavailable");
+        expect((error as Error).message).not.toContain(
+          "Generation not possible",
+        );
+        // One submit, then the polls up to the consecutive-failure cap.
+        expect(mockFetch).toHaveBeenCalledTimes(6);
+      });
+
+      it("stops at once when the job is gone, with the server's message", async () => {
+        const { generateTextWithHorde } = await import(
+          "./textGenerationWithHorde"
+        );
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse({ id: "gen-gone" }))
+          .mockResolvedValueOnce(
+            jsonResponse({ message: "Generation not found" }, 404),
+          );
+
+        await expect(generateTextWithHorde()).rejects.toThrow(
+          "Generation not found",
+        );
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+      });
+
+      it("rejects a finished generation that carries no text", async () => {
+        const { generateTextWithHorde } = await import(
+          "./textGenerationWithHorde"
+        );
+        mockFetch
+          .mockResolvedValueOnce(jsonResponse({ id: "gen-empty" }))
+          .mockResolvedValueOnce(
+            jsonResponse({ done: true, is_possible: true, generations: [] }),
+          );
+
+        const error = await generateTextWithHorde().catch(
+          (caught: Error) => caught,
+        );
+
+        expect((error as Error).message).toContain("No text generated");
+        expect((error as Error).message).not.toContain("TypeError");
+      });
+    });
+
+    it("reports the server's reason when the job is refused at submit", async () => {
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({ message: "Invalid API key" }, 401),
+      );
+
+      await expect(generateTextWithHorde()).rejects.toThrow("Invalid API key");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("generateChatWithHorde", () => {
@@ -267,7 +385,8 @@ describe("textGenerationWithHorde", () => {
           if (init?.method === "DELETE") {
             return jsonResponse({});
           }
-          return jsonResponse(statusResponder(pollCounter++));
+          const reply = statusResponder(pollCounter++);
+          return reply instanceof Response ? reply : jsonResponse(reply);
         },
       );
     }
@@ -385,6 +504,23 @@ describe("textGenerationWithHorde", () => {
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("retrying with any available model"),
       );
+    });
+
+    it("does not submit a second round when the status checks keep failing", async () => {
+      routeHordeFetch({
+        workers: [{ models: ["m-a"], max_length: 1024 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: () =>
+          jsonResponse({ message: "Too many requests" }, 429),
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await expect(generateTextWithHorde()).rejects.toThrow(
+        "Too many requests",
+      );
+      expect(generationRequestBodies()).toHaveLength(2);
     });
 
     it("does not retry when the generation faults", async () => {

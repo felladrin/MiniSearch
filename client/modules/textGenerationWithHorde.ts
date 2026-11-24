@@ -88,6 +88,65 @@ const HORDE_RANKING_FETCH_TIMEOUT_MS = 10 * 1000;
 const GENERATION_NOT_POSSIBLE_MESSAGE =
   "Generation not possible with the selected model";
 
+// A status check that fails this many times in a row ends the generation.
+// Until then a rate limit or a gateway hiccup is retried, waiting 1 s, 2 s,
+// 4 s and so on, up to the cap.
+const MAX_CONSECUTIVE_POLL_FAILURES = 5;
+const MAX_POLL_RETRY_DELAY_MS = 8 * 1000;
+
+/**
+ * A non-ok answer from the AI Horde API. The status is kept so a poll can
+ * tell a passing rate limit from a job that is gone.
+ */
+class HordeHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "HordeHttpError";
+    this.status = status;
+  }
+}
+
+/**
+ * Reads a Horde JSON body, or throws with the server's own message when the
+ * response is not ok. Horde explains a refusal (a bad key, a rate limit) in
+ * the body, and that reason is what the user needs to see.
+ */
+async function readHordeJson<T>(
+  response: Response,
+  fallbackMessage: string,
+): Promise<T> {
+  if (response.ok) return (await response.json()) as T;
+
+  let message = fallbackMessage;
+  try {
+    const body = (await response.json()) as { message?: unknown };
+    if (typeof body.message === "string" && body.message) {
+      message = body.message;
+    }
+  } catch {
+    // A gateway error page is HTML, not JSON, and the status says enough.
+  }
+  throw new HordeHttpError(
+    response.status,
+    `${message} (HTTP ${response.status})`,
+  );
+}
+
+/**
+ * A status poll is an idempotent GET, so anything that can pass on its own is
+ * worth another try: a rate limit, a server error, a body that is not JSON
+ * (an HTML error page from a gateway) and a dropped connection. Any other
+ * HTTP error, such as a 404 for an expired job, will not get better.
+ */
+function isTransientPollFailure(error: unknown): boolean {
+  if (error instanceof HordeHttpError) {
+    return error.status === 429 || error.status >= 500;
+  }
+  return error instanceof SyntaxError || error instanceof TypeError;
+}
+
 function getEffectiveHordeApiKey(
   settings: ReturnType<typeof getSettings> = getSettings(),
 ) {
@@ -129,7 +188,10 @@ async function startGeneration(
     }),
   });
 
-  const data = (await response.json()) as HordeResponse;
+  const data = await readHordeJson<HordeResponse>(
+    response,
+    "Failed to start generation",
+  );
   if (!data.id) {
     throw new Error("Failed to start generation");
   }
@@ -146,43 +208,77 @@ async function handleGenerationStatus(
   let lastText = "";
 
   try {
-    let status: HordeStatusResponse;
+    // Only read after a poll that answered, which is the only way out of the
+    // loop other than a throw.
+    let status: HordeStatusResponse = {};
+    let consecutivePollFailures = 0;
 
-    do {
+    while (true) {
       if (signal?.aborted) {
         throw new Error("Request was aborted");
       }
 
-      const response = await fetch(
-        buildHordeUrl(`/generate/text/status/${generationId}`),
-        {
-          method: "GET",
-          signal,
-          headers: {
-            [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
-            [HTTP_HEADERS.CONTENT_TYPE]: "application/json",
-            [HTTP_HEADERS.API_KEY]: aiHordeApiKey,
+      let polled: HordeStatusResponse | undefined;
+      try {
+        const response = await fetch(
+          buildHordeUrl(`/generate/text/status/${generationId}`),
+          {
+            method: "GET",
+            signal,
+            headers: {
+              [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
+              [HTTP_HEADERS.CONTENT_TYPE]: "application/json",
+              [HTTP_HEADERS.API_KEY]: aiHordeApiKey,
+            },
           },
-        },
-      );
-
-      status = await response.json();
-
-      if (
-        status.generations?.[0]?.text &&
-        status.generations[0].text !== lastText
-      ) {
-        lastText = status.generations[0].text;
-        if (status.generations[0].model) {
-          addLogEntry(
-            `AI Horde completed the generation using the model "${status.generations[0].model}"`,
-          );
+        );
+        polled = await readHordeJson<HordeStatusResponse>(
+          response,
+          "Failed to check generation status",
+        );
+        consecutivePollFailures = 0;
+      } catch (error) {
+        consecutivePollFailures++;
+        // Never a ChatGenerationError: "not possible" has to stay reserved for
+        // a real is_possible: false, since it makes the automatic mode submit
+        // a second round of jobs.
+        if (
+          signal?.aborted ||
+          !isTransientPollFailure(error) ||
+          consecutivePollFailures >= MAX_CONSECUTIVE_POLL_FAILURES
+        ) {
+          throw error;
         }
-        onUpdate(lastText.split(userMarker)[0]);
+        addLogEntry(`AI Horde status check failed, retrying: ${error}`);
       }
 
-      if (!status.done && !status.faulted && status.is_possible) {
-        await sleep(1000);
+      if (polled) {
+        status = polled;
+        const generation = status.generations?.[0];
+        if (generation?.text && generation.text !== lastText) {
+          lastText = generation.text;
+          if (generation.model) {
+            addLogEntry(
+              `AI Horde completed the generation using the model "${generation.model}"`,
+            );
+          }
+          onUpdate(lastText.split(userMarker)[0]);
+        }
+      }
+
+      const pending =
+        polled === undefined ||
+        (!polled.done && !polled.faulted && polled.is_possible);
+
+      if (pending) {
+        await sleep(
+          polled
+            ? 1000
+            : Math.min(
+                1000 * 2 ** (consecutivePollFailures - 1),
+                MAX_POLL_RETRY_DELAY_MS,
+              ),
+        );
       }
 
       if (getTextGenerationState() === "interrupted") {
@@ -191,12 +287,9 @@ async function handleGenerationStatus(
         await cancelGeneration(generationId).catch(() => {});
         throw new ChatGenerationError("Generation interrupted");
       }
-    } while (
-      !status.done &&
-      !status.faulted &&
-      status.is_possible &&
-      !signal?.aborted
-    );
+
+      if (!pending || signal?.aborted) break;
+    }
 
     if (signal?.aborted) {
       throw new Error("Request was aborted");
@@ -210,7 +303,7 @@ async function handleGenerationStatus(
       throw new ChatGenerationError(GENERATION_NOT_POSSIBLE_MESSAGE);
     }
 
-    const generatedText = status.generations?.[0].text;
+    const generatedText = status.generations?.[0]?.text;
 
     if (!generatedText) {
       throw new Error("No text generated");
