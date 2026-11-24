@@ -362,6 +362,55 @@ export async function getRecentSearches(
   });
 }
 
+/** What the analytics need of a saved search: when it happened and where it came from. */
+export interface SearchActivityRecord {
+  timestamp: number;
+  source?: string;
+}
+
+/**
+ * Every saved search as a timestamp and a source, read from the two indexes
+ * alone, so the result payloads (which dominate a row's size) are never
+ * loaded. The analytics have to see the whole table, and a table can hold
+ * 10,000 rows. A search saved without a source has no entry in the `source`
+ * index, so it comes back without one.
+ */
+export async function getSearchActivityRecords(): Promise<
+  SearchActivityRecord[]
+> {
+  return measurePerformance("Get search activity", () =>
+    historyDatabase.transaction("r", historyDatabase.searches, async () => {
+      const byTime = historyDatabase.searches.orderBy("timestamp");
+      const [timestamps, ids, distinctSources] = await Promise.all([
+        byTime.keys(),
+        byTime.primaryKeys(),
+        historyDatabase.searches.orderBy("source").uniqueKeys(),
+      ]);
+
+      // A handful of sources exist ("user", "followup", "suggestion"), so one
+      // index lookup per source is far cheaper than walking the whole index.
+      const sourceById = new Map<unknown, string>();
+      await Promise.all(
+        distinctSources.map(async (source) => {
+          const sourceIds = await historyDatabase.searches
+            .where("source")
+            .equals(source)
+            .primaryKeys();
+          for (const id of sourceIds) sourceById.set(id, String(source));
+        }),
+      );
+
+      return ids.map((id, index) => ({
+        timestamp: Number(timestamps[index]),
+        source: sourceById.get(id),
+      }));
+    }),
+  ).catch((error) => {
+    addLogEntry(`Error fetching search activity: ${error}`);
+    return [];
+  });
+}
+
 export async function saveLlmResponseForQuery(
   query: string,
   response: string,
