@@ -3,7 +3,7 @@ import type { UseFormReturnType } from "@mantine/form";
 import { defaultSettings } from "@/modules/settings";
 
 interface SystemPromptInputProps {
-  form: UseFormReturnType<typeof defaultSettings>;
+  form: UseFormReturnType<Pick<typeof defaultSettings, "systemPrompt">>;
 }
 
 /** Custom system prompt editor, with an inline action to restore the default. */
