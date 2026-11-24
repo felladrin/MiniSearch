@@ -1382,9 +1382,7 @@ describe("internalApiEndpointServerHook", () => {
       const after = getInferenceStats(["test-model"]);
       expect(after.failed.abandoned).toBe(before.failed.abandoned + 1);
       const model = after.byModel[0];
-      expect(model.abandoned).toBe(
-        (before.byModel[0]?.abandoned ?? 0) + 1,
-      );
+      expect(model.abandoned).toBe((before.byModel[0]?.abandoned ?? 0) + 1);
       expect(model.attempted).toBe(
         model.streamed + model.failed + model.abandoned,
       );

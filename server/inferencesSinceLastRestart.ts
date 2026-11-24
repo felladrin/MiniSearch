@@ -168,9 +168,9 @@ export function recordInference({
  */
 function byModelArray(modelOrder: string[]): ModelCounts[] {
   const listed = new Set(modelOrder);
-  const entries = [...listed].map(
-    (model) => ({ ...(byModel.get(model) ?? zeroCounts()) }),
-  );
+  const entries = [...listed].map((model) => ({
+    ...(byModel.get(model) ?? zeroCounts()),
+  }));
   for (const [model, counts] of byModel) {
     if (!listed.has(model)) entries.push({ ...counts });
   }
