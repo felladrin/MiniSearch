@@ -209,6 +209,33 @@ async function buildSearchUrl(
 }
 
 /**
+ * Names a failed request at the point of failure, where the cause is still
+ * known. The timer is the only thing that aborts the controller, so an aborted
+ * signal is a timeout whatever rejected, the fetch before the headers or
+ * `json()` mid-body. The Fetch spec rejects a network failure with a
+ * TypeError in every browser, whatever the wording, and a body that is not
+ * JSON fails with a SyntaxError.
+ */
+function labelSearchFailure(error: unknown, signal: AbortSignal): Error {
+  if (
+    signal.aborted ||
+    (error instanceof Error && error.name === "AbortError")
+  ) {
+    return new Error(
+      "Request timeout - server did not respond within 30 seconds",
+      { cause: error },
+    );
+  }
+  if (error instanceof SyntaxError) {
+    return new Error(`JSON parsing error: ${error.message}`, { cause: error });
+  }
+  if (error instanceof TypeError) {
+    return new Error(`Network error: ${error.message}`, { cause: error });
+  }
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+/**
  * One request, with the timeout covering the body as well as the response, so
  * a server that answers and then stalls mid-stream still aborts.
  */
@@ -228,13 +255,9 @@ async function attemptSearch<T>(searchUrl: URL): Promise<SearchAttempt<T>> {
       return { ok: false, status: response.status };
     }
 
-    try {
-      return { ok: true, results: (await response.json()) as T };
-    } catch (parseError) {
-      throw new Error(
-        `JSON parsing error: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-      );
-    }
+    return { ok: true, results: (await response.json()) as T };
+  } catch (error) {
+    throw labelSearchFailure(error, controller.signal);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -450,44 +473,30 @@ const searchService = {
       );
     }
 
-    try {
-      let attempt = await attemptSearch<T>(
+    let attempt = await attemptSearch<T>(
+      await buildSearchUrl(endpoint, query, limit),
+    );
+
+    // Every server process mints its own search token, so a restart leaves
+    // this page hashing one the server never issued. Drop the cached config,
+    // take the token the server is handing out now, and try once more. The
+    // retry runs once per request: a second rejection is a real one, and is
+    // reported as the failure it is.
+    if (!attempt.ok && attempt.status === UNAUTHORIZED_STATUS) {
+      addLogEntry(
+        "Search token was rejected; refreshing it and retrying the search",
+      );
+      invalidateConfig();
+      attempt = await attemptSearch<T>(
         await buildSearchUrl(endpoint, query, limit),
       );
-
-      // Every server process mints its own search token, so a restart leaves
-      // this page hashing one the server never issued. Drop the cached config,
-      // take the token the server is handing out now, and try once more. The
-      // retry runs once per request: a second rejection is a real one, and is
-      // reported as the failure it is.
-      if (!attempt.ok && attempt.status === UNAUTHORIZED_STATUS) {
-        addLogEntry(
-          "Search token was rejected; refreshing it and retrying the search",
-        );
-        invalidateConfig();
-        attempt = await attemptSearch<T>(
-          await buildSearchUrl(endpoint, query, limit),
-        );
-      }
-
-      if (!attempt.ok) {
-        throw new Error(`HTTP error! status: ${attempt.status}`);
-      }
-
-      return attempt.results;
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.name === "AbortError") {
-          throw new Error(
-            "Request timeout - server did not respond within 30 seconds",
-          );
-        }
-        if (error.message.includes("network")) {
-          throw new Error(`Network error: ${error.message}`);
-        }
-      }
-      throw error;
     }
+
+    if (!attempt.ok) {
+      throw new Error(`HTTP error! status: ${attempt.status}`);
+    }
+
+    return attempt.results;
   },
 
   async searchText(

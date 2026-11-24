@@ -221,9 +221,8 @@ describe("Search Module", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
-    // Each row has to reach the branch it is named for. A plain Error matches
-    // neither `AbortError` nor the lowercase "network" the wrapper looks for,
-    // so a row that rejects with one only watches a raw error propagate.
+    // Each row has to reach the branch it is named for. A network failure is a
+    // TypeError in every browser, each with its own wording.
     it.each([
       [
         "wraps a body it cannot parse",
@@ -237,9 +236,22 @@ describe("Search Module", () => {
         "JSON parsing error: Unexpected token",
       ],
       [
-        "labels a network failure",
-        () => mockFetch.mockRejectedValue(new Error("network is unreachable")),
-        "Network error: network is unreachable",
+        "labels a Chrome network failure",
+        () => mockFetch.mockRejectedValue(new TypeError("Failed to fetch")),
+        "Network error: Failed to fetch",
+      ],
+      [
+        "labels a Firefox network failure",
+        () =>
+          mockFetch.mockRejectedValue(
+            new TypeError("NetworkError when attempting to fetch resource."),
+          ),
+        "Network error: NetworkError when attempting to fetch resource.",
+      ],
+      [
+        "labels a Safari network failure",
+        () => mockFetch.mockRejectedValue(new TypeError("Load failed")),
+        "Network error: Load failed",
       ],
       [
         "labels an aborted request as a timeout",
@@ -260,6 +272,39 @@ describe("Search Module", () => {
           "test",
         ),
       ).rejects.toThrow(expected);
+    });
+
+    it("labels a timeout that fires while the body is still arriving", async () => {
+      // The headers came back in time, then the body stalled until the
+      // request timer aborted it.
+      mockFetch.mockImplementation(
+        async (_url: string, init: { signal: AbortSignal }) => ({
+          ok: true,
+          json: () =>
+            new Promise((_resolve, reject) => {
+              init.signal.addEventListener("abort", () =>
+                reject(
+                  new DOMException("The user aborted a request.", "AbortError"),
+                ),
+              );
+            }),
+        }),
+      );
+      vi.useFakeTimers();
+      try {
+        const search = searchModule.searchServiceInstance
+          .performSearch<string[][]>("text", "test")
+          .catch((caught: Error) => caught);
+        await vi.advanceTimersByTimeAsync(30 * 1000);
+
+        const error = await search;
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe(
+          "Request timeout - server did not respond within 30 seconds",
+        );
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
