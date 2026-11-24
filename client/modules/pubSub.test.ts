@@ -83,3 +83,88 @@ describe("PubSub localStorage persistence", () => {
     );
   });
 });
+
+describe("numeric settings never hold an empty string", () => {
+  it("clearing the context length stores the default number", async () => {
+    const { updateSettings, getSettings } = await import("./pubSub");
+    const { defaultSettings } = await import("./settings");
+    updateSettings({
+      ...getSettings(),
+      openAiContextLength: "" as unknown as number,
+    });
+    expect(getSettings().openAiContextLength).toBe(
+      defaultSettings.openAiContextLength,
+    );
+    const stored = JSON.parse(localStorage.getItem("settings") as string);
+    expect(stored.openAiContextLength).toBe(
+      defaultSettings.openAiContextLength,
+    );
+  });
+
+  it("clearing CPU threads, max entries or retention days stores the default number", async () => {
+    const { updateSettings, getSettings } = await import("./pubSub");
+    const { defaultSettings } = await import("./settings");
+    updateSettings({
+      ...getSettings(),
+      cpuThreads: "" as unknown as number,
+      historyMaxEntries: "" as unknown as number,
+      historyRetentionDays: "" as unknown as number,
+    });
+    expect(getSettings().cpuThreads).toBe(defaultSettings.cpuThreads);
+    expect(getSettings().historyMaxEntries).toBe(
+      defaultSettings.historyMaxEntries,
+    );
+    expect(getSettings().historyRetentionDays).toBe(
+      defaultSettings.historyRetentionDays,
+    );
+  });
+
+  it("keeps history retention cleanup enabled when a stored retention is empty", async () => {
+    const { defaultSettings } = await import("./settings");
+    localStorage.setItem(
+      "settings",
+      JSON.stringify({ ...defaultSettings, historyRetentionDays: "" }),
+    );
+    const { getSettings } = await import("./pubSub");
+    expect(getSettings().historyRetentionDays).toBeGreaterThan(0);
+  });
+
+  it("repairs a stored empty string on load without a migration", async () => {
+    const { defaultSettings } = await import("./settings");
+    localStorage.setItem(
+      "settings",
+      JSON.stringify({
+        ...defaultSettings,
+        openAiContextLength: "",
+        cpuThreads: "",
+        historyMaxEntries: "",
+      }),
+    );
+    const { getSettings } = await import("./pubSub");
+    expect(getSettings()).toMatchObject({
+      openAiContextLength: defaultSettings.openAiContextLength,
+      cpuThreads: defaultSettings.cpuThreads,
+      historyMaxEntries: defaultSettings.historyMaxEntries,
+    });
+  });
+
+  it("sends the default max_tokens and sizes the excerpt budget from the default when a stored context length is empty", async () => {
+    const { defaultSettings } = await import("./settings");
+    localStorage.setItem(
+      "settings",
+      JSON.stringify({
+        ...defaultSettings,
+        inferenceType: "openai",
+        openAiContextLength: "",
+      }),
+    );
+    const {
+      getDefaultChatCompletionCreateParamsStreaming,
+      getEffectiveContextSize,
+    } = await import("./textGenerationUtilities");
+    expect(getDefaultChatCompletionCreateParamsStreaming().max_tokens).toBe(
+      defaultSettings.openAiContextLength,
+    );
+    expect(getEffectiveContextSize()).toBe(defaultSettings.openAiContextLength);
+  });
+});

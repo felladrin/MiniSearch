@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- Clearing the context length, CPU threads, history max entries or history retention field no longer saves an empty value. It now falls back to the default number, and an empty value already saved in the browser is repaired when the app loads, so AI answers keep their token budget and history cleanup keeps running.
 - Restoring a saved search that has no saved results and no saved answer (a failed search, a search with zero results and AI answers off, an abandoned search) no longer appends a duplicate entry to the history nor starts a new live search. The same happened when Regenerate was clicked, or the "enable AI response" prompt accepted, after restoring an entry. The restored query is now treated as handled, like a submitted or auto-searched one.
 - When the browser blocks site data (for example Safari "Block All Cookies" or Chrome "sites can't save data"), the app no longer crashes on load with a blank page. Settings and other persisted values stay in memory for the session and simply do not write through.
 
