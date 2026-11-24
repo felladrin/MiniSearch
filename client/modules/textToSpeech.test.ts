@@ -212,6 +212,18 @@ describe("prepareTextForSpeech", () => {
       "Title\nSee (the docs) now",
     );
   });
+
+  it("returns an empty string when the reasoning block never closed", () => {
+    const text = "<think>The user wants the capital. Maybe Paris?";
+    expect(tts.prepareTextForSpeech(text, "<think>", "</think>")).toBe("");
+  });
+
+  it("keeps a marker mentioned mid-answer as plain text", () => {
+    const text = "Models wrap reasoning in <think> tags like this.";
+    expect(tts.prepareTextForSpeech(text, "<think>", "</think>")).toBe(
+      "Models wrap reasoning in <think> tags like this.",
+    );
+  });
 });
 
 describe("splitIntoSentences", () => {
@@ -295,6 +307,17 @@ describe("speak", () => {
 
     expect(worker.sent).toEqual([]);
     expect(spoken).toEqual(["Hello there."]);
+  });
+
+  it("creates no utterance and never enters the speaking state for an open reasoning block", async () => {
+    const worker = createFakeWorker();
+    tts.setWorkerFactory(() => worker as unknown as Worker);
+
+    await tts.speak("<think>The user wants the capital. Maybe Paris?");
+
+    expect(worker.sent).toEqual([]);
+    expect(spoken).toEqual([]);
+    expect(mockUpdateState).not.toHaveBeenCalled();
   });
 
   it("does not fall back after audio has started", async () => {

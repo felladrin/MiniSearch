@@ -2,6 +2,7 @@ import { addLogEntry } from "./logEntries";
 import type { Voice, VoiceId } from "./piper";
 import { voices } from "./piper";
 import { getSettings, updateTextToSpeechState } from "./pubSub";
+import { splitReasoning } from "./reasoning";
 import type {
   WorkerRequest,
   WorkerResponse,
@@ -27,31 +28,23 @@ export interface VoiceOption {
   languageName?: string;
 }
 
-/** The markers come from user settings, so a character like `(` must not be read as syntax. */
-function escapeForRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /**
- * Strips reasoning blocks, links and markdown punctuation so both engines are
- * fed the same plain text.
+ * Strips the reasoning block, links and markdown punctuation so both engines
+ * are fed the same plain text. The reasoning rule is the UI's shared one: only
+ * a block at the start of the response counts, and an unterminated one has no
+ * answer to speak.
  */
 export function prepareTextForSpeech(
   text: string,
   reasoningStartMarker: string,
   reasoningEndMarker: string,
 ): string {
-  const withoutReasoning = text.replace(
-    new RegExp(
-      `${escapeForRegExp(reasoningStartMarker)}[\\s\\S]*?${escapeForRegExp(reasoningEndMarker)}`,
-      "g",
-    ),
-    "",
+  const { answer } = splitReasoning(
+    text,
+    reasoningStartMarker,
+    reasoningEndMarker,
   );
-  const withoutLinks = withoutReasoning.replace(
-    /\[([^\]]+)\]\([^)]+\)/g,
-    "($1)",
-  );
+  const withoutLinks = answer.replace(/\[([^\]]+)\]\([^)]+\)/g, "($1)");
   return withoutLinks.replace(/[#*`_~[\]]/g, "").trim();
 }
 
