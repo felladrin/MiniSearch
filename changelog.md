@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- Requests to an OpenAI-compatible backend and to the internal API no longer ask for an answer as long as the whole context window. `max_tokens` used to be the full Context Length, so prompt plus answer could not fit, and backends that check the sum rejected the request or cut the answer short. It is now what the window has left after the prompt, at least 64 tokens, measured against the same window the page excerpts and chat history use.
 - Restoring a saved search that has no saved results and no saved answer (a failed search, a search with zero results and AI answers off, an abandoned search) no longer appends a duplicate entry to the history nor starts a new live search. The same happened when Regenerate was clicked, or the "enable AI response" prompt accepted, after restoring an entry. The restored query is now treated as handled, like a submitted or auto-searched one.
 - When the browser blocks site data (for example Safari "Block All Cookies" or Chrome "sites can't save data"), the app no longer crashes on load with a blank page. Settings and other persisted values stay in memory for the session and simply do not write through.
 
