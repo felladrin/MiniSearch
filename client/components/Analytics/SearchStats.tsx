@@ -14,7 +14,7 @@ import { IconSearch } from "@tabler/icons-react";
 import { useMemo } from "react";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
 import type { SearchEntry } from "@/modules/history";
-import { buildActivity } from "@/modules/searchActivity";
+import { buildActivity, localKey, startOfDay } from "@/modules/searchActivity";
 import { formatRelativeTime } from "@/modules/stringFormatters";
 import ActivityHeatmap from "./ActivityHeatmap";
 
@@ -96,7 +96,8 @@ export default function SearchStats({
 
     const dateCounts = new Map<string, number>();
     filteredSearches.forEach((search) => {
-      const date = new Date(search.timestamp).toISOString().split("T")[0];
+      // Local day, like the hour math below and the heatmap's active days.
+      const date = localKey(startOfDay(search.timestamp));
       dateCounts.set(date, (dateCounts.get(date) || 0) + 1);
     });
 

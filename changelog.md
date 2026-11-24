@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- Daily Average in the History analytics now counts days by your local calendar, like Most Active Hour and the activity heatmap. It used to split days at UTC midnight, so outside UTC, searches made late at night or early in the morning could land on a different day, lower the average and disagree with the heatmap's active days.
 - An image-result thumbnail larger than 500 KB is no longer shown cut off. The server used to send the first 500 KB of it as if it were the whole image and keep that copy for an hour, so the tile showed a damaged picture (a JPEG lost everything below the cut, other formats could fail to show at all). Such a thumbnail is now refused, and the tile shows the site's name, like other thumbnails that cannot be loaded.
 - Turning off "Enable Search History" now stops saving searches. After a reload with the setting off, every search, its results, the AI answer and follow-up chat messages were still written to the browser's storage, while the History drawer that could show or delete them stayed hidden. Nothing is read from or written to the history while the setting is off.
 - Clearing the context length, CPU threads, history max entries or history retention field no longer saves an empty value. It now falls back to the default number, and an empty value already saved in the browser is repaired when the app loads, so AI answers keep their token budget and history cleanup keeps running.
