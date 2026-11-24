@@ -81,7 +81,7 @@ function ensureSseHeaders(response: ServerResponse): void {
   if (response.headersSent) return;
 
   response.setHeader("Content-Type", "text/event-stream");
-  response.setHeader("Cache-Control", "no-cache");
+  response.setHeader("Cache-Control", "no-store");
   response.setHeader("Connection", "keep-alive");
 }
 
@@ -143,6 +143,8 @@ export function internalApiEndpointServerHook<
       if (new URL(request.url, "http://localhost").pathname !== "/inference") {
         return next();
       }
+
+      response.setHeader("Cache-Control", "no-store");
 
       if (request.method !== "POST") {
         response.setHeader("Allow", "POST");

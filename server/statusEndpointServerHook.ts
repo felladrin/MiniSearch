@@ -44,6 +44,8 @@ export function statusEndpointServerHook<
       return next();
     }
 
+    response.setHeader("Cache-Control", "no-store");
+
     const sessions = getVerifiedTokensAmount();
     const textualSearches = getTextualSearchesSinceLastRestart();
     const graphicalSearches = getGraphicalSearchesSinceLastRestart();
