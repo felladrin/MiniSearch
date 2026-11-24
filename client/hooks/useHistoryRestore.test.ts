@@ -1,12 +1,15 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ImageResults, SearchEntry, TextResults } from "@/modules/history";
+import { getLatestLlmResponseForEntry } from "@/modules/history";
 import {
   getLlmTextSearchResults,
+  getSuppressNextFollowUp,
   imageSearchResultsPubSub,
   imageSearchStatePubSub,
   textSearchResultsPubSub,
   updateImageSearchResults,
+  updateSuppressNextFollowUp,
 } from "@/modules/pubSub";
 import { useHistoryRestore } from "./useHistoryRestore";
 
@@ -67,6 +70,8 @@ const expectedImages = [
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.mocked(getLatestLlmResponseForEntry).mockResolvedValue(null);
+  updateSuppressNextFollowUp(false);
   updateImageSearchResults([
     ["Previous image", "old.png", "old-thumb.png", ""],
   ]);
@@ -128,5 +133,21 @@ describe("useHistoryRestore", () => {
 
     expect(imageSearchResultsPubSub[2]()).toEqual([]);
     expect(imageSearchStatePubSub[2]()).toBe("completed");
+  });
+
+  it("leaves suppressNextFollowUp false when the restored entry has no saved response", async () => {
+    await restoreEntry({ textResults });
+
+    expect(getSuppressNextFollowUp()).toBe(false);
+  });
+
+  it("sets suppressNextFollowUp true when the restored entry has a saved response", async () => {
+    vi.mocked(getLatestLlmResponseForEntry).mockResolvedValueOnce(
+      "Saved AI answer.",
+    );
+
+    await restoreEntry({ textResults });
+
+    expect(getSuppressNextFollowUp()).toBe(true);
   });
 });
