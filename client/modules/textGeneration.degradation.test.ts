@@ -11,6 +11,7 @@ const harness = vi.hoisted(() => {
     pageContents: {} as Record<string, string>,
     searchRunId: "run-1",
     staleFlag: false,
+    suppressNextFollowUp: false,
     searchPromise: Promise.resolve({}) as Promise<unknown>,
     settings: {
       inferenceType: "internal",
@@ -57,6 +58,9 @@ vi.mock("./pubSub", () => ({
   },
   updateSearchPromise: (promise: Promise<unknown>) => {
     harness.state.searchPromise = promise;
+  },
+  updateSuppressNextFollowUp: (value: boolean) => {
+    harness.state.suppressNextFollowUp = value;
   },
   updateTextGenerationState: (value: string) => {
     harness.state.textGenerationState = value;
@@ -429,6 +433,15 @@ describe("search degradation", () => {
     expect(harness.state.textSearchResults).toEqual([]);
     expect(harness.state.llmTextSearchResults).toEqual([]);
     expect(harness.state.textSearchState).toBe("failed");
+  });
+
+  it("resets suppressNextFollowUp so a prior restore does not suppress the next search", async () => {
+    harness.state.suppressNextFollowUp = true;
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(harness.state.suppressNextFollowUp).toBe(false);
   });
 });
 

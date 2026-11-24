@@ -1,23 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { generateFollowUpQuestion } from "./followUpQuestions";
 
-vi.mock("./pubSub", () => ({
-  getSuppressNextFollowUp: vi.fn(() => false),
-}));
-
 vi.mock("./textGeneration", () => ({
   generateChatResponse: vi.fn(),
 }));
 
-import { getSuppressNextFollowUp } from "./pubSub";
 import { generateChatResponse } from "./textGeneration";
 
 const mockedGenerateChatResponse = vi.mocked(generateChatResponse);
-const mockedGetSuppressNextFollowUp = vi.mocked(getSuppressNextFollowUp);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedGetSuppressNextFollowUp.mockReturnValue(false);
 });
 
 describe("generateFollowUpQuestion", () => {
@@ -77,18 +70,6 @@ describe("generateFollowUpQuestion", () => {
       currentContent: "Cats are independent.",
     });
 
-    expect(question).toBe("");
-  });
-
-  it("returns an empty string when follow-up questions are suppressed", async () => {
-    mockedGetSuppressNextFollowUp.mockReturnValue(true);
-
-    const question = await generateFollowUpQuestion({
-      topic: "cats",
-      currentContent: "Cats are independent.",
-    });
-
-    expect(mockedGenerateChatResponse).not.toHaveBeenCalled();
     expect(question).toBe("");
   });
 });

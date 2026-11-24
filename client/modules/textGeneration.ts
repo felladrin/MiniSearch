@@ -24,6 +24,7 @@ import {
   updatePageContents,
   updateResponse,
   updateSearchPromise,
+  updateSuppressNextFollowUp,
   updateTextGenerationState,
   updateTextSearchResults,
   updateTextSearchStale,
@@ -256,6 +257,8 @@ export async function searchAndRespond() {
   updateImageSearchResults([]);
 
   updateChatMessages([]);
+
+  updateSuppressNextFollowUp(false);
 
   updatePageContents({});
 

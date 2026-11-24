@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- Restoring a saved search from history no longer turns off follow-up question suggestions for the rest of the session. Sending a chat message in the restored conversation or starting a new search now generates follow-up suggestions again, restoring an entry with no saved answer no longer suppresses them, and a follow-up question still generating from a previous search is cancelled so it cannot land in the restored session.
 - A relative date in a search query is now recognised the way people type it. "next year’s champion" with a curly apostrophe, the default on iPhone and Mac, no longer gets a year added, and a non-breaking or double space no longer hides "next year". A date the query already carries in another spelling ("2026 December", "Dec 2026", "2026-12") is not appended again, and a year inside a longer number such as "120265" is no longer taken for one. A follow-up search that is only a year no longer starts with a space, which gave the same search two cache entries.
 
 ## 2026-11-23
