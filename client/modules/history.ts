@@ -1,5 +1,6 @@
 import Dexie, { type Table } from "dexie";
 import { addLogEntry } from "./logEntries";
+import { getSettings } from "./pubSub";
 
 let currentSearchRunId: string | null = null;
 
@@ -12,6 +13,17 @@ export function getCurrentSearchRunId(): string {
     currentSearchRunId = generateSearchRunId();
   }
   return currentSearchRunId;
+}
+
+/**
+ * History is on unless the user turned it off. The check guards every read and
+ * write instead of relying on the database being closed: Dexie opens a
+ * database that was never opened on its first query, so skipping `open()` at
+ * startup does not keep searches out of IndexedDB. Settings saved before the
+ * toggle existed have no value, which counts as on, like the default.
+ */
+export function isHistoryEnabled(): boolean {
+  return getSettings().enableHistory !== false;
 }
 
 export function setCurrentSearchRunId(id: string): void {
@@ -131,7 +143,6 @@ class HistoryDatabase extends Dexie {
 
   async performCleanup(): Promise<void> {
     try {
-      const { getSettings } = await import("./pubSub");
       const globalSettings = getSettings();
       const settings = {
         autoCleanup: globalSettings.historyAutoCleanup,
@@ -213,6 +224,7 @@ export async function updateSearchResults(
   searchRunId: string,
   results: TextResults | ImageResults,
 ): Promise<void> {
+  if (!isHistoryEnabled()) return;
   try {
     await measurePerformance("Update search results", async () => {
       const latest = await historyDatabase.searches
@@ -240,6 +252,7 @@ export async function addSearchToHistory(
   results: TextResults | ImageResults,
   source: "user" | "followup" | "suggestion" = "user",
 ): Promise<number | undefined> {
+  if (!isHistoryEnabled()) return undefined;
   try {
     const id = await measurePerformance("Add search to history", async () => {
       return await historyDatabase.searches.add({
@@ -282,6 +295,7 @@ export async function saveLlmResponseForQuery(
   response: string,
   model: string = "",
 ): Promise<void> {
+  if (!isHistoryEnabled()) return;
   try {
     const searchRunId = getCurrentSearchRunId();
     const latest = await historyDatabase.searches
@@ -329,6 +343,7 @@ export async function saveChatMessageForQuery(
   role: "user" | "assistant",
   content: string,
 ): Promise<void> {
+  if (!isHistoryEnabled()) return;
   try {
     const searchRunId = getCurrentSearchRunId();
     await historyDatabase.chatHistory.add({

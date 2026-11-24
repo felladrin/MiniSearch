@@ -14,6 +14,10 @@ The `HistoryDatabase` Dexie instance stores three related tables:
 
 All three tables share a `searchRunId` foreign key so restoring a specific run can bring back the search results, saved AI response, and chat transcript atomically.
 
+## Disabled History
+
+When `enableHistory` is off, `isHistoryEnabled()` makes every history write (`addSearchToHistory`, `updateSearchResults`, `saveLlmResponseForQuery`, `saveChatMessageForQuery`, the follow-up question chat entries) and the `useSearchHistory` reads return without touching IndexedDB. Skipping `historyDatabase.open()` at startup is not enough on its own: Dexie opens a database that was never opened on its first query, so the setting, not the open state, decides.
+
 ## Cleanup Guarantees
 
 To keep IndexedDB lean, inserts trigger `performCleanup()`, which enforces:

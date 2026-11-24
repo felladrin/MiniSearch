@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getSettings } from "./pubSub";
 
 // Pin auto-cleanup off and avoid pubSub's module-level localStorage reads.
 vi.mock("./pubSub", () => ({
@@ -605,5 +606,66 @@ describe("History Module - Dexie CRUD", () => {
       expect(await historyDatabase.llmResponses.count()).toBe(0);
       expect(await historyDatabase.chatHistory.count()).toBe(0);
     });
+  });
+});
+
+describe("History Module - Enable Search History off", () => {
+  const settingsMock = vi.mocked(getSettings);
+  const historyOn = settingsMock.getMockImplementation();
+  const textResults = {
+    type: "text" as const,
+    items: [{ title: "T", url: "https://t.com", snippet: "S" }],
+  };
+
+  beforeEach(async () => {
+    const { historyDatabase } = await import("./history");
+    await historyDatabase.searches.clear();
+    await historyDatabase.llmResponses.clear();
+    await historyDatabase.chatHistory.clear();
+    settingsMock.mockImplementation(
+      () =>
+        ({
+          ...historyOn?.(),
+          enableHistory: false,
+        }) as ReturnType<typeof getSettings>,
+    );
+  });
+
+  afterEach(async () => {
+    if (historyOn) settingsMock.mockImplementation(historyOn);
+    const { historyDatabase } = await import("./history");
+    if (!historyDatabase.isOpen()) await historyDatabase.open();
+  });
+
+  it("writes no search, result, answer or chat message", async () => {
+    const {
+      addSearchToHistory,
+      getCurrentSearchRunId,
+      historyDatabase,
+      saveChatMessageForQuery,
+      saveLlmResponseForQuery,
+      updateSearchResults,
+    } = await import("./history");
+
+    const id = await addSearchToHistory("private query", textResults);
+    await updateSearchResults(getCurrentSearchRunId(), textResults);
+    await saveLlmResponseForQuery("private query", "answer", "m");
+    await saveChatMessageForQuery("private query", "user", "follow-up");
+
+    expect(id).toBeUndefined();
+    expect(await historyDatabase.searches.count()).toBe(0);
+    expect(await historyDatabase.llmResponses.count()).toBe(0);
+    expect(await historyDatabase.chatHistory.count()).toBe(0);
+  });
+
+  it("does not open a database the app never opened", async () => {
+    // The state at startup with history off: index.tsx skips open(), and
+    // Dexie would open the database on the first query.
+    const { addSearchToHistory, historyDatabase } = await import("./history");
+    historyDatabase.close({ disableAutoOpen: false });
+
+    await addSearchToHistory("private query", textResults);
+
+    expect(historyDatabase.isOpen()).toBe(false);
   });
 });
