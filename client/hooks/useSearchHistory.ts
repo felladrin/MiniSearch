@@ -244,7 +244,9 @@ export function useSearchHistory(
     async (searchId: number) => {
       try {
         const search = await historyDatabase.searches.get(searchId);
-        await historyDatabase.searches.delete(searchId);
+        if (search) {
+          await historyDatabase.deleteSearchesWithChildren([search]);
+        }
         await refreshHistory();
 
         if (search) {

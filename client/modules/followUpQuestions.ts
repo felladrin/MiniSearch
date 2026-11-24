@@ -1,24 +1,6 @@
-import { historyDatabase, isHistoryEnabled } from "./history";
 import { addLogEntry } from "./logEntries";
 import { generateChatResponse } from "./textGeneration";
 import type { ChatMessage } from "./types";
-
-async function saveChatHistoryEntry(
-  role: "user" | "assistant",
-  content: string,
-) {
-  if (!isHistoryEnabled()) return;
-  await historyDatabase.chatHistory
-    .add({
-      role,
-      content,
-      timestamp: Date.now(),
-      conversationId: `follow-up-${Date.now()}`,
-    })
-    .catch((error) => {
-      addLogEntry(`Error saving chat history: ${error}`);
-    });
-}
 
 interface FollowUpQuestionParams {
   topic: string;
@@ -33,8 +15,6 @@ export async function generateFollowUpQuestion({
 }: FollowUpQuestionParams): Promise<string> {
   try {
     addLogEntry("Generating a follow-up question");
-
-    await saveChatHistoryEntry("user", topic);
 
     const promptMessages: ChatMessage[] = [
       {
@@ -80,8 +60,6 @@ Respond with just the question, no additional text or explanations.`,
 
     const response = await generateChatResponse(promptMessages, () => {});
 
-    await saveChatHistoryEntry("assistant", response);
-
     const lines = response
       .trim()
       .split("\n")
@@ -104,8 +82,6 @@ Respond with just the question, no additional text or explanations.`,
     questionLine = questionLine.charAt(0).toUpperCase() + questionLine.slice(1);
 
     addLogEntry("Generated follow-up question successfully");
-
-    await saveChatHistoryEntry("assistant", questionLine);
 
     return questionLine;
   } catch (error) {
