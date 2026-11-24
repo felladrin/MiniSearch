@@ -138,7 +138,9 @@ the existing per-page character cap and cross-page duplicate suppression.
 
 Pools above 256 passages keep the exact lexical ranking of the whole pool;
 they are not truncated to a shortlist. An unloaded model (empty dense scores)
-or a scoring error also keeps lexical ranking. Errors log a fixed diagnostic
+or a scoring error also keeps lexical ranking, and so does a scoring request
+the worker has not answered within 10 seconds (`SCORE_TIMEOUT_MS`), so a worker
+that is alive but stuck cannot hold page-content reads. Errors log a fixed diagnostic
 without query, URL, passage text or model error details.
 
 Dense scoring runs in a worker thread (`server/biEncoderWorker.ts`), not on
