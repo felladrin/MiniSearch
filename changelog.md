@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-23
 
+- Saved searches in the History drawer can now be restored with the keyboard. The query used to be a plain card that only a click could activate, so Tab skipped it; it is now a button that Enter and Space activate, separate from the pin and delete buttons.
 - When the in-browser AI model fails during its warm-up, the model and its worker are now released, so the failed start no longer keeps the model's memory allocated until the page is reloaded. The original error is still the one reported, and the log says if the release itself failed.
 - When the access key cannot be checked because the server is unreachable, the access page now says "Could not reach the server. Please try again." instead of "Invalid access key", so a network problem no longer looks like a wrong key. Access still stays closed until the key is checked.
 - With the AI Horde engine, the answer card and its Stop button now appear as soon as the request is queued, instead of a loading skeleton for the whole wait, which can take minutes. Stop now works during that wait, and it also cancels the queued job on the Horde, so a stopped answer no longer keeps spending kudos.

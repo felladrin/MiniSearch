@@ -141,6 +141,44 @@ describe("HistoryDrawer component", () => {
     expect(onSearchSelect).toHaveBeenCalledWith(entry);
   });
 
+  it("selects an entry once when its query is clicked", async () => {
+    const onSearchSelect = vi.fn();
+    const entry = makeEntry(1, "quantum tunneling");
+    mockHistory({ filteredSearches: [entry] });
+
+    const user = userEvent.setup();
+    renderDrawer(onSearchSelect);
+    await user.click(
+      await screen.findByRole("button", { name: /quantum tunneling/ }),
+    );
+
+    expect(onSearchSelect).toHaveBeenCalledTimes(1);
+    expect(onSearchSelect).toHaveBeenCalledWith(entry);
+  });
+
+  it("selects an entry from the keyboard", async () => {
+    const onSearchSelect = vi.fn();
+    const entry = makeEntry(1, "quantum tunneling");
+    mockHistory({ filteredSearches: [entry] });
+
+    const user = userEvent.setup();
+    renderDrawer(onSearchSelect);
+    const queryButton = await screen.findByRole("button", {
+      name: /quantum tunneling/,
+    });
+
+    for (let i = 0; i < 10 && document.activeElement !== queryButton; i++) {
+      await user.tab();
+    }
+    expect(queryButton).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    await user.keyboard(" ");
+
+    expect(onSearchSelect).toHaveBeenCalledTimes(2);
+    expect(onSearchSelect).toHaveBeenCalledWith(entry);
+  });
+
   it("pins an entry without selecting it", async () => {
     const onSearchSelect = vi.fn();
     const entry = makeEntry(1, "quantum tunneling");
