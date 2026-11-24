@@ -4,6 +4,8 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- When the browser blocks site data (for example Safari "Block All Cookies" or Chrome "sites can't save data"), the app no longer crashes on load with a blank page. Settings and other persisted values stay in memory for the session and simply do not write through.
+
 - Search results, page contents, AI answers, the status report and access key checks are now sent with `Cache-Control: no-store`, errors included, so a shared cache or proxy in front of the server can no longer keep them. In production the access key and AI answer responses used to be marked as publicly cacheable for 24 hours, and the search, page content and status responses carried no caching directive at all. The AI answer stream changes from `no-cache` to `no-store`.
 - "Clear all data" now finishes resetting and reloads the page even when Cache Storage is unavailable (such as on a plain HTTP LAN deployment) or when clearing a cache or the in-browser AI model cache fails. It also releases the temporary Wllama worker after clearing the model cache instead of leaving it alive until the reload.
 - A failed or empty conversation summary fold no longer erases the summary already built for a long chat. When summarizing older turns fails and the fallback returns empty (for example after dropping a very long message) or the model returns an empty summary, MiniSearch keeps the existing stored summary and includes it in the prompt for the current turn.

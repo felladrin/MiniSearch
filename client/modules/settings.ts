@@ -10,6 +10,7 @@ import {
 } from "@shared/serverConfig";
 import { FALLBACK_CONFIG } from "./config";
 import { addLogEntry } from "./logEntries";
+import * as safeStorage from "./safeStorage";
 
 export const SETTINGS_STORAGE_KEY = "settings";
 
@@ -20,7 +21,7 @@ export const SETTINGS_STORAGE_KEY = "settings";
  * that happens to equal a default.
  */
 export const hasStoredUserSettings =
-  localStorage.getItem(SETTINGS_STORAGE_KEY) !== null;
+  safeStorage.getItem(SETTINGS_STORAGE_KEY) !== null;
 
 /**
  * Whether this profile picked an OS voice before the local engine existed.
@@ -31,7 +32,7 @@ export const hasStoredUserSettings =
 const hasLegacySystemVoice = (() => {
   try {
     const stored: unknown = JSON.parse(
-      localStorage.getItem(SETTINGS_STORAGE_KEY) ?? "{}",
+      safeStorage.getItem(SETTINGS_STORAGE_KEY) ?? "{}",
     );
     if (typeof stored !== "object" || stored === null) return false;
     const { selectedVoiceId, textToSpeechEngine } = stored as Record<
