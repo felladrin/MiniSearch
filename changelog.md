@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- The History drawer's Analytics tab now counts every saved search. It read only the newest 1,000, so with a longer history (Maximum Entries goes up to 10,000) Total Searches stopped at 1,000, and Daily Average, Most Active Hour, Search Sources and the activity heatmap left out everything older. The tab now reads only the time and source of each search, never the saved results.
 - A page load where the server configuration could not be fetched no longer saves the shipped defaults as the browser's settings. On a first visit that failure used to lock in the built-in model and inference type, so the server's own defaults were never applied to that browser afterwards. The model the app switches to when the saved one has left the catalog follows the same rule: it is saved only when the server's configuration was available.
 - The suggestion shown in an empty search box now uses up one stored suggestion each time the box is emptied, and the suggestions are drawn evenly from the whole list. Deleting the last character or pressing Clear used to use up two and show one, and when none were stored it fetched the list twice at the same moment. The shuffle also favoured entries near the top of the list, so some suggestions came up far more often than others.
 
