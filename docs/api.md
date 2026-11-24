@@ -284,7 +284,10 @@ and `Cache-Control: private, max-age=3600`.
 The fetch is bounded by a 3 s deadline covering DNS and every hop, at most 3
 redirects, each of them re-validated, and 500 KB of body; a larger image is
 refused rather than served cut off. Successful fetches are held in an
-in-process LRU (100 entries, 50 MB); failures never are.
+in-process LRU (100 entries, 50 MB); failures never are. The upstream request
+carries the same `User-Agent` as page reads (name, version and repository URL
+from `package.json`), since some image hosts, such as `upload.wikimedia.org`,
+answer a request without one with 403.
 
 | Status | Body                                                                                  | When                                                                                                                                                                                  |
 | ------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

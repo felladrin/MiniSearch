@@ -145,13 +145,15 @@ describe("requestPinnedToVettedAddress", () => {
     expect(httpsRequestMock).not.toHaveBeenCalled();
   });
 
-  it("dials the pinned address end-to-end while the server sees the original Host", async () => {
+  it("dials the pinned address end-to-end while the server sees the original Host and the User-Agent", async () => {
     // pinned-host.test has no DNS record: the request can only succeed if
     // the socket goes where the pin says, not where a resolver would.
     let seenHost = "";
+    let seenUserAgent = "";
     let seenTarget = "";
     const server = http.createServer((request, response) => {
       seenHost = request.headers.host ?? "";
+      seenUserAgent = request.headers["user-agent"] ?? "";
       seenTarget = request.url ?? "";
       response.writeHead(200, { "content-type": "image/png" });
       response.end(Buffer.from([9, 8, 7]));
@@ -169,6 +171,10 @@ describe("requestPinnedToVettedAddress", () => {
       expect(response.statusCode).toBe(200);
       expect(Array.from(bytes)).toEqual([9, 8, 7]);
       expect(seenHost).toBe(`pinned-host.test:${port}`);
+      // upload.wikimedia.org answers a request without a User-Agent with 403.
+      expect(seenUserAgent).toMatch(
+        /^Mozilla\/5\.0 \(compatible; MiniSearch\/[^;]+; \+https:\/\/github\.com\/felladrin\/MiniSearch\)$/,
+      );
       expect(seenTarget).toBe("/img.png?v=1");
     } finally {
       server.close();
