@@ -1,5 +1,5 @@
 import { MantineProvider } from "@mantine/core";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ChatMessage } from "@/modules/types";
 import MessageList from "./MessageList";
@@ -52,6 +52,47 @@ describe("MessageList", () => {
       "what is the capital of France?",
     );
     expect(renderedQuestions).toHaveLength(2);
+  });
+
+  describe("an empty answer earlier in the chat", () => {
+    // An empty answer is saved when the stream ends with no content.
+    const messages: ChatMessage[] = [
+      { role: "user", content: "system instructions" },
+      { role: "assistant", content: "Ok!" },
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "" },
+      { role: "user", content: "Q2" },
+      { role: "assistant", content: "" },
+      { role: "user", content: "Q3" },
+      { role: "assistant", content: "A3" },
+    ];
+
+    it("edits each question at its position in the chat", () => {
+      const onEditMessage = vi.fn();
+      renderMessageList({ messages, onEditMessage });
+
+      const editButtons = screen.getAllByLabelText("Edit message");
+      expect(editButtons).toHaveLength(3);
+      for (const button of editButtons) fireEvent.click(button);
+
+      expect(onEditMessage.mock.calls).toEqual([[2], [4], [6]]);
+    });
+
+    it("keeps the Re-generate button on the last answer", () => {
+      const onRegenerate = vi.fn();
+      renderMessageList({ messages, onRegenerate });
+
+      fireEvent.click(screen.getByLabelText("Re-generate response"));
+
+      expect(onRegenerate).toHaveBeenCalledTimes(1);
+    });
+
+    it("renders no bubble for the empty answers", () => {
+      renderMessageList({ messages });
+
+      expect(screen.getAllByText(/^(Q1|Q2|Q3|A3)$/)).toHaveLength(4);
+      expect(document.querySelectorAll(".mantine-Paper-root")).toHaveLength(4);
+    });
   });
 
   describe("unterminated reasoning", () => {
