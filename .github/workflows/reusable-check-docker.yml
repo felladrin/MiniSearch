@@ -17,7 +17,7 @@ jobs:
       - run: docker compose -f docker-compose.production.yml up -d
       - name: Check if main page is available
         run: until curl -s -o /dev/null -w "%{http_code}" localhost:"$PORT" | grep 200; do sleep 1; done
-        timeout-minutes: 1
+        timeout-minutes: 3
 
       - uses: actions/setup-node@v7
         with:

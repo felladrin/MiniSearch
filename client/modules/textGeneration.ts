@@ -466,6 +466,18 @@ async function getKeywords(text: string, limit?: number) {
 }
 
 /**
+ * The text to search for a query over the server's 2000-character limit: its
+ * keywords, or the trimmed query when it has none (stopwords only) and fits.
+ * Empty when neither works.
+ */
+async function getLongQuerySearchText(query: string) {
+  const keywords = (await getKeywords(query, 20)).join(" ");
+  if (keywords) return keywords;
+  const trimmed = query.trim();
+  return trimmed.length <= 2000 ? trimmed : "";
+}
+
+/**
  * Reads the pages behind the top results so the answer is grounded on their
  * text instead of on search snippets alone. Awaited by the search promise, so
  * generation waits for it while the results are already on screen.
@@ -511,7 +523,7 @@ async function startTextSearch(query: string, invocation: number) {
   const asOf = new Date();
 
   const searchQuery = normalizeRelativeDates(
-    query.length > 2000 ? (await getKeywords(query, 20)).join(" ") : query,
+    query.length > 2000 ? await getLongQuerySearchText(query) : query,
     asOf,
     // The server rejects a longer query outright, so the anchor has to fit.
     { maxLength: 2000 },
@@ -525,21 +537,27 @@ async function startTextSearch(query: string, invocation: number) {
     updateTextSearchState("running");
 
     try {
-      let { results: textResults, stale } = await searchText(
-        searchQuery,
-        getSettings().searchResultsLimit,
-      );
+      // A query with no keywords left has nothing to send, which is an empty
+      // result set rather than a failed search.
+      let { results: textResults, stale } = searchQuery
+        ? await searchText(searchQuery, getSettings().searchResultsLimit)
+        : { results: [] as TextSearchResults, stale: false };
 
       if (textResults.length === 0) {
-        const queryKeywords = await getKeywords(query, 10);
-        const keywordOutcome = await searchText(
-          normalizeRelativeDates(queryKeywords.join(" "), asOf, {
-            maxLength: 2000,
-          }).searchQuery,
-          getSettings().searchResultsLimit,
-        );
-        textResults = keywordOutcome.results;
-        stale = keywordOutcome.stale;
+        const keywordQuery = normalizeRelativeDates(
+          (await getKeywords(query, 10)).join(" "),
+          asOf,
+          { maxLength: 2000 },
+        ).searchQuery;
+
+        if (keywordQuery) {
+          const keywordOutcome = await searchText(
+            keywordQuery,
+            getSettings().searchResultsLimit,
+          );
+          textResults = keywordOutcome.results;
+          stale = keywordOutcome.stale;
+        }
       }
 
       results.textResults = textResults;
@@ -566,7 +584,8 @@ async function startTextSearch(query: string, invocation: number) {
       // Started here but awaited last: only the AI answer waits on it, while
       // image search and the history write carry on.
       pageContentsRead = readPageContents(searchQuery, resultsForLlm);
-    } catch {
+    } catch (error) {
+      addLogEntry(`Text search failed: ${error}`);
       updateTextSearchStale(false);
       updateTextSearchState("failed");
       textSearchFailed = true;

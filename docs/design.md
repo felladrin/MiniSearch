@@ -21,7 +21,7 @@
 
 ### Performance
 
-- Lazy loading for routes and components with React.lazy()
+- Lazy loading with `React.lazy()` for code not needed on first paint (`AccessPage`, result and AI sections inside `MainPage`, drawers, modals, and `WllamaModelSelect`); `MainPage` is a static import
 - Optimized bundle size using Vite 8 build optimizations
 - Efficient state management with create-pubsub
 - Caching strategies for search results and AI responses
