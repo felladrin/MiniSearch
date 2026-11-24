@@ -1,9 +1,8 @@
 import { MantineProvider } from "@mantine/core";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import SearchForm, {
-  resetAutoSearchedQuery,
-} from "@/components/Search/Form/SearchForm";
+import SearchForm from "@/components/Search/Form/SearchForm";
+import { resetHandledQuery } from "@/modules/autoSearch";
 import { settingsPubSub } from "@/modules/pubSub";
 import { defaultSettings } from "@/modules/settings";
 import { searchAndRespond } from "@/modules/textGeneration";
@@ -91,7 +90,7 @@ const waitForPlaceholder = async () => {
 describe("SearchForm component", () => {
   beforeEach(() => {
     vi.mocked(searchAndRespond).mockClear();
-    resetAutoSearchedQuery();
+    resetHandledQuery();
     window.history.replaceState({}, "", "/");
   });
 
