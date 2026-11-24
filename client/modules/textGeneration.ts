@@ -435,10 +435,9 @@ export async function generateChatResponse(
     if (newMessages.length > processedMessages.length) {
       const droppedCount = newMessages.length - processedMessages.length;
       const droppedMessages = newMessages.slice(0, droppedCount);
-      const updatedSummary = await createLlmSummary(
-        droppedMessages,
-        existingSummary,
-      );
+      const updatedSummary =
+        (await createLlmSummary(droppedMessages, existingSummary)) ||
+        existingSummary;
       saveConversationSummary(updatedSummary, conversationId);
       systemPrompt = {
         role: "user",

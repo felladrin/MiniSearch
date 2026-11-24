@@ -61,7 +61,7 @@ vi.mock("./textGenerationWithOpenAi", () => ({
   generateChatWithOpenAi: vi.fn(),
 }));
 
-import { updateConversationSummary } from "./pubSub";
+import { getConversationSummary, updateConversationSummary } from "./pubSub";
 import { generateChatResponse } from "./textGeneration";
 import { generateChatWithOpenAi } from "./textGenerationWithOpenAi";
 import { generateChatWithWllama } from "./textGenerationWithWllama";
@@ -196,5 +196,60 @@ describe("generateChatResponse context budget", () => {
     expect(summarizer).toHaveLength(1);
     expect(summarizer[0][0].content).toContain("u".repeat(600));
     expect(summarizer[0][0].content).not.toContain("w".repeat(300));
+  });
+
+  it("keeps the stored summary when the summarizer rejects and the fallback returns empty", async () => {
+    state.systemPrompt = "s".repeat(3500);
+    const messages: ChatMessage[] = [
+      { role: "user", content: "first question" },
+      { role: "assistant", content: "x".repeat(900) },
+      { role: "user", content: "follow-up question" },
+    ];
+    vi.mocked(getConversationSummary).mockReturnValue({
+      conversationId: "first question",
+      summary: "S1",
+    });
+    vi.mocked(generateChatWithWllama).mockImplementation(async (chat) => {
+      if (chat[0].content.startsWith(summarizerInstruction)) {
+        throw new Error("summarizer unavailable");
+      }
+      return "the answer";
+    });
+
+    await generateChatResponse(messages, () => {});
+
+    expect(updateConversationSummary).toHaveBeenCalledWith({
+      conversationId: "first question",
+      summary: "S1",
+    });
+    const { answer } = callsTo(generateChatWithWllama);
+    expect(answer).toHaveLength(1);
+    expect(answer[0][0].content).toContain("S1");
+  });
+
+  it("keeps the stored summary when the summarizer resolves to an empty string", async () => {
+    state.systemPrompt = "s".repeat(3500);
+    const messages: ChatMessage[] = [
+      { role: "user", content: "first question" },
+      { role: "assistant", content: "x".repeat(900) },
+      { role: "user", content: "follow-up question" },
+    ];
+    vi.mocked(getConversationSummary).mockReturnValue({
+      conversationId: "first question",
+      summary: "S1",
+    });
+    vi.mocked(generateChatWithWllama).mockImplementation(async (chat) =>
+      chat[0].content.startsWith(summarizerInstruction) ? "" : "the answer",
+    );
+
+    await generateChatResponse(messages, () => {});
+
+    expect(updateConversationSummary).toHaveBeenCalledWith({
+      conversationId: "first question",
+      summary: "S1",
+    });
+    const { answer } = callsTo(generateChatWithWllama);
+    expect(answer).toHaveLength(1);
+    expect(answer[0][0].content).toContain("S1");
   });
 });
