@@ -12,7 +12,10 @@ import {
   readCappedStream,
   requestPinnedToVettedAddress,
 } from "./utils/pinnedFetch.ts";
-import { resolvePublicUrlAndAddress } from "./utils/publicUrl.ts";
+import {
+  resolvePublicUrlAndAddress,
+  resolveWithinDeadline,
+} from "./utils/publicUrl.ts";
 import { parseRequestUrl } from "./utils/requestUrl.ts";
 import { safeEndResponse } from "./utils/streamUtils.ts";
 import { thumbnailRateLimiter } from "./verifyTokenAndRateLimit.ts";
@@ -159,39 +162,6 @@ type ThumbnailOutcome =
 
 function isRedirect(status: number): boolean {
   return status >= 300 && status < 400 && status !== 304;
-}
-
-/**
- * `resolvePublicUrlAndAddress`'s DNS lookup does not take a signal, so it
- * is raced against the hop deadline: a hanging resolver would otherwise
- * add its own timeout on top of the one that is documented to bound the
- * whole chain.
- */
-function timeoutError(): Error {
-  const error = new Error("The operation was aborted");
-  error.name = "TimeoutError";
-  return error;
-}
-
-function resolveWithinDeadline<T>(
-  deadline: AbortSignal,
-  work: Promise<T>,
-): Promise<T> {
-  if (deadline.aborted) return Promise.reject(timeoutError());
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => reject(timeoutError());
-    deadline.addEventListener("abort", onAbort, { once: true });
-    work.then(
-      (value) => {
-        deadline.removeEventListener("abort", onAbort);
-        resolve(value);
-      },
-      (error) => {
-        deadline.removeEventListener("abort", onAbort);
-        reject(error);
-      },
-    );
-  });
 }
 
 /**

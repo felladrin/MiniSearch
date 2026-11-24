@@ -96,6 +96,25 @@ async function countOutcomes(url: string, breaker = new PageReadHostBreaker()) {
   };
 }
 
+/**
+ * `AbortSignal.timeout` runs on Node's own timer, which fake timers do not
+ * move, so a test that needs the 6 s deadline to pass hands out signals
+ * driven by the faked `setTimeout` instead of waiting it out for real.
+ */
+function useFakeDeadlines() {
+  return vi.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+    const controller = new AbortController();
+    setTimeout(
+      () =>
+        controller.abort(
+          new DOMException("The operation timed out.", "TimeoutError"),
+        ),
+      ms,
+    );
+    return controller.signal;
+  });
+}
+
 describe("extractReadableText", () => {
   it("keeps the article and drops site chrome, scripts and styles", () => {
     const text = extractReadableText(articlePage);
@@ -842,6 +861,24 @@ describe("page read counters", () => {
     ).toEqual({ failed: 1 });
   });
 
+  it("bounds a hanging DNS lookup with the same deadline and counts it as a timeout", async () => {
+    // Matches REQUEST_TIMEOUT_MS in pageContentService.ts.
+    const requestTimeoutMs = 6000;
+    lookupMock.mockImplementation(() => new Promise(() => {}));
+    vi.useFakeTimers();
+    const deadlines = useFakeDeadlines();
+    try {
+      const counted = countOutcomes("https://hanging-dns.example.com/");
+      await vi.advanceTimersByTimeAsync(requestTimeoutMs);
+
+      expect((await counted).skipped).toEqual({ timedOut: 1 });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      deadlines.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it("counts a page that yielded almost no text", async () => {
     respondWithHtml("<html><body><p>Accept cookies</p></body></html>");
 
@@ -978,6 +1015,32 @@ describe("host circuit breaker", () => {
     expect(
       (await countOutcomes("https://slow.example.com/d", breaker)).skipped,
     ).toEqual({ skippedByBreaker: 1 });
+  });
+
+  it("counts a DNS lookup that outlasts the deadline toward the box", async () => {
+    const breaker = new PageReadHostBreaker(breakerOptions);
+    lookupMock.mockImplementation(() => new Promise(() => {}));
+    const deadlines = useFakeDeadlines();
+    try {
+      for (const page of ["a", "b", "c"]) {
+        const counted = countOutcomes(
+          `https://hanging-dns.example.com/${page}`,
+          breaker,
+        );
+        await vi.advanceTimersByTimeAsync(6000);
+        await counted;
+      }
+    } finally {
+      deadlines.mockRestore();
+    }
+
+    lookupMock.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+    respondWithHtml(articlePage);
+    expect(
+      (await countOutcomes("https://hanging-dns.example.com/d", breaker))
+        .skipped,
+    ).toEqual({ skippedByBreaker: 1 });
+    expect(breaker.getOpens()).toBe(1);
   });
 
   it("does not count a dead link or a thin page, and either one ends a run of refusals", async () => {
