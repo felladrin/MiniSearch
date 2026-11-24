@@ -26,7 +26,7 @@ interface SearchStatsProps {
 interface StatsData {
   totalSearches: number;
   avgPerDay: number;
-  mostActiveHour: number;
+  mostActiveHour: number | null;
   topSources: { source: string; count: number; percentage: number }[];
   recentActivity: SearchEntry[];
 }
@@ -109,7 +109,8 @@ export default function SearchStats({
       const hour = new Date(search.timestamp).getHours();
       hourCounts[hour]++;
     });
-    const mostActiveHour = hourCounts.indexOf(Math.max(...hourCounts));
+    const mostActiveHour =
+      totalSearches > 0 ? hourCounts.indexOf(Math.max(...hourCounts)) : null;
 
     const sourceCounts = filteredSearches.reduce(
       (acc, search) => {
@@ -213,7 +214,11 @@ export default function SearchStats({
         />
         <MetricCard
           title="Most Active Hour"
-          value={formatHour(stats.mostActiveHour)}
+          value={
+            stats.mostActiveHour !== null
+              ? formatHour(stats.mostActiveHour)
+              : "-"
+          }
           compact={compact}
         />
         <MetricCard
