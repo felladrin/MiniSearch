@@ -7,6 +7,7 @@ import {
   type SearchEntry,
   type TextResults,
 } from "@/modules/history";
+import { getSettings } from "@/modules/pubSub";
 import * as stringFormatters from "@/modules/stringFormatters";
 import {
   FILTER_DEBOUNCE_MS,
@@ -83,6 +84,33 @@ async function settle() {
 }
 
 describe("useSearchHistory", () => {
+  it("leaves IndexedDB alone while history is turned off", async () => {
+    const settingsMock = vi.mocked(getSettings);
+    const historyOn = settingsMock.getMockImplementation();
+    settingsMock.mockImplementation(
+      () =>
+        ({
+          ...historyOn?.(),
+          enableHistory: false,
+        }) as ReturnType<typeof getSettings>,
+    );
+    const readSpy = vi.spyOn(historyModule, "getRecentSearches");
+
+    try {
+      const { result } = renderHook(() => useSearchHistory({ limit: 100 }));
+      await settle();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS);
+      });
+
+      expect(readSpy).not.toHaveBeenCalled();
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.recentSearches).toEqual([]);
+    } finally {
+      if (historyOn) settingsMock.mockImplementation(historyOn);
+    }
+  });
+
   it("reads IndexedDB only on load, never while typing", async () => {
     const readSpy = vi.spyOn(historyModule, "getRecentSearches");
 
