@@ -23,6 +23,7 @@ import {
   recordStreamEndedWithoutFinish,
 } from "./inferencesSinceLastRestart.ts";
 import { sendJsonError } from "./utils/httpResponse.ts";
+import { parseRequestUrl } from "./utils/requestUrl.ts";
 import {
   calculateBackoffTime,
   isResponseWritable,
@@ -154,12 +155,11 @@ export function internalApiEndpointServerHook<
         return;
       }
 
-      const hostHeader = request.headers.host;
-      const baseUrl =
-        typeof hostHeader === "string" && hostHeader.length > 0
-          ? `http://${hostHeader}`
-          : "http://localhost";
-      const url = new URL(request.url, baseUrl);
+      const url = parseRequestUrl(request);
+      if (!url) {
+        sendJsonError(response, 400, { error: "Malformed request" });
+        return;
+      }
       const token = url.searchParams.get("token");
       const { shouldContinue } = await handleTokenVerification(
         token,

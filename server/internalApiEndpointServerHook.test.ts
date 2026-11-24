@@ -1599,3 +1599,21 @@ describe("internalApiEndpointServerHook", () => {
     });
   });
 });
+
+describe("internalApiEndpointServerHook with a malformed Host header", () => {
+  it("answers 400 and keeps the handler promise from rejecting", async () => {
+    vi.mocked(handleTokenVerification).mockClear();
+    const request = createRequest({ messages: [] });
+    request.headers.host = "bad host";
+    const response = createResponse();
+    const next = vi.fn();
+
+    await expect(
+      getRegisteredHandler()(request, response, next),
+    ).resolves.toBeUndefined();
+
+    expect(response.statusCode).toBe(400);
+    expect(handleTokenVerification).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+});

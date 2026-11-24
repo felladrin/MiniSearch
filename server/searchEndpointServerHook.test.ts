@@ -939,3 +939,25 @@ describe("searchEndpointServerHook", () => {
     });
   });
 });
+
+describe("searchEndpointServerHook with a malformed Host header", () => {
+  it("answers 400 and keeps the handler promise from rejecting", async () => {
+    vi.mocked(handleTokenVerification).mockResolvedValue({
+      shouldContinue: true,
+    });
+    const request = {
+      url: "/search/text?q=cats&token=abc",
+      headers: { host: "bad host" },
+    } as unknown as IncomingMessage;
+    const response = createResponse();
+    const next = vi.fn();
+
+    await expect(
+      getRegisteredHandler()(request, response, next),
+    ).resolves.toBeUndefined();
+
+    expect(response.statusCode).toBe(400);
+    expect(handleTokenVerification).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+});

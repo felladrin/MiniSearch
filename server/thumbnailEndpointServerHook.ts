@@ -13,6 +13,7 @@ import {
   requestPinnedToVettedAddress,
 } from "./utils/pinnedFetch.ts";
 import { resolvePublicUrlAndAddress } from "./utils/publicUrl.ts";
+import { parseRequestUrl } from "./utils/requestUrl.ts";
 import { safeEndResponse } from "./utils/streamUtils.ts";
 import { thumbnailRateLimiter } from "./verifyTokenAndRateLimit.ts";
 
@@ -336,7 +337,11 @@ export function thumbnailEndpointServerHook<
     }
 
     try {
-      const url = new URL(request.url, `http://${request.headers.host}`);
+      const url = parseRequestUrl(request);
+      if (!url) {
+        serveError(response, 400, "Malformed request");
+        return;
+      }
 
       const { shouldContinue } = await handleTokenVerification(
         url.searchParams.get("token"),

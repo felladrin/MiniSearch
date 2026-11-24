@@ -182,3 +182,36 @@ describe("statusEndpointServerHook", () => {
     }
   });
 });
+
+describe("statusEndpointServerHook with a malformed build define", () => {
+  it("answers 500 instead of rejecting the middleware", async () => {
+    const use = vi.fn();
+    statusEndpointServerHook({
+      middlewares: { use },
+      config: {
+        define: {
+          VITE_BUILD_DATE_TIME: new Date().toISOString(),
+          VITE_COMMIT_SHORT_HASH: "{not json",
+        },
+      },
+    } as unknown as Parameters<typeof statusEndpointServerHook>[0]);
+    const response = {
+      statusCode: 200,
+      setHeader: vi.fn(),
+      end: vi.fn(),
+    } as unknown as RecordedResponse;
+
+    await expect(
+      (use.mock.calls[0][0] as Handler)(
+        { url: "/status", headers: {} } as unknown as IncomingMessage,
+        response,
+        () => undefined,
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(response.statusCode).toBe(500);
+    expect(JSON.parse(response.end.mock.calls[0][0])).toEqual({
+      error: "Malformed VITE_COMMIT_SHORT_HASH build define",
+    });
+  });
+});
