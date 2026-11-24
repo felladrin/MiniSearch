@@ -11,9 +11,13 @@ import {
   Title,
 } from "@mantine/core";
 import { IconSearch } from "@tabler/icons-react";
-import { useMemo } from "react";
-import { useSearchHistory } from "@/hooks/useSearchHistory";
-import type { SearchEntry } from "@/modules/history";
+import { useEffect, useMemo, useState } from "react";
+import { REFRESH_INTERVAL_MS } from "@/hooks/useSearchHistory";
+import {
+  getSearchActivityRecords,
+  isHistoryEnabled,
+  type SearchActivityRecord,
+} from "@/modules/history";
 import { buildActivity, localKey, startOfDay } from "@/modules/searchActivity";
 import { formatRelativeTime } from "@/modules/stringFormatters";
 import ActivityHeatmap from "./ActivityHeatmap";
@@ -28,7 +32,7 @@ interface StatsData {
   avgPerDay: number;
   mostActiveHour: number;
   topSources: { source: string; count: number; percentage: number }[];
-  recentActivity: SearchEntry[];
+  recentActivity: SearchActivityRecord[];
 }
 
 function MetricCard({
@@ -58,7 +62,34 @@ export default function SearchStats({
   period = "week",
   compact = false,
 }: SearchStatsProps) {
-  const { recentSearches, isLoading } = useSearchHistory({ limit: 1000 });
+  const [recentSearches, setRecentSearches] = useState<SearchActivityRecord[]>(
+    [],
+  );
+  const [isLoading, setIsLoading] = useState(true);
+
+  // The whole table, not a window of the newest rows: the totals, the
+  // averages and the heatmap are only right if the oldest searches count too.
+  // A disabled history is shown as empty without opening the database.
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      const records = isHistoryEnabled()
+        ? await getSearchActivityRecords()
+        : [];
+      if (cancelled) return;
+      setRecentSearches(records);
+      setIsLoading(false);
+    };
+
+    load();
+    const intervalId = setInterval(load, REFRESH_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, []);
 
   const stats = useMemo((): StatsData => {
     if (!recentSearches.length) {
