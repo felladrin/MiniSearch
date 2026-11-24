@@ -22,7 +22,21 @@ let worker: Worker | null = null;
 let isReady = false;
 let nextRequestId = 0;
 
-const pendingScores = new Map<number, (scores: number[]) => void>();
+/**
+ * How long a scoring request may wait for the worker before it is answered
+ * with empty scores, so a worker that is alive but stuck degrades ranking to
+ * lexical instead of holding every page-content read. Sized from the budget
+ * the client already enforces: its 20 s `/page-content` abort, minus the 6 s
+ * page-read deadline, minus margin for the rest of the request.
+ */
+export const SCORE_TIMEOUT_MS = 10_000;
+
+interface PendingScore {
+  resolve: (scores: number[]) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+const pendingScores = new Map<number, PendingScore>();
 
 /**
  * Answers every in-flight request with empty scores. Empty is the signal
@@ -31,7 +45,10 @@ const pendingScores = new Map<number, (scores: number[]) => void>();
  * page-content reads waiting for a reply that is never coming.
  */
 function resolvePendingEmpty() {
-  for (const resolve of pendingScores.values()) resolve([]);
+  for (const { resolve, timer } of pendingScores.values()) {
+    clearTimeout(timer);
+    resolve([]);
+  }
   pendingScores.clear();
 }
 
@@ -58,9 +75,11 @@ export async function startBiEncoderService() {
   biEncoderWorker.on("message", (message: BiEncoderResponse) => {
     if (message.type === "ready") return;
 
-    const resolve = pendingScores.get(message.id);
-    if (!resolve) return;
+    const pending = pendingScores.get(message.id);
+    if (!pending) return;
     pendingScores.delete(message.id);
+    clearTimeout(pending.timer);
+    const { resolve } = pending;
 
     if (message.type === "failed") {
       printMessage(`Bi-encoder scoring failed: ${message.message}`);
@@ -138,7 +157,16 @@ export async function scorePassages(
   const id = nextRequestId++;
 
   return new Promise<number[]>((resolve) => {
-    pendingScores.set(id, resolve);
+    // A late reply after the timeout finds no entry and is ignored.
+    const timer = setTimeout(() => {
+      pendingScores.delete(id);
+      printMessage(
+        `Bi-encoder scoring did not answer within ${SCORE_TIMEOUT_MS} ms; falling back to lexical ranking.`,
+      );
+      resolve([]);
+    }, SCORE_TIMEOUT_MS);
+    timer.unref();
+    pendingScores.set(id, { resolve, timer });
 
     const request: BiEncoderRequest = { type: "score", id, query, passages };
     try {
@@ -146,6 +174,7 @@ export async function scorePassages(
     } catch (error) {
       // The worker was terminated between the check above and this send.
       pendingScores.delete(id);
+      clearTimeout(timer);
       printMessage(
         `Could not reach the bi-encoder worker: ${error instanceof Error ? error.message : String(error)}`,
       );
