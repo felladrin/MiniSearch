@@ -1,3 +1,4 @@
+import { shuffle } from "@shared/shuffle";
 import { addLogEntry } from "./logEntries";
 import { getQuerySuggestions, updateQuerySuggestions } from "./pubSub";
 
@@ -13,13 +14,21 @@ function toNonEmptyStrings(value: unknown): string[] {
   );
 }
 
+/** The refill under way, so callers that find the store empty together share one fetch. */
+let refillInFlight: Promise<void> | undefined;
+
 /** Pops a stored suggestion, refilling the store when it is empty; never resolves to an empty string. */
 export async function getRandomQuerySuggestion(): Promise<string> {
-  let querySuggestions = toNonEmptyStrings(getQuerySuggestions());
+  if (toNonEmptyStrings(getQuerySuggestions()).length === 0) {
+    refillInFlight ??= refillQuerySuggestions(25).finally(() => {
+      refillInFlight = undefined;
+    });
+    await refillInFlight;
+  }
 
-  if (querySuggestions.length === 0)
-    querySuggestions = await refillQuerySuggestions(25);
-
+  // Read after the wait, not before: callers that waited on the same refill
+  // each take their own suggestion from what it stored.
+  const querySuggestions = toNonEmptyStrings(getQuerySuggestions());
   const randomQuerySuggestion = querySuggestions.pop();
 
   updateQuerySuggestions(querySuggestions);
@@ -27,7 +36,7 @@ export async function getRandomQuerySuggestion(): Promise<string> {
   return randomQuerySuggestion ?? DEFAULT_QUERY_SUGGESTION;
 }
 
-async function refillQuerySuggestions(limit: number): Promise<string[]> {
+async function refillQuerySuggestions(limit: number): Promise<void> {
   const querySuggestionsFileUrl = new URL(
     "/query-suggestions.json",
     self.location.origin,
@@ -46,21 +55,21 @@ async function refillQuerySuggestions(limit: number): Promise<string[]> {
       throw new Error("the response is not a list");
     }
 
-    const querySuggestionsList = toNonEmptyStrings(body)
-      .sort(() => Math.random() - 0.5)
-      .slice(0, limit);
+    const querySuggestionsList = shuffle(toNonEmptyStrings(body)).slice(
+      0,
+      limit,
+    );
+
+    updateQuerySuggestions(querySuggestionsList);
 
     addLogEntry(
       `Query suggestions refilled with ${querySuggestionsList.length} suggestions`,
     );
-
-    return querySuggestionsList;
   } catch (error) {
     addLogEntry(
       `Failed to refill query suggestions: ${
         error instanceof Error ? error.message : String(error)
       }`,
     );
-    return [];
   }
 }

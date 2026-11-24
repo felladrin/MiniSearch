@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import SearchForm from "@/components/Search/Form/SearchForm";
 import { resetHandledQuery } from "@/modules/autoSearch";
 import { settingsPubSub } from "@/modules/pubSub";
+import { getRandomQuerySuggestion } from "@/modules/querySuggestions";
 import { defaultSettings } from "@/modules/settings";
 import { searchAndRespond } from "@/modules/textGeneration";
 
@@ -98,6 +99,49 @@ describe("SearchForm component", () => {
     const mockUpdate = vi.fn();
     renderSearchForm("", mockUpdate);
     await waitForPlaceholder();
+  });
+
+  describe("the suggestion for an emptied field", () => {
+    it("is taken once when the last character is deleted", async () => {
+      const user = userEvent.setup();
+      renderSearchForm("a", vi.fn());
+      const textarea = await screen.findByRole("textbox");
+      vi.mocked(getRandomQuerySuggestion).mockClear();
+
+      await user.type(textarea, "{Backspace}");
+      await act(async () => {});
+
+      expect(getRandomQuerySuggestion).toHaveBeenCalledTimes(1);
+    });
+
+    it("is taken once when Clear is clicked", async () => {
+      const user = userEvent.setup();
+      renderSearchForm("hello", vi.fn());
+      await screen.findByRole("textbox");
+      vi.mocked(getRandomQuerySuggestion).mockClear();
+
+      await user.click(screen.getByRole("button", { name: "Clear" }));
+      await act(async () => {});
+
+      expect(getRandomQuerySuggestion).toHaveBeenCalledTimes(1);
+    });
+
+    it("is dropped when the field was filled again before it arrived", async () => {
+      let deliver: (suggestion: string) => void = () => {};
+      vi.mocked(getRandomQuerySuggestion)
+        .mockImplementationOnce(
+          () => new Promise((resolve) => (deliver = resolve)),
+        )
+        .mockImplementationOnce(() => new Promise(() => {}));
+      const user = userEvent.setup();
+      renderSearchForm("a", vi.fn());
+      const textarea = await screen.findByRole("textbox");
+
+      await user.type(textarea, "{Backspace}b{Backspace}");
+      await act(async () => deliver("a late suggestion"));
+
+      expect(textarea).toHaveAttribute("placeholder", "Anything you need!");
+    });
   });
 
   describe("Enter and Shift+Enter", () => {

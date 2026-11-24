@@ -53,6 +53,42 @@ describe("getRandomQuerySuggestion", () => {
     expect(getQuerySuggestions()).toEqual([]);
   });
 
+  it("stores at most 25 of the fetched suggestions, each once", async () => {
+    const fetched = Array.from({ length: 40 }, (_, index) => `s${index}`);
+    mockFetch.mockResolvedValueOnce(jsonResponse(fetched));
+
+    await getRandomQuerySuggestion();
+
+    const stored = getQuerySuggestions();
+    expect(stored).toHaveLength(24);
+    expect(new Set(stored).size).toBe(24);
+    expect(stored.every((entry) => fetched.includes(entry))).toBe(true);
+  });
+
+  it("shares one fetch between callers that find the store empty together", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse(["a", "b", "c"]));
+
+    const [first, second] = await Promise.all([
+      getRandomQuerySuggestion(),
+      getRandomQuerySuggestion(),
+    ]);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(first).not.toBe(second);
+    expect(getQuerySuggestions()).toHaveLength(1);
+  });
+
+  it("fetches again once a finished refill has been used up", async () => {
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse(["a"]))
+      .mockResolvedValueOnce(jsonResponse(["b"]));
+
+    await expect(getRandomQuerySuggestion()).resolves.toBe("a");
+    await expect(getRandomQuerySuggestion()).resolves.toBe("b");
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
   it("logs how many suggestions the refill actually stored", async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse(["a", "b", "c"]));
 
