@@ -2,8 +2,11 @@
  * Counts and durations only. The obvious thing to record about an inference is
  * the conversation, and that is the whole of what the user typed, so none of it
  * is kept: no prompt, no message, no answer, no token, and no timestamp per
- * request. Model ids are configuration rather than user data, and the endpoint
- * already sends them to the browser in every chunk, so those are named.
+ * request. Model ids are not published either: `/status` needs no token, and
+ * naming the internal pool would hand whoever probes it the list of upstream
+ * models to target, which with a random-model pool is the upstream's whole
+ * catalog. The per-model counters come out as an array in the configured
+ * order instead, so the operator can still map each entry to a model.
  */
 
 /**
@@ -61,6 +64,10 @@ function countsFor(model: string): ModelCounts {
   const created = { attempted: 0, streamed: 0, failed: 0, abandoned: 0 };
   byModel.set(model, created);
   return created;
+}
+
+function zeroCounts(): ModelCounts {
+  return { attempted: 0, streamed: 0, failed: 0, abandoned: 0 };
 }
 
 export function recordModelAttempt(model: string): void {
@@ -151,12 +158,32 @@ export function recordInference({
 }
 
 /**
+ * The per-model counters as an array, never keyed by model name: `/status`
+ * needs no token. With the configured list given, entry *i* is the model at
+ * position *i* of that list (duplicates listed once), zero-filled when that
+ * model has not been tried, so an operator who knows their own list can still
+ * read a dead member of the pool out of it. Counters for a model outside the
+ * list are appended after it rather than dropped. With no list (the random
+ * pool), the entries follow first-seen order, stable for the process.
+ */
+function byModelArray(modelOrder: string[]): ModelCounts[] {
+  const listed = new Set(modelOrder);
+  const entries = [...listed].map(
+    (model) => ({ ...(byModel.get(model) ?? zeroCounts()) }),
+  );
+  for (const [model, counts] of byModel) {
+    if (!listed.has(model)) entries.push({ ...counts });
+  }
+  return entries;
+}
+
+/**
  * Every outcome sums to `requests`, so a request that stops being recorded
  * shows up as a gap rather than being lost silently. `outcomes.unclassified` is
  * that gap made visible: it should always be zero, and a non-zero value means
  * a path through the handler no longer reports what it did.
  */
-export function getInferenceStats() {
+export function getInferenceStats(modelOrder: string[] = []) {
   const { streamed, ...failed } = outcomes;
   const requests = Object.values(outcomes).reduce(
     (total, count) => total + count,
@@ -182,8 +209,6 @@ export function getInferenceStats() {
     streamsEndedWithoutFinish,
     attemptFailures: { ...attemptFailures },
     failed,
-    byModel: Object.fromEntries(
-      [...byModel].map(([model, counts]) => [model, { ...counts }]),
-    ),
+    byModel: byModelArray(modelOrder),
   };
 }

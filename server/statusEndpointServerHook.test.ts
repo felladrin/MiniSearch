@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it, vi } from "vitest";
 import { getFallbackProviderStats } from "./fallbackSearchService.ts";
+import { recordModelAttempt } from "./inferencesSinceLastRestart.ts";
 import {
   incrementSearchesFailedOnFallback,
   incrementSearchesServedByFallback,
@@ -59,6 +60,21 @@ function callStatus(): Promise<Record<string, unknown>> {
 }
 
 describe("statusEndpointServerHook", () => {
+  it("serves inference.byModel as an array in the configured model order", async () => {
+    vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "slot-one, slot-two");
+    try {
+      recordModelAttempt("slot-two");
+      const status = await callStatus();
+      const inference = status.inference as { byModel: unknown[] };
+      expect(inference.byModel).toEqual([
+        { attempted: 0, streamed: 0, failed: 0, abandoned: 0 },
+        { attempted: 1, streamed: 0, failed: 0, abandoned: 0 },
+      ]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it.each(["/statuses", "/statusX?token=abc", "/status/extra"])(
     "passes through %s, which is not the /status route",
     async (url) => {

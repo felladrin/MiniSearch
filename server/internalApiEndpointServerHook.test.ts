@@ -1310,7 +1310,7 @@ describe("internalApiEndpointServerHook", () => {
     });
 
     it("counts a finished answer under its model", async () => {
-      const before = getInferenceStats();
+      const before = getInferenceStats(["test-model"]);
       vi.mocked(streamText).mockImplementation(
         () =>
           streamOf([
@@ -1321,15 +1321,15 @@ describe("internalApiEndpointServerHook", () => {
 
       await callInference();
 
-      const after = getInferenceStats();
+      const after = getInferenceStats(["test-model"]);
       expect(after.streamed).toBe(before.streamed + 1);
       expect(after.requests).toBe(before.requests + 1);
       expect(after.averageAttempts).toBeGreaterThan(0);
-      expect(after.byModel["test-model"].attempted).toBe(
-        (before.byModel["test-model"]?.attempted ?? 0) + 1,
+      expect(after.byModel[0].attempted).toBe(
+        (before.byModel[0]?.attempted ?? 0) + 1,
       );
-      expect(after.byModel["test-model"].streamed).toBe(
-        (before.byModel["test-model"]?.streamed ?? 0) + 1,
+      expect(after.byModel[0].streamed).toBe(
+        (before.byModel[0]?.streamed ?? 0) + 1,
       );
     });
 
@@ -1356,7 +1356,7 @@ describe("internalApiEndpointServerHook", () => {
     });
 
     it("counts an attempt the client walked away from mid-answer", async () => {
-      const before = getInferenceStats();
+      const before = getInferenceStats(["test-model"]);
       const response = createResponse();
       const mutable = response as {
         writableEnded: boolean;
@@ -1379,11 +1379,11 @@ describe("internalApiEndpointServerHook", () => {
 
       await callInference(response);
 
-      const after = getInferenceStats();
+      const after = getInferenceStats(["test-model"]);
       expect(after.failed.abandoned).toBe(before.failed.abandoned + 1);
-      const model = after.byModel["test-model"];
+      const model = after.byModel[0];
       expect(model.abandoned).toBe(
-        (before.byModel["test-model"]?.abandoned ?? 0) + 1,
+        (before.byModel[0]?.abandoned ?? 0) + 1,
       );
       expect(model.attempted).toBe(
         model.streamed + model.failed + model.abandoned,
@@ -1391,13 +1391,13 @@ describe("internalApiEndpointServerHook", () => {
     });
 
     it("counts an exhausted ladder as a failure before the first token", async () => {
-      const before = getInferenceStats();
+      const before = getInferenceStats(["test-model"]);
       vi.mocked(streamText).mockImplementation(() => streamOf([]) as never);
 
       const response = await callInference();
 
       expect(response.statusCode).toBe(503);
-      const after = getInferenceStats();
+      const after = getInferenceStats(["test-model"]);
       expect(after.failed.failedBeforeFirstToken).toBe(
         before.failed.failedBeforeFirstToken + 1,
       );
@@ -1405,8 +1405,8 @@ describe("internalApiEndpointServerHook", () => {
       expect(after.streamsEndedWithoutFinish).toBe(
         before.streamsEndedWithoutFinish + 2,
       );
-      expect(after.byModel["test-model"].failed).toBe(
-        (before.byModel["test-model"]?.failed ?? 0) + 2,
+      expect(after.byModel[0].failed).toBe(
+        (before.byModel[0]?.failed ?? 0) + 2,
       );
       // A retry of the same model is not a move to another model.
       expect(after.modelFallbacks).toBe(before.modelFallbacks);
@@ -1468,7 +1468,7 @@ describe("internalApiEndpointServerHook", () => {
     });
 
     it("counts a fallback to another model", async () => {
-      const before = getInferenceStats();
+      const before = getInferenceStats(["model-a", "model-b"]);
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
       vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
         { id: "model-a" },
@@ -1504,13 +1504,13 @@ describe("internalApiEndpointServerHook", () => {
         vi.useRealTimers();
       }
 
-      const after = getInferenceStats();
+      const after = getInferenceStats(["model-a", "model-b"]);
       expect(after.modelFallbacks).toBe(before.modelFallbacks + 1);
-      expect(after.byModel["model-a"].failed).toBe(
-        (before.byModel["model-a"]?.failed ?? 0) + 1,
+      expect(after.byModel[0].failed).toBe(
+        (before.byModel[0]?.failed ?? 0) + 1,
       );
-      expect(after.byModel["model-b"].streamed).toBe(
-        (before.byModel["model-b"]?.streamed ?? 0) + 1,
+      expect(after.byModel[1].streamed).toBe(
+        (before.byModel[1]?.streamed ?? 0) + 1,
       );
       expect(after.streamed).toBe(before.streamed + 1);
     });
