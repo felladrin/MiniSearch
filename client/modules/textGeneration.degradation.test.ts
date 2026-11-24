@@ -244,6 +244,51 @@ describe("search degradation", () => {
     expect(harness.state.textSearchState).toBe("completed");
   });
 
+  it("completes with no results when a stopword-only query leaves no keywords to retry with", async () => {
+    harness.state.query = "how about that";
+    vi.mocked(searchText).mockImplementation(async (query) => {
+      if (!query.trim()) {
+        throw new Error("Query cannot be empty or whitespace only");
+      }
+      return { results: [], stale: false };
+    });
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(searchText).toHaveBeenCalledTimes(1);
+    expect(harness.state.textSearchResults).toEqual([]);
+    expect(harness.state.textSearchState).toBe("completed");
+  });
+
+  it("completes without searching when an over-long query has no keywords", async () => {
+    harness.state.query = "that ".repeat(401);
+    vi.mocked(searchText).mockImplementation(async (query) => {
+      if (!query.trim()) {
+        throw new Error("Query cannot be empty or whitespace only");
+      }
+      return { results: [], stale: false };
+    });
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(searchText).not.toHaveBeenCalled();
+    expect(harness.state.textSearchState).toBe("completed");
+  });
+
+  it("searches the trimmed query when an over-long query has no keywords but fits once trimmed", async () => {
+    harness.state.query = `how about that${" ".repeat(2000)}`;
+    vi.mocked(searchText).mockResolvedValue({ results: [], stale: false });
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(searchText).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(searchText).mock.calls[0][0]).toBe("how about that");
+    expect(harness.state.textSearchState).toBe("completed");
+  });
+
   it("grounds the LLM on image results when the text search fails", async () => {
     vi.mocked(searchText).mockRejectedValue(
       new Error("HTTP error! status: 502"),

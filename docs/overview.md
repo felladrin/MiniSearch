@@ -104,7 +104,7 @@ The system executes two parallel flows when a user submits a query:
 ### AI Generation Flow
 
 1. `textGeneration.ts` orchestrates response generation after search completes
-2. State machine transitions: `idle` -> `loadingModel`/`preparingToGenerate` -> `awaitingSearchResults` -> `generating` -> `completed`/`failed`/`interrupted` (see Text Generation States below; `loadingModel` only occurs on the browser/Wllama path, other backends use `preparingToGenerate`)
+2. State machine transitions: `idle` -> `awaitingModelDownloadAllowance` -> `loadingModel` -> `awaitingSearchResults` -> `preparingToGenerate` -> `generating` -> `completed`/`failed`/`interrupted` (see Text Generation States below; `awaitingModelDownloadAllowance` and `loadingModel` only occur on the browser/Wllama path, while every backend transitions through `awaitingSearchResults` and then `preparingToGenerate`)
 3. Search results are formatted and injected into system prompt via `{{searchResults}}` placeholder. With `enablePageContentFetch` on, the pages behind the top results are read through `/page-content` first and their excerpts are appended to each result (see `docs/page-content.md`)
 4. LLM generates response with streaming tokens
 5. Response updates throttled to ~12 updates/sec via `throttleit` to prevent React render overload
@@ -150,7 +150,7 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 - `awaitingModelDownloadAllowance` - Waiting for user consent to download a browser model
 - `loadingModel` - Downloading or initializing the browser (Wllama) model
 - `awaitingSearchResults` - Waiting for search to complete before generating
-- `preparingToGenerate` - Building the prompt/request just before calling the inference backend (OpenAI-compatible, Internal API, and AI Horde paths)
+- `preparingToGenerate` - Building the prompt/request after search results arrive, just before calling the inference backend (all backends, including browser/Wllama)
 - `generating` - Streaming response tokens
 - `interrupted` - Generation was cancelled by the user
 - `completed` - Full response received
