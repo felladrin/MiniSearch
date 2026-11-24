@@ -13,7 +13,6 @@ interface MessageListProps {
 
 interface MessageProps {
   message: ChatMessage;
-  index: number;
   absoluteIndex: number;
   isLastAssistant: boolean;
   isGenerating: boolean;
@@ -24,7 +23,6 @@ interface MessageProps {
 const Message = memo(
   ({
     message,
-    index,
     absoluteIndex,
     isLastAssistant,
     isGenerating,
@@ -58,7 +56,7 @@ const Message = memo(
         )}
 
         <Paper
-          key={`${message.role}-${index}`}
+          key={`${message.role}-${absoluteIndex}`}
           shadow="xs"
           radius="xl"
           p="sm"
@@ -102,27 +100,27 @@ const MessageList = memo(function MessageList({
 
   return (
     <Stack gap="md">
-      {messages
-        .slice(2)
-        .filter((message) => message.content.length > 0)
-        .map((message, index) => {
-          const absoluteIndex = index + 2;
-          const isLastAssistant =
-            absoluteIndex === messages.length - 1 &&
-            message.role === "assistant";
-          return (
-            <Message
-              key={absoluteIndex}
-              message={message}
-              index={index}
-              absoluteIndex={absoluteIndex}
-              isLastAssistant={isLastAssistant}
-              isGenerating={isGenerating}
-              onEditMessage={onEditMessage}
-              onRegenerate={onRegenerate}
-            />
-          );
-        })}
+      {messages.map((message, absoluteIndex) => {
+        // The index is the message's position in `messages`, which is what
+        // editing and regenerating act on. The first two messages are the
+        // system prompt and its acknowledgement, and an empty message has
+        // nothing to show, so neither renders, but both keep their position.
+        if (absoluteIndex < 2 || message.content.length === 0) return null;
+        const isLastAssistant =
+          absoluteIndex === messages.length - 1 && message.role === "assistant";
+        return (
+          <Message
+            // biome-ignore lint/suspicious/noArrayIndexKey: a message's position in the chat is its identity
+            key={absoluteIndex}
+            message={message}
+            absoluteIndex={absoluteIndex}
+            isLastAssistant={isLastAssistant}
+            isGenerating={isGenerating}
+            onEditMessage={onEditMessage}
+            onRegenerate={onRegenerate}
+          />
+        );
+      })}
     </Stack>
   );
 });
