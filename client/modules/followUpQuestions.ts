@@ -1,4 +1,4 @@
-import { historyDatabase } from "./history";
+import { historyDatabase, isHistoryEnabled } from "./history";
 import { addLogEntry } from "./logEntries";
 import { generateChatResponse } from "./textGeneration";
 import type { ChatMessage } from "./types";
@@ -7,6 +7,7 @@ async function saveChatHistoryEntry(
   role: "user" | "assistant",
   content: string,
 ) {
+  if (!isHistoryEnabled()) return;
   await historyDatabase.chatHistory
     .add({
       role,
