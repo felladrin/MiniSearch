@@ -118,6 +118,11 @@ identity.
 
 ## Endpoints
 
+Every response from `/search/text`, `/search/images`, `/page-content`, `/inference`,
+`/status`, `/api/config` and `/api/validate-access-key`, errors included, carries
+`Cache-Control: no-store`, so no shared cache keeps a result, a token verdict or a
+rate-limit answer. `/thumbnail` sets its own headers, described below.
+
 ### `GET /search/text`
 
 Query parameters:
@@ -335,7 +340,7 @@ written the status line is already sent, so a later failure arrives as a data
 frame carrying an `error` field, followed by `[DONE]`, rather than as a status
 code.
 
-The stream carries `Content-Type: text/event-stream`, `Cache-Control: no-cache`
+The stream carries `Content-Type: text/event-stream`, `Cache-Control: no-store`
 and `Connection: keep-alive`.
 
 Failures before the stream starts:

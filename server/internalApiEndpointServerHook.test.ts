@@ -427,6 +427,14 @@ describe("internalApiEndpointServerHook", () => {
         "Content-Type",
         "text/event-stream",
       );
+      expect(response.setHeader).toHaveBeenCalledWith(
+        "Cache-Control",
+        "no-store",
+      );
+      expect(response.setHeader).not.toHaveBeenCalledWith(
+        "Cache-Control",
+        "no-cache",
+      );
       const writeCalls = response.write.mock.calls.map((c) => c[0]);
       expect(
         writeCalls.some((s: string) => s.includes('"content":"Hello"')),
@@ -783,7 +791,10 @@ describe("internalApiEndpointServerHook", () => {
         response,
         vi.fn(),
       );
-      expect(response.setHeader).not.toHaveBeenCalled();
+      expect(response.setHeader).not.toHaveBeenCalledWith(
+        "Content-Type",
+        "text/event-stream",
+      );
       expect(streamText).not.toHaveBeenCalled();
     });
 
@@ -1203,8 +1214,12 @@ describe("internalApiEndpointServerHook", () => {
         try {
           const handler = getRegisteredHandler();
           const response = createResponse();
-          response.setHeader.mockImplementationOnce(() => {
-            throw new Error("setHeader exploded");
+          let thrown = false;
+          response.setHeader.mockImplementation((name: string) => {
+            if (!thrown && name === "Content-Type") {
+              thrown = true;
+              throw new Error("setHeader exploded");
+            }
           });
           await handler(
             createRequest({ messages: [{ role: "user", content: "hi" }] }),

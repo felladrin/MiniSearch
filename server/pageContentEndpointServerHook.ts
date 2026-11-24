@@ -51,6 +51,8 @@ export function pageContentEndpointServerHook<
   server.middlewares.use(async (request, response, next) => {
     if (!request.url?.startsWith("/page-content")) return next();
 
+    response.setHeader("Cache-Control", "no-store");
+
     const url = parseRequestUrl(request);
     if (!url) {
       sendJsonError(response, 400, { error: "Malformed request" });

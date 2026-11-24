@@ -116,14 +116,15 @@ export async function initializeWllama(
   }
 }
 
-export async function clearWllamaCache(): Promise<Wllama> {
+export async function clearWllamaCache(): Promise<void> {
   addLogEntry("Clearing Wllama cache");
 
+  let wllama: Wllama | undefined;
+
   try {
-    const wllama = await createWllamaInstance();
+    wllama = await createWllamaInstance();
     await wllama.cacheManager.clear();
     addLogEntry("Wllama cache cleared successfully");
-    return wllama;
   } catch (error) {
     addLogEntry(
       `Failed to clear Wllama cache: ${
@@ -131,6 +132,14 @@ export async function clearWllamaCache(): Promise<Wllama> {
       }`,
     );
     throw error;
+  } finally {
+    await wllama?.exit().catch((exitError: unknown) => {
+      addLogEntry(
+        `Failed to release Wllama after clearing cache: ${
+          exitError instanceof Error ? exitError.message : "Unknown error"
+        }`,
+      );
+    });
   }
 }
 

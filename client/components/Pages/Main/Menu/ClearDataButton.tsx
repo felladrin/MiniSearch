@@ -27,42 +27,71 @@ export default function ClearDataButton() {
 
     setState((prev) => ({ ...prev, isClearingData: true }));
 
-    self.localStorage.clear();
-
-    for (const cacheName of await self.caches.keys()) {
-      await self.caches.delete(cacheName);
-    }
+    let clearedSuccessfully = false;
 
     try {
-      const dbNames = await Dexie.getDatabaseNames();
+      self.localStorage.clear();
 
-      for (const dbName of dbNames) {
-        await Dexie.delete(dbName);
-        addLogEntry(`Deleted database: ${dbName}`);
+      if (self.caches) {
+        try {
+          for (const cacheName of await self.caches.keys()) {
+            try {
+              await self.caches.delete(cacheName);
+            } catch (error) {
+              addLogEntry(
+                `Error deleting cache ${cacheName}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            }
+          }
+        } catch (error) {
+          addLogEntry(
+            `Error listing caches: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
       }
+
+      try {
+        const dbNames = await Dexie.getDatabaseNames();
+
+        for (const dbName of dbNames) {
+          await Dexie.delete(dbName);
+          addLogEntry(`Deleted database: ${dbName}`);
+        }
+      } catch (error) {
+        addLogEntry(
+          `Error deleting databases: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+
+      const { clearWllamaCache } = await import("../../../../modules/wllama");
+
+      await clearWllamaCache();
+
+      clearedSuccessfully = true;
+      addLogEntry("All data cleared successfully");
     } catch (error) {
       addLogEntry(
-        `Error deleting databases: ${
+        `Error clearing data: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
+    } finally {
+      setState((prev) => ({
+        ...prev,
+        isClearingData: false,
+        hasClearedData: clearedSuccessfully,
+      }));
+
+      navigate("/", { replace: true });
+
+      self.location.reload();
     }
-
-    const { clearWllamaCache } = await import("../../../../modules/wllama");
-
-    await clearWllamaCache();
-
-    setState((prev) => ({
-      ...prev,
-      isClearingData: false,
-      hasClearedData: true,
-    }));
-
-    addLogEntry("All data cleared successfully");
-
-    navigate("/", { replace: true });
-
-    self.location.reload();
   };
 
   return (
