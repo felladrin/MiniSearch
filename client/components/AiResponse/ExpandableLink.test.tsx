@@ -37,6 +37,14 @@ function renderLink(label = "Example Domain", href = "https://example.com") {
   );
 }
 
+function getPill() {
+  const pill = screen
+    .getByRole("link")
+    .querySelectorAll<HTMLElement>('[aria-hidden="true"]');
+  expect(pill).toHaveLength(1);
+  return pill[0];
+}
+
 function getFullText() {
   return screen.getByTestId("expandable-link-full");
 }
@@ -207,5 +215,44 @@ describe("ExpandableLink", () => {
     const fullText = getFullText();
     expect(fullText).toHaveTextContent("Example Domain");
     expect(fullText.style.visibility).not.toBe("hidden");
+  });
+
+  it("shows the first character of plain link text in the pill", () => {
+    renderLink("Example Domain");
+
+    expect(getPill().textContent).toBe("E");
+  });
+
+  it("shows the first visible character of formatted link text in the pill", () => {
+    render(
+      <MantineProvider>
+        <ExpandableLink href="https://www.reuters.com/">
+          <strong>Reuters</strong>
+        </ExpandableLink>
+      </MantineProvider>,
+    );
+
+    expect(getPill().textContent).toBe("R");
+  });
+
+  it.each([
+    ["😀 Emoji Site", "😀"],
+    ["🇨🇭 Swiss Site", "🇨🇭"],
+    ["👩‍💻 Dev Site", "👩‍💻"],
+  ])("keeps the leading emoji of %s whole in the pill", (label, expected) => {
+    renderLink(label);
+
+    expect(getPill().textContent).toBe(expected);
+  });
+
+  it("falls back to the first code point without Intl.Segmenter", () => {
+    vi.stubGlobal(
+      "Intl",
+      Object.assign(Object.create(Intl), { Segmenter: undefined }),
+    );
+
+    renderLink("😀 Emoji Site");
+
+    expect(getPill().textContent).toBe("😀");
   });
 });

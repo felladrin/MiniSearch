@@ -55,6 +55,35 @@ function registerResizeListener(
 }
 
 /**
+ * Collects the visible text of React children. Formatted link text such as
+ * `**Reuters**` arrives as elements, whose `toString()` is "[object Object]".
+ */
+function getTextContent(node: React.ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+  if (Array.isArray(node)) {
+    return node.map(getTextContent).join("");
+  }
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return getTextContent(node.props.children);
+  }
+  return "";
+}
+
+/**
+ * Returns the first user-perceived character, so an emoji, a flag or a ZWJ
+ * sequence is never split into a lone surrogate or a partial glyph.
+ */
+function getFirstGrapheme(text: string): string {
+  if (typeof Intl.Segmenter === "function") {
+    const [first] = new Intl.Segmenter().segment(text);
+    return first?.segment ?? "";
+  }
+  return Array.from(text)[0] ?? "";
+}
+
+/**
  * Citation link that collapses to a first-character pill and reveals the full
  * link text on hover/focus, auto-collapsing after 3 s.
  *
@@ -68,8 +97,7 @@ export default function ExpandableLink({
   href,
   children,
 }: ExpandableLinkProps) {
-  const childContent = children?.toString() || "";
-  const firstChar = childContent.charAt(0);
+  const firstChar = getFirstGrapheme(getTextContent(children));
   const [isExpanded, setIsExpanded] = React.useState(true);
   const timerRef = React.useRef<number | null>(null);
   const anchorRef = React.useRef<HTMLAnchorElement>(null);

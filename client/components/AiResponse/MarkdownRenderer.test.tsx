@@ -80,6 +80,19 @@ describe("MarkdownRenderer rendered output", () => {
     expect(link?.getAttribute("rel")).toContain("nofollow");
   });
 
+  it.each([
+    ["[**Reuters**](https://www.reuters.com/)", "R"],
+    ["[`npm`](https://www.npmjs.com/)", "n"],
+  ])(
+    "collapses the formatted link %s to its first visible character",
+    (markdown, expected) => {
+      const { container } = renderMarkdown(markdown);
+
+      const pill = container.querySelector('a [aria-hidden="true"]');
+      expect(pill?.textContent).toBe(expected);
+    },
+  );
+
   it("renders a fenced code block through CodeHighlight with its language", () => {
     const { getByTestId } = renderMarkdown("```js\nconst x = 1;\n```");
 
