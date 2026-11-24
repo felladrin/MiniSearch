@@ -251,6 +251,58 @@ describe("useSearchHistory", () => {
     expect(result.current.filteredSearches).toHaveLength(SEEDED_QUERIES.length);
   });
 
+  it("deletes an entry's answer and chat with it and leaves the other entries' rows", async () => {
+    // Seeding shares one search run; give each entry its own, as separate
+    // searches have, with an answer and a chat turn stored under it.
+    const entries = await historyDatabase.searches.toArray();
+    for (const entry of entries) {
+      const runId = `run-${entry.id}`;
+      await historyDatabase.searches.update(entry.id as number, {
+        searchRunId: runId,
+      });
+      await historyDatabase.llmResponses.add({
+        searchRunId: runId,
+        searchId: entry.id,
+        prompt: entry.query,
+        response: "answer",
+        model: "m",
+        timestamp: Date.now(),
+      });
+      await historyDatabase.chatHistory.add({
+        role: "user",
+        content: "chat",
+        timestamp: Date.now(),
+        conversationId: runId,
+      });
+    }
+    const { result } = renderHook(() => useSearchHistory({ limit: 100 }));
+    await settle();
+
+    const [target] = entries;
+    await act(async () => {
+      await result.current.deleteEntry(target.id as number);
+    });
+
+    const targetRun = `run-${target.id}`;
+    expect(await historyDatabase.searches.get(target.id as number)).toBe(
+      undefined,
+    );
+    expect(
+      await historyDatabase.llmResponses
+        .where("searchRunId")
+        .equals(targetRun)
+        .count(),
+    ).toBe(0);
+    expect(
+      await historyDatabase.chatHistory
+        .where("conversationId")
+        .equals(targetRun)
+        .count(),
+    ).toBe(0);
+    expect(await historyDatabase.llmResponses.count()).toBe(entries.length - 1);
+    expect(await historyDatabase.chatHistory.count()).toBe(entries.length - 1);
+  });
+
   it("paginates from memory: page changes and queries trigger no reads", async () => {
     await addSearchToHistory("wine tasting porto", textResults);
     vi.advanceTimersByTime(1000);

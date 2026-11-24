@@ -1,3 +1,4 @@
+import Dexie from "dexie";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getSettings } from "./pubSub";
 
@@ -667,5 +668,241 @@ describe("History Module - Enable Search History off", () => {
     await addSearchToHistory("private query", textResults);
 
     expect(historyDatabase.isOpen()).toBe(false);
+  });
+});
+
+describe("History Module - a search takes its answers and chats with it", () => {
+  const settingsMock = vi.mocked(getSettings);
+  const historyOn = settingsMock.getMockImplementation();
+
+  function enableCleanup(
+    overrides: {
+      historyRetentionDays?: number;
+      historyMaxEntries?: number;
+    } = {},
+  ) {
+    settingsMock.mockImplementation(
+      () =>
+        ({
+          ...historyOn?.(),
+          historyAutoCleanup: true,
+          historyRetentionDays: 30,
+          historyMaxEntries: 500,
+          ...overrides,
+        }) as ReturnType<typeof getSettings>,
+    );
+  }
+
+  /** A search plus the answer and chat turn stored under its key. */
+  async function seedSearch({
+    key,
+    ageMs = 0,
+    pinned = false,
+    legacy = false,
+  }: {
+    key: string;
+    ageMs?: number;
+    pinned?: boolean;
+    legacy?: boolean;
+  }) {
+    const { historyDatabase } = await import("./history");
+    const timestamp = Date.now() - ageMs;
+    const searchId = await historyDatabase.searches.add({
+      ...(legacy ? {} : { searchRunId: key }),
+      query: key,
+      timestamp,
+      pinned,
+      source: "user",
+    });
+    await historyDatabase.llmResponses.add({
+      searchRunId: key,
+      searchId: searchId as number,
+      prompt: key,
+      response: `answer for ${key}`,
+      model: "m",
+      timestamp,
+    });
+    await historyDatabase.chatHistory.add({
+      role: "user",
+      content: `chat for ${key}`,
+      timestamp,
+      conversationId: key,
+    });
+    return searchId as number;
+  }
+
+  async function counts() {
+    const { historyDatabase } = await import("./history");
+    return {
+      searches: await historyDatabase.searches.count(),
+      llmResponses: await historyDatabase.llmResponses.count(),
+      chatHistory: await historyDatabase.chatHistory.count(),
+    };
+  }
+
+  /** The search, answer and chat stored under `key` are the only rows left. */
+  async function expectOnlyRowsOf(key: string) {
+    const { historyDatabase } = await import("./history");
+    const searches = await historyDatabase.searches.toArray();
+    const answers = await historyDatabase.llmResponses.toArray();
+    const chats = await historyDatabase.chatHistory.toArray();
+    expect(searches.map((search) => search.searchRunId)).toEqual([key]);
+    expect(answers.map((answer) => answer.searchRunId)).toEqual([key]);
+    expect(chats.map((chat) => chat.conversationId)).toEqual([key]);
+  }
+
+  const sixtyDays = 60 * 24 * 60 * 60 * 1000;
+
+  beforeEach(async () => {
+    const { historyDatabase } = await import("./history");
+    await historyDatabase.searches.clear();
+    await historyDatabase.llmResponses.clear();
+    await historyDatabase.chatHistory.clear();
+  });
+
+  afterEach(() => {
+    if (historyOn) settingsMock.mockImplementation(historyOn);
+  });
+
+  it("removes an expired search's answer and chat with it", async () => {
+    enableCleanup();
+    await seedSearch({ key: "old", ageMs: sixtyDays });
+    await seedSearch({ key: "recent" });
+
+    const { historyDatabase } = await import("./history");
+    await historyDatabase.runCleanup();
+
+    await expectOnlyRowsOf("recent");
+  });
+
+  it("keeps a pinned search's answer and chat", async () => {
+    enableCleanup();
+    await seedSearch({ key: "pinned", ageMs: sixtyDays, pinned: true });
+
+    const { historyDatabase } = await import("./history");
+    await historyDatabase.runCleanup();
+
+    await expectOnlyRowsOf("pinned");
+  });
+
+  it("trims answers and chats with the searches over the entry limit", async () => {
+    enableCleanup({ historyRetentionDays: 0, historyMaxEntries: 10 });
+    for (let i = 0; i < 15; i++) {
+      await seedSearch({ key: `run-${i}`, ageMs: (15 - i) * 1000 });
+    }
+
+    const { historyDatabase } = await import("./history");
+    await historyDatabase.runCleanup();
+
+    expect(await counts()).toEqual({
+      searches: 10,
+      llmResponses: 10,
+      chatHistory: 10,
+    });
+  });
+
+  it("finds a legacy search's answer and chat by its query", async () => {
+    enableCleanup();
+    await seedSearch({ key: "legacy query", ageMs: sixtyDays, legacy: true });
+
+    const { historyDatabase } = await import("./history");
+    await historyDatabase.runCleanup();
+
+    expect(await counts()).toEqual({
+      searches: 0,
+      llmResponses: 0,
+      chatHistory: 0,
+    });
+  });
+
+  it("keeps the rows of a key another search still reads", async () => {
+    enableCleanup();
+    // Two searches of one run share the key their answer is stored under.
+    await seedSearch({ key: "shared-run", ageMs: sixtyDays });
+    const { historyDatabase } = await import("./history");
+    await historyDatabase.searches.add({
+      searchRunId: "shared-run",
+      query: "second search of the run",
+      timestamp: Date.now(),
+      pinned: false,
+      source: "user",
+    });
+
+    await historyDatabase.runCleanup();
+
+    await expectOnlyRowsOf("shared-run");
+  });
+
+  it("deletes one search with its answer and chat and leaves the others", async () => {
+    const target = await seedSearch({ key: "delete-me" });
+    await seedSearch({ key: "keep-me" });
+
+    const { historyDatabase } = await import("./history");
+    const entry = await historyDatabase.searches.get(target);
+    if (!entry) throw new Error("seeded search is missing");
+    await historyDatabase.deleteSearchesWithChildren([entry]);
+
+    await expectOnlyRowsOf("keep-me");
+  });
+
+  it("drops the rows no search owns when a version 1 database is upgraded", async () => {
+    const { historyDatabase } = await import("./history");
+    historyDatabase.close({ disableAutoOpen: false });
+    await Dexie.delete("History");
+
+    const v1 = new Dexie("History");
+    v1.version(1).stores({
+      searches: "++id, searchRunId, query, timestamp, source, pinned, results",
+      llmResponses: "++id, searchId, searchRunId, timestamp, model",
+      chatHistory:
+        "++id, conversationId, timestamp, [conversationId+timestamp]",
+    });
+    const now = Date.now();
+    await v1.table("searches").add({
+      searchRunId: "live",
+      query: "live",
+      timestamp: now,
+      pinned: false,
+    });
+    await v1.table("llmResponses").bulkAdd([
+      {
+        searchRunId: "live",
+        prompt: "p",
+        response: "kept",
+        model: "m",
+        timestamp: now,
+      },
+      {
+        searchRunId: "gone",
+        prompt: "p",
+        response: "orphan",
+        model: "m",
+        timestamp: now,
+      },
+    ]);
+    await v1.table("chatHistory").bulkAdd([
+      { role: "user", content: "kept", timestamp: now, conversationId: "live" },
+      {
+        role: "user",
+        content: "orphan",
+        timestamp: now,
+        conversationId: "gone",
+      },
+      {
+        role: "user",
+        content: "follow-up",
+        timestamp: now,
+        conversationId: "follow-up-1",
+      },
+    ]);
+    v1.close();
+
+    await historyDatabase.open();
+
+    const answers = await historyDatabase.llmResponses.toArray();
+    const chats = await historyDatabase.chatHistory.toArray();
+    expect(answers.map((row) => row.response)).toEqual(["kept"]);
+    expect(chats.map((row) => row.content)).toEqual(["kept"]);
+    expect(await historyDatabase.searches.count()).toBe(1);
   });
 });
