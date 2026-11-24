@@ -122,52 +122,44 @@ export default memo(function SearchForm({
     void initializeComponent();
   }, [updateQuery, isRestoringFromHistory, addToHistory]);
 
+  // The only place a suggestion is taken when the field empties, whether by
+  // typing or by Clear. An answer that arrives after the field was filled again
+  // is dropped, so it cannot replace a newer one.
   useEffect(() => {
-    if (state.textAreaValue.length === 0) {
-      fetchQuerySuggestion()
-        .then((suggestion) => {
+    if (state.textAreaValue.length !== 0) return;
+
+    let isCurrent = true;
+    fetchQuerySuggestion()
+      .then((suggestion) => {
+        if (isCurrent)
           setState((prev) => ({ ...prev, suggestedQuery: suggestion }));
-        })
-        .catch(() => {
+      })
+      .catch(() => {
+        if (isCurrent)
           setState((prev) => ({
             ...prev,
             suggestedQuery: DEFAULT_QUERY_SUGGESTION,
           }));
-        });
-    }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
   }, [state.textAreaValue.length, fetchQuerySuggestion]);
 
-  const handleInputChange = async (event: ChangeEvent<HTMLTextAreaElement>) => {
+  const handleInputChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     const text = event.target.value;
 
     setState((prev) => ({ ...prev, textAreaValue: text }));
-
-    if (text.length === 0) {
-      try {
-        const suggestion = await getRandomQuerySuggestion();
-        setState((prev) => ({ ...prev, suggestedQuery: suggestion }));
-      } catch {
-        addLogEntry("Failed to get query suggestion");
-        setState((prev) => ({
-          ...prev,
-          suggestedQuery: DEFAULT_QUERY_SUGGESTION,
-        }));
-      }
-    }
   };
 
-  const handleClearButtonClick = async () => {
+  const handleClearButtonClick = () => {
     textAreaRef.current?.focus();
     setState((prev) => ({
       ...prev,
       textAreaValue: "",
     }));
     addLogEntry("User cleaned the search query field");
-    const suggestion = await fetchQuerySuggestion();
-    setState((prev) => ({
-      ...prev,
-      suggestedQuery: suggestion,
-    }));
   };
 
   // Stable identities, so `memo` on the dictation button actually holds.
