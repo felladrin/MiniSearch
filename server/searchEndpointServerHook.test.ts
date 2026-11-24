@@ -136,6 +136,59 @@ describe("searchEndpointServerHook", () => {
     expect(fetchSearXNG).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "/search/",
+    "/search/foo",
+    "/search/textual",
+    "/search/text/",
+    "/search/text/x",
+    "/search/images2",
+  ])("answers 404 to %s without running a search", async (path) => {
+    const handler = getRegisteredHandler();
+    const response = createResponse();
+    const next = vi.fn();
+
+    await handler(createRequest(`${path}?q=cats&token=abc`), response, next);
+
+    expect(response.statusCode).toBe(404);
+    expect(response.setHeader).toHaveBeenCalledWith(
+      "Content-Type",
+      "application/json",
+    );
+    expect(response.end).toHaveBeenCalledWith(
+      JSON.stringify({ error: "Not found" }),
+    );
+    // Nothing was authorized or searched, so nothing is verified, ranked or
+    // counted.
+    expect(handleTokenVerification).not.toHaveBeenCalled();
+    expect(fetchSearXNG).not.toHaveBeenCalled();
+    expect(recordSearchDuration).not.toHaveBeenCalled();
+    expect(incrementTextualSearchesSinceLastRestart).not.toHaveBeenCalled();
+    expect(incrementGraphicalSearchesSinceLastRestart).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("takes the search type from the path alone", async () => {
+    vi.mocked(fetchSearXNG).mockResolvedValue([]);
+    const handler = getRegisteredHandler();
+    const unknown = createResponse();
+
+    await handler(
+      createRequest("/search/foo?q=cats&token=abc&next=/search/text"),
+      unknown,
+      vi.fn(),
+    );
+    await handler(
+      createRequest("/search/images?q=cats&token=abc&next=/search/text"),
+      createResponse(),
+      vi.fn(),
+    );
+
+    expect(unknown.statusCode).toBe(404);
+    expect(fetchSearXNG).toHaveBeenCalledTimes(1);
+    expect(fetchSearXNG).toHaveBeenCalledWith("cats", "images", 30);
+  });
+
   it("responds 400 when the query parameter is missing", async () => {
     const handler = getRegisteredHandler();
     const response = createResponse();

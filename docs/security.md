@@ -15,6 +15,7 @@
 4. On success: key hash is stored in localStorage with timestamp
 5. On subsequent loads, `useAccessKeyValidation` in `App.tsx` calls `verifyStoredAccessKey()` to check if the cached key is still valid
 6. If expired (based on `ACCESS_KEY_TIMEOUT_HOURS`), user is prompted to re-enter
+7. The stored hash is deleted only when it has expired, cannot be read, or the server answers `{"valid":false}`. When the server gives no verdict (it is unreachable, rate-limits the call, or a proxy answers with an error page), the hash is kept and the check is repeated on the next load, so a passing outage does not make the user retype a key that is still good. Access stays closed for that load either way.
 
 Whether access keys are enabled is read at runtime from `/api/config`. When that
 request fails, the app shell refuses to render rather than assuming access keys
