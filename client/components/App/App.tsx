@@ -12,11 +12,9 @@ import { Notifications } from "@mantine/notifications";
 import { usePubSub } from "create-pubsub/react";
 import { lazy, useEffect, useState } from "react";
 import { addLogEntry } from "@/modules/logEntries";
-import { settingsPubSub } from "@/modules/pubSub";
+import { hasStoredUserSettings, settingsPubSub } from "@/modules/pubSub";
 import {
   applyServerConfig,
-  defaultSettings,
-  hasStoredUserSettings,
   upgradeUntouchedSystemPrompt,
 } from "@/modules/settings";
 import { webGpuSupport } from "@/modules/webGpu";
@@ -124,7 +122,7 @@ function useInitializeSettings(config: ConfigState) {
 
     setSettings(
       applyServerConfig(
-        upgradeUntouchedSystemPrompt({ ...defaultSettings, ...settings }),
+        upgradeUntouchedSystemPrompt(settings),
         config,
         hasStoredUserSettings,
         hasWebGpu,

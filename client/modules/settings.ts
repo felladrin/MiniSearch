@@ -15,15 +15,6 @@ import * as safeStorage from "./safeStorage";
 export const SETTINGS_STORAGE_KEY = "settings";
 
 /**
- * Whether this browser already had settings from an earlier visit. Read at
- * module load, before anything writes the key back, so `applyServerConfig()`
- * can tell an untouched profile from a user who deliberately picked a value
- * that happens to equal a default.
- */
-export const hasStoredUserSettings =
-  safeStorage.getItem(SETTINGS_STORAGE_KEY) !== null;
-
-/**
  * Whether this profile picked an OS voice before the local engine existed.
  * Such a value is a bare `speechSynthesis` voice URI rather than a prefixed
  * one, and picking it was a deliberate choice, so the profile keeps the system
