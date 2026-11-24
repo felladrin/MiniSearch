@@ -95,42 +95,58 @@ export async function verifyStoredAccessKey(
   const storedData = localStorage.getItem(ACCESS_KEY_STORAGE_KEY);
   if (!storedData) return false;
 
+  let hash: string;
+  let timestamp: number;
   try {
-    const { hash, timestamp }: StoredAccessKey = JSON.parse(storedData);
+    ({ hash, timestamp } = JSON.parse(storedData) as StoredAccessKey);
+  } catch (error) {
+    addLogEntry(`Error reading stored access key: ${error}`);
+    localStorage.removeItem(ACCESS_KEY_STORAGE_KEY);
+    return false;
+  }
 
-    const expirationTime = timeoutHours * 60 * 60 * 1000;
-    if (Date.now() - timestamp > expirationTime) {
-      localStorage.removeItem(ACCESS_KEY_STORAGE_KEY);
-      addLogEntry("Stored access key expired");
-      return false;
-    }
+  const expirationTime = timeoutHours * 60 * 60 * 1000;
+  if (Date.now() - timestamp > expirationTime) {
+    localStorage.removeItem(ACCESS_KEY_STORAGE_KEY);
+    addLogEntry("Stored access key expired");
+    return false;
+  }
 
+  // Only the server saying the key is invalid may delete the hash. Anything
+  // else leaves the server's verdict unknown: an unreachable server, a rate
+  // limit, a proxy's error page. The user would have to retype a key that is
+  // still good, while keeping the hash costs nothing, because access still
+  // needs a fresh `valid: true` on every load.
+  try {
     const response = await fetch("/api/validate-access-key", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ accessKeyHash: hash }),
     });
 
-    // A 429 must not be read as "wrong key": the stored hash may be fine and
-    // the caller simply hit the rate limiter. Keep the hash on disk so a
-    // later load can still validate it.
-    if (response.status === 429) {
-      addLogEntry("Stored access key validation rate-limited");
+    if (!response.ok) {
+      addLogEntry(
+        `Stored access key could not be verified (status ${response.status})`,
+      );
       return false;
     }
 
     const data = await response.json();
-    if (!data.valid) {
+    if (data.valid === true) {
+      addLogEntry("Using stored access key");
+      return true;
+    }
+
+    if (data.valid === false) {
       localStorage.removeItem(ACCESS_KEY_STORAGE_KEY);
       addLogEntry("Stored access key is no longer valid");
       return false;
     }
 
-    addLogEntry("Using stored access key");
-    return true;
+    addLogEntry("Stored access key could not be verified (unexpected reply)");
+    return false;
   } catch (error) {
     addLogEntry(`Error verifying stored access key: ${error}`);
-    localStorage.removeItem(ACCESS_KEY_STORAGE_KEY);
     return false;
   }
 }

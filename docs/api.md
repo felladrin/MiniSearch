@@ -32,6 +32,10 @@ Those two compare the whole request target, query string included, so
 do not check the method at all: a `POST` to `/search/text` is served like a
 `GET`. Only `/inference` answers `405`.
 
+A path under `/search/` never reaches Vite's static handler: the search hook
+claims the whole prefix and answers `404` to any path other than `/search/text`
+and `/search/images`.
+
 ## Authentication
 
 ### Search token
@@ -201,8 +205,10 @@ search fall through to the same `502`.
 Same parameters and failures as `/search/text`, except that the text-search
 fallback above never applies here: an image search has no second source, so its
 `502` still means SearXNG failed. The hook claims the whole
-`/search/` prefix and treats every path that does not start with `/search/text`
-as an image search, so `/search/anything` is an image search.
+`/search/` prefix but serves only the exact paths `/search/text` and
+`/search/images`. Any other path under it, such as `/search/anything` or
+`/search/text/`, answers `404` with `{"error":"Not found"}` before the token is
+checked, so it costs no rate-limit point and runs no search.
 
 The ordering above does not carry over: image results are a plain score sort,
 nothing is pinned at index 0, and no result is exempt from the score filter

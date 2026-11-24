@@ -172,6 +172,7 @@ describe("Access Key Module", () => {
       );
       const result = await verifyStoredAccessKey(TIMEOUT_HOURS);
       expect(result).toBe(false);
+      expect(localStorage.getItem("accessKeyHash")).toBeNull();
     });
 
     it("should return false without asking the server when the timeout is zero", async () => {
@@ -196,6 +197,19 @@ describe("Access Key Module", () => {
 
       const result = await verifyStoredAccessKey(TIMEOUT_HOURS);
       expect(result).toBe(false);
+      expect(localStorage.getItem("accessKeyHash")).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("deletes a stored value that is not JSON without asking the server", async () => {
+      const { verifyStoredAccessKey } = await import("./accessKey");
+      localStorage.setItem("accessKeyHash", "not-json");
+
+      const result = await verifyStoredAccessKey(TIMEOUT_HOURS);
+
+      expect(result).toBe(false);
+      expect(localStorage.getItem("accessKeyHash")).toBeNull();
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("keeps the stored hash on a 429 instead of deleting it", async () => {
@@ -214,6 +228,76 @@ describe("Access Key Module", () => {
       expect(result).toBe(false);
       // A rate-limited validation must not be read as a wrong key.
       expect(localStorage.getItem("accessKeyHash")).not.toBeNull();
+    });
+
+    describe("when the server gives no verdict on the key", () => {
+      const storedValue = JSON.stringify({
+        hash: "test-hash",
+        timestamp: Date.now(),
+      });
+
+      it.each([
+        [
+          "the fetch rejects",
+          () => mockFetch.mockRejectedValue(new TypeError("Failed to fetch")),
+        ],
+        [
+          "a proxy answers 502 with a page that is not JSON",
+          () =>
+            mockFetch.mockResolvedValue({
+              ok: false,
+              status: 502,
+              json: vi
+                .fn()
+                .mockRejectedValue(new SyntaxError("Unexpected token <")),
+            }),
+        ],
+        [
+          "the SPA fallback answers 200 with the app page",
+          () =>
+            mockFetch.mockResolvedValue({
+              ok: true,
+              status: 200,
+              json: vi
+                .fn()
+                .mockRejectedValue(new SyntaxError("Unexpected token <")),
+            }),
+        ],
+        [
+          "a proxy answers 503 with JSON that has no verdict",
+          () =>
+            mockFetch.mockResolvedValue({
+              ok: false,
+              status: 503,
+              json: vi
+                .fn()
+                .mockResolvedValue({ error: "upstream unavailable" }),
+            }),
+        ],
+      ])("keeps the stored hash when %s", async (_situation, answerWithIt) => {
+        const { verifyStoredAccessKey } = await import("./accessKey");
+        answerWithIt();
+        localStorage.setItem("accessKeyHash", storedValue);
+
+        const result = await verifyStoredAccessKey(TIMEOUT_HOURS);
+
+        expect(result).toBe(false);
+        expect(localStorage.getItem("accessKeyHash")).toBe(storedValue);
+      });
+
+      it("accepts the same hash on the next load once the server answers", async () => {
+        const { verifyStoredAccessKey } = await import("./accessKey");
+        localStorage.setItem("accessKeyHash", storedValue);
+
+        mockFetch.mockRejectedValue(new TypeError("Failed to fetch"));
+        await verifyStoredAccessKey(TIMEOUT_HOURS);
+        mockFetch.mockResolvedValue({
+          ok: true,
+          json: vi.fn().mockResolvedValue({ valid: true }),
+        });
+
+        await expect(verifyStoredAccessKey(TIMEOUT_HOURS)).resolves.toBe(true);
+      });
     });
   });
 });
