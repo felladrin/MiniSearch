@@ -149,10 +149,16 @@ App
 
 **Responsibility:** Query input and search initiation
 
+**Props:**
+
+- `query: string` — Current query passed from `MainPage` / `HomePage`
+- `updateQuery: (query: string) => void` — Publishes to `queryPubSub` on submit, URL auto-search, and history restore (typing only updates local `textAreaValue` state)
+- `additionalButtons?: ReactNode` — Optional buttons rendered in the action row (e.g. `MenuButton`)
+
 **PubSub:**
 
-- **Subscribes:** `queryPubSub`, `textSearchStatePubSub`
-- **Updates:** `queryPubSub` (on type), triggers `searchAndRespond()` (on submit)
+- **Subscribes:** `settingsPubSub`, `isRestoringFromHistoryPubSub`, `textSearchResultsPubSub`, `imageSearchResultsPubSub`, `responsePubSub`
+- **Updates:** calls `updateQuery(...)` on submit, URL auto-search, and history restore; triggers `searchAndRespond()` on submit and URL auto-search
 
 The query field is wrapped in its own `position: relative` element so
 `DictationButton` anchors to the field rather than to the form, and stays put
@@ -161,20 +167,33 @@ when the row of buttons below the field changes height.
 **Logic:**
 
 ```typescript
-function SearchForm() {
-  const [query, setQuery] = usePubSub(queryPubSub);
-  const [searchState] = usePubSub(textSearchStatePubSub);
-  
-  const handleSubmit = () => {
-    searchAndRespond();
+function SearchForm({ query, updateQuery, additionalButtons }: SearchFormProps) {
+  const [state, setState] = useState({
+    textAreaValue: query,
+    suggestedQuery: DEFAULT_QUERY_SUGGESTION,
+  });
+  const [pubSubSettings] = usePubSub(settingsPubSub);
+  const [isRestoringFromHistory] = usePubSub(isRestoringFromHistoryPubSub);
+  const [textSearchResults] = usePubSub(textSearchResultsPubSub);
+  const [imageSearchResults] = usePubSub(imageSearchResultsPubSub);
+  const [responseValue] = usePubSub(responsePubSub);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    // Publishes to queryPubSub via updateQuery, updates URL & history, then runs searchAndRespond()
+    startSearching();
   };
-  
+
   return (
     <form onSubmit={handleSubmit}>
-      <input value={query} onChange={e => setQuery(e.target.value)} />
-      <button disabled={searchState === 'running'}>
-        {searchState === 'running' ? 'Searching...' : 'Search'}
-      </button>
+      <Textarea
+        value={state.textAreaValue}
+        onChange={(e) => setState((prev) => ({ ...prev, textAreaValue: e.target.value }))}
+      />
+      <Button type="submit" size="xs" variant="default" flex={1}>
+        Search
+      </Button>
+      {additionalButtons}
     </form>
   );
 }
@@ -370,21 +389,21 @@ const { restoreSearch } = useHistoryRestore(updateQuery, textAreaRef);
 ```
 User types query
     ↓
-SearchForm updates queryPubSub
+SearchForm updates local textAreaValue state (queryPubSub is not updated while typing)
     ↓
 User submits
     ↓
-searchAndRespond() called
+SearchForm calls updateQuery() → queryPubSub, updates URL & history, calls searchAndRespond()
     ↓
-searchText() updates textSearchStatePubSub → 'loading'
+startTextSearch() updates textSearchStatePubSub → "running"
     ↓
 SearchResultsSection shows loading skeleton
     ↓
-API returns results
+searchText() returns results (or throws → textSearchStatePubSub → "failed")
+    ↓
+startTextSearch() updates textSearchStalePubSub and sets textSearchStatePubSub → "completed"
     ↓
 textSearchResultsPubSub updated with results
-    ↓
-textSearchStatePubSub → 'idle'
     ↓
 SearchResultsSection renders results
 ```
@@ -392,27 +411,21 @@ SearchResultsSection renders results
 ### AI Response Flow
 
 ```
-Search results ready
+searchAndRespond() starts (with enableAiResponse enabled)
     ↓
-canStartResponding() → true
+Browser (Wllama) path only: canDownloadModels() → "awaitingModelDownloadAllowance" (if consent needed) → "loadingModel"
     ↓
-textGenerationStatePubSub → 'loadingModel'
+Strategy awaits canStartResponding() → textGenerationStatePubSub → "awaitingSearchResults"
     ↓
-AiResponseSection shows "Loading AI model..."
+Search promise resolves → textGenerationStatePubSub → "preparingToGenerate"
     ↓
-Model loaded
+First streamed token arrives → textGenerationStatePubSub → "generating"
     ↓
-textGenerationStatePubSub → 'generating'
-    ↓
-Response tokens stream in
-    ↓
-responsePubSub updated (throttled 12/sec)
+Response tokens stream in → responsePubSub updated (throttled 12/sec)
     ↓
 AiResponseSection updates content
     ↓
-Generation complete
-    ↓
-textGenerationStatePubSub → 'completed'
+Generation complete → response saved to history → textGenerationStatePubSub → "completed" (or "failed" / "interrupted")
 ```
 
 ### Chat Flow
@@ -528,7 +541,7 @@ lock and no error.
 
 1. **Single Responsibility:** Components do one thing well
 2. **PubSub-First:** Use channels for cross-component communication
-3. **Lazy Loading:** Route-level components use `React.lazy()` for code splitting
+3. **Lazy Loading:** `React.lazy()` is used for code not needed on first paint (`AccessPage`, the result and AI sections inside `MainPage`, drawers, modals, and `WllamaModelSelect`), while `MainPage` itself is a static import in `App.tsx`
 4. **Error Boundaries:** Used selectively -- `SearchResultsSection` wraps each result type, and `MarkdownRenderer` wraps syntax-highlighted code blocks (falling back to plain text on failure). AI response and chat components are not currently wrapped in error boundaries.
 
 ## File Organization
