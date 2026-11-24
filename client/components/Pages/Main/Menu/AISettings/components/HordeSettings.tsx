@@ -5,7 +5,9 @@ import { aiHordeDefaultApiKey } from "@/modules/textGenerationWithHorde";
 import type { HordeUserInfo, ModelOption } from "../types";
 
 interface HordeSettingsProps {
-  form: UseFormReturnType<typeof defaultSettings>;
+  form: UseFormReturnType<
+    Pick<typeof defaultSettings, "hordeApiKey" | "hordeModel">
+  >;
   hordeUserInfo: HordeUserInfo | null;
   hordeModels: ModelOption[];
 }

@@ -1,8 +1,8 @@
 import { Select, Stack, Switch, Text, TextInput } from "@mantine/core";
-import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { usePubSub } from "create-pubsub/react";
 import { useEffect, useState } from "react";
+import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { FALLBACK_CONFIG, getConfig } from "@/modules/config";
 import { requestNotificationPermission } from "@/modules/notifications";
 import { settingsPubSub } from "@/modules/pubSub";
@@ -15,8 +15,26 @@ import { useHordeModels } from "./hooks/useHordeModels";
 import { useHordeUserInfo } from "./hooks/useHordeUserInfo";
 import { useOpenAiModels } from "./hooks/useOpenAiModels";
 
+const SETTINGS_KEYS = [
+  "enableAiResponse",
+  "enableNotificationOnAiComplete",
+  "enablePageContentFetch",
+  "inferenceType",
+  "openAiApiBaseUrl",
+  "openAiApiKey",
+  "openAiApiModel",
+  "openAiContextLength",
+  "hordeApiKey",
+  "hordeModel",
+  "wllamaModelId",
+  "cpuThreads",
+  "systemPrompt",
+  "reasoningStartMarker",
+  "reasoningEndMarker",
+] as const;
+
 export default function AISettingsForm() {
-  const [settings, setSettings] = usePubSub(settingsPubSub);
+  const [settings] = usePubSub(settingsPubSub);
   const { openAiModels, useTextInput } = useOpenAiModels(settings);
   const hordeModels = useHordeModels(settings);
   const hordeUserInfo = useHordeUserInfo(settings);
@@ -29,10 +47,7 @@ export default function AISettingsForm() {
       .then(setServerConfig);
   }, []);
 
-  const form = useForm({
-    initialValues: settings,
-    onValuesChange: setSettings,
-  });
+  const form = useSettingsForm(SETTINGS_KEYS);
 
   const handleNotificationToggle = async (
     event: React.ChangeEvent<HTMLInputElement>,

@@ -4,16 +4,12 @@ import {
   useComputedColorScheme,
   useMantineColorScheme,
 } from "@mantine/core";
-import { useForm } from "@mantine/form";
-import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "@/modules/pubSub";
+import { useSettingsForm } from "@/hooks/useSettingsForm";
+
+const SETTINGS_KEYS = ["enterToSubmit"] as const;
 
 export default function InterfaceSettingsForm() {
-  const [settings, setSettings] = usePubSub(settingsPubSub);
-  const form = useForm({
-    initialValues: settings,
-    onValuesChange: setSettings,
-  });
+  const form = useSettingsForm(SETTINGS_KEYS);
   const { setColorScheme } = useMantineColorScheme();
   const computedColorScheme = useComputedColorScheme("light");
 

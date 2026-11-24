@@ -8,21 +8,25 @@ import {
   Switch,
   Text,
 } from "@mantine/core";
-import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { IconInfoCircle } from "@tabler/icons-react";
-import { usePubSub } from "create-pubsub/react";
 import { useState } from "react";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
+import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { addLogEntry } from "@/modules/logEntries";
-import { settingsPubSub } from "@/modules/pubSub";
 
 interface HistorySettingsProps {
   onClose?: () => void;
 }
 
+const SETTINGS_KEYS = [
+  "enableHistory",
+  "historyMaxEntries",
+  "historyAutoCleanup",
+  "historyRetentionDays",
+] as const;
+
 export default function HistorySettings({ onClose }: HistorySettingsProps) {
-  const [settings, setSettings] = usePubSub(settingsPubSub);
   const { recentSearches, llmResponseCount, chatMessageCount, clearAll } =
     useSearchHistory();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -30,20 +34,7 @@ export default function HistorySettings({ onClose }: HistorySettingsProps) {
   const hasHistory =
     recentSearches.length > 0 || llmResponseCount > 0 || chatMessageCount > 0;
 
-  const form = useForm({
-    initialValues: {
-      enableHistory: settings.enableHistory,
-      historyMaxEntries: settings.historyMaxEntries,
-      historyAutoCleanup: settings.historyAutoCleanup,
-      historyRetentionDays: settings.historyRetentionDays,
-    },
-    onValuesChange: (values) => {
-      setSettings({
-        ...settings,
-        ...values,
-      });
-    },
-  });
+  const form = useSettingsForm(SETTINGS_KEYS);
 
   const handleClearHistory = async () => {
     try {

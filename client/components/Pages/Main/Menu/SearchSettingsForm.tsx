@@ -1,14 +1,14 @@
 import { Slider, Stack, Switch, Text } from "@mantine/core";
-import { useForm } from "@mantine/form";
-import { usePubSub } from "create-pubsub/react";
-import { settingsPubSub } from "@/modules/pubSub";
+import { useSettingsForm } from "@/hooks/useSettingsForm";
+
+const SETTINGS_KEYS = [
+  "searchResultsLimit",
+  "enableTextSearch",
+  "enableImageSearch",
+] as const;
 
 export default function SearchSettingsForm() {
-  const [settings, setSettings] = usePubSub(settingsPubSub);
-  const form = useForm({
-    initialValues: settings,
-    onValuesChange: setSettings,
-  });
+  const form = useSettingsForm(SETTINGS_KEYS);
 
   return (
     <Stack gap="md">
