@@ -25,6 +25,8 @@ const MIN_SNIPPET_LINE_LENGTH = 40;
 const DEFAULT_RATE_LIMIT_PAUSE_MS = 60_000;
 const MAX_RATE_LIMIT_PAUSE_MS = 3_600_000;
 const MIN_RATE_LIMIT_PAUSE_MS = 1_000;
+// The most results one Keenable search returns; it refuses a larger count.
+const KEENABLE_MAX_RESULTS = 50;
 
 // One per server process: Parallel uses it for free-tier rate limiting and
 // one MiniSearch instance is one client, so a fresh one per request would shed
@@ -62,9 +64,19 @@ interface YoucomSearchDocument {
   results?: { web?: YoucomWebResult[] };
 }
 
+interface KeenableSearchResult {
+  url?: string;
+  title?: string | null;
+  snippet?: string | null;
+}
+
+interface KeenableSearchDocument {
+  results?: KeenableSearchResult[];
+}
+
 type TextualResult = [title: string, content: string, url: string];
 
-type ProviderName = "parallel" | "youcom";
+type ProviderName = "parallel" | "youcom" | "keenable";
 
 interface MappedResults {
   results: TextualResult[];
@@ -75,7 +87,15 @@ interface MappedResults {
 interface FallbackProvider {
   name: ProviderName;
   apiKeyVariable: string;
+  /**
+   * Left out of the default list: tried only when SEARCH_FALLBACK_PROVIDERS
+   * names it or its key is set, so adding it changes nothing for an instance
+   * that already runs the fallback.
+   */
+  optIn?: boolean;
   endpointUrl: (apiKey: string) => string;
+  /** The headers that carry the key, and any the provider needs on every request. Bearer when absent. */
+  headers?: (apiKey: string) => Record<string, string>;
   toolCall: (
     query: string,
     limit: number,
@@ -114,6 +134,36 @@ const PROVIDERS: readonly FallbackProvider[] = [
     }),
     mapResults: (document, limit) =>
       mapYoucomResults(document as YoucomSearchDocument, limit),
+  },
+  {
+    name: "keenable",
+    apiKeyVariable: "SEARCH_FALLBACK_KEENABLE_API_KEY",
+    optIn: true,
+    endpointUrl: (apiKey) =>
+      apiKey
+        ? "https://api.keenable.ai/mcp"
+        : "https://api.keenable.ai/mcp-public",
+    // Keenable reads a key from X-API-Key; a Bearer token there is taken for
+    // an OAuth sign-in and refused. The app name identifies the caller on the
+    // keyless endpoint.
+    headers: (apiKey) => ({
+      "X-Keenable-Title": "MiniSearch",
+      ...(apiKey ? { "X-API-Key": apiKey } : {}),
+    }),
+    // `output_format: json` returns the raw search response instead of the
+    // readable text the tool sends by default. Cards (prices, rates) carry
+    // URLs that expire after a day, so they are left out.
+    toolCall: (query, limit) => ({
+      name: "search_web_pages",
+      arguments: {
+        query,
+        max_results: Math.min(limit, KEENABLE_MAX_RESULTS),
+        output_format: "json",
+        disable_cards: true,
+      },
+    }),
+    mapResults: (document, limit) =>
+      mapKeenableResults(document as KeenableSearchDocument, limit),
   },
 ];
 
@@ -206,7 +256,12 @@ function readConfiguredProviders(): FallbackProvider[] {
   }
 
   const value = process.env.SEARCH_FALLBACK_PROVIDERS ?? "";
-  if (value.trim() === "") return [...PROVIDERS];
+  if (value.trim() === "") {
+    return PROVIDERS.filter(
+      ({ optIn, apiKeyVariable }) =>
+        !optIn || (process.env[apiKeyVariable] ?? "").trim() !== "",
+    );
+  }
 
   const names = value
     .split(",")
@@ -426,7 +481,11 @@ async function searchWithProvider(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "application/json, text/event-stream",
-    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    ...(provider.headers
+      ? provider.headers(apiKey)
+      : apiKey
+        ? { Authorization: `Bearer ${apiKey}` }
+        : {}),
   };
 
   const initializeResponse = await fetch(endpointUrl, {
@@ -644,6 +703,35 @@ function mapYoucomResults(
   return {
     results: mapEntries(document.results.web, limit, buildYoucomSnippet),
   };
+}
+
+/**
+ * Keenable's snippet is markdown cut from the page for the query, the same
+ * kind of text as a Parallel excerpt, so each result is read as a Parallel
+ * result with that one excerpt: cleaned the same way, and kept whole for
+ * `/page-content`.
+ */
+function mapKeenableResults(
+  document: KeenableSearchDocument,
+  limit: number,
+): MappedResults {
+  if (!Array.isArray(document.results)) return mapParallelResults({}, limit);
+
+  return mapParallelResults(
+    {
+      results: document.results.map((result) =>
+        result && typeof result === "object"
+          ? {
+              url: result.url,
+              title: result.title,
+              excerpts:
+                typeof result.snippet === "string" ? [result.snippet] : [],
+            }
+          : result,
+      ),
+    },
+    limit,
+  );
 }
 
 function mapEntries<Entry extends { url?: string; title?: string | null }>(

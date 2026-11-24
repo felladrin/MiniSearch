@@ -166,7 +166,7 @@ Need to:
 - `server/crossOriginServerHook.ts` - COOP/COEP headers for SharedArrayBuffer
 - `server/cacheServerHook.ts` - Cache-Control headers (preview server only)
 - `server/webSearchService.ts` - SearXNG integration with circuit breaker and retry logic
-- `server/fallbackSearchService.ts` - Fallback text-search cascade over Parallel and You.com for when SearXNG fails and `SEARCH_FALLBACK_ENABLED` is on, with a per-provider pause after a 429
+- `server/fallbackSearchService.ts` - Fallback text-search cascade over Parallel, You.com and opt-in Keenable for when SearXNG fails and `SEARCH_FALLBACK_ENABLED` is on, with a per-provider pause after a 429
 - `server/pageContentService.ts` - Reads result pages and extracts query-relevant passages
 - `server/pageReadHostBreaker.ts` - Per-host circuit breaker for page reads: skips a host that refused the last three reads, then probes it once
 - `server/utils/publicUrl.ts` - Blocks private and reserved addresses before a server-side fetch

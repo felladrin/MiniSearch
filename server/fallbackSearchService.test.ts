@@ -89,6 +89,8 @@ function youcomDocumentWith(web: unknown[]): string {
 const PARALLEL_URL = "https://search.parallel.ai/mcp";
 const YOUCOM_KEYLESS_URL = "https://api.you.com/mcp?profile=free";
 const YOUCOM_AUTHENTICATED_URL = "https://api.you.com/mcp";
+const KEENABLE_KEYLESS_URL = "https://api.keenable.ai/mcp-public";
+const KEENABLE_AUTHENTICATED_URL = "https://api.keenable.ai/mcp";
 
 const DESCRIPTION =
   "A plain description that You.com returns for a page that matched the query, long enough to read as a summary.";
@@ -112,6 +114,7 @@ const FALLBACK_VARIABLES = [
   "SEARCH_FALLBACK_PROVIDERS",
   "SEARCH_FALLBACK_PARALLEL_API_KEY",
   "SEARCH_FALLBACK_YOUCOM_API_KEY",
+  "SEARCH_FALLBACK_KEENABLE_API_KEY",
   "SEARCH_FALLBACK_PROVIDER",
   "SEARCH_FALLBACK_API_KEY",
 ] as const;
@@ -1356,7 +1359,7 @@ describe("configuration", () => {
     listProviders("parallel, Bing");
 
     expect(() => assertSearchFallbackConfiguration()).toThrow(
-      "SEARCH_FALLBACK_PROVIDERS has unknown provider names: bing; valid names: parallel, youcom.",
+      "SEARCH_FALLBACK_PROVIDERS has unknown provider names: bing; valid names: parallel, youcom, keenable.",
     );
     await expect(
       fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
@@ -1907,6 +1910,110 @@ describe("getFallbackProviderStats", () => {
     expect(getFallbackProviderStats()).toEqual({
       parallel: zero,
       youcom: zero,
+      keenable: zero,
     });
+  });
+});
+
+describe("Keenable", () => {
+  const KEENABLE_KEY_VARIABLE = "SEARCH_FALLBACK_KEENABLE_API_KEY";
+  const keenableDocumentWith = (results: unknown[]) =>
+    toolReply({ query: QUERY, mode: "pro", results });
+  const runKeenable = async (results: unknown[], limit = 10) => {
+    process.env.SEARCH_FALLBACK_PROVIDERS = "keenable";
+    mockExchange(keenableDocumentWith(results), { initializeSession: null });
+    return fetchFallbackTextResults(QUERY, limit, FULL_BUDGET_MS);
+  };
+
+  it("is left out of the default list while it has no key", async () => {
+    delete process.env.SEARCH_FALLBACK_PROVIDERS;
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    mockExchange(documentWith([]));
+    mockExchange(youcomDocumentWith([]), { initializeSession: null });
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    const urls = fetchMock.mock.calls.map(([requestUrl]) => String(requestUrl));
+    expect(new Set(urls)).toEqual(new Set([PARALLEL_URL, YOUCOM_KEYLESS_URL]));
+  });
+
+  it("joins the default list when its key is set", async () => {
+    delete process.env.SEARCH_FALLBACK_PROVIDERS;
+    process.env[KEENABLE_KEY_VARIABLE] = "keenable-test-value";
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    mockExchange(documentWith([]));
+    mockExchange(youcomDocumentWith([]), { initializeSession: null });
+    mockExchange(keenableDocumentWith([]), { initializeSession: null });
+
+    await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
+
+    const urls = fetchMock.mock.calls.map(([requestUrl]) => String(requestUrl));
+    expect(new Set(urls)).toEqual(
+      new Set([PARALLEL_URL, YOUCOM_KEYLESS_URL, KEENABLE_AUTHENTICATED_URL]),
+    );
+  });
+
+  it("calls the keyless endpoint with the app name and no key header", async () => {
+    await runKeenable([]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [index, [requestUrl]] of fetchMock.mock.calls.entries()) {
+      expect(String(requestUrl)).toBe(KEENABLE_KEYLESS_URL);
+      expect(requestHeaders(index)["X-Keenable-Title"]).toBe("MiniSearch");
+      expect(requestHeaders(index)["X-API-Key"]).toBeUndefined();
+      expect(requestHeaders(index).Authorization).toBeUndefined();
+    }
+    expect(requestBody(1).params?.name).toBe("search_web_pages");
+    expect(requestBody(1).params?.arguments).toEqual({
+      query: QUERY,
+      max_results: 10,
+      output_format: "json",
+      disable_cards: true,
+    });
+  });
+
+  it("sends a key as X-API-Key, never as a Bearer token, on the keyed endpoint", async () => {
+    process.env[KEENABLE_KEY_VARIABLE] = "keenable-test-value";
+
+    await runKeenable([]);
+
+    for (const [index, [requestUrl]] of fetchMock.mock.calls.entries()) {
+      expect(String(requestUrl)).toBe(KEENABLE_AUTHENTICATED_URL);
+      expect(requestHeaders(index)["X-API-Key"]).toBe("keenable-test-value");
+      expect(requestHeaders(index).Authorization).toBeUndefined();
+    }
+  });
+
+  it("asks for at most 50 results", async () => {
+    await runKeenable([], 80);
+
+    expect(requestBody(1).params?.arguments?.max_results).toBe(50);
+  });
+
+  it("maps the snippet like an excerpt and keeps the endpoint's order", async () => {
+    const results = await runKeenable([
+      {
+        title: "First",
+        url: "https://example.com/1",
+        snippet: `# Heading\n${EXCERPT}`,
+      },
+      { title: "No snippet", url: "https://example.com/2", snippet: "" },
+      { title: "Second", url: "https://example.com/3", snippet: EXCERPT },
+      "not an object",
+    ]);
+
+    expect(results).toEqual([
+      ["First", EXCERPT, "https://example.com/1"],
+      ["Second", EXCERPT, "https://example.com/3"],
+    ]);
+  });
+
+  it("throws when the document has no results array", async () => {
+    process.env.SEARCH_FALLBACK_PROVIDERS = "keenable";
+    mockExchange(toolReply({ query: QUERY }), { initializeSession: null });
+
+    await expect(
+      fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
+    ).rejects.toThrow("without a results array");
   });
 });

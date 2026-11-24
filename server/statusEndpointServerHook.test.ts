@@ -148,7 +148,7 @@ describe("statusEndpointServerHook", () => {
       Object.keys(
         (status.searches as { fallbackProviders: object }).fallbackProviders,
       ),
-    ).toEqual(["parallel", "youcom"]);
+    ).toEqual(["parallel", "youcom", "keenable"]);
   });
 
   it("publishes the page-read circuit count beside the outcome counters", async () => {
