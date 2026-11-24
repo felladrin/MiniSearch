@@ -1,6 +1,7 @@
 import { createPubSub } from "create-pubsub";
 import throttle from "throttleit";
 import { addLogEntry } from "./logEntries";
+import * as safeStorage from "./safeStorage";
 import { defaultSettings, SETTINGS_STORAGE_KEY } from "./settings";
 import type {
   ImageSearchResults,
@@ -27,7 +28,7 @@ function isSameJsonKind(value: unknown, reference: unknown): boolean {
 }
 
 function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
-  const localStorageValue = localStorage.getItem(localStorageKey);
+  const localStorageValue = safeStorage.getItem(localStorageKey);
   let initialValue: T = defaultValue;
   if (localStorageValue !== null) {
     let parsed: unknown;
@@ -42,7 +43,7 @@ function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
       // Runs at module load, so an unparseable or wrong-type stored value must
       // not crash the app. Remove it (so the fallback doesn't repeat on every
       // load) and log it for the in-app log panel.
-      localStorage.removeItem(localStorageKey);
+      safeStorage.removeItem(localStorageKey);
       addLogEntry(
         `Discarded an unusable stored value for '${localStorageKey}'`,
       );
@@ -53,7 +54,7 @@ function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   const [, onValueChange] = localStoragePubSub;
 
   onValueChange((value) =>
-    localStorage.setItem(localStorageKey, JSON.stringify(value)),
+    safeStorage.setItem(localStorageKey, JSON.stringify(value)),
   );
 
   return localStoragePubSub;

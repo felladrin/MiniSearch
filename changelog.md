@@ -4,6 +4,8 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- When the browser blocks site data (for example Safari "Block All Cookies" or Chrome "sites can't save data"), the app no longer crashes on load with a blank page. Settings and other persisted values stay in memory for the session and simply do not write through.
+
 - A failed or empty conversation summary fold no longer erases the summary already built for a long chat. When summarizing older turns fails and the fallback returns empty (for example after dropping a very long message) or the model returns an empty summary, MiniSearch keeps the existing stored summary and includes it in the prompt for the current turn.
 - Restoring a saved search from history no longer turns off follow-up question suggestions for the rest of the session. Sending a chat message in the restored conversation or starting a new search now generates follow-up suggestions again, restoring an entry with no saved answer no longer suppresses them, and a follow-up question still generating from a previous search is cancelled so it cannot land in the restored session.
 - A missing file under `/assets/` is no longer sent with a one-year immutable cache header. During a partial deploy, or for an outdated link, the server answered such a request with the app page or a 404 marked immutable, so browsers could keep that wrong answer for the asset's URL for a year. Only files that exist in the build are now marked immutable; anything else under `/assets/` gets `no-cache`.
