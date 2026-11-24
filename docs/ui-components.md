@@ -157,7 +157,7 @@ App
 
 **PubSub:**
 
-- **Subscribes:** `settingsPubSub`, `isRestoringFromHistoryPubSub`, `textSearchResultsPubSub`, `imageSearchResultsPubSub`, `responsePubSub`
+- **Subscribes:** `settingsPubSub`, `isRestoringFromHistoryPubSub`
 - **Updates:** calls `updateQuery(...)` on submit, URL auto-search, and history restore; triggers `searchAndRespond()` on submit and URL auto-search
 
 The query field is wrapped in its own `position: relative` element so
@@ -373,6 +373,8 @@ Restoring a past search (re-running its query) is handled separately by `useHist
 ```typescript
 const { restoreSearch } = useHistoryRestore(updateQuery, textAreaRef);
 ```
+
+`restoreSearch` marks the entry's query as handled in `modules/autoSearch.ts` before it changes the URL, the same mark the URL auto-search and a submit set, so an entry that restores empty (a failed search, zero results with AI off, an abandoned search) does not fall through to the URL auto-search and get a duplicate history entry.
 
 **Features:**
 

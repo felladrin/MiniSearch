@@ -16,17 +16,12 @@ import DictationButton, {
 } from "@/components/DictationButton";
 import { useHistoryRestore } from "@/hooks/useHistoryRestore";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
+import { isQueryHandled, markQueryAsHandled } from "@/modules/autoSearch";
 import { resetSearchRunId } from "@/modules/history";
 import { handleEnterKeyDown } from "@/modules/keyboard";
 import { addLogEntry } from "@/modules/logEntries";
 import { postMessageToParentWindow } from "@/modules/parentWindow";
-import {
-  imageSearchResultsPubSub,
-  isRestoringFromHistoryPubSub,
-  responsePubSub,
-  settingsPubSub,
-  textSearchResultsPubSub,
-} from "@/modules/pubSub";
+import { isRestoringFromHistoryPubSub, settingsPubSub } from "@/modules/pubSub";
 import {
   DEFAULT_QUERY_SUGGESTION,
   getRandomQuerySuggestion,
@@ -40,20 +35,6 @@ const dictationGutter = 4;
 
 function getUrlQuery() {
   return new URLSearchParams(window.location.search).get("q");
-}
-
-/**
- * The query whose auto-search already ran. Module-level so it survives
- * the remount when MainPage swaps HomePage for SearchForm as the query
- * goes from empty to non-empty. Kept as a single slot (not a Set) so it
- * suppresses only the most recent auto-search, matching the behavior the
- * user expects when navigating back to a previously searched query.
- */
-let autoSearchedQuery: string | null = null;
-
-/** Exposed for tests to reset module state between runs. */
-export function resetAutoSearchedQuery(): void {
-  autoSearchedQuery = null;
 }
 
 interface SearchFormState {
@@ -92,9 +73,6 @@ export default memo(function SearchForm({
   const [, navigate] = useLocation();
   const [pubSubSettings] = usePubSub(settingsPubSub);
   const [isRestoringFromHistory] = usePubSub(isRestoringFromHistoryPubSub);
-  const [textSearchResults] = usePubSub(textSearchResultsPubSub);
-  const [imageSearchResults] = usePubSub(imageSearchResultsPubSub);
-  const [responseValue] = usePubSub(responsePubSub);
   const { addToHistory } = useSearchHistory();
   const { restoreSearch } = useHistoryRestore((newQuery) => {
     setState((prev) => ({ ...prev, textAreaValue: newQuery }));
@@ -114,17 +92,12 @@ export default memo(function SearchForm({
       const normalizedUrlQuery = urlQuery?.trim();
 
       if (
+        urlQuery &&
         normalizedUrlQuery &&
-        normalizedUrlQuery !== autoSearchedQuery &&
+        !isQueryHandled(normalizedUrlQuery) &&
         !isRestoringFromHistory
       ) {
-        const hasRestoredResults =
-          textSearchResults.length > 0 || imageSearchResults.length > 0;
-        const hasRestoredResponse = responseValue.trim().length > 0;
-        if (hasRestoredResults || hasRestoredResponse) return;
-
-        if (!urlQuery) return;
-        autoSearchedQuery = normalizedUrlQuery;
+        markQueryAsHandled(normalizedUrlQuery);
         updateQuery(urlQuery);
         setState((prevState) => ({
           ...prevState,
@@ -147,14 +120,7 @@ export default memo(function SearchForm({
     };
 
     void initializeComponent();
-  }, [
-    updateQuery,
-    isRestoringFromHistory,
-    textSearchResults.length,
-    imageSearchResults.length,
-    responseValue,
-    addToHistory,
-  ]);
+  }, [updateQuery, isRestoringFromHistory, addToHistory]);
 
   useEffect(() => {
     if (state.textAreaValue.length === 0) {
@@ -222,7 +188,7 @@ export default memo(function SearchForm({
     const normalizedQuery = queryToEncode.trim();
 
     if (normalizedQuery.length > 0) {
-      autoSearchedQuery = normalizedQuery;
+      markQueryAsHandled(normalizedQuery);
     }
 
     setState((prev) => ({ ...prev, textAreaValue: queryToEncode }));

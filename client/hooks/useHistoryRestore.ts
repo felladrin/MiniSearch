@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useLocation } from "wouter";
+import { markQueryAsHandled } from "../modules/autoSearch";
 import type { SearchEntry } from "../modules/history";
 import {
   getChatMessagesForQuery,
@@ -38,6 +39,11 @@ export function useHistoryRestore(
   const restoreSearch = useCallback(
     async (entry: SearchEntry) => {
       const selectedQuery = entry.query;
+      // The URL is about to hold this query; without the mark, an entry that
+      // restores empty would fall through to the URL auto-search once
+      // isRestoringFromHistory flips back, appending a duplicate history
+      // entry and starting a live search.
+      markQueryAsHandled(selectedQuery);
       updateQuery(selectedQuery);
 
       const searchRunId = entry.searchRunId || entry.query;

@@ -44,6 +44,7 @@ The `client/modules/` directory contains core business logic organized by domain
 | `textGeneration.ts`             | AI response generation and chat handling                                                                                          |
 | `textGenerationWith*.ts`        | Provider-specific inference implementations (Wllama, OpenAI, Horde, Internal API)                                                 |
 | `history.ts`                    | IndexedDB persistence for searches and chat                                                                                       |
+| `autoSearch.ts`                 | The query the URL belongs to (auto-searched, submitted or restored), so the URL auto-search runs once                             |
 | `settings.ts`                   | Default settings and inference type definitions                                                                                   |
 | `followUpQuestions.ts`          | Generates contextual follow-up questions                                                                                          |
 | `relatedSearchQuery.ts`         | Creates related search queries from conversation                                                                                  |
