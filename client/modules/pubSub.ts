@@ -31,10 +31,41 @@ function isSameJsonKind(value: unknown, reference: unknown): boolean {
   return typeof value === typeof reference;
 }
 
+/**
+ * Fill a stored settings object with the defaults for the keys it does not
+ * have, so the first value a reader sees is complete even when the stored
+ * profile predates a newly added key. A stored key whose value has a
+ * different JSON kind than the default falls back to the default alone; keys
+ * the defaults do not know are kept.
+ */
+function hydrateWithDefaults<T>(defaultValue: T, parsed: unknown): T {
+  if (
+    typeof defaultValue !== "object" ||
+    defaultValue === null ||
+    Array.isArray(defaultValue) ||
+    typeof parsed !== "object" ||
+    parsed === null ||
+    Array.isArray(parsed)
+  ) {
+    return parsed as T;
+  }
+  const defaults = defaultValue as Record<string, unknown>;
+  const accepted: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(
+    parsed as Record<string, unknown>,
+  )) {
+    if (!(key in defaults) || isSameJsonKind(value, defaults[key])) {
+      accepted[key] = value;
+    }
+  }
+  return { ...defaults, ...accepted } as T;
+}
+
 function createLocalStoragePubSub<T>(
   localStorageKey: string,
   defaultValue: T,
   normalize?: (value: T) => T,
+  reportUsableStoredValue?: (usable: boolean) => void,
 ) {
   const localStorageValue = safeStorage.getItem(localStorageKey);
   let initialValue: T = defaultValue;
@@ -46,7 +77,9 @@ function createLocalStoragePubSub<T>(
       parsed = undefined;
     }
     if (parsed !== undefined && isSameJsonKind(parsed, defaultValue)) {
-      initialValue = normalize ? normalize(parsed as T) : (parsed as T);
+      const hydrated = hydrateWithDefaults(defaultValue, parsed);
+      initialValue = normalize ? normalize(hydrated) : hydrated;
+      reportUsableStoredValue?.(true);
     } else {
       // Runs at module load, so an unparseable or wrong-type stored value must
       // not crash the app. Remove it (so the fallback doesn't repeat on every
@@ -55,6 +88,7 @@ function createLocalStoragePubSub<T>(
       addLogEntry(
         `Discarded an unusable stored value for '${localStorageKey}'`,
       );
+      reportUsableStoredValue?.(false);
     }
   }
   const localStoragePubSub = createPubSub(initialValue);
@@ -128,11 +162,25 @@ export const modelLoadingProgressPubSub = createPubSub(0);
 
 export const [updateModelLoadingProgress] = modelLoadingProgressPubSub;
 
+let storedSettingsUsable = false;
+
 export const settingsPubSub = createLocalStoragePubSub(
   SETTINGS_STORAGE_KEY,
   defaultSettings,
   coerceNumericSettings,
+  (usable) => {
+    storedSettingsUsable = usable;
+  },
 );
+
+/**
+ * Whether this browser already had a usable settings object from an earlier
+ * visit, decided while `settingsPubSub` hydrated. `applyServerConfig()` uses
+ * it to tell an untouched profile from a user who deliberately picked a value
+ * that happens to equal a default. A stored value that was discarded as
+ * unusable counts as no stored settings, which is what the merge assumes.
+ */
+export const hasStoredUserSettings = storedSettingsUsable;
 
 export const [updateSettings, listenToSettingsChanges, getSettings] =
   settingsPubSub;
