@@ -7,11 +7,19 @@ vi.mock("./biEncoderService.ts", () => ({ scorePassages: scorePassagesMock }));
 const lookupMock = vi.hoisted(() => vi.fn());
 const pdfGetTextMock = vi.hoisted(() => vi.fn());
 const pdfDestroyMock = vi.hoisted(() => vi.fn());
+const htmlToTextConvertMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:dns/promises", () => ({
   default: { lookup: lookupMock },
   lookup: lookupMock,
 }));
+
+// Runs the real converter unless a case makes it throw once.
+vi.mock("html-to-text", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("html-to-text")>();
+  htmlToTextConvertMock.mockImplementation(actual.convert);
+  return { ...actual, convert: htmlToTextConvertMock };
+});
 
 vi.mock("pdf-parse", () => ({
   PDFParse: class {
@@ -1525,4 +1533,92 @@ describe("dense passage fusion", () => {
       expect(result.every((page) => page.content.length <= 6000)).toBe(true);
     },
   );
+});
+
+describe("pages that arrive but cannot be parsed", () => {
+  const pdfResponse = () =>
+    new Response("%PDF-1.7\n%%EOF", {
+      status: 200,
+      headers: { "content-type": "application/pdf" },
+    });
+
+  it("counts a PDF whose text extraction rejects as unparsable, not failed", async () => {
+    pdfGetTextMock.mockRejectedValue(new Error("No password given"));
+    fetchMock.mockImplementation(async () => pdfResponse());
+
+    expect(
+      (await countOutcomes("https://example.com/locked.pdf")).skipped,
+    ).toEqual({ unparsable: 1 });
+    expect(pdfDestroyMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not box a host over documents it served and the parser could not read", async () => {
+    const breaker = new PageReadHostBreaker({ failureThreshold: 3 });
+    pdfGetTextMock.mockRejectedValue(new Error("Invalid PDF structure"));
+    fetchMock.mockImplementation(async () => pdfResponse());
+
+    for (const name of ["a", "b", "c"]) {
+      expect(
+        (await countOutcomes(`https://docs.example.com/${name}.pdf`, breaker))
+          .skipped,
+      ).toEqual({ unparsable: 1 });
+    }
+    expect(breaker.getOpens()).toBe(0);
+
+    // The host's good pages are still read.
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(articlePage, {
+          status: 200,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+    );
+    expect(
+      (await countOutcomes("https://docs.example.com/article", breaker)).read,
+    ).toBe(1);
+  });
+
+  it("counts an HTML page whose extraction throws as unparsable", async () => {
+    respondWithHtml(articlePage);
+    htmlToTextConvertMock.mockImplementationOnce(() => {
+      throw new Error("unexpected markup");
+    });
+
+    expect(
+      (await countOutcomes("https://example.com/broken-markup")).skipped,
+    ).toEqual({ unparsable: 1 });
+  });
+
+  it("keeps a rejected fetch and a body that errors mid-stream as failed, and they still box the host", async () => {
+    const breaker = new PageReadHostBreaker({ failureThreshold: 3 });
+
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+    expect(
+      (await countOutcomes("https://flaky.example.com/a", breaker)).skipped,
+    ).toEqual({ failed: 1 });
+
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(
+          new ReadableStream({
+            pull(controller) {
+              controller.error(new TypeError("terminated"));
+            },
+          }),
+          { status: 200, headers: { "content-type": "text/html" } },
+        ),
+    );
+    expect(
+      (await countOutcomes("https://flaky.example.com/b", breaker)).skipped,
+    ).toEqual({ failed: 1 });
+    expect(
+      (await countOutcomes("https://flaky.example.com/c", breaker)).skipped,
+    ).toEqual({ failed: 1 });
+
+    respondWithHtml(articlePage);
+    expect(
+      (await countOutcomes("https://flaky.example.com/d", breaker)).skipped,
+    ).toEqual({ skippedByBreaker: 1 });
+    expect(breaker.getOpens()).toBe(1);
+  });
 });

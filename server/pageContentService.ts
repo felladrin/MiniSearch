@@ -527,26 +527,37 @@ async function readHop(url: URL, deadline: AbortSignal): Promise<HopResult> {
     }
   }
 
+  let bytes: Uint8Array;
+  let truncated: boolean;
   try {
-    const { bytes, truncated } = await readCappedBytes(
+    ({ bytes, truncated } = await readCappedBytes(
       response,
       MAX_RESPONSE_BYTES,
-    );
-    if (contentType.trim().toLowerCase().startsWith("application/pdf")) {
+    ));
+  } catch (error) {
+    return { outcome: isTimeout(error) ? "timedOut" : "failed" };
+  }
+
+  if (contentType.trim().toLowerCase().startsWith("application/pdf")) {
+    // The host delivered the file. A parser that rejects it (a password, a
+    // damaged structure) says something about the document, not the host, so
+    // it must not read as a dropped connection and count toward boxing.
+    try {
       return {
         outcome: "ok",
         text: await extractPdfText(bytes),
         bodyTruncated: truncated,
       };
+    } catch {
+      return { outcome: "unparsable" };
     }
-    return {
-      outcome: "ok",
-      html: decodeDocument(bytes, contentType),
-      bodyTruncated: truncated,
-    };
-  } catch (error) {
-    return { outcome: isTimeout(error) ? "timedOut" : "failed" };
   }
+
+  return {
+    outcome: "ok",
+    html: decodeDocument(bytes, contentType),
+    bodyTruncated: truncated,
+  };
 }
 
 /**
@@ -1201,8 +1212,10 @@ async function fetchPageContent(
       contextTerms,
     };
   } catch {
+    // The page arrived and its text could not be extracted: not a connection
+    // failure.
     recordPageRead({
-      outcome: "failed",
+      outcome: "unparsable",
       durationMs: performance.now() - startedAt,
       bodyTruncated,
     });

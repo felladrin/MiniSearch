@@ -323,6 +323,7 @@ is counted at all (see `docs/page-content.md`):
 | `skipped.redirectLimit`    | number | `MAX_REDIRECTS`                                                                                                                                                  |
 | `skipped.timedOut`         | number | `REQUEST_TIMEOUT_MS`                                                                                                                                             |
 | `skipped.tooLittleText`    | number | `MIN_USEFUL_CHARS`, and the extractor's selectors                                                                                                                |
+| `skipped.unparsable`       | number | A served document that could not be parsed (a locked PDF); never boxes a host                                                                                    |
 | `skipped.failed`           | number | Nothing; the residue worth watching for a pattern                                                                                                                |
 | `grounding.requests`       | number | Nothing; the denominator for the two below                                                                                                                       |
 | `grounding.withContent`    | number | Nothing; requests where at least one page yielded text                                                                                                           |

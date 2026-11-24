@@ -334,13 +334,15 @@ in the same batch gets one probe, not two.
 
 What counts as a refusal is the host's doing and nothing else: 401, 403 and
 429 (`httpForbidden`), any other non-ok status (`httpOtherError`), a read that
-hit the deadline (`timedOut`), and a connection that was refused or dropped
-(`failed`). A dead link (`httpNotFound`) is the host answering, a page with too
-little text is the page's fault, and a blocked address never reached the host,
+hit the deadline (`timedOut`), and a connection that was refused or dropped, or
+a redirect to an address that is not a URL (`failed`). A dead link
+(`httpNotFound`) is the host answering, a page with too little text is the
+page's fault, a document the host served but that could not be parsed
+(`unparsable`) is the document's, and a blocked address never reached the host,
 so none of those count, and any of them ends a run of refusals the way a read
-that worked does. A redirect counts for the host that sent it as an answer;
-the chain is then judged again at the host it lands on, and stops there if that
-host is boxed.
+that worked does. A redirect counts for the host that sent it as an
+answer; the chain is then judged again at the host it lands on, and stops there
+if that host is boxed.
 
 The circuit is keyed on `url.host` once `resolvePublicUrl` has cleared it, so
 the breaker only ever holds hosts the instance was going to fetch from. Its
@@ -377,6 +379,7 @@ this limit set where it should be", not "who read what":
 | `averageReadMs`            | Is a 6 s deadline generous or stingy                                                                                                                                            |
 | `skipped.timedOut`         | How much is being lost to that deadline                                                                                                                                         |
 | `skipped.tooLittleText`    | Is the 200-character floor discarding real pages, or is the extractor missing their text                                                                                        |
+| `skipped.unparsable`       | How many documents arrive that cannot be read. Kept apart from `failed` so they never box a host                                                                                |
 | `skipped.notADocument`     | Are useful content types being turned away                                                                                                                                      |
 | `skipped.blocked`          | Are callers aiming at private space, deliberately or otherwise                                                                                                                  |
 | `skipped.httpForbidden`    | How often bot walls or rate limits turn the instance away (401, 403, 429)                                                                                                       |
@@ -412,6 +415,7 @@ grounded on before:
 | Other HTTP error (5xx, other non-ok status)                                        | That page is skipped (`httpOtherError`)                                                                                                           |
 | Host refused the last three reads                                                  | That page is skipped without a request for five minutes, then one read probes the host (`skippedByBreaker`)                                       |
 | Page yields less than 200 characters                                               | That page is skipped (`tooLittleText`)                                                                                                            |
+| Document cannot be parsed (a locked PDF)                                           | That page is skipped (`unparsable`); the host is not boxed for it                                                                                 |
 | `/page-content` fails or times out                                                 | Answer falls back to snippets                                                                                                                     |
 | Setting turned off, or AI responses off                                            | No page is ever read                                                                                                                              |
 | A newer search starts while pages are still being read                             | The late result is dropped instead of grounding the new answer                                                                                    |
