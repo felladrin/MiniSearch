@@ -65,7 +65,9 @@ export default function ChatInterface({
   const [textSearchResults] = usePubSub(textSearchResultsPubSub);
   const [imageSearchResults] = usePubSub(imageSearchResultsPubSub);
   const [currentQuery] = usePubSub(queryPubSub);
-  const [suppressNextFollowUp] = usePubSub(suppressNextFollowUpPubSub);
+  const [suppressNextFollowUp, setSuppressNextFollowUp] = usePubSub(
+    suppressNextFollowUpPubSub,
+  );
   const [previousFollowUpQuestions, setPreviousFollowUpQuestions] = useState<
     string[]
   >([]);
@@ -190,6 +192,13 @@ export default function ChatInterface({
   useEffect(() => {
     if (suppressNextFollowUp) {
       hasInitialized.current = true;
+      followUpInvocationRef.current += 1;
+      setFollowUpQuestion("");
+      setGenerationState({
+        ...getChatGenerationState(),
+        isGeneratingFollowUpQuestion: false,
+      });
+      setSuppressNextFollowUp(false);
       return;
     }
     if (suppressInitialFollowUp) return;
@@ -214,6 +223,9 @@ export default function ChatInterface({
     initialMessages,
     messages,
     regenerateFollowUpQuestion,
+    setFollowUpQuestion,
+    setGenerationState,
+    setSuppressNextFollowUp,
     suppressInitialFollowUp,
     suppressNextFollowUp,
   ]);

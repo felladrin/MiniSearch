@@ -29,6 +29,7 @@ vi.mock("./pubSub", () => ({
   updateImageSearchState: vi.fn(),
   updateChatMessages: vi.fn(),
   updateLlmTextSearchResults: vi.fn(),
+  updateSuppressNextFollowUp: vi.fn(),
 }));
 
 vi.mock("./history", () => ({
