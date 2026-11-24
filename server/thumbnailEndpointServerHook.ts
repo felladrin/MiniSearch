@@ -43,7 +43,8 @@ printMessage.enabled = true;
  *   shared deadline.
  * - Content-Type: raster-only allowlist below; SVG is deliberately
  *   excluded because served same-origin it is a script-carrying document.
- * - Response size: `MAX_THUMBNAIL_BYTES` via `readCappedStream`.
+ * - Response size: `MAX_THUMBNAIL_BYTES` via `readCappedStream`; a body
+ *   over the cap is refused, never served or cached cut off.
  * - Timeout: `THUMBNAIL_TIMEOUT_MS`, shared across DNS and every hop.
  * - Rate limiting: per client IP via `thumbnailRateLimiter`, a dedicated
  *   60-per-10s budget so a grid of tiles cannot exhaust the search
@@ -270,12 +271,26 @@ async function fetchThumbnail(rawUrl: string): Promise<ThumbnailOutcome> {
     }
 
     let bytes: Uint8Array;
+    let truncated: boolean;
     try {
-      ({ bytes } = await readCappedStream(response, MAX_THUMBNAIL_BYTES));
+      ({ bytes, truncated } = await readCappedStream(
+        response,
+        MAX_THUMBNAIL_BYTES,
+      ));
     } catch (error) {
       return {
         kind: "failed",
         reason: error instanceof Error ? error.name : String(error),
+      };
+    }
+
+    // An image cut at the cap is a damaged image: a baseline JPEG loses
+    // everything below the cut, other formats may not decode at all. Served,
+    // it would also sit in the LRU and the browser cache for an hour.
+    if (truncated) {
+      return {
+        kind: "failed",
+        reason: `larger than ${MAX_THUMBNAIL_BYTES} bytes`,
       };
     }
 

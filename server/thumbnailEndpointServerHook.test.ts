@@ -574,7 +574,9 @@ describe("thumbnailEndpointServerHook", () => {
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
   });
 
-  it("truncates an oversized body to the byte cap", async () => {
+  it("answers 502 instead of serving a body over the byte cap cut off", async () => {
+    // The cap is 500_000 bytes; the first 500_000 of this body would decode
+    // as a damaged image.
     const bigBody = new Uint8Array(600_000).fill(7);
     pinnedRequestMock.mockResolvedValue(imageResponse(bigBody));
     const handler = getRegisteredHandler();
@@ -586,10 +588,53 @@ describe("thumbnailEndpointServerHook", () => {
       vi.fn(),
     );
 
+    expect(response.statusCode).toBe(502);
+    expect(response.setHeader).toHaveBeenCalledWith(
+      "Cache-Control",
+      "no-store",
+    );
+    expect(response.end).toHaveBeenCalledWith(
+      JSON.stringify({ error: "Thumbnail could not be fetched" }),
+    );
+    expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+    expect(logLines.join("\n")).toContain(
+      "Thumbnail fetch failed: larger than 500000 bytes",
+    );
+  });
+
+  it("does not cache a body over the byte cap, so the next load fetches again", async () => {
+    const url = publicThumbnailUrl();
+    pinnedRequestMock
+      .mockResolvedValueOnce(imageResponse(new Uint8Array(600_000).fill(7)))
+      .mockResolvedValueOnce(imageResponse());
+    const handler = getRegisteredHandler();
+
+    const first = createResponse();
+    await handler(createRequest(requestUrlFor(url)), first, vi.fn());
+    expect(first.statusCode).toBe(502);
+
+    const second = createResponse();
+    await handler(createRequest(requestUrlFor(url)), second, vi.fn());
+    expect(second.statusCode).toBe(200);
+    expect(pinnedRequestMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("serves a body of exactly the byte cap", async () => {
+    const capSizedBody = new Uint8Array(500_000).fill(7);
+    pinnedRequestMock.mockResolvedValue(imageResponse(capSizedBody));
+    const handler = getRegisteredHandler();
+    const response = createResponse();
+
+    await handler(
+      createRequest(requestUrlFor(publicThumbnailUrl())),
+      response,
+      vi.fn(),
+    );
+
     expect(response.statusCode).toBe(200);
     const body = response.end.mock.calls[0][0] as Buffer;
-    // The cap is 500_000 bytes; a 600_000-byte body must be truncated.
     expect(body.length).toBe(500_000);
+    expect(recordThumbnailDropped).not.toHaveBeenCalled();
   });
 
   it("evicts the least recently used entry, not the least recently loaded one", async () => {
