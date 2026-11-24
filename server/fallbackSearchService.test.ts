@@ -86,6 +86,10 @@ function youcomDocumentWith(web: unknown[]): string {
   return toolReply({ results: { web } });
 }
 
+function keenableDocumentWith(results: unknown[]): string {
+  return toolReply({ query: QUERY, mode: "pro", results });
+}
+
 const PARALLEL_URL = "https://search.parallel.ai/mcp";
 const YOUCOM_KEYLESS_URL = "https://api.you.com/mcp?profile=free";
 const YOUCOM_AUTHENTICATED_URL = "https://api.you.com/mcp";
@@ -1303,8 +1307,9 @@ function listProviders(value: string | undefined) {
   else process.env[PROVIDERS_VARIABLE] = value;
 }
 
-// Fisher-Yates over the two built-in providers draws once: 0 swaps them,
-// anything near 1 keeps the table's order.
+// Fisher-Yates over the three built-in providers draws twice: 0 rotates the
+// last item to the front (You.com), anything near 1 keeps the table's order
+// (Parallel).
 function orderYoucomFirst() {
   return vi.spyOn(Math, "random").mockReturnValue(0);
 }
@@ -1337,11 +1342,12 @@ describe("configuration", () => {
     orderParallelFirst();
     mockExchange(documentWith([]));
     mockYoucom([]);
+    mockExchange(keenableDocumentWith([]), { initializeSession: null });
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     expect(new Set(requestUrls())).toEqual(
-      new Set([PARALLEL_URL, YOUCOM_KEYLESS_URL]),
+      new Set([PARALLEL_URL, YOUCOM_KEYLESS_URL, KEENABLE_KEYLESS_URL]),
     );
   });
 
@@ -1431,24 +1437,28 @@ describe("configuration", () => {
     orderParallelFirst();
     mockExchange(documentWith([]));
     mockYoucom([]);
+    mockExchange(keenableDocumentWith([]), { initializeSession: null });
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
-    // Parallel's three requests carry its key; You.com, with no key of its
-    // own, stays on the keyless profile and is never sent Parallel's.
+    // Parallel's three requests carry its key; You.com and Keenable, with no
+    // key of their own, stay on their keyless endpoints and are never sent
+    // Parallel's.
     expect(requestUrls()).toEqual([
       PARALLEL_URL,
       PARALLEL_URL,
       PARALLEL_URL,
       YOUCOM_KEYLESS_URL,
       YOUCOM_KEYLESS_URL,
+      KEENABLE_KEYLESS_URL,
+      KEENABLE_KEYLESS_URL,
     ]);
     for (const index of [0, 1, 2]) {
       expect(requestHeaders(index).Authorization).toBe(
         "Bearer parallel-test-value",
       );
     }
-    for (const index of [3, 4]) {
+    for (const index of [3, 4, 5, 6]) {
       expect(requestHeaders(index).Authorization).toBeUndefined();
     }
   });
@@ -1541,6 +1551,7 @@ describe("the cascade", () => {
     orderParallelFirst();
     fetchMock.mockResolvedValueOnce(createMockResponse("", { status: 500 }));
     fetchMock.mockResolvedValueOnce(createMockResponse("", { status: 503 }));
+    fetchMock.mockResolvedValueOnce(createMockResponse("", { status: 502 }));
 
     const error = (await fetchFallbackTextResults(
       QUERY,
@@ -1549,7 +1560,7 @@ describe("the cascade", () => {
     ).catch((thrown: unknown) => thrown)) as Error;
 
     expect(error.message).toBe(
-      "Every fallback search provider failed (parallel: The fallback search endpoint did not answer the initialize request (status 500); youcom: The fallback search endpoint did not answer the initialize request (status 503))",
+      "Every fallback search provider failed (parallel: The fallback search endpoint did not answer the initialize request (status 500); youcom: The fallback search endpoint did not answer the initialize request (status 503); keenable: The fallback search endpoint did not answer the initialize request (status 502))",
     );
     expect(error.message).not.toContain(QUERY);
   });
@@ -1591,6 +1602,7 @@ describe("the cascade", () => {
   it("gives each attempt an equal share of what is left of the budget", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(1_000_000);
+    listProviders("parallel,youcom");
     orderParallelFirst();
     const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
     // The first provider spends a second before it fails, so the second one
@@ -1608,6 +1620,7 @@ describe("the cascade", () => {
 
   it("splits the module's own cap when the caller offers more", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
+    listProviders("parallel,youcom");
     orderParallelFirst();
     const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
     mockExchange(
@@ -1631,7 +1644,7 @@ describe("the cascade", () => {
     });
 
     await expect(fetchFallbackTextResults(QUERY, 10, 3_000)).rejects.toThrow(
-      "No fallback search provider served the search (parallel: Network failure; not tried, the time budget ran out: youcom)",
+      "No fallback search provider served the search (parallel: Network failure; not tried, the time budget ran out: youcom, keenable)",
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -1777,14 +1790,15 @@ describe("pausing a rate-limited provider", () => {
       throw new Error("Network failure");
     });
     fetchMock.mockResolvedValueOnce(rateLimited({ "retry-after": "3600" }));
+    fetchMock.mockResolvedValueOnce(createMockResponse("", { status: 502 }));
 
     await expect(
       fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
     ).rejects.toThrow(
-      "Every fallback search provider failed (parallel: Network failure)",
+      "Every fallback search provider failed (parallel: Network failure; keenable: The fallback search endpoint did not answer the initialize request (status 502))",
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(getFallbackProviderStats().youcom).toMatchObject({
       rateLimited: 1,
       skippedWhilePaused: 1,
@@ -1814,7 +1828,7 @@ describe("pausing a rate-limited provider", () => {
     listProviders("youcom");
     await hitRateLimit();
 
-    listProviders(undefined);
+    listProviders("parallel,youcom");
     orderParallelFirst();
     const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
     mockExchange(
@@ -1885,6 +1899,7 @@ describe("pausing a rate-limited provider", () => {
     orderParallelFirst();
     fetchMock.mockResolvedValueOnce(rateLimited());
     fetchMock.mockResolvedValueOnce(rateLimited());
+    fetchMock.mockResolvedValueOnce(rateLimited());
     await expect(
       fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
     ).rejects.toThrow("Every fallback search provider failed");
@@ -1917,27 +1932,28 @@ describe("getFallbackProviderStats", () => {
 
 describe("Keenable", () => {
   const KEENABLE_KEY_VARIABLE = "SEARCH_FALLBACK_KEENABLE_API_KEY";
-  const keenableDocumentWith = (results: unknown[]) =>
-    toolReply({ query: QUERY, mode: "pro", results });
   const runKeenable = async (results: unknown[], limit = 10) => {
     process.env.SEARCH_FALLBACK_PROVIDERS = "keenable";
     mockExchange(keenableDocumentWith(results), { initializeSession: null });
     return fetchFallbackTextResults(QUERY, limit, FULL_BUDGET_MS);
   };
 
-  it("is left out of the default list while it has no key", async () => {
+  it("joins the default list on the keyless endpoint when it has no key", async () => {
     delete process.env.SEARCH_FALLBACK_PROVIDERS;
     vi.spyOn(Math, "random").mockReturnValue(0.99);
     mockExchange(documentWith([]));
     mockExchange(youcomDocumentWith([]), { initializeSession: null });
+    mockExchange(keenableDocumentWith([]), { initializeSession: null });
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
     const urls = fetchMock.mock.calls.map(([requestUrl]) => String(requestUrl));
-    expect(new Set(urls)).toEqual(new Set([PARALLEL_URL, YOUCOM_KEYLESS_URL]));
+    expect(new Set(urls)).toEqual(
+      new Set([PARALLEL_URL, YOUCOM_KEYLESS_URL, KEENABLE_KEYLESS_URL]),
+    );
   });
 
-  it("joins the default list when its key is set", async () => {
+  it("uses the authenticated endpoint when its key is set", async () => {
     delete process.env.SEARCH_FALLBACK_PROVIDERS;
     process.env[KEENABLE_KEY_VARIABLE] = "keenable-test-value";
     vi.spyOn(Math, "random").mockReturnValue(0.99);

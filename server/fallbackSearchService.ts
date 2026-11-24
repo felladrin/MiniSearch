@@ -88,12 +88,6 @@ interface MappedResults {
 interface FallbackProvider {
   name: ProviderName;
   apiKeyVariable: string;
-  /**
-   * Left out of the default list: tried only when SEARCH_FALLBACK_PROVIDERS
-   * names it or its key is set, so adding it changes nothing for an instance
-   * that already runs the fallback.
-   */
-  optIn?: boolean;
   endpointUrl: (apiKey: string) => string;
   /** The headers that carry the key, and any the provider needs on every request. Bearer when absent. */
   headers?: (apiKey: string) => Record<string, string>;
@@ -139,7 +133,6 @@ const PROVIDERS: readonly FallbackProvider[] = [
   {
     name: "keenable",
     apiKeyVariable: "SEARCH_FALLBACK_KEENABLE_API_KEY",
-    optIn: true,
     endpointUrl: (apiKey) =>
       apiKey
         ? "https://api.keenable.ai/mcp"
@@ -257,12 +250,7 @@ function readConfiguredProviders(): FallbackProvider[] {
   }
 
   const value = process.env.SEARCH_FALLBACK_PROVIDERS ?? "";
-  if (value.trim() === "") {
-    return PROVIDERS.filter(
-      ({ optIn, apiKeyVariable }) =>
-        !optIn || (process.env[apiKeyVariable] ?? "").trim() !== "",
-    );
-  }
+  if (value.trim() === "") return [...PROVIDERS];
 
   const names = value
     .split(",")
