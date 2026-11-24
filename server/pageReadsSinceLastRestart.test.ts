@@ -46,9 +46,10 @@ describe("recordPageRead", () => {
       recordPageRead({ outcome: "timedOut", durationMs: 6000 });
       recordPageRead({ outcome: "tooLittleText", durationMs: 7 });
       recordPageRead({ outcome: "failed", durationMs: 8 });
+      recordPageRead({ outcome: "unparsable", durationMs: 9 });
     });
 
-    expect(counted.requested).toBe(10);
+    expect(counted.requested).toBe(11);
     expect(counted.read).toBe(0);
     expect(counted.skipped).toEqual({
       blocked: 1,
@@ -61,6 +62,7 @@ describe("recordPageRead", () => {
       timedOut: 1,
       tooLittleText: 1,
       failed: 1,
+      unparsable: 1,
     });
   });
 

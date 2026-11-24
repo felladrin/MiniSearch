@@ -3,6 +3,9 @@
  * contributed nothing to the prompt and its result kept only its snippet.
  * `skippedByBreaker` is a read that never left the server: its host had
  * refused enough recent reads that `pageReadHostBreaker` boxed it.
+ * `unparsable` is a page that arrived but whose content could not be read: a
+ * PDF the parser rejected (password-protected, malformed) or markup the
+ * extractor threw on. The host answered, so it never counts toward the breaker.
  */
 export type PageReadOutcome =
   | "read"
@@ -15,6 +18,7 @@ export type PageReadOutcome =
   | "redirectLimit"
   | "timedOut"
   | "tooLittleText"
+  | "unparsable"
   | "failed";
 
 /**
@@ -39,6 +43,7 @@ const outcomes: Record<PageReadOutcome, number> = {
   redirectLimit: 0,
   timedOut: 0,
   tooLittleText: 0,
+  unparsable: 0,
   failed: 0,
 };
 

@@ -184,6 +184,11 @@ export function getUnresponsiveEngineStats() {
 
 let textualSearchMs = 0;
 let graphicalSearchMs = 0;
+// The searches behind those sums. Not the "searches served" counters above:
+// those also count a search the fallback served, which has no SearXNG duration,
+// so dividing by them made the average sink during an outage.
+let textualSearchesTimed = 0;
+let graphicalSearchesTimed = 0;
 let thumbnailsRequested = 0;
 let thumbnailsDropped = 0;
 let thumbnailsBlocked = 0;
@@ -193,8 +198,13 @@ export function recordSearchDuration(
   searchType: SearchType,
   durationMs: number,
 ): void {
-  if (searchType === "text") textualSearchMs += durationMs;
-  else graphicalSearchMs += durationMs;
+  if (searchType === "text") {
+    textualSearchMs += durationMs;
+    textualSearchesTimed++;
+  } else {
+    graphicalSearchMs += durationMs;
+    graphicalSearchesTimed++;
+  }
 }
 
 export function recordThumbnailRequested(): void {
@@ -217,11 +227,9 @@ export function recordThumbnailBlocked(): void {
 
 export function getSearchStats() {
   return {
-    averageTextualMs: Math.round(
-      textualSearchMs / textualSearchesSinceLastRestart || 0,
-    ),
+    averageTextualMs: Math.round(textualSearchMs / textualSearchesTimed || 0),
     averageGraphicalMs: Math.round(
-      graphicalSearchMs / graphicalSearchesSinceLastRestart || 0,
+      graphicalSearchMs / graphicalSearchesTimed || 0,
     ),
   };
 }

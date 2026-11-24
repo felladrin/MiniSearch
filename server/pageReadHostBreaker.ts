@@ -9,9 +9,10 @@ import {
  * bot wall or rate limit (`httpForbidden`), any other non-ok status, a read
  * that hit the deadline, and a connection that was refused or dropped. A dead
  * link (`httpNotFound`) is the host answering, a page with too little text is
- * the page's fault, and `blocked` never reached the host at all, so none of
- * those count, and each of them resets the run of refusals the way a read
- * that worked does.
+ * the page's fault, a document the host served but that could not be parsed
+ * (`unparsable`) is the document's, and `blocked` never reached the host at
+ * all, so none of those count, and each of them resets the run of refusals the
+ * way a read that worked does.
  */
 const HOST_REFUSALS: ReadonlySet<string> = new Set<PageReadOutcome>([
   "httpForbidden",
