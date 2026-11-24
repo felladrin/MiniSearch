@@ -6,6 +6,7 @@ import { getFallbackProviderStats } from "./fallbackSearchService.ts";
 import { getInferenceStats } from "./inferencesSinceLastRestart.ts";
 import { getPageReadCircuitStats } from "./pageReadHostBreaker.ts";
 import { getPageReadStats } from "./pageReadsSinceLastRestart.ts";
+import { parseCommaSeparatedList } from "./parseCommaSeparatedList.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
 import { getRerankingStats } from "./rerankingSinceLastRestart.ts";
 import {
@@ -108,7 +109,14 @@ export function statusEndpointServerHook<
         ...getPageReadCircuitStats(),
       },
       authorization: getAuthorizationStats(),
-      inference: getInferenceStats(),
+      // The per-model counters go out as an array in the configured order,
+      // never keyed by model name: `/status` needs no token. Same parse the
+      // inference hook uses for its ladder.
+      inference: getInferenceStats(
+        parseCommaSeparatedList(
+          process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL,
+        ),
+      ),
       activeSessions: getActiveSessionsAmount(),
       searches: {
         ...getSearchStats(),
