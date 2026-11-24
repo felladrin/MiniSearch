@@ -2,6 +2,7 @@ import type { IncomingMessage } from "node:http";
 import http from "node:http";
 import https from "node:https";
 import { isIP } from "node:net";
+import { OUTBOUND_USER_AGENT } from "../outboundUserAgent.ts";
 
 /**
  * What the capped reader needs from a response body: an async stream of
@@ -22,7 +23,9 @@ export interface CappedReadable extends AsyncIterable<Uint8Array> {
  * The original hostname survives the pin three ways: it stays the request's
  * `hostname`, so TLS SNI and certificate verification run against it, not
  * against the IP being dialled, and the `Host` header is set explicitly so
- * virtual-host routing is unaffected.
+ * virtual-host routing is unaffected. Every request also carries the
+ * server's `User-Agent`, because some image hosts refuse a request without
+ * one (upload.wikimedia.org answers 403).
  *
  * @throws When the protocol is not http(s) or the request fails
  */
@@ -51,7 +54,7 @@ export function requestPinnedToVettedAddress(
     // SNI and certificate verification follow the hostname, not the pinned
     // address, so a wrong-host certificate still fails the request.
     servername: isTls ? hostname : undefined,
-    headers: { Host: hostHeader },
+    headers: { Host: hostHeader, "User-Agent": OUTBOUND_USER_AGENT },
     // The pin itself: the socket connects to the vetted address and no
     // resolver is consulted, so the address checked is the address reached.
     // Node's Happy Eyeballs path (autoSelectFamily, on by default since

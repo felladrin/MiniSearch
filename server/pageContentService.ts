@@ -1,7 +1,7 @@
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { PDFParse } from "pdf-parse";
-import { repository, version } from "../package.json" with { type: "json" };
 import { scorePassages } from "./biEncoderService.ts";
+import { OUTBOUND_USER_AGENT } from "./outboundUserAgent.ts";
 import {
   type PageReadHostBreaker,
   pageReadHostBreaker,
@@ -28,15 +28,13 @@ const OVERLAP_CHARS = 200;
 const MAX_DENSE_PASSAGES = 256;
 const RRF_K = 60;
 
-const appName = repository.url.slice(repository.url.lastIndexOf("/") + 1);
-
 const REQUEST_HEADERS = {
   Accept: "text/html,application/xhtml+xml;q=0.9,text/plain;q=0.8",
   // No language preference: searches arrive in every language, and asking for
   // English made a multilingual site serve its English edition for a query
   // written in something else.
   "Accept-Language": "*",
-  "User-Agent": `Mozilla/5.0 (compatible; ${appName}/${version}; +${repository.url})`,
+  "User-Agent": OUTBOUND_USER_AGENT,
 } as const;
 
 const READABLE_CONTENT_TYPES =
