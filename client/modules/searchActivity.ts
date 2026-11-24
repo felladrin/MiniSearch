@@ -53,13 +53,13 @@ export interface ActivityData {
   weeks: number;
 }
 
-function startOfDay(ts: number): Date {
+export function startOfDay(ts: number): Date {
   const d = new Date(ts);
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
-function localKey(d: Date): string {
+export function localKey(d: Date): string {
   const month = `${d.getMonth() + 1}`.padStart(2, "0");
   const day = `${d.getDate()}`.padStart(2, "0");
   return `${d.getFullYear()}-${month}-${day}`;
