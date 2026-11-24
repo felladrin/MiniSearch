@@ -19,6 +19,8 @@ export function validateAccessKeyServerHook<
       return next();
     }
 
+    res.setHeader("Cache-Control", "no-store");
+
     // Consume a rate-limit point before the argon2 loop. A wrong hash costs one
     // full argon2 verification per configured key, so nothing may bound that
     // work other than the limiter - the same lever the search token path closes.

@@ -231,6 +231,8 @@ The `cacheServerHook` sets Cache-Control headers on every response:
 | `/` or `*.html` | `no-cache`                               | HTML must always check for updates    |
 | Everything else | `public, max-age=86400, must-revalidate` | 24-hour cache with revalidation       |
 
+The dynamic endpoints (`/search/*`, `/page-content`, `/inference`, `/status`, `/api/config` and `/api/validate-access-key`) set `Cache-Control: no-store` themselves, which overrides this hook where it runs first. `/thumbnail` sets `private, max-age=3600` on success and `no-store` on errors.
+
 ### Status Endpoint
 
 The `/status` endpoint returns a JSON object:
