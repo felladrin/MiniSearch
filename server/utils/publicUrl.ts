@@ -190,3 +190,37 @@ export async function resolvePublicUrlAndAddress(
 export async function resolvePublicUrl(rawUrl: string): Promise<URL> {
   return (await resolvePublicUrlAndAddress(rawUrl)).url;
 }
+
+function timeoutError(): Error {
+  const error = new Error("The operation was aborted");
+  error.name = "TimeoutError";
+  return error;
+}
+
+/**
+ * The DNS lookup behind `resolvePublicUrl` and `resolvePublicUrlAndAddress`
+ * does not take a signal, so callers race it against their request deadline:
+ * a hanging resolver would otherwise add its own timeout on top of the one
+ * that is documented to bound the whole redirect chain. The lookup itself
+ * keeps running, but the caller settles on time with a `TimeoutError`.
+ */
+export function resolveWithinDeadline<T>(
+  deadline: AbortSignal,
+  work: Promise<T>,
+): Promise<T> {
+  if (deadline.aborted) return Promise.reject(timeoutError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(timeoutError());
+    deadline.addEventListener("abort", onAbort, { once: true });
+    work.then(
+      (value) => {
+        deadline.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        deadline.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}

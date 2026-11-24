@@ -12,7 +12,7 @@ import {
   recordPageServedFromSearchExcerpts,
 } from "./pageReadsSinceLastRestart.ts";
 import { recallSearchExcerpts } from "./searchExcerptStore.ts";
-import { resolvePublicUrl } from "./utils/publicUrl.ts";
+import { resolvePublicUrl, resolveWithinDeadline } from "./utils/publicUrl.ts";
 import { readCappedBytes } from "./utils/streamUtils.ts";
 
 const REQUEST_TIMEOUT_MS = 6000;
@@ -550,6 +550,20 @@ async function readHop(url: URL, deadline: AbortSignal): Promise<HopResult> {
 }
 
 /**
+ * A lookup that runs out the deadline never reaches `admit`, so the host it
+ * was resolving is charged here: it cost the batch the whole wait, the way a
+ * read that hangs does. Admitting first keeps a half-open host to one probe.
+ */
+function chargeLookupTimeout(
+  target: string,
+  breaker: PageReadHostBreaker,
+): DownloadResult {
+  const host = URL.parse(target)?.host;
+  if (host && breaker.admit(host)) breaker.settle(host, "timedOut");
+  return { outcome: "timedOut" };
+}
+
+/**
  * Follows redirects by hand so that every hop is validated: `redirect:
  * "follow"` would let a public URL bounce the server into a private address.
  * The whole chain shares one deadline, so a page cannot buy extra time by
@@ -572,8 +586,9 @@ async function downloadDocument(
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     let url: URL;
     try {
-      url = await resolvePublicUrl(target);
-    } catch {
+      url = await resolveWithinDeadline(deadline, resolvePublicUrl(target));
+    } catch (error) {
+      if (isTimeout(error)) return chargeLookupTimeout(target, breaker);
       return { outcome: "blocked" };
     }
 
