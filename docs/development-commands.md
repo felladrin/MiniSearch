@@ -114,7 +114,7 @@ The repository uses nine GitHub Actions workflows for continuous integration, de
 
 Used by both `on-push-to-main` and `on-pull-request-to-main` to run the production container smoke test:
 
-1. **check-docker-container** - Builds and starts the production container with `docker compose -f docker-compose.production.yml up -d`, then verifies the main page returns HTTP 200 within 60 seconds
+1. **check-docker-container** - Builds and starts the production container with `docker compose -f docker-compose.production.yml up -d`, then verifies the main page returns HTTP 200 within 3 minutes
 
 ### Docker Image Builds
 
