@@ -114,6 +114,12 @@ describe("normalizeRelativeDates", () => {
       );
     });
 
+    it("trims the query on both sides when an anchor is appended", () => {
+      expect(normalizeRelativeDates("  next year  ", AS_OF).searchQuery).toBe(
+        "next year 2027",
+      );
+    });
+
     it("leaves an empty query alone", () => {
       for (const query of ["", "   "]) {
         expect(normalizeRelativeDates(query, AS_OF)).toEqual({
@@ -270,6 +276,156 @@ describe("normalizeRelativeDates", () => {
         .searchQuery,
     ).toBe("x".repeat(1999));
   });
+
+  describe("spelling variants", () => {
+    it.each(["'", "\u2018", "\u2019", "\u02bc", "\uff07"])(
+      "skips the possessive headline form with the apostrophe %j",
+      (apostrophe) => {
+        const query = `next year${apostrophe}s champion`;
+
+        expect(normalizeRelativeDates(query, AS_OF)).toEqual({
+          searchQuery: query,
+          replacements: [],
+        });
+      },
+    );
+
+    it.each([
+      "last\u00a0month\u00a0of pregnancy symptoms",
+      "last  month of pregnancy symptoms",
+      "the last\u00a0year\u00a0of college",
+    ])("skips a blacklisted phrase written with odd spacing: %j", (query) => {
+      expect(normalizeRelativeDates(query, AS_OF)).toEqual({
+        searchQuery: query,
+        replacements: [],
+      });
+    });
+
+    it.each(["next\u00a0year", "next  year"])(
+      "anchors a trigger written with the spacing %j",
+      (phrase) => {
+        expect(normalizeRelativeDates(`${phrase} champion`, AS_OF)).toEqual({
+          searchQuery: `${phrase} champion 2027`,
+          replacements: [{ phrase, anchor: "2027" }],
+        });
+      },
+    );
+
+    it("reports the phrase as typed after a letter that grows when lowercased", () => {
+      // "İ".toLowerCase() is two code units, which used to shift every index
+      // computed on the lowercased copy.
+      expect(normalizeRelativeDates("İstanbul next year", AS_OF)).toEqual({
+        searchQuery: "İstanbul next year 2027",
+        replacements: [{ phrase: "next year", anchor: "2027" }],
+      });
+    });
+  });
+
+  describe("dates the query already carries", () => {
+    it.each([
+      "events in 2026 December next month",
+      "events in December 2026 next month",
+      "events in Dec 2026 next month",
+      "events in Dec. 2026 next month",
+      "events in Sept 2026 and 2026-12 next month",
+      "events in 2026-12 next month",
+      "events in 2026/12 next month",
+    ])("does not add December 2026 to %j", (query) => {
+      expect(normalizeRelativeDates(query, AS_OF)).toEqual({
+        searchQuery: query,
+        replacements: [],
+      });
+    });
+
+    it.each(["2026年12月的活动 下个月", "2026 年 12 月的活动 下个月"])(
+      "does not add 2026年12月 to %j",
+      (query) => {
+        expect(normalizeRelativeDates(query, AS_OF)).toEqual({
+          searchQuery: query,
+          replacements: [],
+        });
+      },
+    );
+
+    it("still adds a month when the query names only the year", () => {
+      expect(
+        normalizeRelativeDates("events in 2026 next month", AS_OF),
+      ).toEqual({
+        searchQuery: "events in 2026 next month December 2026",
+        replacements: [{ phrase: "next month", anchor: "December 2026" }],
+      });
+    });
+
+    it("still adds a month when the query names another month", () => {
+      expect(
+        normalizeRelativeDates("events in January 2026 next month", AS_OF)
+          .replacements,
+      ).toEqual([{ phrase: "next month", anchor: "December 2026" }]);
+    });
+
+    it("does not take a year inside a longer number for a year", () => {
+      expect(normalizeRelativeDates("ticket 120265 this year", AS_OF)).toEqual({
+        searchQuery: "ticket 120265 this year 2026",
+        replacements: [{ phrase: "this year", anchor: "2026" }],
+      });
+    });
+
+    it("does not take a season for a month", () => {
+      // 2011-12 is a season (the second number follows the first year), not
+      // December 2011, so next month's anchor is still worth adding.
+      expect(
+        normalizeRelativeDates(
+          "2011-12 season next month",
+          new Date(2011, 10, 3, 12),
+        ).replacements,
+      ).toEqual([{ phrase: "next month", anchor: "December 2011" }]);
+    });
+  });
+
+  describe("which month a written date carries", () => {
+    const JANUARY_2026 = new Date(2026, 0, 10, 12);
+
+    it("takes the month written inside the date over a month name behind it", () => {
+      // "Nov" belongs to "Nov 2026", not to 2026-12, so December is written.
+      expect(
+        normalizeRelativeDates("report 2026-12 Nov 2026 next month", AS_OF),
+      ).toEqual({
+        searchQuery: "report 2026-12 Nov 2026 next month",
+        replacements: [],
+      });
+      expect(
+        normalizeRelativeDates("2026年12月 November 2026 next month", AS_OF)
+          .replacements,
+      ).toEqual([]);
+    });
+
+    it("gives a month name to the date it stands in front of, not the one before", () => {
+      // "2023-2025 Dec 2026" is a range, then December 2026. December 2025,
+      // which last month resolves to in January 2026, is not written.
+      expect(
+        normalizeRelativeDates("2023-2025 Dec 2026 last month", JANUARY_2026)
+          .replacements,
+      ).toEqual([{ phrase: "last month", anchor: "December 2025" }]);
+    });
+
+    it("does not give a month to a year range", () => {
+      expect(
+        normalizeRelativeDates("2023-2025 December last month", JANUARY_2026)
+          .replacements,
+      ).toEqual([{ phrase: "last month", anchor: "December 2025" }]);
+    });
+
+    it("gives a month name in front of a range to its first year only", () => {
+      expect(
+        normalizeRelativeDates("December 2025-2027 last month", JANUARY_2026)
+          .replacements,
+      ).toEqual([]);
+      expect(
+        normalizeRelativeDates("December 2023-2025 last month", JANUARY_2026)
+          .replacements,
+      ).toEqual([{ phrase: "last month", anchor: "December 2025" }]);
+    });
+  });
 });
 
 describe("normalizeFollowUpDates", () => {
@@ -366,5 +522,74 @@ describe("normalizeFollowUpDates", () => {
         maxLength: 2000,
       }).searchQuery,
     ).toHaveLength(2000);
+  });
+
+  describe("anchors already written", () => {
+    it("does not repeat a year the user typed that the anchor resolves to", () => {
+      expect(
+        normalizeFollowUpDates(
+          "2025 election results",
+          ["2025 election results", "what happened last year?"],
+          AS_OF,
+        ),
+      ).toEqual({ searchQuery: "2025 election results", replacements: [] });
+    });
+
+    it("does not repeat a month the user typed, written another way", () => {
+      expect(
+        normalizeFollowUpDates(
+          "new releases in Dec 2026",
+          ["new releases in Dec 2026", "and next month?"],
+          AS_OF,
+        ),
+      ).toEqual({ searchQuery: "new releases in Dec 2026", replacements: [] });
+    });
+
+    it("keeps the anchor that is not already written", () => {
+      expect(
+        normalizeFollowUpDates(
+          "2025 election results",
+          ["2025 election results", "and what about next year?"],
+          AS_OF,
+        ).searchQuery,
+      ).toBe("2025 election results 2027");
+    });
+  });
+
+  describe("a query that is only a written date", () => {
+    it("gets its anchor without a leading space", () => {
+      expect(
+        normalizeFollowUpDates("2025", ["what happened last year?"], AS_OF),
+      ).toEqual({
+        searchQuery: "2025",
+        replacements: [{ phrase: "last year", anchor: "2025" }],
+      });
+    });
+
+    it.each(["2025", "  2025  ", "2024-25", "2026年"])(
+      "returns a trimmed query for the model's %j",
+      (query) => {
+        const result = normalizeFollowUpDates(
+          query,
+          ["what happened last year?"],
+          AS_OF,
+        );
+
+        expect(result.replacements).not.toEqual([]);
+        expect(result.searchQuery).toBe(result.searchQuery.trim());
+      },
+    );
+  });
+
+  describe("abbreviated months", () => {
+    it("drops the model's abbreviated month together with its year", () => {
+      // Only the year used to go, which left a dangling "Dec" in the query.
+      expect(
+        normalizeFollowUpDates("results and Dec 2026", ["what 去年"], AS_OF),
+      ).toEqual({
+        searchQuery: "results and 2025年",
+        replacements: [{ phrase: "去年", anchor: "2025年" }],
+      });
+    });
   });
 });

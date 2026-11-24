@@ -55,6 +55,12 @@ interface Hit extends Occurrence {
   anchor: string;
 }
 
+/** A date as a query writes it; `month` is 1 to 12 when the query names one. */
+interface WrittenDate {
+  year: number;
+  month?: number;
+}
+
 /**
  * Month arithmetic in local calendar terms: December plus one month is January
  * of the next year, not a wrapped month inside the same one.
@@ -175,40 +181,40 @@ const BLACKLIST_PHRASES: readonly string[] = [
   "last year of",
 ];
 
-function isAsciiLetter(char: string): boolean {
-  return (char >= "A" && char <= "Z") || (char >= "a" && char <= "z");
+/** Keyboards type any of these: ' U+2018 U+2019 U+02BC U+FF07. */
+const APOSTROPHES = "'\u2018\u2019\u02bc\uff07";
+
+/**
+ * Whitespace of any kind matches a space and any apostrophe variant matches
+ * `'`. The pattern runs on the original text rather than a lowercased copy, so
+ * a match keeps its position: "İ".toLowerCase() is two code units.
+ */
+function compilePhrase(phrase: string, wordBounded: boolean): RegExp {
+  const body = phrase
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/ /g, "\\s+")
+    .replace(/'/g, `[${APOSTROPHES}]`);
+
+  return new RegExp(
+    wordBounded ? `(?<![A-Za-z])${body}(?![A-Za-z])` : body,
+    "gi",
+  );
 }
 
-function findOccurrences(
-  text: string,
-  phrase: string,
-  wordBounded: boolean,
-): Occurrence[] {
-  const haystack = text.toLowerCase();
-  const needle = phrase.toLowerCase();
-  const occurrences: Occurrence[] = [];
-  let from = 0;
+const COMPILED_RULES = RULES.map((rule) => ({
+  rule,
+  pattern: compilePhrase(rule.phrase, rule.wordBounded),
+}));
 
-  while (from + needle.length <= haystack.length) {
-    const start = haystack.indexOf(needle, from);
-    if (start === -1) break;
+const BLACKLIST_PATTERNS = BLACKLIST_PHRASES.map((phrase) =>
+  compilePhrase(phrase, false),
+);
 
-    const end = start + needle.length;
-    const touchesWord =
-      wordBounded &&
-      (isAsciiLetter(haystack.charAt(start - 1)) ||
-        isAsciiLetter(haystack.charAt(end)));
-
-    if (touchesWord) {
-      from = start + 1;
-      continue;
-    }
-
-    occurrences.push({ start, end });
-    from = end;
-  }
-
-  return occurrences;
+function findOccurrences(text: string, pattern: RegExp): Occurrence[] {
+  return [...text.matchAll(pattern)].map((match) => ({
+    start: match.index,
+    end: match.index + match[0].length,
+  }));
 }
 
 function overlaps(occurrence: Occurrence, ranges: readonly Occurrence[]) {
@@ -229,17 +235,13 @@ export function normalizeRelativeDates(
 
   if (query.trim() === "") return unchanged;
 
-  const blacklistRanges = BLACKLIST_PHRASES.flatMap((phrase) =>
-    findOccurrences(query, phrase, false),
+  const blacklistRanges = BLACKLIST_PATTERNS.flatMap((pattern) =>
+    findOccurrences(query, pattern),
   );
 
   const hits: Hit[] = [];
-  for (const rule of RULES) {
-    for (const occurrence of findOccurrences(
-      query,
-      rule.phrase,
-      rule.wordBounded,
-    )) {
+  for (const { rule, pattern } of COMPILED_RULES) {
+    for (const occurrence of findOccurrences(query, pattern)) {
       // A trigger inside a title or a longer word is a false positive; the
       // blacklist owns that run of text.
       if (overlaps(occurrence, blacklistRanges)) continue;
@@ -253,6 +255,8 @@ export function normalizeRelativeDates(
   }
 
   if (hits.length === 0) return unchanged;
+
+  const writtenInQuery = writtenDates(query);
 
   hits.sort(
     (left, right) =>
@@ -269,8 +273,9 @@ export function normalizeRelativeDates(
     if (selected.some((chosen) => overlaps(hit, [chosen]))) continue;
     // An anchor the query already spells out is not worth repeating: the
     // search engine has that year already, and a doubled anchor only dilutes
-    // the query.
-    if (query.toLowerCase().includes(hit.anchor.toLowerCase())) continue;
+    // the query. Compared as dates, so "Dec 2026" meets December 2026 and the
+    // "2026" inside "120265" meets nothing.
+    if (isAlreadyWritten(writtenInQuery, hit.anchor)) continue;
 
     usedAnchors.add(hit.anchor);
     selected.push(hit);
@@ -304,9 +309,13 @@ function appendAnchors(
   // means the query goes out as it came, cut only when it was too long.
   const base = clampToMaxLength(query, maxLength);
   const appended: RelativeDateReplacement[] = [];
-  let searchQuery = base.trimEnd();
+  // Both ends, so a query that is only a written date gets no leading space,
+  // which would give the same search a second cache key.
+  let searchQuery = base.trim();
   for (const replacement of replacements) {
-    const candidate = `${searchQuery} ${replacement.anchor}`;
+    const candidate = searchQuery
+      ? `${searchQuery} ${replacement.anchor}`
+      : replacement.anchor;
     if (candidate.length > maxLength) break;
     searchQuery = candidate;
     appended.push(replacement);
@@ -318,15 +327,102 @@ function appendAnchors(
 
 const YEAR = "(?<!\\d)(?:19|20)\\d{2}(?!\\d)";
 
+/** A month name or its three-letter abbreviation ("Sept" too), as a whole word. */
+const MONTH_WORD = `(?:${MONTH_NAMES.flatMap((name) => [name, name.slice(0, 3)]).join("|")}|Sept)\\b`;
+
 /**
  * A year a model writes into a query, alone, as a range or a season, after a
- * month name, or glued to Chinese text: "2023", "2023-2025", "2024-25",
- * "November 2026", "2026年11月", "2025 年".
+ * month name (written out or abbreviated), or glued to Chinese text: "2023",
+ * "2023-2025", "2024-25", "November 2026", "Dec 2026", "2026年11月",
+ * "2025 年 3 月".
  */
 const WRITTEN_DATE = new RegExp(
-  `(?:\\b(?:${MONTH_NAMES.join("|")})\\s+)?${YEAR}(?:\\s*[-–/]\\s*${YEAR}|[-–/]\\d{2}(?!\\d))?(?:\\s*年(?:\\d{1,2}月)?)?`,
+  `(?:\\b${MONTH_WORD}\\.?\\s+)?${YEAR}(?:\\s*[-–/]\\s*${YEAR}|[-–/]\\d{2}(?!\\d))?(?:\\s*年(?:\\s*\\d{1,2}\\s*月)?)?`,
   "gi",
 );
+
+function monthNumber(word: string): number {
+  const prefix = word.slice(0, 3).toLowerCase();
+  return (
+    MONTH_NAMES.findIndex((name) => name.slice(0, 3).toLowerCase() === prefix) +
+    1
+  );
+}
+
+/**
+ * A month written inside the date wins ("2026年12月", "2026-12", which is a
+ * season rather than a month when it reads "2024-25"), then a name in front of
+ * the year, then one behind it, unless the next date starts with that name. A
+ * range takes a month only from a name in front, and only for its first year.
+ */
+function monthOfWrittenDate(
+  match: RegExpExecArray,
+  nextMatch: RegExpExecArray | undefined,
+  text: string,
+  yearCount: number,
+): number | undefined {
+  const written = match[0];
+
+  if (yearCount === 1) {
+    const chinese = written.match(/年\s*(\d{1,2})\s*月/);
+    if (chinese) return Number(chinese[1]);
+
+    const iso = written.match(/(?:19|20)(\d{2})[-/](\d{2})(?!\d)/);
+    if (iso) {
+      const [yearDigits, month] = [Number(iso[1]), Number(iso[2])];
+      const isSeason = month === (yearDigits + 1) % 100;
+      if (!isSeason && month >= 1 && month <= 12) return month;
+    }
+  }
+
+  const leading = written.match(new RegExp(`^${MONTH_WORD}`, "i"));
+  if (leading) return monthNumber(leading[0]);
+
+  if (yearCount !== 1) return undefined;
+
+  const end = match.index + written.length;
+  const trailing = text
+    .slice(end)
+    .match(new RegExp(`^[,\\s]+(${MONTH_WORD})`, "i"));
+  if (!trailing) return undefined;
+
+  const wordStart = end + trailing[0].length - trailing[1].length;
+  return nextMatch?.index === wordStart ? undefined : monthNumber(trailing[1]);
+}
+
+function writtenDates(text: string): WrittenDate[] {
+  const matches = [...text.matchAll(WRITTEN_DATE)];
+
+  return matches.flatMap((match, index) => {
+    const years = (match[0].match(new RegExp(YEAR, "g")) ?? []).map(Number);
+    const month = monthOfWrittenDate(
+      match,
+      matches[index + 1],
+      text,
+      years.length,
+    );
+
+    return years.map((year, position) => ({
+      year,
+      month: position === 0 ? month : undefined,
+    }));
+  });
+}
+
+/** A year-only anchor is met by any written date in that year. */
+function isAlreadyWritten(
+  written: readonly WrittenDate[],
+  anchor: string,
+): boolean {
+  const [wanted] = writtenDates(anchor);
+  if (!wanted) return false;
+
+  return written.some(
+    (date) =>
+      date.year === wanted.year &&
+      (wanted.month === undefined || date.month === wanted.month),
+  );
+}
 
 /**
  * Anchors the relative dates of the question the user typed onto the query a
@@ -356,9 +452,15 @@ export function normalizeFollowUpDates(
     .replace(/\s+/g, " ")
     .trim();
 
+  // A date the user typed survives the cleaning above, and its anchor would
+  // repeat it.
+  const writtenInQuery = writtenDates(queryWithoutModelDates);
+
   return appendAnchors(
     queryWithoutModelDates,
-    replacements,
+    replacements.filter(
+      ({ anchor }) => !isAlreadyWritten(writtenInQuery, anchor),
+    ),
     options?.maxLength,
   );
 }
