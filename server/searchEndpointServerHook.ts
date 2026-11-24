@@ -55,6 +55,14 @@ const OFFICIAL_LANE_RESERVED_MS = 5_000;
 // slower than the page it was meant to improve.
 const MAX_OFFICIAL_LANE_TIMEOUT_MS = 8_000;
 
+// The hook claims every path under `/search/`, so the type comes from the exact
+// pathname: a prefix test would run a search for `/search/foo` and for
+// `/search/textual`.
+const SEARCH_TYPES = new Map<string, SearchType>([
+  ["/search/text", "text"],
+  ["/search/images", "images"],
+]);
+
 const searchParamsSchema = z.object({
   query: z
     .string({ error: "Missing query parameter" })
@@ -187,6 +195,14 @@ export function searchEndpointServerHook<
       return;
     }
 
+    // Answered before the token is checked: an unknown path starts no search,
+    // so it has nothing to authorize and costs the caller no rate-limit point.
+    const searchType = SEARCH_TYPES.get(url.pathname);
+    if (!searchType) {
+      sendJsonError(response, 404, { error: "Not found" });
+      return;
+    }
+
     // Verified before the parameters are read, matching `/page-content`: a
     // malformed query from an unauthenticated caller has to cost the caller a
     // rate-limit point, and it has to be counted, rather than leaving on a 400
@@ -212,8 +228,7 @@ export function searchEndpointServerHook<
     const { query, limit } = parsedParams.data;
 
     try {
-      const isTextSearch = request.url?.startsWith("/search/text");
-      const searchType = isTextSearch ? "text" : "images";
+      const isTextSearch = searchType === "text";
 
       let searchResults: TextResult[] | ImageResult[] | null;
       let servedBySearXNG = false;
