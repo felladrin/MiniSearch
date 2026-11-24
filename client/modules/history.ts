@@ -1,4 +1,4 @@
-import Dexie, { type Table } from "dexie";
+import Dexie, { type Table, type Transaction } from "dexie";
 import { addLogEntry } from "./logEntries";
 import { getSettings } from "./pubSub";
 
@@ -116,6 +116,43 @@ interface ChatHistoryMessage {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * The key a search's answers and chat turns are stored under. Entries written
+ * before `searchRunId` existed use their query, as the readers in
+ * `getLatestLlmResponseForEntry` and `useHistoryRestore` do.
+ */
+function childKeyOf(search: SearchEntry): string {
+  return search.searchRunId || search.query;
+}
+
+/**
+ * Version 1 never removed a search's answers or chat turns with it, and
+ * follow-up questions wrote chat rows under `follow-up-*` ids that nothing
+ * reads, so an existing install carries rows that no search owns. They are
+ * dropped once, on the upgrade. Rows that a search still reads stay.
+ */
+async function dropRowsNoSearchOwns(tx: Transaction): Promise<void> {
+  const searches = await tx.table<SearchEntry>("searches").toArray();
+  const liveKeys = new Set(searches.map(childKeyOf));
+  await tx
+    .table<ChatHistoryMessage>("chatHistory")
+    .filter((message) => !liveKeys.has(message.conversationId))
+    .delete();
+  await tx
+    .table<LLMResponse>("llmResponses")
+    .filter(
+      (response) =>
+        !response.searchRunId || !liveKeys.has(response.searchRunId),
+    )
+    .delete();
+}
+
+const historySchema = {
+  searches: "++id, searchRunId, query, timestamp, source, pinned, results",
+  llmResponses: "++id, searchId, searchRunId, timestamp, model",
+  chatHistory: "++id, conversationId, timestamp, [conversationId+timestamp]",
+};
+
 class HistoryDatabase extends Dexie {
   searches!: Table<SearchEntry>;
   llmResponses!: Table<LLMResponse>;
@@ -124,12 +161,55 @@ class HistoryDatabase extends Dexie {
   constructor() {
     super("History");
 
-    this.version(1).stores({
-      searches: "++id, searchRunId, query, timestamp, source, pinned, results",
-      llmResponses: "++id, searchId, searchRunId, timestamp, model",
-      chatHistory:
-        "++id, conversationId, timestamp, [conversationId+timestamp]",
-    });
+    this.version(1).stores(historySchema);
+    this.version(2).stores(historySchema).upgrade(dropRowsNoSearchOwns);
+  }
+
+  /**
+   * Deletes searches together with their answers and chat turns, in one
+   * transaction, so a pruned search never leaves rows behind that the UI can
+   * no longer reach. A key that a surviving search still uses (two searches
+   * of one run, or two legacy searches with the same query) keeps its rows,
+   * because that search reads them.
+   */
+  async deleteSearchesWithChildren(searches: SearchEntry[]): Promise<void> {
+    const ids = searches
+      .map((search) => search.id)
+      .filter((id): id is number => id !== undefined);
+    if (ids.length === 0) return;
+    const keys = [...new Set(searches.map(childKeyOf))];
+
+    await this.transaction(
+      "rw",
+      this.searches,
+      this.llmResponses,
+      this.chatHistory,
+      async () => {
+        await this.searches.bulkDelete(ids);
+
+        const survivors = [
+          ...(await this.searches.where("searchRunId").anyOf(keys).toArray()),
+          ...(await this.searches
+            .where("query")
+            .anyOf(keys)
+            .filter((search) => !search.searchRunId)
+            .toArray()),
+        ];
+        const keysInUse = new Set(survivors.map(childKeyOf));
+        const ownedKeys = keys.filter((key) => !keysInUse.has(key));
+
+        await this.llmResponses.where("searchRunId").anyOf(ownedKeys).delete();
+        await this.llmResponses
+          .where("searchId")
+          .anyOf(ids)
+          .filter((response) => !response.searchRunId)
+          .delete();
+        await this.chatHistory
+          .where("conversationId")
+          .anyOf(ownedKeys)
+          .delete();
+      },
+    );
   }
 
   private cleanupInFlight: Promise<void> | null = null;
@@ -163,11 +243,7 @@ class HistoryDatabase extends Dexie {
           .toArray();
 
         if (oldSearches.length > 0) {
-          await this.searches.bulkDelete(
-            oldSearches
-              .map((s) => s.id)
-              .filter((id): id is number => id !== undefined),
-          );
+          await this.deleteSearchesWithChildren(oldSearches);
           addLogEntry(`Cleaned up ${oldSearches.length} old search entries`);
         }
       }
@@ -182,11 +258,7 @@ class HistoryDatabase extends Dexie {
           .toArray();
 
         if (excess.length > 0) {
-          await this.searches.bulkDelete(
-            excess
-              .map((s) => s.id)
-              .filter((id): id is number => id !== undefined),
-          );
+          await this.deleteSearchesWithChildren(excess);
           addLogEntry(`Removed ${excess.length} excess search entries`);
         }
       }

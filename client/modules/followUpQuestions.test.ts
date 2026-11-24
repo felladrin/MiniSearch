@@ -73,3 +73,18 @@ describe("generateFollowUpQuestion", () => {
     expect(question).toBe("");
   });
 });
+
+describe("generateFollowUpQuestion and the chat history", () => {
+  it("writes no chat rows for the follow-up exchange, since nothing reads them", async () => {
+    const { historyDatabase } = await import("./history");
+    const before = await historyDatabase.chatHistory.count();
+    mockedGenerateChatResponse.mockResolvedValue("1. What comes next?");
+
+    await generateFollowUpQuestion({
+      topic: "cats",
+      currentContent: "Cats are independent.",
+    });
+
+    expect(await historyDatabase.chatHistory.count()).toBe(before);
+  });
+});
