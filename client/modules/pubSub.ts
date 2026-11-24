@@ -2,7 +2,11 @@ import { createPubSub } from "create-pubsub";
 import throttle from "throttleit";
 import { addLogEntry } from "./logEntries";
 import * as safeStorage from "./safeStorage";
-import { defaultSettings, SETTINGS_STORAGE_KEY } from "./settings";
+import {
+  coerceNumericSettings,
+  defaultSettings,
+  SETTINGS_STORAGE_KEY,
+} from "./settings";
 import type {
   ImageSearchResults,
   PageContents,
@@ -27,7 +31,11 @@ function isSameJsonKind(value: unknown, reference: unknown): boolean {
   return typeof value === typeof reference;
 }
 
-function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
+function createLocalStoragePubSub<T>(
+  localStorageKey: string,
+  defaultValue: T,
+  normalize?: (value: T) => T,
+) {
   const localStorageValue = safeStorage.getItem(localStorageKey);
   let initialValue: T = defaultValue;
   if (localStorageValue !== null) {
@@ -38,7 +46,7 @@ function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
       parsed = undefined;
     }
     if (parsed !== undefined && isSameJsonKind(parsed, defaultValue)) {
-      initialValue = parsed as T;
+      initialValue = normalize ? normalize(parsed as T) : (parsed as T);
     } else {
       // Runs at module load, so an unparseable or wrong-type stored value must
       // not crash the app. Remove it (so the fallback doesn't repeat on every
@@ -51,13 +59,20 @@ function createLocalStoragePubSub<T>(localStorageKey: string, defaultValue: T) {
   }
   const localStoragePubSub = createPubSub(initialValue);
 
-  const [, onValueChange] = localStoragePubSub;
+  const [updateValue, onValueChange, getValue] = localStoragePubSub;
 
   onValueChange((value) =>
     safeStorage.setItem(localStorageKey, JSON.stringify(value)),
   );
 
-  return localStoragePubSub;
+  if (!normalize) return localStoragePubSub;
+  // Every write goes through the same rule as hydration, so no path can store
+  // a value the consumers would misread.
+  return [
+    (value: T) => updateValue(normalize(value)),
+    onValueChange,
+    getValue,
+  ] as typeof localStoragePubSub;
 }
 
 const querySuggestionsPubSub = createLocalStoragePubSub<string[]>(
@@ -116,6 +131,7 @@ export const [updateModelLoadingProgress] = modelLoadingProgressPubSub;
 export const settingsPubSub = createLocalStoragePubSub(
   SETTINGS_STORAGE_KEY,
   defaultSettings,
+  coerceNumericSettings,
 );
 
 export const [updateSettings, listenToSettingsChanges, getSettings] =

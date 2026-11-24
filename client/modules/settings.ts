@@ -103,6 +103,30 @@ export const defaultSettings = {
   enablePageContentFetch: true,
 };
 
+/**
+ * Returns the settings with every numeric setting that holds something other
+ * than a finite number replaced by its default. A cleared Mantine NumberInput
+ * emits `""`, which `??` does not catch and `> 0` reads as false, so it would
+ * otherwise reach consumers as a `max_tokens` of `""` or a retention that
+ * silently stops cleanup. Keys whose default is not a number are left alone.
+ */
+export function coerceNumericSettings(
+  settings: typeof defaultSettings,
+): typeof defaultSettings {
+  const coerced: Record<string, unknown> = { ...settings };
+  for (const key of Object.keys(defaultSettings) as Array<
+    keyof typeof defaultSettings
+  >) {
+    const fallback = defaultSettings[key];
+    if (typeof fallback !== "number") continue;
+    const value: unknown = settings[key];
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      coerced[key] = fallback;
+    }
+  }
+  return coerced as typeof defaultSettings;
+}
+
 addLogEntry(
   `Number of logical processors in CPU: ${
     navigator.hardwareConcurrency ?? "unknown"
