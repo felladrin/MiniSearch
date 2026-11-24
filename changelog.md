@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-24
 
+- A bi-encoder worker that stays alive but stops answering no longer stalls page content reads. Its scoring requests waited with no deadline, so every later read queued behind it, AI answers waited out the browser's 20 second timeout and lost their page excerpts until the server restarted. A scoring request now gets 10 seconds, after which the passages are ranked lexically, as when the model is not loaded, and the log says so.
 - Restoring a saved search that has no saved results and no saved answer (a failed search, a search with zero results and AI answers off, an abandoned search) no longer appends a duplicate entry to the history nor starts a new live search. The same happened when Regenerate was clicked, or the "enable AI response" prompt accepted, after restoring an entry. The restored query is now treated as handled, like a submitted or auto-searched one.
 - When the browser blocks site data (for example Safari "Block All Cookies" or Chrome "sites can't save data"), the app no longer crashes on load with a blank page. Settings and other persisted values stay in memory for the session and simply do not write through.
 
