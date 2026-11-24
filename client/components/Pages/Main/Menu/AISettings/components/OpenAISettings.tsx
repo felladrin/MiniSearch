@@ -5,7 +5,15 @@ import { defaultSettings } from "@/modules/settings";
 import type { ModelOption } from "../types";
 
 interface OpenAISettingsProps {
-  form: UseFormReturnType<typeof defaultSettings>;
+  form: UseFormReturnType<
+    Pick<
+      typeof defaultSettings,
+      | "openAiApiBaseUrl"
+      | "openAiApiKey"
+      | "openAiApiModel"
+      | "openAiContextLength"
+    >
+  >;
   openAiModels: ModelOption[];
   useTextInput: boolean;
 }

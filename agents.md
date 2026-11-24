@@ -185,6 +185,7 @@ Need to:
 - `client/hooks/useSearchHistory.ts` - Search history management from IndexedDB
 - `client/hooks/useHistoryRestore.ts` - Restores full search state from history
 - `client/hooks/useDrawerState.ts` - Drawer open/close state with logging
+- `client/hooks/useSettingsForm.ts` - Mantine form over a list of settings keys that writes only the keys that changed
 - `client/hooks/useScreenWakeLock.ts` - Keeps the screen awake while a response is generating
 
 ## Common Tasks Quick Reference
@@ -201,7 +202,7 @@ Need to:
 ### Add a new setting
 
 1. Add to `client/modules/settings.ts` default object
-2. Add UI in `client/components/Pages/Main/Menu/`
+2. Add UI in `client/components/Pages/Main/Menu/`, and add its key to that form's `useSettingsForm` keys
 3. Update `docs/configuration.md` settings table
 
 ### Modify search behavior

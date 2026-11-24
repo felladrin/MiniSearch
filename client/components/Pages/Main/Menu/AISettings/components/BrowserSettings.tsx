@@ -8,7 +8,9 @@ const WllamaModelSelect = lazy(
 );
 
 interface BrowserSettingsProps {
-  form: UseFormReturnType<typeof defaultSettings>;
+  form: UseFormReturnType<
+    Pick<typeof defaultSettings, "wllamaModelId" | "cpuThreads">
+  >;
 }
 
 /** Browser inference settings: the model to run (lazy-loaded) and its CPU threads. */

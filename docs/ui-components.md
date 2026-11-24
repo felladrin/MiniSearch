@@ -335,6 +335,7 @@ function AiResponseSection() {
 **PubSub:**
 
 - **Subscribes/Updates:** `settingsPubSub` (full settings object)
+- **Form state:** each form is built with `useSettingsForm(keys)` (`client/hooks/useSettingsForm.ts`), which holds only that form's own settings and writes only the keys that changed, merged into the settings as they are at that moment. Forms that are open together, and the settings the app writes while the menu is open, therefore cannot undo each other.
 
 **Persistence:**
 

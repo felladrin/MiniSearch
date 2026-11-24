@@ -6,10 +6,10 @@ import {
   Switch,
   Text,
 } from "@mantine/core";
-import { useForm } from "@mantine/form";
 import getUnicodeFlagIcon from "country-flag-icons/unicode";
 import { usePubSub } from "create-pubsub/react";
 import { useCallback, useEffect, useState } from "react";
+import { useSettingsForm } from "@/hooks/useSettingsForm";
 import { settingsPubSub } from "@/modules/pubSub";
 import {
   listVoices,
@@ -17,8 +17,15 @@ import {
   type VoiceOption,
 } from "@/modules/textToSpeech";
 
+const SETTINGS_KEYS = [
+  "enableDictation",
+  "enableLocalDictationModel",
+  "textToSpeechEngine",
+  "selectedVoiceId",
+] as const;
+
 export default function VoiceSettingsForm() {
-  const [settings, setSettings] = usePubSub(settingsPubSub);
+  const [settings] = usePubSub(settingsPubSub);
   const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
 
   const getCountryFlag = useCallback((langCode: string) => {
@@ -33,10 +40,7 @@ export default function VoiceSettingsForm() {
     }
   }, []);
 
-  const form = useForm({
-    initialValues: settings,
-    onValuesChange: setSettings,
-  });
+  const form = useSettingsForm(SETTINGS_KEYS);
 
   useEffect(() => {
     let cancelled = false;

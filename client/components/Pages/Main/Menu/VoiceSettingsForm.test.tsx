@@ -168,7 +168,6 @@ describe("VoiceSettingsForm", () => {
 
     expect(setSettings).toHaveBeenCalledWith(
       expect.objectContaining({ enableLocalDictationModel: false }),
-      expect.anything(),
     );
   });
 
@@ -189,7 +188,6 @@ describe("VoiceSettingsForm", () => {
         textToSpeechEngine: "system",
         selectedVoiceId: "",
       }),
-      expect.anything(),
     );
     expect((voiceInput() as HTMLInputElement).value).toBe("");
   });
