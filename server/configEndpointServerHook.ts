@@ -1,6 +1,7 @@
 import type { PreviewServer, ViteDevServer } from "vite";
 import {
   DEFAULT_INFERENCE_TYPE,
+  DEFAULT_INTERNAL_API_CONTEXT_LENGTH,
   DEFAULT_INTERNAL_API_NAME,
   DEFAULT_PARENT_WINDOW_ORIGINS,
   DEFAULT_WLLAMA_GPU_MODEL_ID,
@@ -9,6 +10,19 @@ import {
 } from "../shared/serverConfig.ts";
 import { parseCommaSeparatedList } from "./parseCommaSeparatedList.ts";
 import { getSearchToken } from "./searchToken.ts";
+
+function getInternalApiContextLength(): number {
+  const value = process.env.INTERNAL_OPENAI_COMPATIBLE_API_CONTEXT_LENGTH;
+  if (!value) return DEFAULT_INTERNAL_API_CONTEXT_LENGTH;
+  const contextLength = Number(value);
+  if (Number.isInteger(contextLength) && contextLength > 0) {
+    return contextLength;
+  }
+  console.error(
+    `INTERNAL_OPENAI_COMPATIBLE_API_CONTEXT_LENGTH is not a positive integer ("${value}"); using ${DEFAULT_INTERNAL_API_CONTEXT_LENGTH}.`,
+  );
+  return DEFAULT_INTERNAL_API_CONTEXT_LENGTH;
+}
 
 /**
  * Serves the server config at /api/config at runtime rather than compiling it
@@ -38,6 +52,7 @@ export function configEndpointServerHook<
       internalApiName:
         process.env.INTERNAL_OPENAI_COMPATIBLE_API_NAME ||
         DEFAULT_INTERNAL_API_NAME,
+      internalApiContextLength: getInternalApiContextLength(),
       defaultInferenceType:
         process.env.DEFAULT_INFERENCE_TYPE || DEFAULT_INFERENCE_TYPE,
       // Served here rather than compiled into the bundle so a client always

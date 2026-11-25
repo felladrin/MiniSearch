@@ -16,6 +16,13 @@ const state = vi.hoisted(() => ({
     reasoningStartMarker?: string;
     reasoningEndMarker?: string;
   },
+  internalApiContextLength: 131072,
+}));
+
+vi.mock("./config", () => ({
+  getConfig: async () => ({
+    internalApiContextLength: state.internalApiContextLength,
+  }),
 }));
 
 vi.mock("./pubSub", () => ({
@@ -329,26 +336,33 @@ describe("getFormattedSearchResults", () => {
 });
 
 describe("getEffectiveContextSize", () => {
-  it("follows the configured context on the OpenAI-compatible backend", () => {
+  it("follows the configured context on the OpenAI-compatible backend", async () => {
     state.settings = { inferenceType: "openai", openAiContextLength: 32768 };
 
-    expect(getEffectiveContextSize()).toBe(32768);
+    expect(await getEffectiveContextSize()).toBe(32768);
   });
 
-  it("stays at the default on every other backend, whatever the setting says", () => {
-    for (const inferenceType of ["browser", "horde", "internal"]) {
+  it("follows the server's context length on the internal API, whatever the setting says", async () => {
+    state.settings = { inferenceType: "internal", openAiContextLength: 4096 };
+    state.internalApiContextLength = 65536;
+
+    expect(await getEffectiveContextSize()).toBe(65536);
+  });
+
+  it("stays at the default on the in-browser and AI Horde backends, whatever the setting says", async () => {
+    for (const inferenceType of ["browser", "horde"]) {
       state.settings = { inferenceType, openAiContextLength: 32768 };
 
-      expect(getEffectiveContextSize()).toBe(4096);
+      expect(await getEffectiveContextSize()).toBe(4096);
     }
   });
 
-  it("falls back to the default when the setting cannot size a window", () => {
+  it("falls back to the default when the setting cannot size a window", async () => {
     // A cleared numeric input can persist as an empty string.
     for (const openAiContextLength of [undefined, 0, -1, "" as never]) {
       state.settings = { inferenceType: "openai", openAiContextLength };
 
-      expect(getEffectiveContextSize()).toBe(4096);
+      expect(await getEffectiveContextSize()).toBe(4096);
     }
   });
 });
@@ -371,45 +385,50 @@ describe("getDefaultChatCompletionCreateParamsStreaming", () => {
     state.settings = { inferenceType: "openai", openAiContextLength: 4096 };
   });
 
-  it("leaves the prompt room in the window instead of asking for all of it", () => {
+  it("leaves the prompt room in the window instead of asking for all of it", async () => {
     const messages = getDefaultChatMessages(searchResultsOf(2500));
     const promptTokens = countPromptTokens(messages);
     expect(promptTokens).toBeGreaterThan(2000);
 
     const { max_tokens } =
-      getDefaultChatCompletionCreateParamsStreaming(messages);
+      await getDefaultChatCompletionCreateParamsStreaming(messages);
 
     expect(promptTokens + max_tokens).toBeLessThanOrEqual(4096);
     expect(max_tokens).toBeGreaterThan(1000);
   });
 
-  it("still asks for a short answer when the prompt nearly fills the window", () => {
+  it("still asks for a short answer when the prompt nearly fills the window", async () => {
     const messages = getDefaultChatMessages(searchResultsOf(4090));
 
     expect(
-      getDefaultChatCompletionCreateParamsStreaming(messages).max_tokens,
+      (await getDefaultChatCompletionCreateParamsStreaming(messages))
+        .max_tokens,
     ).toBe(minimumOutputTokens);
   });
 
-  it("sizes the budget from the configured context on the OpenAI-compatible backend", () => {
+  it("sizes the budget from the configured context on the OpenAI-compatible backend", async () => {
     state.settings = { inferenceType: "openai", openAiContextLength: 32768 };
     const messages = getDefaultChatMessages(searchResultsOf(8000));
 
     const { max_tokens } =
-      getDefaultChatCompletionCreateParamsStreaming(messages);
+      await getDefaultChatCompletionCreateParamsStreaming(messages);
 
     expect(max_tokens).toBeGreaterThan(20000);
     expect(countPromptTokens(messages) + max_tokens).toBeLessThanOrEqual(32768);
   });
 
-  it("sizes the budget from the default context on the internal API", () => {
-    state.settings = { inferenceType: "internal", openAiContextLength: 32768 };
+  it("sizes the budget from the server's context length on the internal API", async () => {
+    state.settings = { inferenceType: "internal", openAiContextLength: 4096 };
+    state.internalApiContextLength = 131072;
     const messages = getDefaultChatMessages(searchResultsOf(1000));
 
     const { max_tokens } =
-      getDefaultChatCompletionCreateParamsStreaming(messages);
+      await getDefaultChatCompletionCreateParamsStreaming(messages);
 
-    expect(countPromptTokens(messages) + max_tokens).toBeLessThanOrEqual(4096);
+    expect(max_tokens).toBeGreaterThan(100000);
+    expect(countPromptTokens(messages) + max_tokens).toBeLessThanOrEqual(
+      131072,
+    );
   });
 });
 

@@ -18,6 +18,16 @@ vi.mock("./history", () => ({
 
 vi.mock("./logEntries", () => ({ addLogEntry: vi.fn() }));
 
+// The internal API sizes its budgets from /api/config; `fetch` below only
+// answers /inference.
+vi.mock("./config", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./config")>();
+  return {
+    ...actual,
+    getConfig: vi.fn(() => Promise.resolve(actual.FALLBACK_CONFIG)),
+  };
+});
+
 vi.mock("./notifications", () => ({ showAiCompleteNotification: vi.fn() }));
 
 vi.mock("./pageContent", () => ({

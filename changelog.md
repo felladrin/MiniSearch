@@ -11,6 +11,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-25
 
+- Answers from the instance's own AI are no longer cut short. The browser sized every request to it for a 4096-token window, so with search results and page excerpts in the prompt the answer often got fewer than 2048 tokens, and the server capped it at 2048 anyway; a reasoning model could spend all of that thinking. The window now defaults to 131072 tokens (128K) and can be set with `INTERNAL_OPENAI_COMPATIBLE_API_CONTEXT_LENGTH`, and the server's cap, `MODEL_DEFAULT_MAX_TOKENS`, now defaults to 8192. With the larger window, more of each page read also goes into the prompt.
 - Admins can now set the reasoning effort of the instance's own AI. The new `INTERNAL_OPENAI_COMPATIBLE_API_REASONING_EFFORT` variable is sent as `reasoning_effort` on every request to the internal OpenAI-compatible API, for every model in the list, so a reasoning model can be told to think less (or not at all) and answer faster. Left empty, nothing is sent and the API keeps its own default.
 
 - Follow-up questions are now shown when the main AI answer came back empty. The first follow-up question and its answer used to be hidden for good, "Copy conversation" left them out, and they could not be regenerated. A last answer that came back empty now shows "No response" with its Re-generate button, instead of showing nothing to retry from.

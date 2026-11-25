@@ -162,10 +162,12 @@ describe("numeric settings never hold an empty string", () => {
       getDefaultChatCompletionCreateParamsStreaming,
       getEffectiveContextSize,
     } = await import("./textGenerationUtilities");
-    expect(getDefaultChatCompletionCreateParamsStreaming([]).max_tokens).toBe(
+    expect(
+      (await getDefaultChatCompletionCreateParamsStreaming([])).max_tokens,
+    ).toBe(defaultSettings.openAiContextLength);
+    expect(await getEffectiveContextSize()).toBe(
       defaultSettings.openAiContextLength,
     );
-    expect(getEffectiveContextSize()).toBe(defaultSettings.openAiContextLength);
   });
 });
 
@@ -235,6 +237,7 @@ describe("settings hydration merges the stored profile into the defaults", () =>
         wllamaDefaultGpuModelId: "gemma-3-4b",
         internalApiEnabled: false,
         internalApiName: "Internal API",
+        internalApiContextLength: 131072,
         defaultInferenceType: "openai",
         searchToken: "a".repeat(64),
         parentWindowOrigins: ["https://huggingface.co"],

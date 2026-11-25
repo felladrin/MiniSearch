@@ -1,4 +1,5 @@
 import gptTokenizer from "gpt-tokenizer";
+import { getConfig } from "./config";
 import { addLogEntry } from "./logEntries";
 import { allocatePageExcerpts } from "./pageExcerptAllocation";
 import type {
@@ -42,8 +43,11 @@ const pageContentTokenBudgetRatio = 0.35;
  * out of the prompt (page excerpts, chat history) measures against this one
  * number, so the parts are sized for the same window and fit together.
  */
-export function getEffectiveContextSize() {
+export async function getEffectiveContextSize() {
   const { inferenceType, openAiContextLength } = getSettings();
+  if (inferenceType === "internal") {
+    return (await getConfig()).internalApiContextLength;
+  }
   // `openAiContextLength` describes one backend's endpoint. Every other one
   // runs at `defaultContextSize` (the browser models are built with it), and
   // the setting outlives a switch between them, so it only counts where it
@@ -58,8 +62,10 @@ export function getEffectiveContextSize() {
   return defaultContextSize;
 }
 
-function getPageContentTokenBudget() {
-  return Math.floor(getEffectiveContextSize() * pageContentTokenBudgetRatio);
+async function getPageContentTokenBudget() {
+  return Math.floor(
+    (await getEffectiveContextSize()) * pageContentTokenBudgetRatio,
+  );
 }
 
 let workerFactory = () =>
@@ -217,7 +223,7 @@ export async function getFormattedSearchResults(
   const pageContents = getPageContents();
   const excerpts = await allocatePageExcerptsAsync(
     searchResults.map(([, , url]) => pageContents[url] ?? ""),
-    getPageContentTokenBudget(),
+    await getPageContentTokenBudget(),
   );
 
   const relevanceTags = getRelevanceTags(searchResults);
@@ -276,8 +282,8 @@ const tokensPerMessageOverhead = 4;
  * uses the same tokenizer as the other prompt budgets; the model's own may
  * differ a little either way.
  */
-function getMaxOutputTokens(messages: ChatMessage[]) {
-  const contextSize = getEffectiveContextSize();
+async function getMaxOutputTokens(messages: ChatMessage[]) {
+  const contextSize = await getEffectiveContextSize();
   const promptTokens = messages.reduce(
     (total, message) =>
       total +
@@ -291,12 +297,12 @@ function getMaxOutputTokens(messages: ChatMessage[]) {
   );
 }
 
-export function getDefaultChatCompletionCreateParamsStreaming(
+export async function getDefaultChatCompletionCreateParamsStreaming(
   messages: ChatMessage[],
 ) {
   return {
     stream: true,
-    max_tokens: getMaxOutputTokens(messages),
+    max_tokens: await getMaxOutputTokens(messages),
     temperature: 0.35,
     top_p: 1.0,
     min_p: 0.0,

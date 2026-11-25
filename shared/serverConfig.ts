@@ -7,6 +7,8 @@ export interface ServerConfig {
   wllamaDefaultGpuModelId: string;
   internalApiEnabled: boolean;
   internalApiName: string;
+  /** Context window, in tokens, of the internal API's models; the answer's token budgets are sized from it. */
+  internalApiContextLength: number;
   defaultInferenceType: string;
   /** The CSRF token to hash into the `?token=` of every request to this server. */
   searchToken: string;
@@ -27,4 +29,5 @@ export const DEFAULT_WLLAMA_MODEL_ID = "littlelamb-290m";
 export const DEFAULT_WLLAMA_GPU_MODEL_ID = "gemma-3-4b";
 export const DEFAULT_INFERENCE_TYPE = "browser";
 export const DEFAULT_INTERNAL_API_NAME = "Internal API";
+export const DEFAULT_INTERNAL_API_CONTEXT_LENGTH = 131072;
 export const DEFAULT_PARENT_WINDOW_ORIGINS = ["https://huggingface.co"];
