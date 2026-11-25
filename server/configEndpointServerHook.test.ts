@@ -27,6 +27,7 @@ async function requestConfig() {
   );
   return JSON.parse(end.mock.calls[0][0] as string) as {
     accessKeysEnabled: boolean;
+    parentWindowOrigins: string[];
   };
 }
 
@@ -44,5 +45,28 @@ describe("configEndpointServerHook", () => {
   it("reports access keys as disabled when the list holds no usable key", async () => {
     vi.stubEnv("ACCESS_KEYS", " , ,");
     expect((await requestConfig()).accessKeysEnabled).toBe(false);
+  });
+
+  it("serves the configured parent window origins as a list", async () => {
+    vi.stubEnv(
+      "PARENT_WINDOW_ORIGINS",
+      "https://huggingface.co, https://example.com,",
+    );
+    expect((await requestConfig()).parentWindowOrigins).toEqual([
+      "https://huggingface.co",
+      "https://example.com",
+    ]);
+  });
+
+  it("serves Hugging Face as the parent window origin when the variable is unset", async () => {
+    vi.stubEnv("PARENT_WINDOW_ORIGINS", undefined);
+    expect((await requestConfig()).parentWindowOrigins).toEqual([
+      "https://huggingface.co",
+    ]);
+  });
+
+  it("serves no parent window origin when the variable is empty", async () => {
+    vi.stubEnv("PARENT_WINDOW_ORIGINS", "");
+    expect((await requestConfig()).parentWindowOrigins).toEqual([]);
   });
 });

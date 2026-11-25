@@ -30,6 +30,7 @@ const serverConfig: ServerConfig = {
   internalApiName: "Internal API",
   defaultInferenceType: "browser",
   searchToken: "a".repeat(64),
+  parentWindowOrigins: ["https://huggingface.co"],
 };
 
 describe("App", () => {

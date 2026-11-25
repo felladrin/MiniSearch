@@ -75,6 +75,16 @@ INTERNAL_OPENAI_COMPATIBLE_API_NAME="Company LLM"
 | ------------------------ | --------- | -------------------------------------------------------------------- |
 | `DEFAULT_INFERENCE_TYPE` | `browser` | Default AI inference type (`browser`, `openai`, `horde`, `internal`) |
 
+### Embedding
+
+When MiniSearch runs inside an iframe, it posts each search to the embedding page as `{ queryString, hash: "" }`, so a page such as a Hugging Face Space can keep its own address in sync with the search.
+
+| Variable                | Default                  | Description                                                                                                                                                                                                  |
+| ----------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PARENT_WINDOW_ORIGINS` | `https://huggingface.co` | Comma-separated list of the origins allowed to receive the query. It is posted to each one, and the browser delivers it only when the embedding page is on that origin. Set it empty to never post the query |
+
+An origin is the scheme, host and port, with no path (`https://example.com`, `http://localhost:8080`). The query is never posted to `*`, since any site can frame an instance.
+
 ### Server Configuration
 
 These variables control the Vite development/preview server behavior:
@@ -405,7 +415,8 @@ Client-facing configuration (access keys, inference type, internal API settings)
   "internalApiEnabled": true,
   "internalApiName": "Internal API",
   "defaultInferenceType": "browser",
-  "searchToken": "<search-token>"
+  "searchToken": "<search-token>",
+  "parentWindowOrigins": ["https://huggingface.co"]
 }
 ```
 
@@ -421,6 +432,7 @@ Client-facing configuration (access keys, inference type, internal API settings)
 | `WLLAMA_DEFAULT_GPU_MODEL_ID`      | Runtime     | Read from `/api/config`                                                             |
 | `INTERNAL_OPENAI_COMPATIBLE_API_*` | Runtime     | Read from `/api/config` (except `API_KEY` which is server-only)                     |
 | `DEFAULT_INFERENCE_TYPE`           | Runtime     | Read from `/api/config`                                                             |
+| `PARENT_WINDOW_ORIGINS`            | Runtime     | Read from `/api/config`                                                             |
 | Search token                       | Runtime     | Read from `/api/config`, so a reload picks up the token of whichever server answers |
 
 ### Security Considerations

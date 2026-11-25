@@ -7,6 +7,7 @@ import {
   getSuppressNextFollowUp,
   imageSearchResultsPubSub,
   imageSearchStatePubSub,
+  isRestoringFromHistoryPubSub,
   textSearchResultsPubSub,
   updateImageSearchResults,
   updateSuppressNextFollowUp,
@@ -18,6 +19,12 @@ vi.mock("wouter", () => ({
 }));
 
 vi.mock("@/modules/logEntries", () => ({ addLogEntry: vi.fn() }));
+
+vi.mock("@/modules/config", () => ({
+  getConfig: vi.fn().mockResolvedValue({
+    parentWindowOrigins: ["https://huggingface.co"],
+  }),
+}));
 
 vi.mock("@/modules/history", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/modules/history")>()),
@@ -149,5 +156,32 @@ describe("useHistoryRestore", () => {
     await restoreEntry({ textResults });
 
     expect(getSuppressNextFollowUp()).toBe(true);
+  });
+
+  it("finishes the restore when embedded after a cross-origin frame", async () => {
+    const parentWindow = {
+      0: {
+        get location(): Location {
+          throw new DOMException("Blocked a frame", "SecurityError");
+        },
+      },
+      postMessage: vi.fn(),
+    };
+    vi.stubGlobal("parent", parentWindow);
+
+    try {
+      await restoreEntry({ textResults });
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
+
+      expect(isRestoringFromHistoryPubSub[2]()).toBe(false);
+      expect(parentWindow.postMessage).toHaveBeenCalledWith(
+        { queryString: "q=saved%20search", hash: "" },
+        "https://huggingface.co",
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

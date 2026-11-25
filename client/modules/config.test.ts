@@ -13,6 +13,7 @@ const serverConfig: ServerConfig = {
   internalApiName: "Custom LLM",
   defaultInferenceType: "internal",
   searchToken: "a".repeat(64),
+  parentWindowOrigins: ["https://huggingface.co"],
 };
 
 /** Imports a fresh copy of the module so its cache starts empty. */
