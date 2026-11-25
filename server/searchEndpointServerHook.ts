@@ -43,6 +43,10 @@ const SEARCH_DEADLINE_MS = 25_000;
 // A fallback cannot finish in this window, so starting one would only move the
 // same 502 further out.
 const MIN_FALLBACK_BUDGET_MS = 2_000;
+// The part of the deadline SearXNG may not spend when a fallback could answer
+// instead, so a stalled SearXNG is given up on while the fallback can still
+// run. SearXNG keeps 15 s, enough for its retries and their backoff.
+const SEARXNG_FALLBACK_RESERVE_MS = 10_000;
 
 // The official lane is a supplement for a search that already succeeded, so it
 // never gets the last seconds of the deadline: what it would add is not worth
@@ -233,8 +237,18 @@ export function searchEndpointServerHook<
       let searchResults: TextResult[] | ImageResult[] | null;
       let servedBySearXNG = false;
       const searchStartedAt = performance.now();
+      const fallbackPossible = isTextSearch && isSearchFallbackEnabled();
+      const searxngTimeoutMs = fallbackPossible
+        ? SEARCH_DEADLINE_MS - SEARXNG_FALLBACK_RESERVE_MS
+        : SEARCH_DEADLINE_MS;
       try {
-        searchResults = await fetchSearXNG(query, searchType, limit);
+        searchResults = await fetchSearXNG(
+          query,
+          searchType,
+          limit,
+          undefined,
+          AbortSignal.timeout(searxngTimeoutMs),
+        );
         servedBySearXNG = true;
         recordSearchDuration(searchType, performance.now() - searchStartedAt);
       } catch {
@@ -243,7 +257,7 @@ export function searchEndpointServerHook<
         // and never for images: no fallback provider has image search.
         searchResults = null;
 
-        if (isTextSearch && isSearchFallbackEnabled()) {
+        if (fallbackPossible) {
           const remainingMs =
             SEARCH_DEADLINE_MS - (performance.now() - searchStartedAt);
 

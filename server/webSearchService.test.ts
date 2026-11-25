@@ -205,8 +205,10 @@ describe("retry logic", () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 500));
 
     const promise = fetchSearXNG("test", "text");
+    // Exact: the last 500 used to throw the plain status message, so the
+    // retries never showed in the log.
     const outcome = expect(promise).rejects.toThrow(
-      "SearXNG request failed with status 500",
+      /^SearXNG request failed with status 500 after 3 retries$/,
     );
     await vi.runAllTimersAsync();
     await outcome;
@@ -1129,5 +1131,136 @@ describe("fetchSupplementarySearXNG", () => {
       expect.any(String),
       expect.objectContaining({ signal: controller.signal }),
     );
+  });
+});
+
+/** A failed answer whose body records being cancelled. */
+function failedResponseWithBody(status: number) {
+  const cancel = vi.fn(() => Promise.resolve());
+  const response = createMockResponse("", false, status);
+  Object.defineProperty(response, "body", { value: { cancel } });
+  return { response, cancel };
+}
+
+describe("search deadline", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("passes the signal to every SearXNG fetch", async () => {
+    fetchMock.mockResolvedValue(successResponse());
+    const { signal } = new AbortController();
+
+    await fetchSearXNG("test", "text", 30, new CircuitBreaker(), signal);
+
+    expect(fetchMock.mock.calls[0][1]?.signal).toBe(signal);
+  });
+
+  it("ends a stalled fetch when the signal fires and counts it against the circuit", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 1 });
+    const deadline = new AbortController();
+    fetchMock.mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(init.signal?.reason),
+          );
+        }),
+    );
+
+    const search = fetchSearXNG("test", "text", 30, breaker, deadline.signal);
+    const outcome = expect(search).rejects.toThrow("timed out");
+    deadline.abort(new DOMException("timed out", "TimeoutError"));
+    await outcome;
+
+    expect(breaker.getState("searxng")).toBe("OPEN");
+  });
+
+  it("stops retrying when the signal fires during the backoff", async () => {
+    fetchMock.mockResolvedValue(createMockResponse("", false, 500));
+    const deadline = new AbortController();
+
+    const search = fetchSearXNG(
+      "test",
+      "text",
+      30,
+      new CircuitBreaker(),
+      deadline.signal,
+    );
+    const outcome = expect(search).rejects.toThrow("timed out");
+    await vi.advanceTimersByTimeAsync(500);
+    deadline.abort(new DOMException("timed out", "TimeoutError"));
+    await vi.runAllTimersAsync();
+    await outcome;
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("failed response bodies", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("discards the body of each 500 that is retried", async () => {
+    const first = failedResponseWithBody(500);
+    const second = failedResponseWithBody(500);
+    fetchMock
+      .mockResolvedValueOnce(first.response)
+      .mockResolvedValueOnce(second.response)
+      .mockResolvedValueOnce(successResponse());
+
+    const search = fetchSearXNG("test", "text", 30, new CircuitBreaker());
+    await vi.runAllTimersAsync();
+    await search;
+
+    expect(first.cancel).toHaveBeenCalledTimes(1);
+    expect(second.cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("discards the body of every 500 when the retries run out", async () => {
+    const answers = Array.from({ length: 4 }, () =>
+      failedResponseWithBody(500),
+    );
+    for (const { response } of answers)
+      fetchMock.mockResolvedValueOnce(response);
+
+    const search = fetchSearXNG("test", "text", 30, new CircuitBreaker());
+    const outcome = expect(search).rejects.toThrow();
+    await vi.runAllTimersAsync();
+    await outcome;
+
+    for (const { cancel } of answers) expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("discards the body of a 503 and keeps its message", async () => {
+    const answer = failedResponseWithBody(503);
+    fetchMock.mockResolvedValueOnce(answer.response);
+
+    await expect(
+      fetchSearXNG("test", "text", 30, new CircuitBreaker()),
+    ).rejects.toThrow(/^SearXNG request failed with status 503$/);
+
+    expect(answer.cancel).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("discards the body of a failed supplementary search", async () => {
+    const answer = failedResponseWithBody(503);
+    fetchMock.mockResolvedValueOnce(answer.response);
+
+    await expect(fetchSupplementarySearXNG("test", 5)).rejects.toThrow(
+      "SearXNG request failed with status 503",
+    );
+
+    expect(answer.cancel).toHaveBeenCalledTimes(1);
   });
 });
