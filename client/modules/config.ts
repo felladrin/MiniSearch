@@ -23,7 +23,9 @@ export type { ServerConfig };
  *
  * `searchToken` has no harmless stand-in, so it is empty here. Anything that
  * needs it goes through `getConfig`, which rejects rather than handing back a
- * token the server would turn away.
+ * token the server would turn away. `parentWindowOrigins` is empty for the
+ * same reason: without the server's list, no embedding page is trusted with
+ * the query.
  */
 export const FALLBACK_CONFIG: ServerConfig = {
   accessKeysEnabled: false,
@@ -34,6 +36,7 @@ export const FALLBACK_CONFIG: ServerConfig = {
   internalApiName: DEFAULT_INTERNAL_API_NAME,
   defaultInferenceType: DEFAULT_INFERENCE_TYPE,
   searchToken: "",
+  parentWindowOrigins: [],
 };
 
 const FETCH_TIMEOUT_MS = 5000;

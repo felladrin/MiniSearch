@@ -5,6 +5,7 @@ Notable changes, grouped by date, most recent first.
 ## 2026-11-25
 
 - Fetches triggered by the settings are cancelled when superseded and give up after 10 seconds. Typing a base URL or a Horde key used to fire one request per character, and the slowest answer won: an old server's model list could replace the correct one, a cleared field could show the old user again, and an endpoint that never answers left the model dropdown stuck or delayed the start of an AI response indefinitely. Clearing the base URL now clears the model list too.
+- Searching from an embedded MiniSearch no longer depends on which frame comes first in the embedding page. The query was posted to an origin read from the parent's first child frame, so when that frame was another site (an ad, a chat widget, or a cross-origin frame of the app's own when not embedded), the browser refused the read and the search did nothing, and restoring a search from the history left the app stuck mid-restore. Browsers without `location.ancestorOrigins` never received the query at all. The query is now posted only to the origins in the new `PARENT_WINDOW_ORIGINS` setting, `https://huggingface.co` by default, and the browser delivers it only when the embedding page is on one of them.
 
 ## 2026-11-24
 
