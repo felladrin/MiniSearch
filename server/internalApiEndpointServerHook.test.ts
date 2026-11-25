@@ -352,6 +352,32 @@ describe("internalApiEndpointServerHook", () => {
       return provider.chatModel.mock.calls.map((call) => call[0]);
     }
 
+    it("sends the configured reasoning effort upstream", async () => {
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_REASONING_EFFORT", " low ");
+      vi.mocked(streamText).mockImplementation(
+        () => streamOf([{ type: "finish" }]) as never,
+      );
+
+      await callWithFakeTimers();
+
+      expect(vi.mocked(streamText).mock.calls[0][0].providerOptions).toEqual({
+        openai: { reasoningEffort: "low" },
+      });
+    });
+
+    it("leaves the reasoning effort to the upstream when unset", async () => {
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_REASONING_EFFORT", "");
+      vi.mocked(streamText).mockImplementation(
+        () => streamOf([{ type: "finish" }]) as never,
+      );
+
+      await callWithFakeTimers();
+
+      expect(
+        vi.mocked(streamText).mock.calls[0][0].providerOptions,
+      ).toBeUndefined();
+    });
+
     it("tries the configured models in their order", async () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", " model-a , model-b ");
       vi.mocked(streamText)
