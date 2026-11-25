@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-26
 
+- An AI Horde answer no longer fails because one of its two jobs did. With no model chosen, MiniSearch sends two jobs and uses whichever answers first, but a job that failed first, such as one whose worker crashed, ended the whole answer with "Generation failed" while the other job was about to finish. A failed job is now ignored as long as the other one is still running, and the answer fails only when both do. When both fail, a stop you pressed still ends it without a new attempt, and a job that could not run on the top models still sends the second round to any model.
 - A failed regeneration no longer loses the answer. Regenerate removed the answer from the chat before asking for a new one, and when the model errored it was gone, with the regenerate button, and the follow-up suggestion was cleared too, so the question had to be typed again; the only trace was a line in the logs. The previous answer and the follow-up suggestion now come back, a red notification says the regeneration failed, and the answer can be regenerated again.
 
 ## 2026-11-25

@@ -505,6 +505,25 @@ export async function generateChatWithHorde(
   return await executeHordeGeneration(messages, onUpdate);
 }
 
+/**
+ * The error to report when every raced job failed. `AggregateError.errors` is
+ * in submission order, not failure order, so the choice goes by priority: an
+ * interrupt first, so a stop never turns into a retry, then "not possible",
+ * the original object `executeHordeGeneration` retries on, then the first.
+ */
+function pickRaceFailure(errors: unknown[]): unknown {
+  const withMessage = (message: string) =>
+    errors.find(
+      (error) =>
+        error instanceof ChatGenerationError && error.message === message,
+    );
+  return (
+    withMessage("Generation interrupted") ??
+    withMessage(GENERATION_NOT_POSSIBLE_MESSAGE) ??
+    errors[0]
+  );
+}
+
 async function raceGenerations(
   messages: ChatMessage[],
   models: string[] | undefined,
@@ -554,7 +573,13 @@ async function raceGenerations(
       ).then((result: string) => ({ result, generationId: generation.id })),
     );
 
-    const winner = await Promise.race(statusPromises);
+    // The first job to answer wins; a job that fails is ignored while another
+    // is still running, so one crashed worker cannot sink a healthy sibling.
+    const winner = await Promise.any(statusPromises).catch((error: unknown) => {
+      throw error instanceof AggregateError
+        ? pickRaceFailure(error.errors)
+        : error;
+    });
 
     await Promise.all(
       generations
