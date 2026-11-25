@@ -90,6 +90,13 @@ describe("HistoryDrawer component", () => {
     expect(await screen.findByText("Search history is disabled")).toBeVisible();
   });
 
+  it("asks for every pinned search, not only the recent ones", () => {
+    renderDrawer();
+    expect(useSearchHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ includeAllPinned: true }),
+    );
+  });
+
   it("shows the empty state when there is no history", async () => {
     renderDrawer();
     expect(await screen.findByText("No search history yet")).toBeVisible();

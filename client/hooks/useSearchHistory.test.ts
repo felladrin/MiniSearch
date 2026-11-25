@@ -83,6 +83,160 @@ async function settle() {
   });
 }
 
+/**
+ * Waits for the hook's read to finish. With includeAllPinned the read also
+ * queries the `pinnedAt` index, which takes fake-indexeddb more turns of
+ * the real event loop than `settle` alone gives it. setImmediate is left real
+ * by the fake timers above, so each await yields one real turn; `vi.waitFor`
+ * would not, since under fake timers it polls by advancing fake time.
+ */
+async function untilLoaded(result: {
+  current: ReturnType<typeof useSearchHistory>;
+}) {
+  for (let turn = 0; turn < 500 && result.current.isLoading; turn++) {
+    await act(async () => {
+      await new Promise((resolve) => setImmediate(resolve));
+    });
+  }
+  expect(result.current.isLoading).toBe(false);
+}
+
+/** Pins the oldest seeded entry, "weather in lisbon". */
+async function pinOldestEntry() {
+  const [oldest] = await historyDatabase.searches
+    .orderBy("timestamp")
+    .limit(1)
+    .toArray();
+  await historyDatabase.searches.update(oldest.id as number, {
+    pinned: true,
+    pinnedAt: oldest.timestamp,
+  });
+}
+
+/** Adds newer searches, so the pinned entry falls out of the recent window. */
+async function addNewerSearches(count: number) {
+  for (let i = 1; i <= count; i++) {
+    await addSearchToHistory(`newer search ${i}`, textResults);
+    vi.advanceTimersByTime(1000);
+  }
+}
+
+describe("useSearchHistory with includeAllPinned", () => {
+  it("keeps a pinned search older than the whole recent window", async () => {
+    await pinOldestEntry();
+    // limit 2 reads the newest 4: the pinned entry is the 7th newest.
+    await addNewerSearches(4);
+
+    const { result } = renderHook(() =>
+      useSearchHistory({ limit: 2, includeAllPinned: true }),
+    );
+    await settle();
+    await untilLoaded(result);
+
+    expect(queriesOf(result.current.filteredSearches)).toEqual([
+      "newer search 4",
+      "newer search 3",
+      "weather in lisbon",
+    ]);
+  });
+
+  it("keeps a pinned search inside the window but past the limit", async () => {
+    await pinOldestEntry();
+
+    const { result } = renderHook(() =>
+      useSearchHistory({ limit: 2, includeAllPinned: true }),
+    );
+    await settle();
+    await untilLoaded(result);
+
+    expect(queriesOf(result.current.filteredSearches)).toEqual([
+      "rust async tutorial",
+      "best pizza porto",
+      "weather in lisbon",
+    ]);
+  });
+
+  it("lets the filter find a pinned search outside the recent window", async () => {
+    await pinOldestEntry();
+    await addNewerSearches(4);
+
+    const { result } = renderHook(() =>
+      useSearchHistory({ limit: 2, includeAllPinned: true }),
+    );
+    await settle();
+    await untilLoaded(result);
+    act(() => result.current.searchHistory("lisbon"));
+    await settle();
+
+    expect(queriesOf(result.current.filteredSearches)).toEqual([
+      "weather in lisbon",
+    ]);
+  });
+
+  it("still reads IndexedDB only on load, never while typing", async () => {
+    await pinOldestEntry();
+    const pinnedReadSpy = vi.spyOn(historyModule, "getPinnedSearches");
+
+    const { result } = renderHook(() =>
+      useSearchHistory({ limit: 2, includeAllPinned: true }),
+    );
+    await settle();
+    await untilLoaded(result);
+    expect(pinnedReadSpy).toHaveBeenCalledTimes(1);
+
+    for (const query of ["w", "we", "wea"]) {
+      act(() => result.current.searchHistory(query));
+      await settle();
+    }
+
+    expect(pinnedReadSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the recent window as it is without the option", async () => {
+    await pinOldestEntry();
+    await addNewerSearches(4);
+
+    const { result } = renderHook(() => useSearchHistory({ limit: 2 }));
+    await settle();
+    await untilLoaded(result);
+
+    expect(queriesOf(result.current.filteredSearches)).toEqual([
+      "newer search 4",
+      "newer search 3",
+    ]);
+  });
+  it("pins and unpins through both fields, so the index agrees with the flag", async () => {
+    const [oldest] = await historyDatabase.searches
+      .orderBy("timestamp")
+      .limit(1)
+      .toArray();
+    const id = oldest.id as number;
+
+    const { result } = renderHook(() =>
+      useSearchHistory({ limit: 2, includeAllPinned: true }),
+    );
+    await untilLoaded(result);
+
+    await act(async () => {
+      await result.current.togglePin(id);
+    });
+    const pinned = await historyDatabase.searches.get(id);
+    expect(pinned?.pinned).toBe(true);
+    expect(pinned?.pinnedAt).toBe(Date.now());
+    expect(queriesOf(await historyModule.getPinnedSearches())).toEqual([
+      "weather in lisbon",
+    ]);
+
+    await act(async () => {
+      await result.current.togglePin(id);
+    });
+    const unpinned = await historyDatabase.searches.get(id);
+    expect(unpinned?.pinned).toBe(false);
+    expect(unpinned && "pinnedAt" in unpinned).toBe(false);
+    expect(await historyModule.getPinnedSearches()).toEqual([]);
+  });
+});
+
 describe("useSearchHistory", () => {
   it("leaves IndexedDB alone while history is turned off", async () => {
     const settingsMock = vi.mocked(getSettings);

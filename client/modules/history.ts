@@ -93,6 +93,12 @@ export interface SearchEntry {
     content: string;
   }>;
   pinned?: boolean;
+  /**
+   * When the entry was pinned; absent while unpinned. It is indexed in place of
+   * `pinned`, because IndexedDB does not index boolean values, so only pinned
+   * entries are in this index. `togglePin` writes both fields in one update.
+   */
+  pinnedAt?: number;
   source?: string;
 }
 
@@ -147,10 +153,34 @@ async function dropRowsNoSearchOwns(tx: Transaction): Promise<void> {
     .delete();
 }
 
+/**
+ * Entries pinned before `pinnedAt` existed get one, so the index finds them.
+ * Their real pin time is unknown; the entry's own `timestamp` stands in, which
+ * keeps a plausible pin order.
+ */
+async function indexPinnedEntries(tx: Transaction): Promise<void> {
+  await tx
+    .table<SearchEntry>("searches")
+    .filter((search) => search.pinned === true)
+    .modify((search) => {
+      search.pinnedAt = search.timestamp;
+    });
+}
+
 const historySchema = {
   searches: "++id, searchRunId, query, timestamp, source, pinned, results",
   llmResponses: "++id, searchId, searchRunId, timestamp, model",
   chatHistory: "++id, conversationId, timestamp, [conversationId+timestamp]",
+};
+
+/**
+ * Version 3 drops the `pinned` index, which never held an entry (IndexedDB
+ * does not index booleans), and indexes `pinnedAt` instead. The `pinned`
+ * field itself stays.
+ */
+const historySchemaV3 = {
+  ...historySchema,
+  searches: "++id, searchRunId, query, timestamp, source, pinnedAt, results",
 };
 
 class HistoryDatabase extends Dexie {
@@ -163,6 +193,7 @@ class HistoryDatabase extends Dexie {
 
     this.version(1).stores(historySchema);
     this.version(2).stores(historySchema).upgrade(dropRowsNoSearchOwns);
+    this.version(3).stores(historySchemaV3).upgrade(indexPinnedEntries);
   }
 
   /**
@@ -407,6 +438,22 @@ export async function getSearchActivityRecords(): Promise<
     }),
   ).catch((error) => {
     addLogEntry(`Error fetching search activity: ${error}`);
+    return [];
+  });
+}
+
+/**
+ * Every pinned search, newest first, however old. Cleanup never deletes a
+ * pinned entry, so a window of recent searches would sooner or later leave
+ * some out. Only pinned entries have a `pinnedAt`, so its index reads them
+ * alone, without scanning the table.
+ */
+export async function getPinnedSearches(): Promise<SearchEntry[]> {
+  return measurePerformance("Get pinned searches", async () => {
+    const pinned = await historyDatabase.searches.orderBy("pinnedAt").toArray();
+    return pinned.sort((a, b) => b.timestamp - a.timestamp);
+  }).catch((error) => {
+    addLogEntry(`Error fetching pinned searches: ${error}`);
     return [];
   });
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addSearchToHistory,
   clearAllHistory,
+  getPinnedSearches,
   getRecentSearches,
   historyDatabase,
   type ImageResults,
@@ -22,6 +23,12 @@ interface UseSearchHistoryOptions {
   enableGrouping?: boolean;
   enablePagination?: boolean;
   pageSize?: number;
+  /**
+   * Keep every pinned search in the list, however many newer searches exist.
+   * Costs one extra read of the `pinnedAt` index per refresh; only the History
+   * drawer asks for it.
+   */
+  includeAllPinned?: boolean;
 }
 
 interface UseSearchHistoryReturn {
@@ -69,6 +76,7 @@ export function useSearchHistory(
     enableGrouping = true,
     enablePagination = false,
     pageSize = 20,
+    includeAllPinned = false,
   } = options;
 
   const [entries, setEntries] = useState<SearchEntry[]>([]);
@@ -104,14 +112,21 @@ export function useSearchHistory(
         return;
       }
 
-      const searches = await getRecentSearches(
-        enablePagination ? 1000 : limit * 2,
-      );
-
-      const [llmCount, chatCount] = await Promise.all([
+      const [recent, pinned, llmCount, chatCount] = await Promise.all([
+        getRecentSearches(enablePagination ? 1000 : limit * 2),
+        includeAllPinned ? getPinnedSearches() : Promise.resolve([]),
         historyDatabase.llmResponses.count(),
         historyDatabase.chatHistory.count(),
       ]);
+
+      // A pinned entry missing from the recent window is older than all of
+      // it, so appending keeps the list newest first.
+      const recentIds = new Set(recent.map((search) => search.id));
+      const searches = [
+        ...recent,
+        ...pinned.filter((search) => !recentIds.has(search.id)),
+      ];
+
       setLlmResponseCount(llmCount);
       setChatMessageCount(chatCount);
       setEntries(searches);
@@ -124,7 +139,7 @@ export function useSearchHistory(
       isLoadingRef.current = false;
       setIsLoading(false);
     }
-  }, [limit, enablePagination]);
+  }, [limit, enablePagination, includeAllPinned]);
 
   // Typing only schedules a debounced settle of the query; it never reaches
   // IndexedDB. Clearing settles synchronously so the full list returns on the
@@ -175,17 +190,30 @@ export function useSearchHistory(
       entries,
       query,
       (search) => search.query,
-      enablePagination ? entries.length : limit,
+      enablePagination || includeAllPinned ? entries.length : limit,
     ).map((result) => result.item);
-  }, [entries, settledQuery, enablePagination, limit]);
+  }, [entries, settledQuery, enablePagination, includeAllPinned, limit]);
 
   const filteredSearches = useMemo(() => {
     if (enablePagination) {
       const startIndex = currentPage * pageSize;
       return matched.slice(startIndex, startIndex + pageSize);
     }
-    return matched.slice(0, limit);
-  }, [matched, enablePagination, currentPage, pageSize, limit]);
+    const shown = matched.slice(0, limit);
+    if (!includeAllPinned) return shown;
+    // The limit caps the unpinned list only: a pinned match past it stays.
+    return [
+      ...shown,
+      ...matched.slice(limit).filter((search) => search.pinned),
+    ];
+  }, [
+    matched,
+    enablePagination,
+    includeAllPinned,
+    currentPage,
+    pageSize,
+    limit,
+  ]);
 
   const matchedCount = matched.length;
 
@@ -222,8 +250,12 @@ export function useSearchHistory(
       try {
         const search = await historyDatabase.searches.get(searchId);
         if (search) {
+          // One update for both fields, so the `pinnedAt` index never
+          // disagrees with `pinned`. Dexie deletes a key set to undefined.
+          const pinned = !search.pinned;
           await historyDatabase.searches.update(searchId, {
-            pinned: !search.pinned,
+            pinned,
+            pinnedAt: pinned ? Date.now() : undefined,
           });
           await refreshHistory();
           addLogEntry(
