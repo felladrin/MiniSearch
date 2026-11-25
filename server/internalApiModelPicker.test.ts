@@ -37,6 +37,9 @@ describe("createModelPicker", () => {
   });
 
   it("never hands out the same random model twice", async () => {
+    // Always the first model left, so a missing exclusion repeats it every
+    // time instead of only by chance.
+    vi.spyOn(Math, "random").mockReturnValue(0);
     vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
       { id: "model-a" },
       { id: "model-b" },
@@ -47,7 +50,7 @@ describe("createModelPicker", () => {
     const picked = [await picker.first(), await picker.next()];
     picked.push(await picker.next());
 
-    expect(new Set(picked)).toEqual(new Set(["model-a", "model-b", "model-c"]));
+    expect(picked).toEqual(["model-a", "model-b", "model-c"]);
   });
 
   it("lists the pool again once every model was tried, and picks from the new list", async () => {
@@ -62,9 +65,9 @@ describe("createModelPicker", () => {
     expect(getInferenceStats().modelsRefetched).toBe(refetchesBefore + 1);
   });
 
-  // Before the try/catch, a failed refetch escaped `next()` and the client got
-  // a 500 instead of the 503 that says every model failed.
-  it("gives up quietly when listing the pool again fails", async () => {
+  // Without the try/catch, a failed refetch would escape `next()` and the
+  // client would get a 500 instead of the 503 that says every model failed.
+  it("returns no model instead of throwing when listing the pool again fails", async () => {
     vi.mocked(listOpenAiCompatibleModels)
       .mockResolvedValueOnce([{ id: "model-a" }])
       .mockRejectedValueOnce(new Error("models endpoint down"));
