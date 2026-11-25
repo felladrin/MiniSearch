@@ -237,6 +237,7 @@ describe("settings hydration merges the stored profile into the defaults", () =>
         internalApiName: "Internal API",
         defaultInferenceType: "openai",
         searchToken: "a".repeat(64),
+        parentWindowOrigins: ["https://huggingface.co"],
       };
       const applied = applyServerConfig(
         defaultSettings,
