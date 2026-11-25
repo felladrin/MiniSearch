@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-26
+
+- A failed regeneration no longer loses the answer. Regenerate removed the answer from the chat before asking for a new one, and when the model errored it was gone, with the regenerate button, and the follow-up suggestion was cleared too, so the question had to be typed again; the only trace was a line in the logs. The previous answer and the follow-up suggestion now come back, a red notification says the regeneration failed, and the answer can be regenerated again.
+
 ## 2026-11-25
 
 - Earlier chat turns no longer send their thinking back to the model. Stored answers keep their reasoning block, and every prompt built from the conversation was sending it again: wasted tokens, and older turns dropped from the context sooner because of it. The reasoning is now stripped where the prompt is built, for the continuation, the rolling summary and the follow-up question suggestions. The chat and the History still show it.

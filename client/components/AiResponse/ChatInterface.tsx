@@ -1,4 +1,5 @@
 import { Card, Stack } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { usePubSub } from "create-pubsub/react";
 import {
   type KeyboardEvent,
@@ -19,6 +20,7 @@ import {
   chatInputPubSub,
   followUpQuestionPubSub,
   getChatGenerationState,
+  getFollowUpQuestion,
   imageSearchResultsPubSub,
   queryPubSub,
   settingsPubSub,
@@ -280,6 +282,10 @@ export default function ChatInterface({
 
     const history = messages.slice(0, -1);
     const lastUser = history[history.length - 1];
+    // Streaming needs the old answer off the list, so keep it and the
+    // follow-up that was showing to put back if the regeneration fails.
+    const previousAnswer = messages[messages.length - 1];
+    const previousFollowUpQuestion = getFollowUpQuestion();
 
     setMessages(history);
     setGenerationState({
@@ -313,6 +319,16 @@ export default function ChatInterface({
       }
     } catch (error) {
       addLogEntry(`Error re-generating response: ${error}`);
+      if (isMountedRef.current) {
+        setStreamedResponse("");
+        setMessages((prev) => [...prev, previousAnswer]);
+        setFollowUpQuestion(previousFollowUpQuestion);
+        notifications.show({
+          message:
+            "Couldn't re-generate the response. The previous answer has been kept.",
+          color: "red",
+        });
+      }
     } finally {
       if (isMountedRef.current) {
         setGenerationState({
