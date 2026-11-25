@@ -4,6 +4,8 @@ const state = vi.hoisted(() => ({
   settings: { inferenceType: "browser" } as {
     inferenceType: string;
     openAiContextLength?: number;
+    reasoningStartMarker?: string;
+    reasoningEndMarker?: string;
   },
   systemPrompt: "",
 }));
@@ -62,7 +64,10 @@ vi.mock("./textGenerationWithOpenAi", () => ({
 }));
 
 import { getConversationSummary, updateConversationSummary } from "./pubSub";
-import { generateChatResponse } from "./textGeneration";
+import {
+  generateChatResponse,
+  generateReplyToMessages,
+} from "./textGeneration";
 import { generateChatWithOpenAi } from "./textGenerationWithOpenAi";
 import { generateChatWithWllama } from "./textGenerationWithWllama";
 import type { ChatMessage } from "./types";
@@ -251,5 +256,67 @@ describe("generateChatResponse context budget", () => {
     const { answer } = callsTo(generateChatWithWllama);
     expect(answer).toHaveLength(1);
     expect(answer[0][0].content).toContain("S1");
+  });
+});
+
+describe("reasoning in earlier assistant turns", () => {
+  const reasoning = "Let me think about the first question at length.";
+  const turnsWithReasoning: ChatMessage[] = [
+    { role: "user", content: "first question" },
+    {
+      role: "assistant",
+      content: `<think>${reasoning}</think>\n\nfirst answer`,
+    },
+  ];
+  const question: ChatMessage = { role: "user", content: "second question" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.settings = {
+      inferenceType: "browser",
+      reasoningStartMarker: "<think>",
+      reasoningEndMarker: "</think>",
+    };
+    state.systemPrompt = "";
+    mockGenerateChat(generateChatWithWllama);
+  });
+
+  function sentText(messages: ChatMessage[]) {
+    return messages.map((message) => message.content).join("\n");
+  }
+
+  it("keeps the reasoning out of the main continuation", async () => {
+    await generateChatResponse([...turnsWithReasoning, question], () => {});
+
+    const { answer } = callsTo(generateChatWithWllama);
+    expect(sentText(answer[0])).toContain("first answer");
+    expect(sentText(answer[0])).not.toContain(reasoning);
+  });
+
+  it("keeps the reasoning out of the summary prompt and the stored summary", async () => {
+    state.systemPrompt = "s".repeat(3500);
+    vi.mocked(generateChatWithWllama).mockImplementation(async (chat) => {
+      if (chat[0].content.startsWith(summarizerInstruction)) {
+        throw new Error("summarizer unavailable");
+      }
+      return "the answer";
+    });
+
+    await generateChatResponse([...turnsWithReasoning, question], () => {});
+
+    const { summarizer } = callsTo(generateChatWithWllama);
+    expect(sentText(summarizer[0])).toContain("first answer");
+    expect(sentText(summarizer[0])).not.toContain(reasoning);
+    const [stored] = vi.mocked(updateConversationSummary).mock.calls[0];
+    expect(stored.summary).toContain("first answer");
+    expect(stored.summary).not.toContain(reasoning);
+  });
+
+  it("keeps the reasoning out of replies built from the conversation", async () => {
+    await generateReplyToMessages([...turnsWithReasoning, question]);
+
+    const [[sent]] = vi.mocked(generateChatWithWllama).mock.calls;
+    expect(sentText(sent)).toContain("first answer");
+    expect(sentText(sent)).not.toContain(reasoning);
   });
 });

@@ -1,5 +1,6 @@
 import { addLogEntry } from "./logEntries";
 import { generateChatResponse } from "./textGeneration";
+import { answerOnly } from "./textGenerationUtilities";
 import type { ChatMessage } from "./types";
 
 interface FollowUpQuestionParams {
@@ -30,7 +31,7 @@ ${topic}
 
 The response was:
 ~~~
-${currentContent}
+${answerOnly(currentContent)}
 ~~~
 
 Follow these instructions:

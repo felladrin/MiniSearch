@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
   settings: { inferenceType: "openai", openAiContextLength: 4096 } as {
     inferenceType?: string;
     openAiContextLength?: number;
+    reasoningStartMarker?: string;
+    reasoningEndMarker?: string;
   },
 }));
 
@@ -37,12 +39,14 @@ vi.mock("./systemPrompt", () => ({
 }));
 
 import {
+  answerOnly,
   getDefaultChatCompletionCreateParamsStreaming,
   getDefaultChatMessages,
   getEffectiveContextSize,
   getFormattedSearchResults,
   minimumOutputTokens,
   setWorkerFactory,
+  withoutReasoning,
 } from "./textGenerationUtilities";
 import type { ChatMessage } from "./types";
 
@@ -508,5 +512,42 @@ describe("worker handoff", () => {
       "• [First](https://a.example/) | first snippet",
     );
     expect(factory).not.toHaveBeenCalled();
+  });
+});
+
+describe("answerOnly", () => {
+  beforeEach(() => {
+    state.settings = {
+      inferenceType: "openai",
+      reasoningStartMarker: "<think>",
+      reasoningEndMarker: "</think>",
+    };
+  });
+
+  it("drops a terminated reasoning block", () => {
+    expect(answerOnly("<think>step by step</think>\n\nThe answer.")).toBe(
+      "The answer.",
+    );
+  });
+
+  it("returns an empty answer for an unterminated block", () => {
+    expect(answerOnly("<think>still thinking")).toBe("");
+  });
+
+  it("leaves a marker mentioned mid-answer intact", () => {
+    const text = "Models wrap thoughts in <think></think> tags.";
+    expect(answerOnly(text)).toBe(text);
+  });
+
+  it("strips assistant turns only", () => {
+    const messages: ChatMessage[] = [
+      { role: "user", content: "<think>quoted by the user</think> hi" },
+      { role: "assistant", content: "<think>plan</think>\n\nHello!" },
+    ];
+
+    expect(withoutReasoning(messages)).toEqual([
+      messages[0],
+      { role: "assistant", content: "Hello!" },
+    ]);
   });
 });

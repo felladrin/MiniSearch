@@ -14,6 +14,7 @@ import {
   getTextSearchStale,
   updateTextGenerationState,
 } from "./pubSub";
+import { splitReasoning } from "./reasoning";
 import { getSystemPrompt } from "./systemPrompt";
 import type { ChatMessage, TextSearchResult } from "./types";
 
@@ -312,4 +313,27 @@ export function getDefaultChatMessages(searchResults: string): ChatMessage[] {
     { role: "assistant", content: "Ok!" },
     { role: "user", content: getQuery() },
   ];
+}
+
+/**
+ * The answer part of a stored response, without the reasoning block that
+ * generation wraps in the configured markers. Prompts built from earlier
+ * turns use it so the chain of thought is not sent back to the model.
+ */
+export function answerOnly(text: string): string {
+  const { reasoningStartMarker, reasoningEndMarker } = getSettings();
+  const { answer } = splitReasoning(
+    text,
+    reasoningStartMarker,
+    reasoningEndMarker,
+  );
+  return answer === text ? text : answer.trim();
+}
+
+export function withoutReasoning(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((message) =>
+    message.role === "assistant"
+      ? { ...message, content: answerOnly(message.content) }
+      : message,
+  );
 }
