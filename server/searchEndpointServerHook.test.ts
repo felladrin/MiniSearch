@@ -186,7 +186,13 @@ describe("searchEndpointServerHook", () => {
 
     expect(unknown.statusCode).toBe(404);
     expect(fetchSearXNG).toHaveBeenCalledTimes(1);
-    expect(fetchSearXNG).toHaveBeenCalledWith("cats", "images", 30);
+    expect(fetchSearXNG).toHaveBeenCalledWith(
+      "cats",
+      "images",
+      30,
+      undefined,
+      expect.any(AbortSignal),
+    );
   });
 
   it("responds 400 when the query parameter is missing", async () => {
@@ -266,7 +272,13 @@ describe("searchEndpointServerHook", () => {
       vi.fn(),
     );
 
-    expect(fetchSearXNG).toHaveBeenCalledWith("cats", "text", 30);
+    expect(fetchSearXNG).toHaveBeenCalledWith(
+      "cats",
+      "text",
+      30,
+      undefined,
+      expect.any(AbortSignal),
+    );
     expect(incrementTextualSearchesSinceLastRestart).toHaveBeenCalled();
     expect(response.setHeader).toHaveBeenCalledWith(
       "Content-Type",
@@ -287,7 +299,13 @@ describe("searchEndpointServerHook", () => {
       vi.fn(),
     );
 
-    expect(fetchSearXNG).toHaveBeenCalledWith("cats", "text", 30);
+    expect(fetchSearXNG).toHaveBeenCalledWith(
+      "cats",
+      "text",
+      30,
+      undefined,
+      expect.any(AbortSignal),
+    );
   });
 
   it("reranks results when the reranker is healthy and returns its reordered output", async () => {
@@ -310,7 +328,13 @@ describe("searchEndpointServerHook", () => {
       vi.fn(),
     );
 
-    expect(fetchSearXNG).toHaveBeenCalledWith("test", "text", 5);
+    expect(fetchSearXNG).toHaveBeenCalledWith(
+      "test",
+      "text",
+      5,
+      undefined,
+      expect.any(AbortSignal),
+    );
     expect(rankSearchResults).toHaveBeenCalledWith(
       "test",
       "text",
@@ -546,6 +570,60 @@ describe("searchEndpointServerHook", () => {
           new Error("SearXNG request failed with status 503"),
         );
       }
+
+      it("gives up on a stalled SearXNG in time for the fallback to answer", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        vi.mocked(fetchFallbackTextResults).mockResolvedValue(fallbackResults);
+        const deadline = new AbortController();
+        const timeoutSpy = vi
+          .spyOn(AbortSignal, "timeout")
+          .mockReturnValue(deadline.signal);
+        // SearXNG never answers; only the deadline signal ends the request.
+        vi.mocked(fetchSearXNG).mockImplementation(
+          (_query, _searchType, _limit, _breaker, signal) =>
+            new Promise((_resolve, reject) => {
+              signal?.addEventListener("abort", () => reject(signal.reason));
+            }),
+        );
+        const now = vi.spyOn(performance, "now").mockReturnValue(0);
+
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+        const handled = handler(
+          createRequest("/search/text?q=cats&token=abc"),
+          response,
+          vi.fn(),
+        );
+
+        await vi.waitFor(() => expect(fetchSearXNG).toHaveBeenCalled());
+        expect(timeoutSpy).toHaveBeenCalledWith(15_000);
+        now.mockReturnValue(15_000);
+        deadline.abort(new DOMException("timed out", "TimeoutError"));
+        await handled;
+
+        // The 10 s reserve is left for the fallback, which serves the search.
+        expect(fetchFallbackTextResults).toHaveBeenCalledWith(
+          "cats",
+          30,
+          10_000,
+        );
+        expect(response.statusCode).toBe(200);
+        expect(incrementSearchesServedByFallback).toHaveBeenCalledTimes(1);
+      });
+
+      it("gives SearXNG the whole deadline when no fallback can follow", async () => {
+        vi.mocked(fetchSearXNG).mockResolvedValue([]);
+        const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+
+        const handler = getRegisteredHandler();
+        await handler(
+          createRequest("/search/text?q=cats&token=abc"),
+          createResponse(),
+          vi.fn(),
+        );
+
+        expect(timeoutSpy).toHaveBeenCalledWith(25_000);
+      });
 
       it("serves the fallback results through the normal text path", async () => {
         vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
