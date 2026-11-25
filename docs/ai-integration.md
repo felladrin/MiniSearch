@@ -33,6 +33,8 @@ Uses `@wllama/wllama` for browser-based inference. Automatically uses WebGPU whe
 4. Runs a single-threaded warmup pass, then reloads with full thread count
 5. Streams tokens via the OAI-compatible `createChatCompletion` API
 
+One answer runs at a time: every caller that answers with the browser model queues behind the previous one in `client/modules/textGenerationWithWllama.ts`, because two loads at once fail on the browser's exclusive file lock and two cached copies double the memory. A queued answer therefore waits for the one ahead of it to finish and release its model.
+
 **Pre-configured Models:**
 Several, on HuggingFace. The full, authoritative list with HuggingFace repo IDs and sizes lives in `client/modules/wllama.ts` (`wllamaModels`) and is rendered in the Settings dropdown; refer to that file rather than a static table here, since models are added/swapped frequently.
 

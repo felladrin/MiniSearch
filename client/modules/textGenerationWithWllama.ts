@@ -78,7 +78,30 @@ interface WllamaConfig {
   shouldCheckCanRespond?: boolean;
 }
 
-async function generateWithWllama({
+/**
+ * The tail of the chain of browser-model sessions: each caller appends itself,
+ * so only one session is open at a time. Two at once load the model into wasm
+ * memory twice, and while it is not cached yet the second load fails on the
+ * browser's exclusive file lock. Not a single-flight promise around the
+ * instance: two callers would share one instance, and each calls `exit()` in
+ * its finally, so whichever finished first would kill the other's answer.
+ */
+let modelSessionQueue: Promise<unknown> = Promise.resolve();
+
+/** Runs `session` once every session already queued has finished. */
+function withModelSession<T>(session: () => Promise<T>): Promise<T> {
+  const queued = modelSessionQueue.then(session);
+  // Settle the chain copy, so a failed session neither skips the next caller
+  // nor replaces its error with the previous one.
+  modelSessionQueue = queued.catch(() => {});
+  return queued;
+}
+
+async function generateWithWllama(config: WllamaConfig): Promise<string> {
+  return withModelSession(() => runWllamaGeneration(config));
+}
+
+async function runWllamaGeneration({
   messages: messagesOrBuilder,
   onUpdate,
   shouldCheckCanRespond = false,

@@ -183,6 +183,89 @@ describe("generateTextWithWllama", () => {
   });
 });
 
+describe("browser-model sessions", () => {
+  beforeEach(() => {
+    // clearAllMocks, not resetAllMocks: the module mocks above carry their
+    // implementations in their factories, and resetting would drop them.
+    vi.clearAllMocks();
+  });
+
+  /**
+   * A model that counts how many instances are open at once and holds each
+   * generation until the test releases it, so an overlap is observable. An
+   * instance counts as open from its creation until its `exit`.
+   */
+  function trackOpenInstances() {
+    let open = 0;
+    let maxOpen = 0;
+    const releases: (() => void)[] = [];
+
+    vi.mocked(initializeWllama).mockImplementation(async () => {
+      open += 1;
+      maxOpen = Math.max(maxOpen, open);
+      return {
+        createChatCompletion: vi.fn().mockImplementation(async () => {
+          await new Promise<void>((resolve) => releases.push(resolve));
+          return singleChunkStream();
+        }),
+        exit: vi.fn().mockImplementation(async () => {
+          open -= 1;
+        }),
+        // biome-ignore lint/suspicious/noExplicitAny: minimal Wllama stub
+      } as any;
+    });
+
+    return { releases, maxOpen: () => maxOpen };
+  }
+
+  it("opens one model instance when a search and a chat run at once", async () => {
+    const { releases, maxOpen } = trackOpenInstances();
+    const order: string[] = [];
+
+    const search = generateTextWithWllama().then((answer) => {
+      order.push("search");
+      return answer;
+    });
+    const chat = generateChatWithWllama(
+      [{ role: "user", content: "hi" }],
+      vi.fn(),
+    ).then((answer) => {
+      order.push("chat");
+      return answer;
+    });
+
+    // Only the first caller reached the model; the chat is waiting its turn.
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    expect(maxOpen()).toBe(1);
+
+    releases[0]();
+    await vi.waitFor(() => expect(releases).toHaveLength(2));
+    releases[1]();
+
+    await expect(Promise.all([search, chat])).resolves.toEqual([
+      "Hello",
+      "Hello",
+    ]);
+    // FIFO, not just one-at-a-time: the first caller finishes first.
+    expect(order).toEqual(["search", "chat"]);
+    expect(maxOpen()).toBe(1);
+  });
+
+  it("releases the turn when a load fails while another caller is queued", async () => {
+    vi.mocked(initializeWllama).mockRejectedValueOnce(new Error("load failed"));
+    mockDownload([]);
+
+    const failing = generateTextWithWllama();
+    const queued = generateChatWithWllama(
+      [{ role: "user", content: "hi" }],
+      vi.fn(),
+    );
+
+    await expect(failing).rejects.toThrow("load failed");
+    await expect(queued).resolves.toBe("Hello");
+  });
+});
+
 describe("stop strings", () => {
   async function streamWithStopModel(chunks: string[]) {
     const savedSettings = getSettings();
