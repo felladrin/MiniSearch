@@ -229,7 +229,6 @@ export function internalApiEndpointServerHook<
         let hasEmittedContent = false;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           if (!model) break;
-          modelPicker.markAttempted(model);
 
           if (!isResponseWritable(response)) {
             outcome = "abandoned";
@@ -332,7 +331,7 @@ export function internalApiEndpointServerHook<
             if (hasEmittedContent) break;
             if (attempt >= maxAttempts) break;
 
-            const nextModel = await modelPicker.next(attempt);
+            const nextModel = await modelPicker.next();
             if (!nextModel) break;
             if (nextModel !== model) recordModelFallback();
             model = nextModel;

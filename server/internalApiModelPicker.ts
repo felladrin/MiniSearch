@@ -20,31 +20,36 @@ export function createModelPicker({
   apiKey: string;
 }) {
   const ladder = [...models, ...models];
+  let position = 0;
   let availableModels: { id: string }[] = [];
+  // Every model handed out counts as attempted: the hook runs each one it
+  // gets, so marking here keeps the exclusion from depending on the caller.
   const attemptedModels = new Set<string>();
-  // Set before the refetch so a failing `/models` endpoint does not trigger
-  // another one on the next failed attempt.
   let hasRefetched = false;
+
+  function handOut(model: string | null | undefined): string | undefined {
+    if (!model) return undefined;
+    attemptedModels.add(model);
+    return model;
+  }
 
   return {
     /** The model for the first attempt. Throws when the API's model list cannot be fetched. */
     async first(): Promise<string | undefined> {
-      if (models.length > 0) return models[0];
+      if (models.length > 0) return handOut(ladder[position]);
       availableModels = await listOpenAiCompatibleModels(baseUrl, apiKey);
-      return selectRandomModel(availableModels) || undefined;
+      return handOut(selectRandomModel(availableModels));
     },
 
-    markAttempted(model: string): void {
-      attemptedModels.add(model);
-    },
-
-    /** The model for the attempt after `attempt` (counted from 1), or undefined when none is left. */
-    async next(attempt: number): Promise<string | undefined> {
-      if (models.length > 0) return ladder[attempt];
+    /** The model for the next attempt, or undefined when none is left. */
+    async next(): Promise<string | undefined> {
+      if (models.length > 0) {
+        position++;
+        return handOut(ladder[position]);
+      }
 
       // A provider whose pool changes mid-flight needs a fresh listing to
-      // recover; without the `hasRefetched` guard we would loop on a stale
-      // list.
+      // recover. Once per request at most.
       if (
         availableModels.every((m) => attemptedModels.has(m.id)) &&
         !hasRefetched
@@ -61,7 +66,7 @@ export function createModelPicker({
         }
       }
 
-      return selectRandomModel(availableModels, attemptedModels) ?? undefined;
+      return handOut(selectRandomModel(availableModels, attemptedModels));
     },
   };
 }
