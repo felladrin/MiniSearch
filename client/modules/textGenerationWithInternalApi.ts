@@ -1,3 +1,4 @@
+import { addLogEntry } from "./logEntries";
 import {
   getTextGenerationState,
   listenToTextGenerationStateChanges,
@@ -16,7 +17,7 @@ import type { ChatMessage } from "./types";
 
 interface InternalApiStreamPayload {
   error?: unknown;
-  choices?: Array<{ delta?: { content?: unknown } }>;
+  choices?: Array<{ delta?: { content?: unknown }; finish_reason?: unknown }>;
 }
 
 export async function generateTextWithInternalApi() {
@@ -131,6 +132,12 @@ async function processStreamResponse(
 
       if (typeof parsedLine?.error === "string") {
         throw new ChatGenerationError(parsedLine.error);
+      }
+
+      if (parsedLine?.choices?.[0]?.finish_reason === "length") {
+        addLogEntry(
+          "The answer was cut short: the model reached its output token limit",
+        );
       }
 
       const deltaContent = parsedLine?.choices?.[0]?.delta?.content;

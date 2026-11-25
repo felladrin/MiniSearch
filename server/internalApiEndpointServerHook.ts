@@ -412,9 +412,15 @@ export function internalApiEndpointServerHook<
                 );
               } else if (part.type === "finish") {
                 clearTimeout(idleTimeoutId);
+                // The SDK spells its reasons with a hyphen where OpenAI uses an
+                // underscore (`content-filter`, `tool-calls`).
                 sendSseData(
                   response,
-                  createChunkPayload(model, undefined, "stop"),
+                  createChunkPayload(
+                    model,
+                    undefined,
+                    part.finishReason.replace("-", "_"),
+                  ),
                 );
                 sendSseDone(response);
                 outcome = "streamed";
