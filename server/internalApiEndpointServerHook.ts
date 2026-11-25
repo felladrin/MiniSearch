@@ -315,6 +315,15 @@ export function internalApiEndpointServerHook<
           return;
         }
 
+        // Passed through unchecked: providers disagree on the accepted values
+        // (`none`, `minimal`, `xhigh`...), and an unknown one comes back from
+        // the upstream as an HTTP error in the log.
+        const reasoningEffort =
+          process.env.INTERNAL_OPENAI_COMPATIBLE_API_REASONING_EFFORT?.trim();
+        const providerOptions = reasoningEffort
+          ? { openai: { reasoningEffort } }
+          : undefined;
+
         const config = getModelConfig();
         const maxAttempts = 5;
         let lastError: unknown = null;
@@ -365,6 +374,7 @@ export function internalApiEndpointServerHook<
               temperature: clampedTemperature,
               topP: clampedTopP,
               maxOutputTokens: clampedMaxTokens,
+              providerOptions,
               maxRetries: 0,
               abortSignal: abortController.signal,
             });
