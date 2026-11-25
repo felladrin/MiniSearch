@@ -46,6 +46,7 @@ let sendMessage: (textToSend?: string) => Promise<void>;
 let regenerateResponse: () => Promise<void>;
 let messageListMessages: ChatMessage[] = [];
 let messageListIsGenerating = false;
+let messageListFollowUpStartIndex: number | undefined;
 
 vi.mock("./ChatInputArea", () => ({
   default: (props: { handleSend: (textToSend?: string) => Promise<void> }) => {
@@ -57,11 +58,13 @@ vi.mock("./ChatInputArea", () => ({
 vi.mock("./MessageList", () => ({
   default: (props: {
     messages: ChatMessage[];
+    followUpStartIndex: number;
     isGenerating: boolean;
     onRegenerate: () => Promise<void>;
   }) => {
     regenerateResponse = props.onRegenerate;
     messageListMessages = props.messages;
+    messageListFollowUpStartIndex = props.followUpStartIndex;
     messageListIsGenerating = props.isGenerating;
     return null;
   },
@@ -125,6 +128,7 @@ beforeEach(() => {
   updateSuppressNextFollowUp(false);
   messageListMessages = [];
   messageListIsGenerating = false;
+  messageListFollowUpStartIndex = undefined;
   vi.mocked(generateChatResponse).mockResolvedValue("An answer.");
   vi.mocked(generateFollowUpQuestion).mockResolvedValue("A question?");
 });
@@ -740,6 +744,61 @@ describe("ChatInterface generation state", () => {
 
     expect(getFollowUpQuestion()).toBe("");
     expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(false);
+  });
+});
+
+describe("ChatInterface follow-up start", () => {
+  const followUps: ChatMessage[] = [
+    { role: "user", content: "Q1" },
+    { role: "assistant", content: "A1" },
+  ];
+
+  function renderWithoutMainAnswer() {
+    return render(
+      <MantineProvider>
+        <ChatInterface
+          initialQuery={initialQuery}
+          initialResponse=""
+          initialMessages={followUps}
+          suppressInitialFollowUp
+        />
+      </MantineProvider>,
+    );
+  }
+
+  it("starts the follow-ups after the main question and answer", () => {
+    renderChatInterface();
+
+    expect(messageListMessages).toEqual([
+      { role: "user", content: initialQuery },
+      { role: "assistant", content: initialResponse },
+    ]);
+    expect(messageListFollowUpStartIndex).toBe(2);
+  });
+
+  it("starts the follow-ups at the top when the main answer is empty", () => {
+    renderWithoutMainAnswer();
+
+    expect(messageListMessages).toEqual(followUps);
+    expect(messageListFollowUpStartIndex).toBe(0);
+  });
+
+  it("regenerates the first follow-up when the main answer is empty", async () => {
+    renderWithoutMainAnswer();
+    vi.mocked(generateChatResponse).mockResolvedValueOnce("A1 again");
+
+    await act(async () => {
+      await regenerateResponse();
+    });
+
+    expect(generateChatResponse).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(generateChatResponse).mock.calls[0][0]).toEqual([
+      followUps[0],
+    ]);
+    expect(messageListMessages.at(-1)).toEqual({
+      role: "assistant",
+      content: "A1 again",
+    });
   });
 });
 

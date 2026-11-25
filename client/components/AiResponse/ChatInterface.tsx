@@ -40,25 +40,45 @@ interface ChatInterfaceProps {
   suppressInitialFollowUp?: boolean;
 }
 
+/**
+ * The messages the chat starts from, and where its follow-ups begin. The main
+ * question and answer lead the list only when the answer has text: after an
+ * empty main answer the follow-ups start at 0, so the first follow-up pair is
+ * not mistaken for them.
+ */
+function buildInitialConversation(
+  initialQuery: string | undefined,
+  initialResponse: string | undefined,
+  initialMessages: ChatMessage[] = [],
+): { messages: ChatMessage[]; followUpStartIndex: number } {
+  if (initialQuery && initialResponse) {
+    return {
+      messages: [
+        { role: "user", content: initialQuery },
+        { role: "assistant", content: initialResponse },
+        ...initialMessages,
+      ],
+      followUpStartIndex: 2,
+    };
+  }
+  return { messages: initialMessages, followUpStartIndex: 0 };
+}
+
 export default function ChatInterface({
   initialQuery,
   initialResponse,
   initialMessages,
   suppressInitialFollowUp,
 }: ChatInterfaceProps) {
-  const initialMessagesArray =
-    initialMessages &&
-    initialMessages.length > 0 &&
-    initialQuery &&
-    initialResponse
-      ? [
-          { role: "user" as const, content: initialQuery },
-          { role: "assistant" as const, content: initialResponse },
-          ...initialMessages,
-        ]
-      : initialMessages || [];
-
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessagesArray);
+  const [initialConversation] = useState(() =>
+    buildInitialConversation(initialQuery, initialResponse, initialMessages),
+  );
+  const [messages, setMessages] = useState<ChatMessage[]>(
+    initialConversation.messages,
+  );
+  const [followUpStartIndex, setFollowUpStartIndex] = useState(
+    initialConversation.followUpStartIndex,
+  );
   const [input, setInput] = usePubSub(chatInputPubSub);
   const [generationState, setGenerationState] = usePubSub(
     chatGenerationStatePubSub,
@@ -174,25 +194,14 @@ export default function ChatInterface({
 
     prevInitialMessagesRef.current = initialMessages;
 
-    const newInitialMessagesArray =
-      initialMessages &&
-      initialMessages.length > 0 &&
-      initialQuery &&
-      initialResponse
-        ? [
-            { role: "user" as const, content: initialQuery },
-            { role: "assistant" as const, content: initialResponse },
-            ...initialMessages,
-          ]
-        : initialMessages || [];
-
-    if (newInitialMessagesArray.length > 0) {
-      setMessages(newInitialMessagesArray);
-    } else if (initialQuery && initialResponse) {
-      setMessages([
-        { role: "user", content: initialQuery },
-        { role: "assistant", content: initialResponse },
-      ]);
+    const conversation = buildInitialConversation(
+      initialQuery,
+      initialResponse,
+      initialMessages,
+    );
+    if (conversation.messages.length > 0) {
+      setMessages(conversation.messages);
+      setFollowUpStartIndex(conversation.followUpStartIndex);
     }
   }, [initialQuery, initialResponse, initialMessages]);
 
@@ -275,7 +284,8 @@ export default function ChatInterface({
   const handleRegenerateResponse = useCallback(async () => {
     if (
       getChatGenerationState().isGeneratingResponse ||
-      messages.length < 3 ||
+      // There must be a follow-up question before the answer to regenerate.
+      messages.length - 1 <= followUpStartIndex ||
       messages[messages.length - 1].role !== "assistant"
     )
       return;
@@ -338,6 +348,7 @@ export default function ChatInterface({
       }
     }
   }, [
+    followUpStartIndex,
     messages,
     regenerateFollowUpQuestion,
     settings,
@@ -448,7 +459,10 @@ export default function ChatInterface({
   return (
     <Card withBorder shadow="sm" radius="md">
       <Card.Section withBorder inheritPadding py="xs">
-        <ChatHeader messages={messages} />
+        <ChatHeader
+          messages={messages}
+          followUpStartIndex={followUpStartIndex}
+        />
       </Card.Section>
       <Stack gap="md" pt="md">
         <MessageList
@@ -457,6 +471,7 @@ export default function ChatInterface({
               ? [...messages, { role: "assistant", content: streamedResponse }]
               : messages
           }
+          followUpStartIndex={followUpStartIndex}
           onEditMessage={handleEditMessage}
           onRegenerate={handleRegenerateResponse}
           isGenerating={generationState.isGeneratingResponse}
