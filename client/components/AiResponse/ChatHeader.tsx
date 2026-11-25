@@ -4,12 +4,14 @@ import CopyIconButton from "./CopyIconButton";
 
 interface ChatHeaderProps {
   messages: ChatMessage[];
+  /** Position of the first follow-up message: 2 after the main question and answer, 0 without them. */
+  followUpStartIndex: number;
 }
 
-function ChatHeader({ messages }: ChatHeaderProps) {
+function ChatHeader({ messages, followUpStartIndex }: ChatHeaderProps) {
   const getChatContent = () => {
     return messages
-      .slice(2)
+      .slice(followUpStartIndex)
       .map(
         (msg, index) =>
           `${index + 1}. ${msg.role?.toUpperCase()}\n\n${msg.content}`,
@@ -20,7 +22,7 @@ function ChatHeader({ messages }: ChatHeaderProps) {
   return (
     <Group justify="space-between">
       <Text fw={500}>Follow-up questions</Text>
-      {messages.length > 2 && (
+      {messages.length > followUpStartIndex && (
         <CopyIconButton
           value={getChatContent()}
           tooltipLabel="Copy conversation"

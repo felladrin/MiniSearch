@@ -1,4 +1,4 @@
-import { ActionIcon, Group, Paper, Stack, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Paper, Stack, Text, Tooltip } from "@mantine/core";
 import { IconPencil, IconRefresh } from "@tabler/icons-react";
 import { memo } from "react";
 import type { ChatMessage } from "@/modules/types";
@@ -6,6 +6,8 @@ import FormattedMarkdown from "./FormattedMarkdown";
 
 interface MessageListProps {
   messages: ChatMessage[];
+  /** Position of the first follow-up message: 2 after the main question and answer, 0 without them. */
+  followUpStartIndex: number;
   onEditMessage: (absoluteIndex: number) => void;
   onRegenerate: () => void;
   isGenerating: boolean;
@@ -62,9 +64,15 @@ const Message = memo(
           p="sm"
           style={{ flex: 1, overflow: "auto" }}
         >
-          <FormattedMarkdown isGenerating={isGenerating && isLastAssistant}>
-            {message.content}
-          </FormattedMarkdown>
+          {message.content.length > 0 ? (
+            <FormattedMarkdown isGenerating={isGenerating && isLastAssistant}>
+              {message.content}
+            </FormattedMarkdown>
+          ) : (
+            <Text c="dimmed" fs="italic" size="sm">
+              No response
+            </Text>
+          )}
         </Paper>
 
         {canRegenerate && (
@@ -92,22 +100,28 @@ const Message = memo(
 
 const MessageList = memo(function MessageList({
   messages,
+  followUpStartIndex,
   onEditMessage,
   onRegenerate,
   isGenerating,
 }: MessageListProps) {
-  if (messages.length <= 2) return null;
+  if (messages.length <= followUpStartIndex) return null;
 
   return (
     <Stack gap="md">
       {messages.map((message, absoluteIndex) => {
         // The index is the message's position in `messages`, which is what
-        // editing and regenerating act on. The first two messages are the
-        // system prompt and its acknowledgement, and an empty message has
-        // nothing to show, so neither renders, but both keep their position.
-        if (absoluteIndex < 2 || message.content.length === 0) return null;
+        // editing and regenerating act on. Messages before the follow-ups are
+        // shown above the chat, so they don't render here but keep their
+        // position.
+        if (absoluteIndex < followUpStartIndex) return null;
         const isLastAssistant =
           absoluteIndex === messages.length - 1 && message.role === "assistant";
+        // An empty message has nothing to show, except a finished last answer:
+        // it renders as "No response" so its Re-generate button has a row. A
+        // trailing empty answer while generating is the stream placeholder.
+        if (message.content.length === 0 && !(isLastAssistant && !isGenerating))
+          return null;
         return (
           <Message
             // biome-ignore lint/suspicious/noArrayIndexKey: a message's position in the chat is its identity
