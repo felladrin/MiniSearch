@@ -93,7 +93,7 @@ Uses OpenAI's API or any OpenAI-compatible service.
 - Streaming responses, built on the Vercel AI SDK (`ai` + `@ai-sdk/openai-compatible`)
 - Auto model selection (if blank)
 - On a request error, automatically retries up to 5 times, switching to a different model fetched from the provider's `/models` endpoint each time (100ms × attempt backoff between retries)
-- Reasoning content support: reasoning/thinking output is wrapped between configurable `reasoningStartMarker`/`reasoningEndMarker` settings (default `<think>` / `</think>`)
+- Reasoning content support: reasoning/thinking output is wrapped between configurable `reasoningStartMarker`/`reasoningEndMarker` settings (default `<think>` / `</think>`). The wrapped block stays in the stored response for the thinking UI, but prompts built from earlier turns (the chat continuation, conversation summaries, follow-up questions and related search queries) send only the answer, via `answerOnly` / `withoutReasoning` in `textGenerationUtilities.ts`
 
 **Configuration:**
 

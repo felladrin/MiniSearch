@@ -129,3 +129,20 @@ describe("generateFollowUpQuestion and the chat history", () => {
     expect(await historyDatabase.chatHistory.count()).toBe(before);
   });
 });
+
+describe("generateFollowUpQuestion and reasoning", () => {
+  it("leaves the reasoning block out of the prompt", async () => {
+    mockedGenerateReplyToMessages.mockResolvedValue("1. What comes next?");
+
+    await generateFollowUpQuestion({
+      topic: "cats",
+      currentContent:
+        "<think>The user wants cat facts.</think>\n\nCats are independent.",
+    });
+
+    const [messages] = mockedGenerateReplyToMessages.mock.calls[0];
+    const prompt = messages.map((message) => message.content).join("\n");
+    expect(prompt).toContain("Cats are independent.");
+    expect(prompt).not.toContain("The user wants cat facts.");
+  });
+});

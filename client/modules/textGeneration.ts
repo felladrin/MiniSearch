@@ -40,6 +40,7 @@ import {
   getFormattedSearchResults,
   imageResultTag,
   searchResultsToConsider,
+  withoutReasoning,
 } from "./textGenerationUtilities";
 import type {
   ChatMessage,
@@ -369,7 +370,7 @@ export async function generateReplyToMessages(
   messages: ChatMessage[],
 ): Promise<string> {
   const keptMessages = keepNewestMessagesWithinBudget(
-    messages,
+    withoutReasoning(messages),
     defaultContextSize * historyBudgetRatio,
   );
 
@@ -382,9 +383,10 @@ export async function generateReplyToMessages(
 }
 
 export async function generateChatResponse(
-  newMessages: ChatMessage[],
+  messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
 ) {
+  const newMessages = withoutReasoning(messages);
   let response = "";
 
   try {

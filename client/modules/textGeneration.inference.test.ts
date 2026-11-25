@@ -42,6 +42,7 @@ vi.mock("./textGenerationUtilities", () => ({
   defaultContextSize: 4096,
   getFormattedSearchResults: vi.fn(() => ""),
   searchResultsToConsider: 6,
+  withoutReasoning: (messages: unknown) => messages,
 }));
 vi.mock("gpt-tokenizer", () => ({
   default: { encode: vi.fn(() => [1, 2, 3]) },
