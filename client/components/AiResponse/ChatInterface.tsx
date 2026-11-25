@@ -131,9 +131,14 @@ export default function ChatInterface({
         // A newer call, or an unmount, took over while this one awaited.
         if (invocation !== followUpInvocationRef.current) return;
 
-        setPreviousFollowUpQuestions((prev) =>
-          [...prev, newQuestion].slice(-5),
-        );
+        // No question was found in the reply: an empty entry would show up as
+        // a blank line in the next prompt's "do not repeat" list and push a
+        // real question out of it.
+        if (newQuestion) {
+          setPreviousFollowUpQuestions((prev) =>
+            [...prev, newQuestion].slice(-5),
+          );
+        }
         setFollowUpQuestion(newQuestion);
         setGenerationState({
           ...getChatGenerationState(),

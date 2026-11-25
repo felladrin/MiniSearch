@@ -3,11 +3,15 @@ import { generateFollowUpQuestion } from "./followUpQuestions";
 
 vi.mock("./textGeneration", () => ({
   generateChatResponse: vi.fn(),
+  generateReplyToMessages: vi.fn(),
 }));
 
-import { generateChatResponse } from "./textGeneration";
+import {
+  generateChatResponse,
+  generateReplyToMessages,
+} from "./textGeneration";
 
-const mockedGenerateChatResponse = vi.mocked(generateChatResponse);
+const mockedGenerateReplyToMessages = vi.mocked(generateReplyToMessages);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -15,7 +19,7 @@ beforeEach(() => {
 
 describe("generateFollowUpQuestion", () => {
   it("keeps an English question with leading numbering", async () => {
-    mockedGenerateChatResponse.mockResolvedValue(
+    mockedGenerateReplyToMessages.mockResolvedValue(
       "1. What about the alternatives?",
     );
 
@@ -28,7 +32,7 @@ describe("generateFollowUpQuestion", () => {
   });
 
   it("keeps a Chinese question ending in a fullwidth question mark", async () => {
-    mockedGenerateChatResponse.mockResolvedValue("你觉得这个方案怎么样？");
+    mockedGenerateReplyToMessages.mockResolvedValue("你觉得这个方案怎么样？");
 
     const question = await generateFollowUpQuestion({
       topic: "方案",
@@ -39,7 +43,7 @@ describe("generateFollowUpQuestion", () => {
   });
 
   it("strips a leading bullet from a Japanese question without touching the text", async () => {
-    mockedGenerateChatResponse.mockResolvedValue(
+    mockedGenerateReplyToMessages.mockResolvedValue(
       "- この案についてどう思いますか？",
     );
 
@@ -52,7 +56,7 @@ describe("generateFollowUpQuestion", () => {
   });
 
   it("keeps an Arabic question ending in an Arabic question mark", async () => {
-    mockedGenerateChatResponse.mockResolvedValue("ما رأيك في البدائل؟");
+    mockedGenerateReplyToMessages.mockResolvedValue("ما رأيك في البدائل؟");
 
     const question = await generateFollowUpQuestion({
       topic: "البدائل",
@@ -63,7 +67,7 @@ describe("generateFollowUpQuestion", () => {
   });
 
   it("returns an empty string when no line ends with a question mark", async () => {
-    mockedGenerateChatResponse.mockResolvedValue("No questions here.");
+    mockedGenerateReplyToMessages.mockResolvedValue("No questions here.");
 
     const question = await generateFollowUpQuestion({
       topic: "cats",
@@ -74,11 +78,48 @@ describe("generateFollowUpQuestion", () => {
   });
 });
 
+describe("generateFollowUpQuestion and the chat generation", () => {
+  it("sends the prompt alone, with the topic and the answer in it", async () => {
+    mockedGenerateReplyToMessages.mockResolvedValue("What comes next?");
+
+    await generateFollowUpQuestion({
+      topic: "cats",
+      currentContent: "Cats sleep up to sixteen hours a day.",
+      previousQuestions: ["Why do cats purr?"],
+    });
+
+    // The chat path puts the system prompt and the search results in front,
+    // and keys the conversation summary by the first message.
+    expect(generateChatResponse).not.toHaveBeenCalled();
+    const [messages] = mockedGenerateReplyToMessages.mock.calls[0];
+    expect(messages).toHaveLength(1);
+    expect(messages[0].role).toBe("user");
+    expect(messages[0].content).toContain("cats");
+    expect(messages[0].content).toContain(
+      "Cats sleep up to sixteen hours a day.",
+    );
+    expect(messages[0].content).toContain("1. Why do cats purr?");
+  });
+
+  it("returns an empty string when the prompt is too long to send", async () => {
+    mockedGenerateReplyToMessages.mockRejectedValue(
+      new Error("The newest message is too long"),
+    );
+
+    const question = await generateFollowUpQuestion({
+      topic: "cats",
+      currentContent: "Cats are independent. ".repeat(5000),
+    });
+
+    expect(question).toBe("");
+  });
+});
+
 describe("generateFollowUpQuestion and the chat history", () => {
   it("writes no chat rows for the follow-up exchange, since nothing reads them", async () => {
     const { historyDatabase } = await import("./history");
     const before = await historyDatabase.chatHistory.count();
-    mockedGenerateChatResponse.mockResolvedValue("1. What comes next?");
+    mockedGenerateReplyToMessages.mockResolvedValue("1. What comes next?");
 
     await generateFollowUpQuestion({
       topic: "cats",

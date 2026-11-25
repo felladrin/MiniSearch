@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-25
 
+- Follow-up question suggestions are now written from the question prompt alone. The prompt went out the way a chat answer does, behind the system prompt with the search results, which buried the instructions for the question under unrelated text; it now goes out on its own, like the related search query. A reply with no question in it also no longer leaves a blank entry in the list of earlier suggestions the next prompt asks the model not to repeat, which pushed a real one out of that list.
 - Searching from an embedded MiniSearch no longer depends on which frame comes first in the embedding page. The query was posted to an origin read from the parent's first child frame, so when that frame was another site (an ad, a chat widget, or a cross-origin frame of the app's own when not embedded), the browser refused the read and the search did nothing, and restoring a search from the history left the app stuck mid-restore. Browsers without `location.ancestorOrigins` never received the query at all. The query is now posted only to the origins in the new `PARENT_WINDOW_ORIGINS` setting, `https://huggingface.co` by default, and the browser delivers it only when the embedding page is on one of them.
 
 ## 2026-11-24
