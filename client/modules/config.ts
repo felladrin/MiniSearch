@@ -8,6 +8,7 @@
 
 import {
   DEFAULT_INFERENCE_TYPE,
+  DEFAULT_INTERNAL_API_CONTEXT_LENGTH,
   DEFAULT_INTERNAL_API_NAME,
   DEFAULT_WLLAMA_GPU_MODEL_ID,
   DEFAULT_WLLAMA_MODEL_ID,
@@ -34,6 +35,7 @@ export const FALLBACK_CONFIG: ServerConfig = {
   wllamaDefaultGpuModelId: DEFAULT_WLLAMA_GPU_MODEL_ID,
   internalApiEnabled: false,
   internalApiName: DEFAULT_INTERNAL_API_NAME,
+  internalApiContextLength: DEFAULT_INTERNAL_API_CONTEXT_LENGTH,
   defaultInferenceType: DEFAULT_INFERENCE_TYPE,
   searchToken: "",
   parentWindowOrigins: [],

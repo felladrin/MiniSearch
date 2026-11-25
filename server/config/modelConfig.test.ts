@@ -45,7 +45,7 @@ describe("getModelConfig", () => {
       maxBackoffMs: 5000,
       requestTimeoutMs: 30000,
       maxConcurrentRequests: 10,
-      defaultMaxTokens: 2048,
+      defaultMaxTokens: 8192,
       temperature: 0.7,
       topP: 0.9,
     });

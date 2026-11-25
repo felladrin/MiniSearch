@@ -396,7 +396,7 @@ export async function generateChatResponse(
   let response = "";
 
   try {
-    const contextSize = getEffectiveContextSize();
+    const contextSize = await getEffectiveContextSize();
     // The newest message is the question being answered. It always goes out,
     // so the one case with no usable prompt is a question larger than the
     // whole window; that fails here, before anything is generated.

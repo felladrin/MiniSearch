@@ -43,7 +43,7 @@ value uses the corresponding default.
 | `MODEL_MAX_BACKOFF_MS`          | `5000`  | Maximum retry backoff in milliseconds         |
 | `MODEL_REQUEST_TIMEOUT_MS`      | `30000` | Model request timeout in milliseconds         |
 | `MODEL_MAX_CONCURRENT_REQUESTS` | `10`    | Maximum number of simultaneous model requests |
-| `MODEL_DEFAULT_MAX_TOKENS`      | `2048`  | Default maximum number of generated tokens    |
+| `MODEL_DEFAULT_MAX_TOKENS`      | `8192`  | Default maximum number of generated tokens    |
 | `MODEL_TEMPERATURE`             | `0.7`   | Model sampling temperature                    |
 | `MODEL_TOP_P`                   | `0.9`   | Model nucleus-sampling probability            |
 
@@ -56,6 +56,7 @@ For self-hosted OpenAI-compatible APIs:
 | `INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL`         | `''`           | Base URL of your API (e.g., `https://api.internal.company.com/v1`) |
 | `INTERNAL_OPENAI_COMPATIBLE_API_KEY`              | `''`           | API key for authentication                                         |
 | `INTERNAL_OPENAI_COMPATIBLE_API_MODEL`            | `''`           | Model ID, or a comma-separated list (random model if empty)        |
+| `INTERNAL_OPENAI_COMPATIBLE_API_CONTEXT_LENGTH`   | `131072`       | Context window of the API's models, in tokens                      |
 | `INTERNAL_OPENAI_COMPATIBLE_API_REASONING_EFFORT` | `''`           | Sent as `reasoning_effort` on every request (API default if empty) |
 | `INTERNAL_OPENAI_COMPATIBLE_API_NAME`             | `Internal API` | Display name shown in UI                                           |
 
@@ -69,6 +70,8 @@ INTERNAL_OPENAI_COMPATIBLE_API_NAME="Company LLM"
 ```
 
 `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` takes several models, separated by commas, in order of preference (`"llama-3.1-8b,qwen-3-8b"`). When a model fails before sending the first token, the server moves to the next one, and after the last one it starts the list over once, up to 5 attempts in all. So a single model gets one retry. Left empty, each request picks a random model from the API's `/models` list, which includes every model the API serves.
+
+`INTERNAL_OPENAI_COMPATIBLE_API_CONTEXT_LENGTH` is the window the browser sizes the request from: the page excerpts get 35% of it, and the answer's `max_tokens` is what is left after the prompt. The server then caps `max_tokens` at `MODEL_DEFAULT_MAX_TOKENS` (8192), which on most OpenAI-compatible APIs also has to hold the thinking of a reasoning model. Set it lower when the models have a smaller window, or the API rejects the longer prompts. A value that is not a positive integer is logged and replaced by the default.
 
 `INTERNAL_OPENAI_COMPATIBLE_API_REASONING_EFFORT` sets the `reasoning_effort` field of every request to the API, for every model in the list. The value is passed through as written, because providers accept different values (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); one the API rejects fails the request, and the error shows in the server log. Left empty, the field is not sent and the API applies its own default.
 

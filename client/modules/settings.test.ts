@@ -19,6 +19,7 @@ const mockConfig: ServerConfig = {
   wllamaDefaultGpuModelId: "gemma-3-4b",
   internalApiEnabled: false,
   internalApiName: "Internal API",
+  internalApiContextLength: 131072,
   defaultInferenceType: "browser",
   searchToken: "a".repeat(64),
   parentWindowOrigins: ["https://huggingface.co"],

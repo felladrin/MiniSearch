@@ -28,6 +28,7 @@ async function requestConfig() {
   return JSON.parse(end.mock.calls[0][0] as string) as {
     accessKeysEnabled: boolean;
     parentWindowOrigins: string[];
+    internalApiContextLength: number;
   };
 }
 
@@ -68,5 +69,27 @@ describe("configEndpointServerHook", () => {
   it("serves no parent window origin when the variable is empty", async () => {
     vi.stubEnv("PARENT_WINDOW_ORIGINS", "");
     expect((await requestConfig()).parentWindowOrigins).toEqual([]);
+  });
+
+  it("serves the configured internal API context length", async () => {
+    vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_CONTEXT_LENGTH", "32768");
+    expect((await requestConfig()).internalApiContextLength).toBe(32768);
+  });
+
+  it("serves a 128K internal API context length when the variable is unset", async () => {
+    vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_CONTEXT_LENGTH", undefined);
+    expect((await requestConfig()).internalApiContextLength).toBe(131072);
+  });
+
+  it("logs an internal API context length that is not a positive integer and serves 128K", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_CONTEXT_LENGTH", "128k");
+    expect((await requestConfig()).internalApiContextLength).toBe(131072);
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('("128k")'),
+    );
+    consoleError.mockRestore();
   });
 });

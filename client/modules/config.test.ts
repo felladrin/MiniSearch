@@ -11,6 +11,7 @@ const serverConfig: ServerConfig = {
   wllamaDefaultGpuModelId: "some-gpu-model",
   internalApiEnabled: true,
   internalApiName: "Custom LLM",
+  internalApiContextLength: 131072,
   defaultInferenceType: "internal",
   searchToken: "a".repeat(64),
   parentWindowOrigins: ["https://huggingface.co"],
