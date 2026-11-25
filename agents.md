@@ -158,6 +158,9 @@ Need to:
 - `server/thumbnailEndpointServerHook.ts` - `/thumbnail` endpoint: one search-result thumbnail at a time, token-gated, with an in-process LRU in front of the upstream host
 - `server/internalApiEndpointServerHook.ts` - `/inference` proxy to self-hosted API
 - `server/internalApiConfig.ts` - Reads and validates every Internal API environment variable; the `/inference`, `/api/config` and `/status` hooks all go through it
+- `server/internalApiModelPicker.ts` - Chooses the model for each `/inference` attempt: the configured list twice, or random picks from `/models` with one refetch
+- `server/utils/readJsonBody.ts` - Reads a JSON request body up to a byte limit, reporting too large or invalid instead of throwing
+- `server/utils/chatCompletionSse.ts` - Writes OpenAI `chat.completion.chunk` events, the `[DONE]` end, and in-stream errors
 - `server/validateAccessKeyServerHook.ts` - Access key validation endpoint
 - `server/statusEndpointServerHook.ts` - `/status` health check endpoint
 - `server/configEndpointServerHook.ts` - `/api/config` runtime client configuration

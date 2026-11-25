@@ -3,10 +3,6 @@ import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { APICallError, streamText } from "ai";
 import type { PreviewServer, ViteDevServer } from "vite";
 import { z } from "zod";
-import {
-  listOpenAiCompatibleModels,
-  selectRandomModel,
-} from "../shared/openaiModels.ts";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
 import {
   type AttemptFailureReason,
@@ -18,17 +14,22 @@ import {
   recordModelFailure,
   recordModelFallback,
   recordModelStreamed,
-  recordModelsRefetched,
   recordStreamEndedWithoutFinish,
 } from "./inferencesSinceLastRestart.ts";
 import { getInternalApiConfig } from "./internalApiConfig.ts";
+import { createModelPicker } from "./internalApiModelPicker.ts";
+import {
+  createChunkPayload,
+  sendSseData,
+  sendSseDone,
+  sendSseError,
+} from "./utils/chatCompletionSse.ts";
 import { sendJsonError } from "./utils/httpResponse.ts";
+import { readJsonBody } from "./utils/readJsonBody.ts";
 import { parseRequestUrl } from "./utils/requestUrl.ts";
 import {
   calculateBackoffTime,
   isResponseWritable,
-  safeEndResponse,
-  safeWriteResponse,
 } from "./utils/streamUtils.ts";
 
 const chatCompletionRequestSchema = z.object({
@@ -44,68 +45,6 @@ const chatCompletionRequestSchema = z.object({
   top_p: z.number().optional(),
   max_tokens: z.number().optional(),
 });
-
-interface ChatCompletionChunk {
-  id: string;
-  object: string;
-  created: number;
-  model?: string;
-  choices: Array<{
-    index: number;
-    delta: { content?: string };
-    finish_reason: string | null;
-  }>;
-}
-
-function createChunkPayload(
-  model: string,
-  content?: string,
-  finish_reason: string | null = null,
-): ChatCompletionChunk {
-  return {
-    id: `chatcmpl-${Date.now()}`,
-    object: "chat.completion.chunk",
-    created: Math.floor(Date.now() / 1000),
-    model,
-    choices: [
-      {
-        index: 0,
-        delta: content ? { content } : {},
-        finish_reason,
-      },
-    ],
-  };
-}
-
-function ensureSseHeaders(response: ServerResponse): void {
-  if (response.headersSent) return;
-
-  response.setHeader("Content-Type", "text/event-stream");
-  response.setHeader("Cache-Control", "no-store");
-  response.setHeader("Connection", "keep-alive");
-}
-
-function sendSseData(response: ServerResponse, data: unknown): void {
-  ensureSseHeaders(response);
-  safeWriteResponse(response, `data: ${JSON.stringify(data)}\n\n`);
-}
-
-function sendSseDone(response: ServerResponse): void {
-  safeWriteResponse(response, "data: [DONE]\n\n");
-  safeEndResponse(response);
-}
-
-function sendSseError(
-  response: ServerResponse,
-  message: string,
-  model?: string,
-): void {
-  sendSseData(response, {
-    error: message,
-    ...(model ? { model } : {}),
-  });
-  sendSseDone(response);
-}
 
 function hasJsonContentType(request: IncomingMessage): boolean {
   const contentType = request.headers["content-type"];
@@ -124,6 +63,8 @@ function classifyAttemptFailure(
   if (error.statusCode === 429) return "rateLimited";
   return error.statusCode >= 500 ? "serverError" : "otherHttpError";
 }
+
+const maxBodyBytes = 1024 * 1024;
 
 /** Self-hosted `/inference` endpoint: streams an OpenAI-compatible chat completion from the internal API, retrying across models. */
 export function internalApiEndpointServerHook<
@@ -179,43 +120,7 @@ export function internalApiEndpointServerHook<
       let outcome: InferenceOutcome = "unclassified";
 
       try {
-        const maxBodyBytes = 1024 * 1024;
-        const body = await new Promise<
-          | { status: "ok"; value: unknown }
-          | { status: "tooLarge" }
-          | { status: "invalid" }
-        >((resolve) => {
-          const chunks: Buffer[] = [];
-          let totalBytes = 0;
-          let settled = false;
-          request.on("data", (chunk: Buffer | string) => {
-            if (settled) return;
-            totalBytes += Buffer.byteLength(chunk);
-            if (totalBytes > maxBodyBytes) {
-              settled = true;
-              resolve({ status: "tooLarge" });
-              return;
-            }
-            chunks.push(Buffer.from(chunk));
-          });
-          request.on("end", () => {
-            if (settled) return;
-            settled = true;
-            try {
-              resolve({
-                status: "ok",
-                value: JSON.parse(Buffer.concat(chunks).toString()),
-              });
-            } catch {
-              resolve({ status: "invalid" });
-            }
-          });
-          request.on("error", () => {
-            if (settled) return;
-            settled = true;
-            resolve({ status: "invalid" });
-          });
-        });
+        const body = await readJsonBody(request, maxBodyBytes);
 
         if (body.status === "tooLarge") {
           outcome = "badRequest";
@@ -256,7 +161,7 @@ export function internalApiEndpointServerHook<
         const requestBody = parsedRequestBody.data;
 
         const internalApi = getInternalApiConfig();
-        const { baseUrl, apiKey, models: configuredModels } = internalApi;
+        const { baseUrl, apiKey } = internalApi;
         if (!baseUrl || !apiKey) {
           outcome = "notConfigured";
           sendJsonError(response, 500, {
@@ -271,32 +176,24 @@ export function internalApiEndpointServerHook<
           name: "openai",
         });
 
-        // Each configured model, in order of preference, then the same list
-        // once more, so a single configured model also gets one retry.
-        const configuredLadder = [...configuredModels, ...configuredModels];
-        let model: string | undefined = configuredModels[0];
-        let availableModels: { id: string }[] = [];
-        const attemptedModels = new Set<string>();
-        // Set before the try so a failing `/models` endpoint does not trigger
-        // another refetch on the next failed attempt.
-        let hasRefetched = false;
-
-        if (!model) {
-          try {
-            availableModels = await listOpenAiCompatibleModels(baseUrl, apiKey);
-            const selectedModel = selectRandomModel(availableModels);
-            model = selectedModel || undefined;
-          } catch (error) {
-            console.error(
-              "Error fetching models:",
-              error instanceof Error ? error.message : error,
-            );
-            outcome = "modelListUnavailable";
-            sendJsonError(response, 500, {
-              error: "Failed to fetch available models",
-            });
-            return;
-          }
+        const modelPicker = createModelPicker({
+          models: internalApi.models,
+          baseUrl,
+          apiKey,
+        });
+        let model: string | undefined;
+        try {
+          model = await modelPicker.first();
+        } catch (error) {
+          console.error(
+            "Error fetching models:",
+            error instanceof Error ? error.message : error,
+          );
+          outcome = "modelListUnavailable";
+          sendJsonError(response, 500, {
+            error: "Failed to fetch available models",
+          });
+          return;
         }
 
         if (!model) {
@@ -332,7 +229,6 @@ export function internalApiEndpointServerHook<
         let hasEmittedContent = false;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           if (!model) break;
-          attemptedModels.add(model);
 
           if (!isResponseWritable(response)) {
             outcome = "abandoned";
@@ -435,35 +331,7 @@ export function internalApiEndpointServerHook<
             if (hasEmittedContent) break;
             if (attempt >= maxAttempts) break;
 
-            // A provider whose pool changes mid-flight needs a fresh listing to
-            // recover; without the `!hasRefetched` guard we would loop on a
-            // stale list.
-            if (
-              configuredModels.length === 0 &&
-              availableModels.every((m) => attemptedModels.has(m.id)) &&
-              !hasRefetched
-            ) {
-              hasRefetched = true;
-              try {
-                availableModels = await listOpenAiCompatibleModels(
-                  baseUrl,
-                  apiKey,
-                );
-                recordModelsRefetched();
-              } catch (refetchError) {
-                console.warn(
-                  "Failed to refetch models:",
-                  refetchError instanceof Error
-                    ? refetchError.message
-                    : refetchError,
-                );
-              }
-            }
-
-            const nextModel =
-              configuredModels.length > 0
-                ? configuredLadder[attempt]
-                : selectRandomModel(availableModels, attemptedModels);
+            const nextModel = await modelPicker.next();
             if (!nextModel) break;
             if (nextModel !== model) recordModelFallback();
             model = nextModel;
