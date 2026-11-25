@@ -93,6 +93,8 @@ const GENERATION_NOT_POSSIBLE_MESSAGE =
 // 4 s and so on, up to the cap.
 const MAX_CONSECUTIVE_POLL_FAILURES = 5;
 const MAX_POLL_RETRY_DELAY_MS = 8 * 1000;
+/** A cancel that the Horde doesn't answer in this time is given up on. */
+const CANCEL_TIMEOUT_MS = 10 * 1000;
 
 /**
  * A non-ok answer from the AI Horde API. The status is kept so a poll can
@@ -282,9 +284,8 @@ async function handleGenerationStatus(
       }
 
       if (getTextGenerationState() === "interrupted") {
-        // Stop only ends the polling here; without a cancel the queued job
-        // would keep running on the Horde and keep spending kudos.
-        await cancelGeneration(generationId).catch(() => {});
+        // Stop only ends the polling here; runHordeJob cancels the queued job
+        // on the way out so it doesn't keep running and spending kudos.
         throw new ChatGenerationError("Generation interrupted");
       }
 
@@ -321,6 +322,10 @@ async function handleGenerationStatus(
   }
 }
 
+/**
+ * Asks the Horde to drop a job. Never throws: a cancel that fails or hangs is
+ * logged and must not replace the answer or the error the caller is handling.
+ */
 async function cancelGeneration(generationId: string): Promise<void> {
   const aiHordeApiKey = getEffectiveHordeApiKey();
   try {
@@ -328,6 +333,9 @@ async function cancelGeneration(generationId: string): Promise<void> {
       buildHordeUrl(`/generate/text/status/${generationId}`),
       {
         method: "DELETE",
+        signal: AbortSignal.timeout(CANCEL_TIMEOUT_MS),
+        // Lets the request finish when the page is being closed.
+        keepalive: true,
         headers: {
           [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
           [HTTP_HEADERS.CONTENT_TYPE]: "application/json",
@@ -346,7 +354,32 @@ async function cancelGeneration(generationId: string): Promise<void> {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     addLogEntry(`Failed to cancel generation ${generationId}: ${errorMessage}`);
-    throw new Error(`Failed to cancel generation: ${errorMessage}`);
+  }
+}
+
+/**
+ * Submits one job and follows it to an answer. On every other way out (an
+ * error, an interrupt, an abort because a sibling won the race, a fallback
+ * round) the job is cancelled, so no worker spends GPU time and kudos on an
+ * answer nobody reads. The cancel is not awaited: a slow or failed DELETE
+ * never delays or changes the outcome.
+ */
+async function runHordeJob(
+  messages: ChatMessage[],
+  models: string[] | undefined,
+  onUpdate: (text: string) => void,
+  signal?: AbortSignal,
+  onStarted?: () => void,
+): Promise<string> {
+  const generation = await startGeneration(messages, signal, models);
+  onStarted?.();
+  let answered = false;
+  try {
+    const text = await handleGenerationStatus(generation.id, onUpdate, signal);
+    answered = true;
+    return text;
+  } finally {
+    if (!answered) void cancelGeneration(generation.id);
   }
 }
 
@@ -533,75 +566,38 @@ async function raceGenerations(
     new AbortController(),
     new AbortController(),
   ];
+  const started = controllers.map(() => false);
+  let winnerIndex: number | null = null;
+  const jobs = controllers.map((ctrl, index) =>
+    runHordeJob(
+      messages,
+      models,
+      (text: string) => {
+        winnerIndex ??= index;
+        if (winnerIndex === index) onUpdate(text);
+      },
+      ctrl.signal,
+      () => {
+        started[index] = true;
+      },
+    ).then((result) => ({ result, index })),
+  );
+
   try {
-    const startPromises = controllers.map(async (ctrl) => {
-      const generation = await startGeneration(messages, ctrl.signal, models);
-      return { id: generation.id, ctrl };
-    });
-
-    const startResults = await Promise.allSettled(startPromises);
-    const generations: Array<{ id: string; ctrl: AbortController }> =
-      startResults
-        .map((generationPromise) =>
-          generationPromise.status === "fulfilled"
-            ? generationPromise.value
-            : null,
-        )
-        .filter(
-          (generation): generation is { id: string; ctrl: AbortController } =>
-            generation !== null,
-        );
-
-    if (generations.length === 0) {
-      throw new Error("Failed to start any AI Horde generation");
-    }
-
-    const raceState = { winnerId: null as string | null, hasWinner: false };
-    const statusPromises = generations.map((generation) =>
-      handleGenerationStatus(
-        generation.id,
-        (text: string) => {
-          if (!raceState.hasWinner) {
-            raceState.winnerId = generation.id;
-            raceState.hasWinner = true;
-          }
-          if (raceState.winnerId === generation.id) {
-            onUpdate(text);
-          }
-        },
-        generation.ctrl.signal,
-      ).then((result: string) => ({ result, generationId: generation.id })),
-    );
-
     // The first job to answer wins; a job that fails is ignored while another
     // is still running, so one crashed worker cannot sink a healthy sibling.
-    const winner = await Promise.any(statusPromises).catch((error: unknown) => {
+    const winner = await Promise.any(jobs).catch((error: unknown) => {
+      if (!started.some(Boolean)) {
+        throw new Error("Failed to start any AI Horde generation");
+      }
       throw error instanceof AggregateError
         ? pickRaceFailure(error.errors)
         : error;
     });
-
-    await Promise.all(
-      generations
-        .filter((generation) => generation.id !== winner.generationId)
-        .map((generation) => {
-          try {
-            generation.ctrl.abort();
-          } catch (abortError) {
-            addLogEntry(
-              `Failed to abort generation ${generation.id}: ${abortError}`,
-            );
-          }
-          return cancelGeneration(generation.id).catch((cancelError: Error) => {
-            addLogEntry(
-              `Failed to cancel generation ${generation.id}: ${cancelError}`,
-            );
-          });
-        }),
-    );
-
     return winner.result;
-  } catch (error) {
+  } finally {
+    // Stops the losers (or, on failure, anything still running). Each job's
+    // own cleanup then cancels it on the Horde without holding up the answer.
     controllers.forEach((controller) => {
       try {
         controller.abort();
@@ -609,7 +605,6 @@ async function raceGenerations(
         addLogEntry(`Failed to abort controller: ${abortError}`);
       }
     });
-    throw error;
   }
 }
 
@@ -620,10 +615,7 @@ async function executeHordeGeneration(
   const settings = getSettings();
 
   if (settings.hordeModel) {
-    const generation = await startGeneration(messages, undefined, [
-      settings.hordeModel,
-    ]);
-    return await handleGenerationStatus(generation.id, onUpdate);
+    return await runHordeJob(messages, [settings.hordeModel], onUpdate);
   }
 
   let topModels: string[] = [];

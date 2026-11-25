@@ -49,6 +49,13 @@ function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status });
 }
 
+/** The job ids that were cancelled, in order. */
+function cancelledIds(): string[] {
+  return mockFetch.mock.calls
+    .filter(([, init]) => (init as { method?: string })?.method === "DELETE")
+    .map(([url]) => String(url).slice(String(url).lastIndexOf("/") + 1));
+}
+
 function mockSettings(overrides: Partial<typeof defaultSettings> = {}) {
   vi.mocked(getSettings).mockReturnValue({ ...defaultSettings, ...overrides });
 }
@@ -180,6 +187,116 @@ describe("textGenerationWithHorde", () => {
       expect(cancelInit.method).toBe("DELETE");
     });
 
+    it("cancels the job exactly once when the user interrupts", async () => {
+      let state: TextGenerationState = "idle";
+      vi.mocked(updateTextGenerationState).mockImplementation((next) => {
+        state = next;
+      });
+      vi.mocked(getTextGenerationState).mockImplementation(() =>
+        state === "generating" ? "interrupted" : state,
+      );
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse({ id: "gen-stop" }))
+        .mockResolvedValueOnce(
+          jsonResponse({ done: false, is_possible: true, generations: [] }),
+        )
+        .mockResolvedValueOnce(jsonResponse({}));
+
+      await expect(generateTextWithHorde()).rejects.toThrow(
+        "Generation interrupted",
+      );
+      expect(cancelledIds()).toEqual(["gen-stop"]);
+    });
+
+    it("cancels a pinned-model job that faults", async () => {
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse({ id: "gen-fault" }))
+        .mockResolvedValueOnce(jsonResponse({ done: true, faulted: true }))
+        .mockResolvedValueOnce(jsonResponse({}));
+
+      await expect(generateTextWithHorde()).rejects.toThrow(
+        "Generation failed",
+      );
+      expect(cancelledIds()).toEqual(["gen-fault"]);
+    });
+
+    it("cancels a pinned-model job that the model cannot take", async () => {
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse({ id: "gen-offline" }))
+        .mockResolvedValueOnce(jsonResponse({ done: true, is_possible: false }))
+        .mockResolvedValueOnce(jsonResponse({}));
+
+      await expect(generateTextWithHorde()).rejects.toThrow(
+        "Generation not possible",
+      );
+      expect(cancelledIds()).toEqual(["gen-offline"]);
+    });
+
+    it("does not cancel a job whose answer was returned", async () => {
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse({ id: "gen-ok" }))
+        .mockResolvedValueOnce(
+          jsonResponse({
+            done: true,
+            is_possible: true,
+            generations: [{ text: "Fine", model: "chosen-model" }],
+          }),
+        );
+
+      await expect(generateTextWithHorde()).resolves.toBe("Fine");
+      expect(cancelledIds()).toEqual([]);
+    });
+
+    it("keeps the original error and logs once when the cancel fails", async () => {
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse({ id: "gen-x" }))
+        .mockResolvedValueOnce(jsonResponse({ done: true, faulted: true }))
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+      await expect(generateTextWithHorde()).rejects.toThrow(
+        "Generation failed",
+      );
+      // The cancel runs unawaited; let it settle before checking the log.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const cancelLogs = vi
+        .mocked(addLogEntry)
+        .mock.calls.filter(([entry]) =>
+          String(entry).includes("Failed to cancel generation gen-x"),
+        );
+      expect(cancelLogs).toHaveLength(1);
+    });
+
+    it("sends the cancel with a timeout and keepalive", async () => {
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse({ id: "gen-k" }))
+        .mockResolvedValueOnce(jsonResponse({ done: true, faulted: true }))
+        .mockResolvedValueOnce(jsonResponse({}));
+
+      await expect(generateTextWithHorde()).rejects.toThrow();
+      const [, cancelInit] = mockFetch.mock.calls[2];
+      expect(cancelInit.method).toBe("DELETE");
+      expect(cancelInit.keepalive).toBe(true);
+      expect(cancelInit.signal).toBeInstanceOf(AbortSignal);
+    });
+
     it("includes the configured model in the generation request body", async () => {
       mockSettings({ hordeModel: "custom-model" });
       const { generateTextWithHorde } = await import(
@@ -269,8 +386,10 @@ describe("textGenerationWithHorde", () => {
         expect((error as Error).message).not.toContain(
           "Generation not possible",
         );
-        // One submit, then the polls up to the consecutive-failure cap.
-        expect(mockFetch).toHaveBeenCalledTimes(6);
+        // One submit, the polls up to the consecutive-failure cap, then the
+        // cancel of the job that will never be read.
+        expect(mockFetch).toHaveBeenCalledTimes(7);
+        expect(mockFetch.mock.calls[6][1].method).toBe("DELETE");
       });
 
       it("stops at once when the job is gone, with the server's message", async () => {
@@ -286,7 +405,9 @@ describe("textGenerationWithHorde", () => {
         await expect(generateTextWithHorde()).rejects.toThrow(
           "Generation not found",
         );
-        expect(mockFetch).toHaveBeenCalledTimes(2);
+        // Submit, the one poll, then the cancel.
+        expect(mockFetch).toHaveBeenCalledTimes(3);
+        expect(mockFetch.mock.calls[2][1].method).toBe("DELETE");
       });
 
       it("rejects a finished generation that carries no text", async () => {
@@ -622,6 +743,94 @@ describe("textGenerationWithHorde", () => {
       );
 
       expect(generationRequestBodies()).toHaveLength(2);
+    });
+
+    it("cancels the losing job and not the winner", async () => {
+      routeHordeFetch({
+        workers: [{ models: ["m-a"], max_length: 1024 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: perJobResponder({
+          "gen-1": () => doneResponse,
+          "gen-2": () => pendingResponse,
+        }),
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
+      expect(cancelledIds()).toEqual(["gen-2"]);
+    });
+
+    it("returns the winner's answer without waiting for the loser's cancel", async () => {
+      routeHordeFetch({
+        workers: [{ models: ["m-a"], max_length: 1024 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: perJobResponder({
+          "gen-1": () => doneResponse,
+          "gen-2": () => pendingResponse,
+        }),
+      });
+      const routed = mockFetch.getMockImplementation();
+      // A Horde that never answers the DELETE.
+      mockFetch.mockImplementation((url: string, init?: { method?: string }) =>
+        init?.method === "DELETE" ? new Promise(() => {}) : routed?.(url, init),
+      );
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
+      expect(cancelledIds()).toEqual(["gen-2"]);
+    });
+
+    it("cancels both jobs when the race fails", async () => {
+      routeHordeFetch({
+        workers: [{ models: ["m-a"], max_length: 1024 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: () => ({ done: true, faulted: true }),
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await expect(generateTextWithHorde()).rejects.toThrow(
+        "Generation failed",
+      );
+      expect(cancelledIds().sort()).toEqual(["gen-1", "gen-2"]);
+    });
+
+    it("cancels the first round before submitting the fallback round", async () => {
+      routeHordeFetch({
+        workers: [{ models: ["m-a"], max_length: 1024 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: perJobResponder({
+          "gen-1": () => ({ done: true, is_possible: false }),
+          "gen-2": () => ({ done: true, is_possible: false }),
+          "gen-3": () => doneResponse,
+          "gen-4": () => pendingResponse,
+        }),
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
+
+      const calls = mockFetch.mock.calls.map(([url, init]) =>
+        (init as { method?: string })?.method === "DELETE"
+          ? `DELETE ${String(url).slice(String(url).lastIndexOf("/") + 1)}`
+          : String(url).includes("/generate/text/async")
+            ? "SUBMIT"
+            : "",
+      );
+      const thirdSubmit = calls.indexOf(
+        "SUBMIT",
+        calls.indexOf("SUBMIT", calls.indexOf("SUBMIT") + 1) + 1,
+      );
+      expect(calls.indexOf("DELETE gen-1")).toBeLessThan(thirdSubmit);
+      expect(calls.indexOf("DELETE gen-2")).toBeLessThan(thirdSubmit);
+      expect(cancelledIds().sort()).toEqual(["gen-1", "gen-2", "gen-4"]);
     });
 
     it("reuses the cached ranking for the next generation", async () => {
