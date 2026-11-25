@@ -7,7 +7,6 @@ import {
   listOpenAiCompatibleModels,
   selectRandomModel,
 } from "../shared/openaiModels.ts";
-import { getModelConfig } from "./config/modelConfig.ts";
 import { handleTokenVerification } from "./handleTokenVerification.ts";
 import {
   type AttemptFailureReason,
@@ -22,6 +21,7 @@ import {
   recordModelsRefetched,
   recordStreamEndedWithoutFinish,
 } from "./inferencesSinceLastRestart.ts";
+import { getInternalApiConfig } from "./internalApiConfig.ts";
 import { sendJsonError } from "./utils/httpResponse.ts";
 import { parseRequestUrl } from "./utils/requestUrl.ts";
 import {
@@ -255,10 +255,9 @@ export function internalApiEndpointServerHook<
         }
         const requestBody = parsedRequestBody.data;
 
-        if (
-          !process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL ||
-          !process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY
-        ) {
+        const internalApi = getInternalApiConfig();
+        const { baseUrl, apiKey, models: configuredModels } = internalApi;
+        if (!baseUrl || !apiKey) {
           outcome = "notConfigured";
           sendJsonError(response, 500, {
             error: "OpenAI API configuration is missing",
@@ -267,17 +266,11 @@ export function internalApiEndpointServerHook<
         }
 
         const openaiProvider = createOpenAICompatible({
-          baseURL: process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
-          apiKey: process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
+          baseURL: baseUrl,
+          apiKey,
           name: "openai",
         });
 
-        const configuredModels = (
-          process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL ?? ""
-        )
-          .split(",")
-          .map((id) => id.trim())
-          .filter(Boolean);
         // Each configured model, in order of preference, then the same list
         // once more, so a single configured model also gets one retry.
         const configuredLadder = [...configuredModels, ...configuredModels];
@@ -290,10 +283,7 @@ export function internalApiEndpointServerHook<
 
         if (!model) {
           try {
-            availableModels = await listOpenAiCompatibleModels(
-              process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
-              process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
-            );
+            availableModels = await listOpenAiCompatibleModels(baseUrl, apiKey);
             const selectedModel = selectRandomModel(availableModels);
             model = selectedModel || undefined;
           } catch (error) {
@@ -318,19 +308,17 @@ export function internalApiEndpointServerHook<
         // Passed through unchecked: providers disagree on the accepted values
         // (`none`, `minimal`, `xhigh`...), and an unknown one comes back from
         // the upstream as an HTTP error in the log.
-        const reasoningEffort =
-          process.env.INTERNAL_OPENAI_COMPATIBLE_API_REASONING_EFFORT?.trim();
+        const { reasoningEffort } = internalApi;
         const providerOptions = reasoningEffort
           ? { openai: { reasoningEffort } }
           : undefined;
 
-        const config = getModelConfig();
         const maxAttempts = 5;
         let lastError: unknown = null;
 
         const clampedMaxTokens =
           requestBody.max_tokens !== undefined
-            ? Math.min(requestBody.max_tokens, config.defaultMaxTokens)
+            ? Math.min(requestBody.max_tokens, internalApi.maxOutputTokens)
             : undefined;
         const clampedTemperature =
           requestBody.temperature !== undefined
@@ -363,7 +351,7 @@ export function internalApiEndpointServerHook<
             if (idleTimeoutId !== undefined) clearTimeout(idleTimeoutId);
             idleTimeoutId = setTimeout(
               () => abortController.abort(),
-              config.requestTimeoutMs,
+              internalApi.requestTimeoutMs,
             );
           }
 
@@ -408,7 +396,7 @@ export function internalApiEndpointServerHook<
                 // records the failure and walks the retry ladder.
                 clearTimeout(idleTimeoutId);
                 throw new Error(
-                  `Upstream stalled for ${config.requestTimeoutMs}ms`,
+                  `Upstream stalled for ${internalApi.requestTimeoutMs}ms`,
                 );
               } else if (part.type === "finish") {
                 clearTimeout(idleTimeoutId);
@@ -458,8 +446,8 @@ export function internalApiEndpointServerHook<
               hasRefetched = true;
               try {
                 availableModels = await listOpenAiCompatibleModels(
-                  process.env.INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL,
-                  process.env.INTERNAL_OPENAI_COMPATIBLE_API_KEY,
+                  baseUrl,
+                  apiKey,
                 );
                 recordModelsRefetched();
               } catch (refetchError) {

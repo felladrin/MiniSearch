@@ -24,10 +24,6 @@ vi.mock("@ai-sdk/openai-compatible", async (importOriginal) => ({
   createOpenAICompatible: vi.fn(),
 }));
 
-vi.mock("./config/modelConfig", () => ({
-  getModelConfig: vi.fn(),
-}));
-
 vi.mock("../shared/openaiModels", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../shared/openaiModels")>()),
   listOpenAiCompatibleModels: vi.fn(),
@@ -40,7 +36,6 @@ import {
   listOpenAiCompatibleModels,
   selectRandomModel,
 } from "../shared/openaiModels";
-import { getModelConfig } from "./config/modelConfig";
 import { handleTokenVerification } from "./handleTokenVerification";
 import { getInferenceStats } from "./inferencesSinceLastRestart";
 import { internalApiEndpointServerHook } from "./internalApiEndpointServerHook";
@@ -322,16 +317,6 @@ describe("internalApiEndpointServerHook", () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL", "http://test-api");
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_KEY", "test-key");
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "test-model");
-      vi.mocked(getModelConfig).mockReturnValue({
-        maxRetries: 5,
-        baseBackoffMs: 100,
-        maxBackoffMs: 5000,
-        requestTimeoutMs: 30000,
-        maxConcurrentRequests: 10,
-        defaultMaxTokens: 2048,
-        temperature: 0.7,
-        topP: 0.9,
-      });
       vi.mocked(createOpenAICompatible).mockReturnValue({
         chatModel: vi.fn().mockReturnValue("mock-chat-model"),
       } as never);
@@ -539,7 +524,7 @@ describe("internalApiEndpointServerHook", () => {
         vi.fn(),
       );
       const callArgs = vi.mocked(streamText).mock.calls[0][0];
-      expect(callArgs.maxOutputTokens).toBe(2048);
+      expect(callArgs.maxOutputTokens).toBe(8192);
     });
 
     it("passes max_tokens unchanged when under cap", async () => {
@@ -1351,16 +1336,6 @@ describe("internalApiEndpointServerHook", () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL", "http://test-api");
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_KEY", "test-key");
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "test-model");
-      vi.mocked(getModelConfig).mockReturnValue({
-        maxRetries: 5,
-        baseBackoffMs: 100,
-        maxBackoffMs: 5000,
-        requestTimeoutMs: 30000,
-        maxConcurrentRequests: 10,
-        defaultMaxTokens: 2048,
-        temperature: 0.7,
-        topP: 0.9,
-      });
       vi.mocked(createOpenAICompatible).mockReturnValue({
         chatModel: vi.fn().mockReturnValue("mock-chat-model"),
       } as never);

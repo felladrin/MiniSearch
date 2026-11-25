@@ -330,8 +330,8 @@ parameter. The body is at most 1 MiB:
 
 `messages` needs at least one entry, each with a `role` of `system`, `user` or
 `assistant` and a string `content`. `temperature` is clamped to 0-2, `top_p` to
-0-1, and `max_tokens` to the server's `defaultMaxTokens`
-(`server/config/modelConfig.ts`).
+0-1, and `max_tokens` to `MODEL_DEFAULT_MAX_TOKENS` (8192 by default,
+`server/internalApiConfig.ts`).
 
 The response is an OpenAI-compatible SSE stream of
 `chat.completion.chunk` objects, ending with a chunk whose `finish_reason` is

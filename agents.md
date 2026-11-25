@@ -157,6 +157,7 @@ Need to:
 - `server/searchEndpointServerHook.ts` - `/search/text` and `/search/images` endpoints
 - `server/thumbnailEndpointServerHook.ts` - `/thumbnail` endpoint: one search-result thumbnail at a time, token-gated, with an in-process LRU in front of the upstream host
 - `server/internalApiEndpointServerHook.ts` - `/inference` proxy to self-hosted API
+- `server/internalApiConfig.ts` - Reads and validates every Internal API environment variable; the `/inference`, `/api/config` and `/status` hooks all go through it
 - `server/validateAccessKeyServerHook.ts` - Access key validation endpoint
 - `server/statusEndpointServerHook.ts` - `/status` health check endpoint
 - `server/configEndpointServerHook.ts` - `/api/config` runtime client configuration

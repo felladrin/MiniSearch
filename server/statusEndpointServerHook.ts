@@ -4,9 +4,9 @@ import { getAuthorizationStats } from "./authorizationSinceLastRestart.ts";
 import { getBiEncoderStatus } from "./biEncoderService.ts";
 import { getFallbackProviderStats } from "./fallbackSearchService.ts";
 import { getInferenceStats } from "./inferencesSinceLastRestart.ts";
+import { getInternalApiConfig } from "./internalApiConfig.ts";
 import { getPageReadCircuitStats } from "./pageReadHostBreaker.ts";
 import { getPageReadStats } from "./pageReadsSinceLastRestart.ts";
-import { parseCommaSeparatedList } from "./parseCommaSeparatedList.ts";
 import { getRerankerStatus } from "./rerankerService.ts";
 import { getRerankingStats } from "./rerankingSinceLastRestart.ts";
 import {
@@ -110,13 +110,9 @@ export function statusEndpointServerHook<
       },
       authorization: getAuthorizationStats(),
       // The per-model counters go out as an array in the configured order,
-      // never keyed by model name: `/status` needs no token. Same parse the
-      // inference hook uses for its ladder.
-      inference: getInferenceStats(
-        parseCommaSeparatedList(
-          process.env.INTERNAL_OPENAI_COMPATIBLE_API_MODEL,
-        ),
-      ),
+      // never keyed by model name: `/status` needs no token. The same list the
+      // inference hook walks for its ladder.
+      inference: getInferenceStats(getInternalApiConfig().models),
       activeSessions: getActiveSessionsAmount(),
       searches: {
         ...getSearchStats(),
