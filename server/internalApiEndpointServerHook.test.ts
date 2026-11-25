@@ -1231,6 +1231,56 @@ describe("internalApiEndpointServerHook", () => {
       }
     });
 
+    it("still answers 503 when the mid-retry re-list fails", async () => {
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
+      vi.mocked(listOpenAiCompatibleModels)
+        .mockResolvedValueOnce([{ id: "model-a" }])
+        .mockRejectedValueOnce(new Error("models endpoint down"));
+      vi.mocked(selectRandomModel).mockReturnValueOnce("model-a");
+
+      vi.mocked(streamText).mockImplementation(
+        () =>
+          streamOf([
+            { type: "error", error: new Error("upstream down") },
+          ]) as never,
+      );
+
+      const before = getInferenceStats();
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.useFakeTimers();
+      try {
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+        const pending = handler(
+          createRequest({ messages: [{ role: "user", content: "hi" }] }),
+          response,
+          vi.fn(),
+        );
+        await vi.runAllTimersAsync();
+        await pending;
+
+        // The re-list failed, so the picker hands out nothing and the request
+        // ends in the all-models-failed answer, not an internal error.
+        expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(2);
+        // The failed re-list left the old pool in place.
+        expect(vi.mocked(selectRandomModel).mock.calls[1][0]).toEqual([
+          { id: "model-a" },
+        ]);
+        expect(streamText).toHaveBeenCalledTimes(1);
+        expect(response.statusCode).toBe(503);
+        expect(getInferenceStats().failed.failedBeforeFirstToken).toBe(
+          before.failed.failedBeforeFirstToken + 1,
+        );
+        expect(warnSpy).toHaveBeenCalledWith(
+          "Failed to refetch models:",
+          "models endpoint down",
+        );
+      } finally {
+        vi.useRealTimers();
+        warnSpy.mockRestore();
+      }
+    });
+
     it("responds 500 when model list fetch fails and no env model set", async () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
       vi.mocked(listOpenAiCompatibleModels).mockRejectedValue(
