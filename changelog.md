@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-25
+
+- Searching from an embedded MiniSearch no longer depends on which frame comes first in the embedding page. The query was posted to an origin read from the parent's first child frame, so when that frame was another site (an ad, a chat widget, or a cross-origin frame of the app's own when not embedded), the browser refused the read and the search did nothing, and restoring a search from the history left the app stuck mid-restore. Browsers without `location.ancestorOrigins` never received the query at all. The query is now posted only to the origins in the new `PARENT_WINDOW_ORIGINS` setting, `https://huggingface.co` by default, and the browser delivers it only when the embedding page is on one of them.
+
 ## 2026-11-24
 
 - Pinned searches now stay in the History drawer however many searches you make after them. The drawer only loaded your 200 most recent searches, and listed 100 of them, so an older pinned search disappeared from it, and from the filter, while it was still stored and protected from cleanup. Every pinned search is now shown in the Pinned section, and the filter finds it. Pinned searches are found through a new index, so this does not slow down as the history grows, and searches pinned before this update are picked up the first time the app opens after it.

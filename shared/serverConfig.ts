@@ -10,6 +10,12 @@ export interface ServerConfig {
   defaultInferenceType: string;
   /** The CSRF token to hash into the `?token=` of every request to this server. */
   searchToken: string;
+  /**
+   * Origins allowed to receive the query when MiniSearch is embedded in an
+   * iframe. The post goes to each one and the browser drops it unless the
+   * embedding page is on that origin.
+   */
+  parentWindowOrigins: string[];
 }
 
 /**
@@ -21,3 +27,4 @@ export const DEFAULT_WLLAMA_MODEL_ID = "littlelamb-290m";
 export const DEFAULT_WLLAMA_GPU_MODEL_ID = "gemma-3-4b";
 export const DEFAULT_INFERENCE_TYPE = "browser";
 export const DEFAULT_INTERNAL_API_NAME = "Internal API";
+export const DEFAULT_PARENT_WINDOW_ORIGINS = ["https://huggingface.co"];
