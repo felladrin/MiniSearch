@@ -144,7 +144,7 @@ Uses aihorde.net, a distributed volunteer GPU network.
 {
   inferenceType: 'horde',
   hordeApiKey: '0000000000', // Default anonymous key; set your own for priority
-  hordeModel: '' // Optional; empty asks for the five most requested models this month and races two requests, using the first response
+  hordeModel: '' // Optional; empty asks for the five most requested models this month and races two requests, using the first one that answers; one that fails is ignored while the other is still running
 }
 ```
 

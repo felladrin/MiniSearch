@@ -365,7 +365,7 @@ describe("textGenerationWithHorde", () => {
       workers: Array<{ models: string[]; max_length: number }>;
       monthStats?: Record<string, number>;
       statsFails?: boolean;
-      statusResponder: (pollIndex: number) => unknown;
+      statusResponder: (pollIndex: number, url: string) => unknown;
     }) {
       let idCounter = 0;
       let pollCounter = 0;
@@ -385,7 +385,7 @@ describe("textGenerationWithHorde", () => {
           if (init?.method === "DELETE") {
             return jsonResponse({});
           }
-          const reply = statusResponder(pollCounter++);
+          const reply = statusResponder(pollCounter++, url);
           return reply instanceof Response ? reply : jsonResponse(reply);
         },
       );
@@ -536,6 +536,91 @@ describe("textGenerationWithHorde", () => {
       await expect(generateTextWithHorde()).rejects.toThrow(
         "Generation failed",
       );
+      expect(generationRequestBodies()).toHaveLength(2);
+    });
+
+    /** Answers each job's polls from its own script, by the job id in the URL. */
+    function perJobResponder(
+      scripts: Record<string, (jobPollIndex: number) => unknown>,
+    ) {
+      const jobPolls: Record<string, number> = {};
+      return (_pollIndex: number, url: string) => {
+        const jobId = url.slice(url.lastIndexOf("/") + 1);
+        const jobPollIndex = jobPolls[jobId] ?? 0;
+        jobPolls[jobId] = jobPollIndex + 1;
+        return scripts[jobId](jobPollIndex);
+      };
+    }
+
+    const pendingResponse = { done: false, is_possible: true, generations: [] };
+
+    it("serves the healthy job when its sibling faults first", async () => {
+      routeHordeFetch({
+        workers: [{ models: ["m-a"], max_length: 1024 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: perJobResponder({
+          "gen-1": () => ({ done: true, faulted: true }),
+          "gen-2": (poll) => (poll === 0 ? pendingResponse : doneResponse),
+        }),
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
+
+      expect(updateResponse).toHaveBeenCalledWith("Top model answer");
+      expect(generationRequestBodies()).toHaveLength(2);
+    });
+
+    it("still retries with any model when one job faults and the other cannot take the job", async () => {
+      routeHordeFetch({
+        workers: [{ models: ["m-a"], max_length: 1024 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: perJobResponder({
+          // The faulted job is first in submission order, so picking the
+          // first error would hide the "not possible" that the retry needs.
+          "gen-1": () => ({ done: true, faulted: true }),
+          "gen-2": () => ({ done: true, is_possible: false }),
+          "gen-3": () => doneResponse,
+          "gen-4": () => doneResponse,
+        }),
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
+
+      expect(generationRequestBodies()).toHaveLength(4);
+    });
+
+    it("reports an interrupt during the race and submits no retry", async () => {
+      let interrupted = false;
+      vi.mocked(getTextGenerationState).mockImplementation(() =>
+        interrupted ? "interrupted" : "generating",
+      );
+      routeHordeFetch({
+        workers: [{ models: ["m-a"], max_length: 1024 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: perJobResponder({
+          "gen-1": () => ({ done: true, is_possible: false }),
+          "gen-2": (poll) => {
+            // The user presses Stop while this job is still queued, after its
+            // sibling has already reported it cannot take the job.
+            if (poll >= 1) interrupted = true;
+            return pendingResponse;
+          },
+        }),
+      });
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await expect(generateTextWithHorde()).rejects.toThrow(
+        "Generation interrupted",
+      );
+
       expect(generationRequestBodies()).toHaveLength(2);
     });
 
