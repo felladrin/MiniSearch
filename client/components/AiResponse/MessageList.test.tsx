@@ -11,6 +11,7 @@ vi.mock("@mantine/code-highlight", () => ({
 
 function renderMessageList(props: {
   messages: ChatMessage[];
+  followUpStartIndex?: number;
   onEditMessage?: (absoluteIndex: number) => void;
   onRegenerate?: () => void;
   isGenerating?: boolean;
@@ -19,6 +20,7 @@ function renderMessageList(props: {
     <MantineProvider>
       <MessageList
         messages={props.messages}
+        followUpStartIndex={props.followUpStartIndex ?? 2}
         onEditMessage={props.onEditMessage ?? vi.fn()}
         onRegenerate={props.onRegenerate ?? vi.fn()}
         isGenerating={props.isGenerating ?? false}
@@ -28,7 +30,7 @@ function renderMessageList(props: {
 }
 
 describe("MessageList", () => {
-  it("renders nothing when there are 2 or fewer messages", () => {
+  it("renders nothing when there are no follow-up messages", () => {
     const messages: ChatMessage[] = [
       { role: "user", content: "system instructions" },
       { role: "assistant", content: "Ok!" },
@@ -92,6 +94,55 @@ describe("MessageList", () => {
 
       expect(screen.getAllByText(/^(Q1|Q2|Q3|A3)$/)).toHaveLength(4);
       expect(document.querySelectorAll(".mantine-Paper-root")).toHaveLength(4);
+    });
+  });
+
+  describe("no main question and answer", () => {
+    // When the main answer came back empty, the follow-ups start at 0.
+    const messages: ChatMessage[] = [
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "A1" },
+    ];
+
+    it("renders the first follow-up pair", () => {
+      renderMessageList({ messages, followUpStartIndex: 0 });
+
+      expect(screen.getByText("Q1")).toBeInTheDocument();
+      expect(screen.getByText("A1")).toBeInTheDocument();
+    });
+
+    it("edits the first follow-up question at position 0", () => {
+      const onEditMessage = vi.fn();
+      renderMessageList({ messages, followUpStartIndex: 0, onEditMessage });
+
+      fireEvent.click(screen.getByLabelText("Edit message"));
+
+      expect(onEditMessage).toHaveBeenCalledWith(0);
+    });
+  });
+
+  describe("an empty last answer", () => {
+    const messages: ChatMessage[] = [
+      { role: "user", content: "system instructions" },
+      { role: "assistant", content: "Ok!" },
+      { role: "user", content: "Q1" },
+      { role: "assistant", content: "" },
+    ];
+
+    it("shows No response with a Re-generate button", () => {
+      const onRegenerate = vi.fn();
+      renderMessageList({ messages, onRegenerate });
+
+      expect(screen.getByText("No response")).toBeInTheDocument();
+      fireEvent.click(screen.getByLabelText("Re-generate response"));
+      expect(onRegenerate).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows no bubble for it while the answer is being generated", () => {
+      renderMessageList({ messages, isGenerating: true });
+
+      expect(screen.queryByText("No response")).toBeNull();
+      expect(document.querySelectorAll(".mantine-Paper-root")).toHaveLength(1);
     });
   });
 
