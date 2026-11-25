@@ -1,3 +1,5 @@
+import { withTimeout } from "./withTimeout";
+
 type OpenAIModel = { id: string };
 
 export function selectRandomModel(
@@ -18,15 +20,25 @@ function makeOpenAIHeaders(apiKey?: string): Record<string, string> {
   };
 }
 
+/** How long a `/models` request may take before it gives up. */
+const LIST_MODELS_TIMEOUT_MS = 10_000;
+
+/**
+ * Lists the models of an OpenAI-compatible server. Gives up after
+ * `LIST_MODELS_TIMEOUT_MS`, or earlier when `signal` aborts, so a server that
+ * never answers cannot leave the caller waiting.
+ */
 export async function listOpenAiCompatibleModels(
   baseUrl: string,
   apiKey?: string,
+  signal?: AbortSignal,
 ): Promise<OpenAIModel[]> {
   if (!baseUrl) throw new Error("Base URL is required to list models");
 
   const normalizedBase = baseUrl.replace(/\/$/, "");
   const response = await fetch(`${normalizedBase}/models`, {
     headers: makeOpenAIHeaders(apiKey),
+    signal: withTimeout(signal, LIST_MODELS_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -36,6 +48,11 @@ export async function listOpenAiCompatibleModels(
   }
 
   const data = await response.json();
-  const models: OpenAIModel[] = Array.isArray(data?.data) ? data.data : [];
-  return models;
+  const items: unknown[] = Array.isArray(data?.data) ? data.data : [];
+  // A non-conforming server may list entries without a usable id; skip them.
+  return items.filter(
+    (m): m is OpenAIModel =>
+      typeof (m as OpenAIModel | null)?.id === "string" &&
+      (m as OpenAIModel).id !== "",
+  );
 }

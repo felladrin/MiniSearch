@@ -454,8 +454,10 @@ async function getTopHordeModels(): Promise<string[]> {
 
 export async function fetchHordeUserInfo(
   apiKey: string,
+  signal?: AbortSignal,
 ): Promise<HordeUserInfo | null> {
   const response = await fetch(buildHordeUrl("/find_user"), {
+    signal,
     headers: {
       [HTTP_HEADERS.API_KEY]: apiKey,
       [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
