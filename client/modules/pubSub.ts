@@ -248,7 +248,8 @@ export const [, , getChatGenerationState] = chatGenerationStatePubSub;
 
 export const followUpQuestionPubSub = createPubSub("");
 
-export const [updateFollowUpQuestion] = followUpQuestionPubSub;
+export const [updateFollowUpQuestion, , getFollowUpQuestion] =
+  followUpQuestionPubSub;
 
 const conversationSummaryPubSub = createPubSub({
   conversationId: "",

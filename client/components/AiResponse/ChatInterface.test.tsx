@@ -36,6 +36,10 @@ vi.mock("@/modules/notifications", () => ({
 
 vi.mock("@/modules/logEntries", () => ({ addLogEntry: vi.fn() }));
 
+vi.mock("@mantine/notifications", () => ({
+  notifications: { show: vi.fn() },
+}));
+
 vi.mock("./ChatHeader", () => ({ default: () => null }));
 
 let sendMessage: (textToSend?: string) => Promise<void>;
@@ -69,6 +73,7 @@ const { generateFollowUpQuestion } = await import(
 );
 const { persistChatMessages } = await import("@/modules/chatHelpers");
 const { addLogEntry } = await import("@/modules/logEntries");
+const { notifications } = await import("@mantine/notifications");
 
 /** A promise plus the handle to settle it, so a test can hold a call open. */
 function deferred<T>() {
@@ -735,6 +740,113 @@ describe("ChatInterface generation state", () => {
 
     expect(getFollowUpQuestion()).toBe("");
     expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(false);
+  });
+});
+
+describe("ChatInterface failed regeneration", () => {
+  const nextQuestion = "And how do I use it?";
+
+  async function sendThenFailRegenerate() {
+    vi.mocked(generateChatResponse)
+      .mockResolvedValueOnce("An answer.")
+      .mockRejectedValueOnce(new Error("model crashed"));
+
+    await act(async () => {
+      await sendMessage(nextQuestion);
+    });
+    await act(async () => {
+      await regenerateResponse();
+    });
+  }
+
+  it("keeps the previous answer so it can be regenerated again", async () => {
+    renderChatInterface();
+    await sendThenFailRegenerate();
+
+    expect(messageListMessages.at(-1)).toEqual({
+      role: "assistant",
+      content: "An answer.",
+    });
+    expect(messageListMessages).toHaveLength(4);
+    expect(getChatGenerationState().isGeneratingResponse).toBe(false);
+
+    vi.mocked(generateChatResponse).mockResolvedValueOnce("A second try.");
+    await act(async () => {
+      await regenerateResponse();
+    });
+
+    expect(generateChatResponse).toHaveBeenCalledTimes(3);
+    expect(messageListMessages.at(-1)?.content).toBe("A second try.");
+  });
+
+  it("shows one red notification and still logs the error", async () => {
+    renderChatInterface();
+    await sendThenFailRegenerate();
+
+    expect(notifications.show).toHaveBeenCalledTimes(1);
+    expect(notifications.show).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: "red",
+        message:
+          "Couldn't re-generate the response. The previous answer has been kept.",
+      }),
+    );
+    expect(addLogEntry).toHaveBeenCalledWith(
+      expect.stringContaining("Error re-generating response"),
+    );
+  });
+
+  it("brings back the follow-up question that was showing", async () => {
+    renderChatInterface();
+    await sendThenFailRegenerate();
+
+    expect(getFollowUpQuestion()).toBe("A question?");
+  });
+
+  it("writes nothing and shows no notification after unmounting", async () => {
+    const response = deferred<string>();
+    vi.mocked(generateChatResponse)
+      .mockResolvedValueOnce("An answer.")
+      .mockReturnValueOnce(response.promise);
+
+    const { unmount } = renderChatInterface();
+    await act(async () => {
+      await sendMessage(nextQuestion);
+    });
+
+    let regenerate: Promise<void> = Promise.resolve();
+    await act(async () => {
+      regenerate = regenerateResponse();
+    });
+    await act(async () => {
+      unmount();
+    });
+    updateFollowUpQuestion("A question from the next chat?");
+
+    await act(async () => {
+      response.reject(new Error("model crashed"));
+      await regenerate;
+    });
+
+    expect(notifications.show).not.toHaveBeenCalled();
+    expect(getFollowUpQuestion()).toBe("A question from the next chat?");
+  });
+
+  it("shows no notification when the regeneration succeeds", async () => {
+    vi.mocked(generateChatResponse)
+      .mockResolvedValueOnce("An answer.")
+      .mockResolvedValueOnce("A regenerated answer.");
+
+    renderChatInterface();
+    await act(async () => {
+      await sendMessage(nextQuestion);
+    });
+    await act(async () => {
+      await regenerateResponse();
+    });
+
+    expect(messageListMessages.at(-1)?.content).toBe("A regenerated answer.");
+    expect(notifications.show).not.toHaveBeenCalled();
   });
 });
 
