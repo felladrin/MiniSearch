@@ -1,5 +1,5 @@
 import { addLogEntry } from "./logEntries";
-import { generateChatResponse } from "./textGeneration";
+import { generateReplyToMessages } from "./textGeneration";
 import type { ChatMessage } from "./types";
 
 interface FollowUpQuestionParams {
@@ -58,7 +58,10 @@ Respond with just the question, no additional text or explanations.`,
       },
     ];
 
-    const response = await generateChatResponse(promptMessages, () => {});
+    // The prompt carries the topic and the answer itself, so it goes out
+    // alone: no system prompt or search results in front of it, and no
+    // reading or writing of the chat's conversation summary.
+    const response = await generateReplyToMessages(promptMessages);
 
     const lines = response
       .trim()

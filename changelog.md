@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-25
+
+- Follow-up question suggestions are now written from the question prompt alone. The prompt went out the way a chat answer does, behind the system prompt with the search results, which buried the instructions for the question under unrelated text; it now goes out on its own, like the related search query. A reply with no question in it also no longer leaves a blank entry in the list of earlier suggestions the next prompt asks the model not to repeat, which pushed a real one out of that list.
+
 ## 2026-11-24
 
 - Pinned searches now stay in the History drawer however many searches you make after them. The drawer only loaded your 200 most recent searches, and listed 100 of them, so an older pinned search disappeared from it, and from the filter, while it was still stored and protected from cleanup. Every pinned search is now shown in the Pinned section, and the filter finds it. Pinned searches are found through a new index, so this does not slow down as the history grows, and searches pinned before this update are picked up the first time the app opens after it.
