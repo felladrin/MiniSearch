@@ -9,6 +9,9 @@ import { recordModelsRefetched } from "./inferencesSinceLastRestart.ts";
  * configured models, it walks them in order of preference and then once
  * more, so a single configured model also gets one retry. Without them, it
  * picks at random from the API's `/models`, never the same model twice.
+ * Create one per request, call `first()` once, then `next()` after each
+ * failed attempt: it keeps its own position and pool, so the calls must
+ * come in that order.
  */
 export function createModelPicker({
   models,
@@ -22,8 +25,10 @@ export function createModelPicker({
   const ladder = [...models, ...models];
   let position = 0;
   let availableModels: { id: string }[] = [];
-  // Every model handed out counts as attempted: the hook runs each one it
-  // gets, so marking here keeps the exclusion from depending on the caller.
+  // Marked on hand-out, not when the attempt runs: this set is only read in
+  // next(), after the previous attempt has finished, and every exit between
+  // a hand-out and the next read ends the request, so it holds the same
+  // models it would if marked at attempt time.
   const attemptedModels = new Set<string>();
   let hasRefetched = false;
 

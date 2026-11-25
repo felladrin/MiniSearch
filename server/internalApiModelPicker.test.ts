@@ -36,6 +36,17 @@ describe("createModelPicker", () => {
     expect(listOpenAiCompatibleModels).not.toHaveBeenCalled();
   });
 
+  // The throw is the contract the hook's 500 "Failed to fetch available
+  // models" depends on; the refetch path below catches its own failure.
+  it("throws when the initial listing fails", async () => {
+    vi.mocked(listOpenAiCompatibleModels).mockRejectedValueOnce(
+      new Error("models endpoint down"),
+    );
+    const picker = createModelPicker({ ...connection, models: [] });
+
+    await expect(picker.first()).rejects.toThrow("models endpoint down");
+  });
+
   it("never hands out the same random model twice", async () => {
     // Always the first model left, so a missing exclusion repeats it every
     // time instead of only by chance.
