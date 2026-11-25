@@ -129,4 +129,39 @@ describe("MarkdownRenderer rendered output", () => {
     expect(container.querySelectorAll("li")).toHaveLength(1);
     expect(container.querySelector(".mantine-Blockquote-root")).not.toBeNull();
   });
+  it("resolves a link reference defined in a later paragraph", () => {
+    const { container } = renderMarkdown(
+      "Plates slip, per [USGS][1].\n\n[1]: https://www.usgs.gov/",
+    );
+
+    const link = container.querySelector('a[href="https://www.usgs.gov/"]');
+    expect(link).not.toBeNull();
+    expect(container.textContent).not.toContain("[USGS][1]");
+  });
+
+  it("renders a footnote reference and its text once, at the end", () => {
+    const { container } = renderMarkdown(
+      "Earthquakes happen when plates slip[^1].\n\nA second paragraph.\n\n[^1]: USGS overview.",
+    );
+
+    expect(container.textContent).not.toContain("[^1]");
+    expect(container.querySelectorAll("section[data-footnotes]")).toHaveLength(
+      1,
+    );
+    const note = container.querySelector("li#user-content-fn-1");
+    expect(note?.textContent).toContain("USGS overview.");
+  });
+
+  it("keeps footnote links in the page instead of opening a new tab", () => {
+    const { container } = renderMarkdown(
+      "Plates slip[^1].\n\n[^1]: USGS overview.",
+    );
+
+    const reference = container.querySelector("a[data-footnote-ref]");
+    expect(reference?.getAttribute("href")).toBe("#user-content-fn-1");
+    expect(reference?.getAttribute("target")).toBeNull();
+    const backReference = container.querySelector("a[data-footnote-backref]");
+    expect(backReference?.getAttribute("href")).toBe("#user-content-fnref-1");
+    expect(backReference?.getAttribute("target")).toBeNull();
+  });
 });

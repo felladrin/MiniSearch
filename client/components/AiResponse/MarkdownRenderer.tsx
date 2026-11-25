@@ -57,12 +57,19 @@ const MarkdownBlock = memo(function MarkdownBlock({
       rehypePlugins={REHYPE_PLUGINS}
       components={{
         a(props) {
-          const { href, children } = props;
+          const { href, children, node: _node, ...anchorProps } = props;
+          if (href?.startsWith("#")) {
+            return (
+              <a href={href} {...anchorProps}>
+                {children}
+              </a>
+            );
+          }
           return <ExpandableLink href={href || ""}>{children}</ExpandableLink>;
         },
         li(props) {
-          const { children } = props;
-          return <li>{unwrapParagraphs(children)}</li>;
+          const { children, id } = props;
+          return <li id={id}>{unwrapParagraphs(children)}</li>;
         },
         hr() {
           return <Divider variant="dashed" my="md" />;

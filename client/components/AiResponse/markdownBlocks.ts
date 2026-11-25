@@ -10,6 +10,12 @@ const LIST_MARKER_RE = /^ {0,3}(?:[-*+]|\d{1,9}[.)])(?:[ \t]|$)/;
 const INDENTED_RE = /^[ \t]/;
 
 /**
+ * A link reference definition (`[1]: https://…`) or footnote definition
+ * (`[^1]: …`) at up to 3 spaces of indent.
+ */
+const DEFINITION_RE = /^ {0,3}\[(?:\^[^\]\s]+|[^\]]+)\]:/;
+
+/**
  * Splits a markdown string into top-level blocks at blank lines the markdown
  * parser treats as block boundaries, so each block can be rendered and
  * memoized independently.
@@ -33,6 +39,11 @@ const INDENTED_RE = /^[ \t]/;
  *   blank line starts a *new* blockquote in CommonMark, so blockquotes
  *   separated by a blank line do split.
  *
+ * - **Definitions keep the whole answer together.** A link reference or
+ *   footnote definition outside a code fence resolves the references that
+ *   use it anywhere in the document, so an answer that has one is a single
+ *   block, and the parser renders each footnote section once.
+ *
  * Merging is always render-safe — the same string reaches the same parser
  * either way — while a wrong split changes the DOM. So when in doubt the
  * rules keep lines together; the cost is a coarser memo, never a
@@ -46,6 +57,7 @@ export function splitMarkdownBlocks(content: string): string[] {
   const blocks: string[] = [];
   let current: string[] = [];
   let blockHasList = false;
+  let hasDefinitions = false;
   let openFence: { char: string; length: number } | null = null;
 
   const flush = () => {
@@ -103,8 +115,18 @@ export function splitMarkdownBlocks(content: string): string[] {
       continue;
     }
 
+    if (DEFINITION_RE.test(line)) hasDefinitions = true;
     if (LIST_MARKER_RE.test(line)) blockHasList = true;
     current.push(line);
+  }
+
+  if (hasDefinitions) {
+    return [
+      lines
+        .join("\n")
+        .replace(/^(?:[ \t\r]*\n)+/, "")
+        .replace(/(?:\n[ \t\r]*)+$/, ""),
+    ];
   }
 
   flush();

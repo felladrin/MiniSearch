@@ -121,4 +121,32 @@ describe("splitMarkdownBlocks", () => {
     // non-list block open.
     expect(splitMarkdownBlocks("text\n\n---")).toEqual(["text", "---"]);
   });
+  it("keeps an answer in one block when a link reference definition follows its use", () => {
+    const md = "Plates slip, per [USGS][1].\n\n[1]: https://www.usgs.gov/";
+    expect(splitMarkdownBlocks(md)).toEqual([md]);
+  });
+
+  it("keeps an answer in one block when a footnote definition follows its use", () => {
+    const md = "Plates slip[^1].\n\nSecond paragraph.\n\n[^1]: USGS overview.";
+    expect(splitMarkdownBlocks(md)).toEqual([md]);
+  });
+
+  it("drops leading and trailing blank lines from an answer kept in one block", () => {
+    expect(
+      splitMarkdownBlocks("\n\nSee [a][1].\n\n[1]: https://a.example\n\n"),
+    ).toEqual(["See [a][1].\n\n[1]: https://a.example"]);
+  });
+
+  it("still splits when a definition-like line sits inside a code fence", () => {
+    expect(
+      splitMarkdownBlocks("```\n[1]: https://a.example\n```\n\ntext"),
+    ).toEqual(["```\n[1]: https://a.example\n```", "text"]);
+  });
+
+  it("does not take a bracketed word without a colon for a definition", () => {
+    expect(splitMarkdownBlocks("a [note] here\n\nsecond")).toEqual([
+      "a [note] here",
+      "second",
+    ]);
+  });
 });
