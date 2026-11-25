@@ -44,14 +44,15 @@ Channels using this pattern: `settingsPubSub`, `querySuggestionsPubSub`, `lastSe
 
 ### Throttling High-Frequency Updates
 
-Streaming LLM output produces token-by-token state changes that would overwhelm React's rendering pipeline. Two channels apply `throttle` from `throttleit` to cap subscriber notification rate to ~12 updates/sec (83.3ms interval):
+Streaming LLM output produces token-by-token state changes that would overwhelm React's rendering pipeline. Two channels cap subscriber notification rate to ~12 updates/sec (83ms interval):
 
-| Export                   | Raw Updater                 | Throttle Interval |
-| ------------------------ | --------------------------- | ----------------- |
-| `updateResponse`         | `responsePubSub[0]`         | 1000 / 12 ms      |
-| `updateReasoningContent` | `reasoningContentPubSub[0]` | 1000 / 12 ms      |
+| Export                                   | Raw Updater         | Throttle                            |
+| ---------------------------------------- | ------------------- | ----------------------------------- |
+| `updateResponse`                         | `responsePubSub[0]` | 1000 / 12 ms, plus a trailing write |
+| `updateResponseImmediately`              | `responsePubSub[0]` | none — drops the trailing write     |
+| `updateStreamedResponse` (ChatInterface) | local React state   | `throttleit`, 1000 / 12 ms          |
 
-Callers write streaming token output directly to these exports without awareness of internal throttling.
+Callers write streaming token output directly to these exports without awareness of internal throttling; the generation flow publishes the final answer through `updateResponseImmediately`, so the last chunk is never lost.
 
 ### Side Effects
 

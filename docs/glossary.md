@@ -30,7 +30,7 @@ Instead of a heavy state management library like Redux, MiniSearch uses a minima
 - **Data Flow**: Components subscribe to "channels" (e.g., `queryPubSub`, `responsePubSub`)
 - **Tuple Pattern**: Each channel is a 3-element tuple: `[update, subscribe, get]`
 - **Persistence**: Some channels use `createLocalStoragePubSub` to automatically sync state with `localStorage`
-- **Throttling**: UI-heavy updates like AI response streaming are throttled to ~12 updates/sec using `throttleit`
+- **Throttling**: UI-heavy updates like AI response streaming are throttled to ~12 updates/sec; the response channel keeps one trailing write and exposes an unthrottled final publish
 
 ### Reranker
 

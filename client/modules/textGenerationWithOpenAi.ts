@@ -36,6 +36,24 @@ interface StreamResult {
   reasoningContent?: string;
 }
 
+/**
+ * The text the response channel carries for a streamed answer: the reasoning
+ * block wrapped in its markers, followed by the answer once it arrives.
+ */
+function composeResponseText(
+  text: string,
+  reasoningContent: string | undefined,
+  settings: { reasoningStartMarker: string; reasoningEndMarker: string },
+) {
+  if (!reasoningContent) return text;
+
+  const reasoning = `${settings.reasoningStartMarker}${reasoningContent}`;
+
+  if (!text) return reasoning;
+
+  return `${reasoning}${settings.reasoningEndMarker}\n\n${text}`;
+}
+
 async function createOpenAiStream({
   messages,
   onUpdate,
@@ -161,7 +179,7 @@ async function createOpenAiStream({
   return tryNextModel();
 }
 
-export async function generateTextWithOpenAi() {
+export async function generateTextWithOpenAi(): Promise<string> {
   await canStartResponding();
   updateTextGenerationState("preparingToGenerate");
 
@@ -170,7 +188,7 @@ export async function generateTextWithOpenAi() {
   );
   const settings = getSettings();
 
-  await createOpenAiStream({
+  const result = await createOpenAiStream({
     messages,
     onUpdate: (text, reasoningContent) => {
       if (
@@ -180,19 +198,11 @@ export async function generateTextWithOpenAi() {
         updateTextGenerationState("generating");
       }
 
-      if (reasoningContent && reasoningContent.length > 0) {
-        if (text && text.length > 0) {
-          updateResponse(
-            `${settings.reasoningStartMarker}${reasoningContent}${settings.reasoningEndMarker}\n\n${text}`,
-          );
-        } else {
-          updateResponse(`${settings.reasoningStartMarker}${reasoningContent}`);
-        }
-      } else {
-        updateResponse(text);
-      }
+      updateResponse(composeResponseText(text, reasoningContent, settings));
     },
   });
+
+  return composeResponseText(result.text, result.reasoningContent, settings);
 }
 
 export async function generateChatWithOpenAi(
@@ -203,23 +213,9 @@ export async function generateChatWithOpenAi(
   const result = await createOpenAiStream({
     messages,
     onUpdate: (text, reasoningContent) => {
-      if (reasoningContent && reasoningContent.length > 0) {
-        if (text && text.length > 0) {
-          onUpdate(
-            `${settings.reasoningStartMarker}${reasoningContent}${settings.reasoningEndMarker}\n\n${text}`,
-          );
-        } else {
-          onUpdate(`${settings.reasoningStartMarker}${reasoningContent}`);
-        }
-      } else {
-        onUpdate(text);
-      }
+      onUpdate(composeResponseText(text, reasoningContent, settings));
     },
   });
 
-  if (result.reasoningContent && result.reasoningContent.length > 0) {
-    return `${settings.reasoningStartMarker}${result.reasoningContent}${settings.reasoningEndMarker}\n\n${result.text}`;
-  }
-
-  return result.text;
+  return composeResponseText(result.text, result.reasoningContent, settings);
 }

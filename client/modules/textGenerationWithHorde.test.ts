@@ -78,7 +78,7 @@ describe("textGenerationWithHorde", () => {
           }),
         );
 
-      await generateTextWithHorde();
+      await expect(generateTextWithHorde()).resolves.toBe("Hello world");
 
       expect(canStartResponding).toHaveBeenCalled();
       expect(vi.mocked(updateTextGenerationState).mock.calls).toEqual([

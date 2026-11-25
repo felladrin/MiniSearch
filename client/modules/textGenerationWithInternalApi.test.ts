@@ -99,7 +99,7 @@ describe("textGenerationWithInternalApi", () => {
         ),
       );
 
-      await generateTextWithInternalApi();
+      await expect(generateTextWithInternalApi()).resolves.toBe("Hello");
 
       expect(canStartResponding).toHaveBeenCalled();
       expect(updateTextGenerationState).toHaveBeenCalledWith(

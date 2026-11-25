@@ -97,7 +97,7 @@ describe("textGenerationWithOpenAi", () => {
         sseResponse([{ choices: [{ delta: { content: "Hello" } }] }]),
       );
 
-      await generateTextWithOpenAi();
+      await expect(generateTextWithOpenAi()).resolves.toBe("Hello");
 
       expect(canStartResponding).toHaveBeenCalled();
       expect(updateTextGenerationState).toHaveBeenCalledWith(
@@ -119,7 +119,9 @@ describe("textGenerationWithOpenAi", () => {
         ]),
       );
 
-      await generateTextWithOpenAi();
+      await expect(generateTextWithOpenAi()).resolves.toBe(
+        "<think>Thinking...</think>\n\nHello",
+      );
 
       expect(updateResponse).toHaveBeenLastCalledWith(
         "<think>Thinking...</think>\n\nHello",

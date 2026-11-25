@@ -12,7 +12,6 @@ import { fetchPageContents } from "./pageContent";
 import {
   getConversationSummary,
   getQuery,
-  getResponse,
   getSettings,
   getTextGenerationState,
   listenToSettingsChanges,
@@ -23,6 +22,7 @@ import {
   updateLlmTextSearchResults,
   updatePageContents,
   updateResponse,
+  updateResponseImmediately,
   updateSearchPromise,
   updateSuppressNextFollowUp,
   updateTextGenerationState,
@@ -51,7 +51,7 @@ import type {
 const SUMMARY_TOKEN_LIMIT = 800;
 
 type InferenceStrategy = {
-  generateText: () => Promise<void>;
+  generateText: () => Promise<string>;
   generateChat: (
     messages: ChatMessage[],
     onUpdate: (partialResponse: string) => void,
@@ -280,12 +280,12 @@ export async function searchAndRespond() {
       updateTextGenerationState("loadingModel");
     }
     const strategy = await getCurrentInferenceStrategy();
-    await strategy.generateText();
+    const finalResponse = await strategy.generateText();
 
     try {
       await saveLlmResponseForQuery(
         getQuery(),
-        getResponse(),
+        finalResponse,
         getCurrentModelName(),
       );
     } catch (e) {
@@ -293,6 +293,12 @@ export async function searchAndRespond() {
         `Failed to persist LLM response: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+
+    // The streaming writes are throttled, so the last chunk may still be
+    // queued here. Publishing the returned text unthrottled before the state
+    // flips to "completed" is what makes the mounted chat read the whole
+    // answer.
+    updateResponseImmediately(finalResponse);
 
     updateTextGenerationState("completed");
 

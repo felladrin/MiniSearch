@@ -493,7 +493,7 @@ export async function generateTextWithHorde() {
   // job is submitted shows the response card and its Stop button for the
   // whole queue wait, which is what makes an interrupt possible at all.
   updateTextGenerationState("generating");
-  await executeHordeGeneration(messages, (text) => {
+  return await executeHordeGeneration(messages, (text) => {
     updateResponse(text);
   });
 }

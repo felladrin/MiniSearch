@@ -22,6 +22,7 @@ vi.mock("./pubSub", () => ({
   getResponse: vi.fn(),
   getQuery: vi.fn(),
   updateResponse: vi.fn(),
+  updateResponseImmediately: vi.fn(),
   updateSearchPromise: vi.fn(),
   updateTextSearchResults: vi.fn(),
   updateTextSearchState: vi.fn(),

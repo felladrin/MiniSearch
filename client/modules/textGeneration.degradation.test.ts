@@ -56,6 +56,10 @@ vi.mock("./pubSub", () => ({
     harness.state.response = value;
     harness.onResponseUpdate.current(value);
   },
+  updateResponseImmediately: (value: string) => {
+    harness.state.response = value;
+    harness.onResponseUpdate.current(value);
+  },
   updateSearchPromise: (promise: Promise<unknown>) => {
     harness.state.searchPromise = promise;
   },
