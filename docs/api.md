@@ -335,7 +335,8 @@ parameter. The body is at most 1 MiB:
 
 The response is an OpenAI-compatible SSE stream of
 `chat.completion.chunk` objects, ending with a chunk whose `finish_reason` is
-`"stop"` and then `data: [DONE]`:
+the upstream's reason for stopping (`"stop"`, or `"length"` when the answer hit
+`max_tokens`) and then `data: [DONE]`:
 
 ```
 data: {"id":"chatcmpl-1730000000000","object":"chat.completion.chunk","created":1730000000,"model":"some-model","choices":[{"index":0,"delta":{"content":"Hel"},"finish_reason":null}]}

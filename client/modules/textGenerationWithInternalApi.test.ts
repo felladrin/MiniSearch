@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { addLogEntry } from "./logEntries";
 import {
   getQuery,
   getTextGenerationState,
@@ -19,6 +20,8 @@ vi.mock("./pubSub", () => ({
   updateResponse: vi.fn(),
   updateTextGenerationState: vi.fn(),
 }));
+
+vi.mock("./logEntries", () => ({ addLogEntry: vi.fn() }));
 
 vi.mock("./searchTokenHash", () => ({
   getSearchTokenHash: vi.fn().mockResolvedValue("mock-token"),
@@ -160,6 +163,46 @@ describe("textGenerationWithInternalApi", () => {
         { role: "assistant", content: "Ok!" },
         { role: "user", content: "test query" },
       ]);
+    });
+
+    it("logs an answer the model cut short at its token limit", async () => {
+      const { generateTextWithInternalApi } = await import(
+        "./textGenerationWithInternalApi"
+      );
+
+      mockFetch.mockResolvedValueOnce(
+        streamResponse(
+          sseChunks([
+            '{"choices":[{"delta":{"content":"Cut"},"finish_reason":null}]}',
+            '{"choices":[{"delta":{},"finish_reason":"length"}]}',
+          ]),
+        ),
+      );
+
+      await expect(generateTextWithInternalApi()).resolves.toBe("Cut");
+      expect(addLogEntry).toHaveBeenCalledWith(
+        "The answer was cut short: the model reached its output token limit",
+      );
+    });
+
+    it("logs nothing about the limit when the answer finished on its own", async () => {
+      const { generateTextWithInternalApi } = await import(
+        "./textGenerationWithInternalApi"
+      );
+
+      mockFetch.mockResolvedValueOnce(
+        streamResponse(
+          sseChunks([
+            '{"choices":[{"delta":{"content":"Done"},"finish_reason":null}]}',
+            '{"choices":[{"delta":{},"finish_reason":"stop"}]}',
+          ]),
+        ),
+      );
+
+      await expect(generateTextWithInternalApi()).resolves.toBe("Done");
+      expect(addLogEntry).not.toHaveBeenCalledWith(
+        expect.stringContaining("cut short"),
+      );
     });
 
     it("throws an HTTP error on a non-OK response", async () => {

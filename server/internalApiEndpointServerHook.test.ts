@@ -109,11 +109,20 @@ function getRegisteredHandler() {
 }
 
 function streamOf(
-  pieces: Array<{ type: string; text?: string; error?: unknown }>,
+  pieces: Array<{
+    type: string;
+    text?: string;
+    error?: unknown;
+    finishReason?: string;
+  }>,
 ) {
   return {
     stream: (async function* () {
-      for (const piece of pieces) yield piece as never;
+      // The SDK always gives a finish part its reason.
+      for (const piece of pieces)
+        yield (
+          piece.type === "finish" ? { finishReason: "stop", ...piece } : piece
+        ) as never;
     })(),
   };
 }
@@ -469,6 +478,46 @@ describe("internalApiEndpointServerHook", () => {
         writeCalls.some((s: string) => s.includes('"finish_reason":"stop"')),
       ).toBe(true);
       expect(writeCalls.some((s: string) => s.includes("[DONE]"))).toBe(true);
+    });
+
+    it("passes on why the upstream stopped, so a cut answer is not reported as complete", async () => {
+      vi.mocked(streamText).mockImplementation(
+        () =>
+          streamOf([
+            { type: "text-delta", text: "Cut" },
+            { type: "finish", finishReason: "length" },
+          ]) as never,
+      );
+      const response = createResponse();
+
+      await getRegisteredHandler()(
+        createRequest({ messages: [{ role: "user", content: "hi" }] }),
+        response,
+        vi.fn(),
+      );
+
+      const writes = response.write.mock.calls.map((c) => c[0]).join("");
+      expect(writes).toContain('"finish_reason":"length"');
+      expect(writes).not.toContain('"finish_reason":"stop"');
+    });
+
+    it("spells the finish reason the way OpenAI does", async () => {
+      vi.mocked(streamText).mockImplementation(
+        () =>
+          streamOf([
+            { type: "finish", finishReason: "content-filter" },
+          ]) as never,
+      );
+      const response = createResponse();
+
+      await getRegisteredHandler()(
+        createRequest({ messages: [{ role: "user", content: "hi" }] }),
+        response,
+        vi.fn(),
+      );
+
+      const writes = response.write.mock.calls.map((c) => c[0]).join("");
+      expect(writes).toContain('"finish_reason":"content_filter"');
     });
 
     it("clamps max_tokens to defaultMaxTokens", async () => {
