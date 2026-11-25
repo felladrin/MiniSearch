@@ -218,9 +218,41 @@ function failWithUnresponsiveEngines(
   );
 }
 
+/**
+ * Waits out a retry backoff, or rejects with the signal's reason as soon as it
+ * fires, so a search that has run out of time does not sleep past its deadline.
+ */
+function waitForRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, delayMs);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/**
+ * A response that is not used still holds its connection until its body is
+ * read or cancelled, so a failed answer has its body discarded before the
+ * caller decides to retry or throw.
+ */
+async function discardBody(response: Response): Promise<void> {
+  await response.body?.cancel().catch(() => {});
+}
+
 async function performSearch(
   query: string,
   searchType: SearchType,
+  signal?: AbortSignal,
 ): Promise<SearxngSearchResult[]> {
   const searchUrl = buildSearchUrl(query, searchType);
 
@@ -232,15 +264,19 @@ async function performSearch(
       printMessage(
         `SearXNG ${retryReason}, retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})`,
       );
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await waitForRetry(delay, signal);
     }
 
     const response = await fetch(searchUrl, {
       headers: { Accept: "application/json" },
+      signal,
     });
 
     if (!response.ok) {
-      if (response.status === 500 && attempt < MAX_RETRIES) {
+      await discardBody(response);
+      // Every 500 is retried; the last one leaves the loop for the throw after
+      // it, whose message says the retries happened.
+      if (response.status === 500) {
         retryReason = "returned 500";
         continue;
       }
@@ -298,9 +334,12 @@ async function processSearchResults(
   searchType: SearchType,
   limit: number,
   breaker: CircuitBreaker,
+  signal?: AbortSignal,
 ) {
+  // An abort is thrown inside `execute`, so a stalled SearXNG counts as a
+  // failure as soon as the deadline passes.
   const results = await breaker.execute("searxng", () =>
-    performSearch(query, searchType),
+    performSearch(query, searchType, signal),
   );
   const consideredResults = openableUniqueResults(results).slice(0, limit);
 
@@ -346,14 +385,26 @@ function reportDiscardedResults<T>(
   return filteredResults;
 }
 
+/**
+ * `signal` bounds the whole search, retries and backoff included: every fetch
+ * gets it, and a backoff ends when it fires. Without one, a stalled SearXNG
+ * holds the request for undici's 300 s default.
+ */
 export async function fetchSearXNG(
   query: string,
   searchType: SearchType,
   limit = 30,
   breaker: CircuitBreaker = searxngCircuitBreaker,
+  signal?: AbortSignal,
 ) {
   try {
-    return await processSearchResults(query, searchType, limit, breaker);
+    return await processSearchResults(
+      query,
+      searchType,
+      limit,
+      breaker,
+      signal,
+    );
   } catch (error) {
     // Upstream failure (bad status, network error, malformed body, open
     // circuit) propagates so the endpoint can answer non-200; an empty array
@@ -382,6 +433,7 @@ export async function fetchSupplementarySearXNG(
   });
 
   if (!response.ok) {
+    await discardBody(response);
     throw new Error(`SearXNG request failed with status ${response.status}`);
   }
 
