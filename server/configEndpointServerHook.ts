@@ -2,6 +2,7 @@ import type { PreviewServer, ViteDevServer } from "vite";
 import {
   DEFAULT_INFERENCE_TYPE,
   DEFAULT_INTERNAL_API_NAME,
+  DEFAULT_PARENT_WINDOW_ORIGINS,
   DEFAULT_WLLAMA_GPU_MODEL_ID,
   DEFAULT_WLLAMA_MODEL_ID,
   type ServerConfig,
@@ -43,6 +44,12 @@ export function configEndpointServerHook<
       // gets the token of the server answering it, and a reload is enough to
       // pick up a new one.
       searchToken: getSearchToken(),
+      // Only an unset variable gets the default: an empty one is how a
+      // deployment stops posting the query to any embedding page.
+      parentWindowOrigins:
+        process.env.PARENT_WINDOW_ORIGINS === undefined
+          ? DEFAULT_PARENT_WINDOW_ORIGINS
+          : parseCommaSeparatedList(process.env.PARENT_WINDOW_ORIGINS),
     };
 
     res.setHeader("Content-Type", "application/json");

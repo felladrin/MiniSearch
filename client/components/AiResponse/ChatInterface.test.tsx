@@ -737,3 +737,27 @@ describe("ChatInterface generation state", () => {
     expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(false);
   });
 });
+
+describe("ChatInterface previous follow-up questions", () => {
+  it("does not record an empty follow-up question", async () => {
+    vi.mocked(generateFollowUpQuestion)
+      .mockResolvedValueOnce("Is it supported in Safari?")
+      .mockResolvedValueOnce("")
+      .mockResolvedValueOnce("Does it drain the battery?");
+
+    renderChatInterface({ suppressInitialFollowUp: false });
+    await act(async () => {});
+
+    await act(async () => {
+      await sendMessage("And how do I use it?");
+    });
+    await act(async () => {
+      await sendMessage("Does it work in the background?");
+    });
+
+    expect(generateFollowUpQuestion).toHaveBeenCalledTimes(3);
+    expect(
+      vi.mocked(generateFollowUpQuestion).mock.calls[2][0].previousQuestions,
+    ).toEqual(["Is it supported in Safari?"]);
+  });
+});
