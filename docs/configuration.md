@@ -31,21 +31,18 @@ Both only seed a profile that has never saved settings; a user's own choice alwa
 
 ### Server Model Request Configuration
 
-The server-side model request defaults can be adjusted at runtime with these
-optional environment variables. Integer values are parsed as decimal numbers,
-and temperature and top-p values are parsed as floating-point numbers. An empty
-value uses the corresponding default.
+These apply to the Internal API's requests (`/inference`). Each takes a whole
+number written in digits. An empty value uses the default; any other value
+(`8k`, `1e4`, `0`, or a timeout above 2147483647, the longest a Node timer can
+wait) is logged once and replaced by the default.
 
-| Variable                        | Default | Description                                   |
-| ------------------------------- | ------- | --------------------------------------------- |
-| `MODEL_MAX_RETRIES`             | `5`     | Maximum number of retries for a model request |
-| `MODEL_BASE_BACKOFF_MS`         | `100`   | Initial retry backoff in milliseconds         |
-| `MODEL_MAX_BACKOFF_MS`          | `5000`  | Maximum retry backoff in milliseconds         |
-| `MODEL_REQUEST_TIMEOUT_MS`      | `30000` | Model request timeout in milliseconds         |
-| `MODEL_MAX_CONCURRENT_REQUESTS` | `10`    | Maximum number of simultaneous model requests |
-| `MODEL_DEFAULT_MAX_TOKENS`      | `8192`  | Default maximum number of generated tokens    |
-| `MODEL_TEMPERATURE`             | `0.7`   | Model sampling temperature                    |
-| `MODEL_TOP_P`                   | `0.9`   | Model nucleus-sampling probability            |
+| Variable                   | Default | Description                                                      |
+| -------------------------- | ------- | ---------------------------------------------------------------- |
+| `MODEL_REQUEST_TIMEOUT_MS` | `30000` | How long the API may stay silent before the attempt is abandoned |
+| `MODEL_DEFAULT_MAX_TOKENS` | `8192`  | Upper bound on the `max_tokens` a request may ask for            |
+
+All Internal API variables, these two included, are read in one place:
+`server/internalApiConfig.ts`.
 
 ### Internal API Configuration
 
@@ -71,7 +68,7 @@ INTERNAL_OPENAI_COMPATIBLE_API_NAME="Company LLM"
 
 `INTERNAL_OPENAI_COMPATIBLE_API_MODEL` takes several models, separated by commas, in order of preference (`"llama-3.1-8b,qwen-3-8b"`). When a model fails before sending the first token, the server moves to the next one, and after the last one it starts the list over once, up to 5 attempts in all. So a single model gets one retry. Left empty, each request picks a random model from the API's `/models` list, which includes every model the API serves.
 
-`INTERNAL_OPENAI_COMPATIBLE_API_CONTEXT_LENGTH` is the window the browser sizes the request from: the page excerpts get 35% of it, and the answer's `max_tokens` is what is left after the prompt. The server then caps `max_tokens` at `MODEL_DEFAULT_MAX_TOKENS` (8192), which on most OpenAI-compatible APIs also has to hold the thinking of a reasoning model. Set it lower when the models have a smaller window, or the API rejects the longer prompts. A value that is not a positive integer is logged and replaced by the default.
+`INTERNAL_OPENAI_COMPATIBLE_API_CONTEXT_LENGTH` is the window the browser sizes the request from: the page excerpts get 35% of it, and the answer's `max_tokens` is what is left after the prompt. The server then caps `max_tokens` at `MODEL_DEFAULT_MAX_TOKENS` (8192), which on most OpenAI-compatible APIs also has to hold the thinking of a reasoning model. Set it lower when the models have a smaller window, or the API rejects the longer prompts. A value that is not a whole number written in digits is logged once and replaced by the default.
 
 `INTERNAL_OPENAI_COMPATIBLE_API_REASONING_EFFORT` sets the `reasoning_effort` field of every request to the API, for every model in the list. The value is passed through as written, because providers accept different values (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); one the API rejects fails the request, and the error shows in the server log. Left empty, the field is not sent and the API applies its own default.
 
