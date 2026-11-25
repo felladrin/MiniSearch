@@ -29,8 +29,8 @@ type ProgressCallback = ({
   total: number;
 }) => void;
 
-export async function generateTextWithWllama(): Promise<void> {
-  if (!getSettings().enableAiResponse) return;
+export async function generateTextWithWllama(): Promise<string> {
+  if (!getSettings().enableAiResponse) return "";
 
   try {
     const response = await generateWithWllama({
@@ -46,6 +46,7 @@ export async function generateTextWithWllama(): Promise<void> {
       shouldCheckCanRespond: true,
     });
     updateResponse(response);
+    return response;
   } catch (error) {
     addLogEntry(
       `Text generation failed: ${

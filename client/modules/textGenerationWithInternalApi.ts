@@ -39,6 +39,8 @@ export async function generateTextWithInternalApi() {
   });
 
   updateResponse(streamedMessage);
+
+  return streamedMessage;
 }
 
 export async function generateChatWithInternalApi(

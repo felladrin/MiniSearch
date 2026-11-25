@@ -107,7 +107,7 @@ The system executes two parallel flows when a user submits a query:
 2. State machine transitions: `idle` -> `awaitingModelDownloadAllowance` -> `loadingModel` -> `awaitingSearchResults` -> `preparingToGenerate` -> `generating` -> `completed`/`failed`/`interrupted` (see Text Generation States below; `awaitingModelDownloadAllowance` and `loadingModel` only occur on the browser/Wllama path, while every backend transitions through `awaitingSearchResults` and then `preparingToGenerate`)
 3. Search results are formatted and injected into system prompt via `{{searchResults}}` placeholder. With `enablePageContentFetch` on, the pages behind the top results are read through `/page-content` first and their excerpts are appended to each result (see `docs/page-content.md`)
 4. LLM generates response with streaming tokens
-5. Response updates throttled to ~12 updates/sec via `throttleit` to prevent React render overload
+5. Response updates throttled to ~12 updates/sec to prevent React render overload; the final answer is published unthrottled before the state turns to `completed` (see Response Throttling)
 6. Response saved to history database via `saveLlmResponseForQuery`
 
 The `textGeneration` module orchestrates the entire search-to-response flow, managing search requests, LLM context preparation, and response streaming. Search results are optionally reranked in-process via ONNX Runtime before being passed to the LLM for response generation.
@@ -173,14 +173,14 @@ MiniSearch uses a PubSub-based architecture where state flows through independen
 
 ### Response Throttling
 
-Streaming LLM output produces token-by-token state changes that would overwhelm React's rendering pipeline. Two channels apply throttling via `throttleit`:
+Streaming LLM output produces token-by-token state changes that would overwhelm React's rendering pipeline. Two channels cap updates at ~12/sec (83ms):
 
-| Channel                  | Throttle Interval | Purpose                              |
-| ------------------------ | ----------------- | ------------------------------------ |
-| `responsePubSub`         | ~83ms (12/sec)    | AI response text streaming           |
-| `reasoningContentPubSub` | ~83ms (12/sec)    | Reasoning/thinking content streaming |
+| Channel                             | Throttle Interval | Purpose                                      |
+| ----------------------------------- | ----------------- | -------------------------------------------- |
+| `responsePubSub` (`updateResponse`) | ~83ms (12/sec)    | AI response text streaming                   |
+| `ChatInterface` streamed response   | ~83ms (12/sec)    | Chat panel re-render while an answer streams |
 
-Callers write tokens directly to `updateResponse` or `updateReasoningContent` without awareness of internal throttling.
+`updateResponse` keeps at most one trailing write for the newest value; `updateResponseImmediately` drops that write and publishes the final answer at once. Callers write tokens directly to these exports without awareness of internal throttling.
 
 ### Side Effects
 

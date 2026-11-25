@@ -118,7 +118,7 @@ describe("generateTextWithWllama", () => {
       { loaded: 175 * megabyte, total: 250 * megabyte },
     ]);
 
-    await generateTextWithWllama();
+    await expect(generateTextWithWllama()).resolves.toBe("Hello");
 
     expect(updateModelLoadingProgress).toHaveBeenCalledTimes(2);
     expect(updateModelLoadingProgress).toHaveBeenLastCalledWith(70);

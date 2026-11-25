@@ -1,5 +1,4 @@
 import { createPubSub } from "create-pubsub";
-import throttle from "throttleit";
 import { addLogEntry } from "./logEntries";
 import * as safeStorage from "./safeStorage";
 import {
@@ -133,7 +132,76 @@ export const [, , getQuery] = queryPubSub;
 
 export const responsePubSub = createPubSub("");
 
-export const updateResponse = throttle(responsePubSub[0], 1000 / 12);
+const responseThrottleInterval = 1000 / 12;
+
+/**
+ * Throttles a publisher to one leading write plus at most one trailing write
+ * per interval, keeping the newest value. `publishNow` drops the trailing
+ * write, so a caller that already holds the final value can publish it without
+ * a queued stale write landing afterwards.
+ */
+function createThrottledPublisher<T>(
+  publish: (value: T) => void,
+  interval: number,
+) {
+  let lastPublishTime = 0;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let pendingValue: T | undefined;
+  let hasPendingValue = false;
+
+  const cancelPending = () => {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    timeoutId = undefined;
+    pendingValue = undefined;
+    hasPendingValue = false;
+  };
+
+  const throttled = (value: T) => {
+    const now = Date.now();
+    const timeSinceLastPublish = now - lastPublishTime;
+
+    cancelPending();
+
+    if (timeSinceLastPublish >= interval) {
+      lastPublishTime = now;
+      publish(value);
+      return;
+    }
+
+    pendingValue = value;
+    hasPendingValue = true;
+    timeoutId = setTimeout(() => {
+      timeoutId = undefined;
+      if (!hasPendingValue) return;
+      const pending = pendingValue as T;
+      pendingValue = undefined;
+      hasPendingValue = false;
+      lastPublishTime = Date.now();
+      publish(pending);
+    }, interval - timeSinceLastPublish);
+  };
+
+  throttled.publishNow = (value: T) => {
+    cancelPending();
+    lastPublishTime = Date.now();
+    publish(value);
+  };
+
+  return throttled;
+}
+
+export const updateResponse = createThrottledPublisher(
+  responsePubSub[0],
+  responseThrottleInterval,
+);
+
+/**
+ * Publishes the final response without waiting for the throttle window and
+ * drops a trailing write still queued, so the UI and the chat mount read the
+ * complete answer instead of the last value that happened to be published.
+ */
+export const updateResponseImmediately = updateResponse.publishNow;
+
 export const [, , getResponse] = responsePubSub;
 
 export const [updateSearchPromise, , getSearchPromise] = createPubSub<

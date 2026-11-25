@@ -20,7 +20,7 @@ import {
   updateIsRestoringFromHistory,
   updateLlmTextSearchResults,
   updatePageContents,
-  updateResponse,
+  updateResponseImmediately,
   updateSuppressNextFollowUp,
   updateTextGenerationState,
   updateTextSearchResults,
@@ -110,11 +110,13 @@ export function useHistoryRestore(
       const savedResponse = await getLatestLlmResponseForEntry(entry);
       if (savedResponse && savedResponse.trim().length > 0) {
         updateSuppressNextFollowUp(true);
-        updateResponse(savedResponse);
+        // The restore publishes the whole stored answer at once; a throttled
+        // write could be overwritten by whatever was queued before it.
+        updateResponseImmediately(savedResponse);
         updateTextGenerationState("completed");
       } else {
         updateSuppressNextFollowUp(false);
-        updateResponse("");
+        updateResponseImmediately("");
         updateTextGenerationState("idle");
       }
 
