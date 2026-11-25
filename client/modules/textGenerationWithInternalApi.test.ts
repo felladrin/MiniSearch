@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getQuery,
   getTextGenerationState,
+  listenToTextGenerationStateChanges,
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
@@ -9,11 +10,12 @@ import {
   ChatGenerationError,
   canStartResponding,
 } from "./textGenerationUtilities";
-import type { ChatMessage } from "./types";
+import type { ChatMessage, TextGenerationState } from "./types";
 
 vi.mock("./pubSub", () => ({
   getQuery: vi.fn().mockReturnValue("test query"),
   getTextGenerationState: vi.fn().mockReturnValue("idle"),
+  listenToTextGenerationStateChanges: vi.fn(() => vi.fn()),
   updateResponse: vi.fn(),
   updateTextGenerationState: vi.fn(),
 }));
@@ -63,6 +65,47 @@ function streamResponse(chunks: Array<string | Uint8Array>, status = 200) {
     },
   });
   return new Response(body, { status });
+}
+
+/**
+ * A response whose stream sends `chunks` and then stays open, as a stalled
+ * upstream does, with a spy on the stream's cancel.
+ */
+function openStreamResponse(chunks: string[]) {
+  const cancel = vi.fn();
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+    },
+    cancel,
+  });
+  return { response: new Response(body), cancel };
+}
+
+/** A closed stream, with a spy on its cancel. */
+function closedStreamResponse(chunks: string[]) {
+  const cancel = vi.fn();
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      controller.close();
+    },
+    cancel,
+  });
+  return { response: new Response(body), cancel };
+}
+
+/** The state listener the module registered last. */
+function lastStateListener() {
+  const call = vi.mocked(listenToTextGenerationStateChanges).mock.calls.at(-1);
+  if (!call) throw new Error("no state listener was registered");
+  return call[0] as (state: TextGenerationState) => void;
+}
+
+function fetchSignal(): AbortSignal {
+  return mockFetch.mock.calls[0][1].signal;
 }
 
 async function generateChatFromChunks(chunks: Array<string | Uint8Array>) {
@@ -255,6 +298,87 @@ describe("textGenerationWithInternalApi", () => {
       await expect(response).rejects.toBeInstanceOf(ChatGenerationError);
       await expect(response).rejects.toThrow(errorMessage);
       expect(onUpdate).toHaveBeenCalledWith("Partial");
+    });
+  });
+
+  describe("cancelling the stream", () => {
+    it("cancels the request when generation is interrupted mid-stream", async () => {
+      const { generateTextWithInternalApi } = await import(
+        "./textGenerationWithInternalApi"
+      );
+      const stream = openStreamResponse([
+        'data: {"choices":[{"delta":{"content":"partial"}}]}\n',
+      ]);
+      mockFetch.mockResolvedValueOnce(stream.response);
+      vi.mocked(getTextGenerationState).mockReturnValue("interrupted");
+
+      await expect(generateTextWithInternalApi()).rejects.toThrow(
+        "Generation interrupted",
+      );
+
+      expect(fetchSignal().aborted).toBe(true);
+      expect(stream.cancel).toHaveBeenCalled();
+    });
+
+    it("cancels the request when the stream sends an error frame", async () => {
+      const { generateChatWithInternalApi } = await import(
+        "./textGenerationWithInternalApi"
+      );
+      const stream = openStreamResponse(['data: {"error":"boom"}\n']);
+      mockFetch.mockResolvedValueOnce(stream.response);
+
+      const error = await generateChatWithInternalApi(
+        [{ role: "user", content: "Hi" }],
+        vi.fn(),
+      ).catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ChatGenerationError);
+      expect((error as Error).message).toBe("boom");
+      expect(fetchSignal().aborted).toBe(true);
+      expect(stream.cancel).toHaveBeenCalled();
+    });
+
+    it("stops a silent stream as soon as generation is interrupted", async () => {
+      const { generateChatWithInternalApi } = await import(
+        "./textGenerationWithInternalApi"
+      );
+      const stream = openStreamResponse([]);
+      mockFetch.mockResolvedValueOnce(stream.response);
+
+      const chat = generateChatWithInternalApi(
+        [{ role: "user", content: "Hi" }],
+        vi.fn(),
+      );
+      const outcome = expect(chat).rejects.toThrow(
+        "Chat generation interrupted",
+      );
+      await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled());
+      // No chunk ever arrives, so only the state change can end the wait.
+      lastStateListener()("interrupted");
+      await outcome;
+
+      expect(fetchSignal().aborted).toBe(true);
+      expect(stream.cancel).toHaveBeenCalled();
+    });
+
+    it("leaves a finished request alone and stops listening", async () => {
+      const { generateChatWithInternalApi } = await import(
+        "./textGenerationWithInternalApi"
+      );
+      const stream = closedStreamResponse(
+        sseChunks(['{"choices":[{"delta":{"content":"Hello"}}]}']),
+      );
+      mockFetch.mockResolvedValueOnce(stream.response);
+
+      await expect(
+        generateChatWithInternalApi([{ role: "user", content: "Hi" }], vi.fn()),
+      ).resolves.toBe("Hello");
+
+      expect(fetchSignal().aborted).toBe(false);
+      expect(stream.cancel).not.toHaveBeenCalled();
+      const stopListening = vi.mocked(listenToTextGenerationStateChanges).mock
+        .results[0].value;
+      expect(stopListening).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -214,7 +214,7 @@ export const textGenerationStatePubSub =
 export const [updateTextGenerationState, , getTextGenerationState] =
   textGenerationStatePubSub;
 
-const [, listenToTextGenerationStateChanges] = textGenerationStatePubSub;
+export const [, listenToTextGenerationStateChanges] = textGenerationStatePubSub;
 
 listenToTextGenerationStateChanges((textGenerationState) => {
   addLogEntry(`Text generation state changed to '${textGenerationState}'`);

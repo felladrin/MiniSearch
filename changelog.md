@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-26
 
+- Stop now ends an answer from the instance's own AI right away. The request was never cancelled: pressing Stop only took effect when the next piece of text arrived, so a stalled answer kept going until the server gave up, and even after Stop the connection stayed open, so the server kept generating and counted the answer as streamed instead of abandoned. The same happened when the answer ended with an error. The request is now cancelled on Stop, even while nothing is arriving, and whenever the answer does not finish.
 - A failed regeneration no longer loses the answer. Regenerate removed the answer from the chat before asking for a new one, and when the model errored it was gone, with the regenerate button, and the follow-up suggestion was cleared too, so the question had to be typed again; the only trace was a line in the logs. The previous answer and the follow-up suggestion now come back, a red notification says the regeneration failed, and the answer can be regenerated again.
 
 ## 2026-11-25

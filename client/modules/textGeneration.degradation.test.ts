@@ -42,6 +42,7 @@ vi.mock("./pubSub", () => ({
   getSettings: () => harness.state.settings,
   getTextGenerationState: () => harness.state.textGenerationState,
   listenToSettingsChanges: vi.fn(() => vi.fn()),
+  listenToTextGenerationStateChanges: vi.fn(() => vi.fn()),
   updateChatMessages: vi.fn(),
   updateConversationSummary: vi.fn(),
   updateImageSearchResults: vi.fn(),
