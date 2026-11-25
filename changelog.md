@@ -4,6 +4,8 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-26
 
+- Stop now ends an answer from the instance's own AI right away. The request was never cancelled: pressing Stop only took effect when the next piece of text arrived, so a stalled answer kept going until the server gave up, and even after Stop the connection stayed open, so the server kept generating and counted the answer as streamed instead of abandoned. The same happened when the answer ended with an error. The request is now cancelled on Stop, even while nothing is arriving, and whenever the answer does not finish.
+- A SearXNG that stops answering no longer holds a search until the client gives up. The request to SearXNG had no time limit, so a stalled instance kept a search waiting for up to 300 seconds, past the client's 30 second timeout, and the fallback providers were then skipped because the search's time had run out. The request, its retries and the waits between them are now canceled after 15 seconds when a fallback could still answer, leaving it the remaining 10, and after 25 seconds otherwise; each canceled request counts toward opening the SearXNG circuit. A failed SearXNG answer now also releases its connection right away, and a search whose every retry got a 500 says so in the log.
 - A failed regeneration no longer loses the answer. Regenerate removed the answer from the chat before asking for a new one, and when the model errored it was gone, with the regenerate button, and the follow-up suggestion was cleared too, so the question had to be typed again; the only trace was a line in the logs. The previous answer and the follow-up suggestion now come back, a red notification says the regeneration failed, and the answer can be regenerated again.
 
 ## 2026-11-25
