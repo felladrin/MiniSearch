@@ -62,7 +62,7 @@ describe("getInternalApiConfig", () => {
   });
 
   // `parseInt` read "8k" as 8, so a typo cut every answer to 8 tokens.
-  it.each(["8k", "abc", "0", "-1", "1.5"])(
+  it.each(["8k", "abc", "0", "-1", "1.5", "0x2000", "1e4"])(
     "replaces %j with the default and logs it",
     (value) => {
       stubEnvironment({ MODEL_DEFAULT_MAX_TOKENS: value });
@@ -72,10 +72,24 @@ describe("getInternalApiConfig", () => {
 
       expect(getInternalApiConfig().maxOutputTokens).toBe(8192);
       expect(consoleError).toHaveBeenCalledWith(
-        `MODEL_DEFAULT_MAX_TOKENS is not a positive integer ("${value}"); using 8192.`,
+        `MODEL_DEFAULT_MAX_TOKENS must be a whole number from 1 to ${Number.MAX_SAFE_INTEGER} ("${value}"); using 8192.`,
       );
     },
   );
+
+  // Node fires a longer timer after 1 ms, which would abort every attempt.
+  it("rejects a timeout longer than a timer can wait", () => {
+    stubEnvironment({ MODEL_REQUEST_TIMEOUT_MS: "2147483648" });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(getInternalApiConfig().requestTimeoutMs).toBe(30000);
+  });
+
+  it("accepts the longest timeout a timer can wait", () => {
+    stubEnvironment({ MODEL_REQUEST_TIMEOUT_MS: "2147483647" });
+
+    expect(getInternalApiConfig().requestTimeoutMs).toBe(2147483647);
+  });
 
   it("logs a bad value once, not on every read", () => {
     stubEnvironment({ MODEL_REQUEST_TIMEOUT_MS: "30s" });

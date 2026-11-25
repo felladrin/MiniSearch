@@ -128,6 +128,20 @@ describe("internalApiEndpointServerHook", () => {
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: true,
     });
+    // The hook reads the real config, so a value exported in the shell that
+    // runs the tests would otherwise leak into them.
+    for (const variable of [
+      "INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL",
+      "INTERNAL_OPENAI_COMPATIBLE_API_KEY",
+      "INTERNAL_OPENAI_COMPATIBLE_API_MODEL",
+      "INTERNAL_OPENAI_COMPATIBLE_API_NAME",
+      "INTERNAL_OPENAI_COMPATIBLE_API_CONTEXT_LENGTH",
+      "INTERNAL_OPENAI_COMPATIBLE_API_REASONING_EFFORT",
+      "MODEL_DEFAULT_MAX_TOKENS",
+      "MODEL_REQUEST_TIMEOUT_MS",
+    ]) {
+      vi.stubEnv(variable, undefined);
+    }
   });
 
   afterEach(() => {
@@ -393,8 +407,10 @@ describe("internalApiEndpointServerHook", () => {
       expect(writes).toContain("Recovered");
     });
 
+    // The trailing comma must not add an empty model to the ladder, which
+    // would end the request after two attempts instead of four.
     it("walks the configured list a second time before giving up", async () => {
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "model-a,model-b");
+      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "model-a,model-b,");
       vi.mocked(streamText).mockImplementation(() => streamOf([]) as never);
 
       const response = await callWithFakeTimers();
@@ -505,27 +521,36 @@ describe("internalApiEndpointServerHook", () => {
       expect(writes).toContain('"finish_reason":"content_filter"');
     });
 
-    it("clamps max_tokens to defaultMaxTokens", async () => {
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "Ok" },
-            { type: "finish" },
-          ]) as never,
-      );
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({
-          messages: [{ role: "user", content: "hi" }],
-          max_tokens: 9999,
-        }),
-        response,
-        vi.fn(),
-      );
-      const callArgs = vi.mocked(streamText).mock.calls[0][0];
-      expect(callArgs.maxOutputTokens).toBe(8192);
-    });
+    it.each([
+      [undefined, 8192],
+      ["100", 100],
+      ["8k", 8192],
+    ])(
+      "clamps max_tokens to MODEL_DEFAULT_MAX_TOKENS=%s, which gives %i",
+      async (maxTokens, expected) => {
+        vi.stubEnv("MODEL_DEFAULT_MAX_TOKENS", maxTokens);
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        vi.mocked(streamText).mockImplementation(
+          () =>
+            streamOf([
+              { type: "text-delta", text: "Ok" },
+              { type: "finish" },
+            ]) as never,
+        );
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+        await handler(
+          createRequest({
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 9999,
+          }),
+          response,
+          vi.fn(),
+        );
+        const callArgs = vi.mocked(streamText).mock.calls[0][0];
+        expect(callArgs.maxOutputTokens).toBe(expected);
+      },
+    );
 
     it("passes max_tokens unchanged when under cap", async () => {
       vi.mocked(streamText).mockImplementation(
@@ -658,61 +683,68 @@ describe("internalApiEndpointServerHook", () => {
       ).toBe(true);
     });
 
-    it("aborts the upstream stream when no part arrives within the idle timeout", async () => {
-      vi.mocked(streamText).mockImplementation(
-        ({ abortSignal }: { abortSignal?: AbortSignal } = {}) => {
-          // Yields one part, then yields an abort part when the signal fires —
-          // mirrors the AI SDK v7 pull handler behavior.
-          return {
-            stream: (async function* () {
-              yield { type: "text-delta", text: "Half" } as never;
-              await new Promise<void>((resolve) => {
-                const check = () => {
-                  if (abortSignal?.aborted) {
-                    resolve();
-                  } else {
-                    abortSignal?.addEventListener("abort", () => resolve(), {
-                      once: true,
-                    });
-                  }
-                };
-                check();
-              });
-              yield { type: "abort" } as never;
-            })(),
-          } as never;
-        },
-      );
-
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      vi.useFakeTimers();
-      try {
-        const pending = handler(
-          createRequest({ messages: [{ role: "user", content: "hi" }] }),
-          response,
-          vi.fn(),
+    it.each([
+      [undefined, 30_000],
+      ["5000", 5000],
+    ])(
+      "aborts the upstream stream when no part arrives within MODEL_REQUEST_TIMEOUT_MS=%s (%i ms)",
+      async (timeout, timeoutMs) => {
+        vi.stubEnv("MODEL_REQUEST_TIMEOUT_MS", timeout);
+        vi.mocked(streamText).mockImplementation(
+          ({ abortSignal }: { abortSignal?: AbortSignal } = {}) => {
+            // Yields one part, then yields an abort part when the signal fires —
+            // mirrors the AI SDK v7 pull handler behavior.
+            return {
+              stream: (async function* () {
+                yield { type: "text-delta", text: "Half" } as never;
+                await new Promise<void>((resolve) => {
+                  const check = () => {
+                    if (abortSignal?.aborted) {
+                      resolve();
+                    } else {
+                      abortSignal?.addEventListener("abort", () => resolve(), {
+                        once: true,
+                      });
+                    }
+                  };
+                  check();
+                });
+                yield { type: "abort" } as never;
+              })(),
+            } as never;
+          },
         );
-        // Not yet past the timeout — signal should be clear.
-        await vi.advanceTimersByTimeAsync(29_999);
-        expect(
-          vi.mocked(streamText).mock.calls[0][0].abortSignal?.aborted,
-        ).toBe(false);
-        // Past the timeout — signal should be set and the abort part emitted.
-        await vi.advanceTimersByTimeAsync(2);
-        await pending;
 
-        // The abort is treated as an attempt failure: the stalled stream is
-        // cut and the SSE error frame carries the message.
-        const writes = response.write.mock.calls.map((c) => c[0] as string);
-        expect(
-          writes.some((s: string) => s.includes("Service unavailable")),
-        ).toBe(true);
-        expect(writes.some((s: string) => s.includes("stalled"))).toBe(true);
-      } finally {
-        vi.useRealTimers();
-      }
-    });
+        const handler = getRegisteredHandler();
+        const response = createResponse();
+        vi.useFakeTimers();
+        try {
+          const pending = handler(
+            createRequest({ messages: [{ role: "user", content: "hi" }] }),
+            response,
+            vi.fn(),
+          );
+          // Not yet past the timeout — signal should be clear.
+          await vi.advanceTimersByTimeAsync(timeoutMs - 1);
+          expect(
+            vi.mocked(streamText).mock.calls[0][0].abortSignal?.aborted,
+          ).toBe(false);
+          // Past the timeout — signal should be set and the abort part emitted.
+          await vi.advanceTimersByTimeAsync(2);
+          await pending;
+
+          // The abort is treated as an attempt failure: the stalled stream is
+          // cut and the SSE error frame carries the message.
+          const writes = response.write.mock.calls.map((c) => c[0] as string);
+          expect(
+            writes.some((s: string) => s.includes("Service unavailable")),
+          ).toBe(true);
+          expect(writes.some((s: string) => s.includes("stalled"))).toBe(true);
+        } finally {
+          vi.useRealTimers();
+        }
+      },
+    );
 
     it("retries the next model when the first model stalls before any content", async () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);

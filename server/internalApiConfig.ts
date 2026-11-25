@@ -25,29 +25,39 @@ export interface InternalApiConfig {
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 const DEFAULT_REQUEST_TIMEOUT_MS = 30000;
+/** Node runs a `setTimeout` with a longer delay after 1 ms instead. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 // The config is read on every request, and `/status` is polled by the
 // container's health check, so a bad value would otherwise flood the log.
+// It lives as long as the module: a test that reuses a bad value from an
+// earlier test in the same file sees no second log.
 const reportedInvalidValues = new Set<string>();
 
-function readPositiveInteger(variable: string, fallback: number): number {
+function readPositiveInteger(
+  variable: string,
+  fallback: number,
+  max = Number.MAX_SAFE_INTEGER,
+): number {
   const value = process.env[variable]?.trim();
   if (!value) return fallback;
-  const parsed = Number(value);
-  if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  // Digits only: `Number` alone also accepts `0x2000` and `1e4`.
+  const parsed = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  if (parsed > 0 && parsed <= max) return parsed;
   const report = `${variable}=${value}`;
   if (!reportedInvalidValues.has(report)) {
     reportedInvalidValues.add(report);
     console.error(
-      `${variable} is not a positive integer ("${value}"); using ${fallback}.`,
+      `${variable} must be a whole number from 1 to ${max} ("${value}"); using ${fallback}.`,
     );
   }
   return fallback;
 }
 
 /**
- * Read on every call rather than once at startup, so the values always match
- * the environment of the process answering.
+ * Read on every call rather than cached at startup. In production the
+ * environment never changes, but the tests stub it per case with
+ * `vi.stubEnv`, and a cache would hand them the first test's values.
  */
 export function getInternalApiConfig(): InternalApiConfig {
   const env = process.env;
@@ -69,6 +79,7 @@ export function getInternalApiConfig(): InternalApiConfig {
     requestTimeoutMs: readPositiveInteger(
       "MODEL_REQUEST_TIMEOUT_MS",
       DEFAULT_REQUEST_TIMEOUT_MS,
+      MAX_TIMER_DELAY_MS,
     ),
   };
 }
