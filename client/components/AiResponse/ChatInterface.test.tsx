@@ -89,7 +89,9 @@ const { generateChatResponse } = await import("@/modules/textGeneration");
 const { generateFollowUpQuestion } = await import(
   "@/modules/followUpQuestions"
 );
-const { persistChatConversation } = await import("@/modules/chatHelpers");
+const { persistChatConversation, runFollowUpSearch } = await import(
+  "@/modules/chatHelpers"
+);
 const { getCurrentSearchRunId } = await import("@/modules/history");
 const { addLogEntry } = await import("@/modules/logEntries");
 const { notifications } = await import("@mantine/notifications");
@@ -1181,6 +1183,31 @@ describe("ChatInterface chat storage", () => {
       ...interruptedTurn,
       { role: "user", content: "Next?" },
       { role: "assistant", content: "Next answer." },
+    ]);
+  });
+
+  it("commits the interrupted turn at unmount even while the follow-up search runs", async () => {
+    vi.mocked(runFollowUpSearch).mockReturnValueOnce(new Promise(() => {}));
+    vi.mocked(generateChatResponse).mockImplementationOnce(
+      async (_messages, _onUpdate, chatSignal) => {
+        if (chatSignal?.aborted) throw new Error("Chat generation interrupted");
+        return "An answer.";
+      },
+    );
+    const view = renderChatInterface();
+    let send: Promise<void> = Promise.resolve();
+    await act(async () => {
+      send = sendMessage("How do I use it?");
+    });
+
+    await act(async () => {
+      view.unmount();
+      await send;
+    });
+
+    expect(getChatMessages()).toEqual([
+      { role: "user", content: "How do I use it?" },
+      { role: "assistant", content: "The answer was interrupted." },
     ]);
   });
 
