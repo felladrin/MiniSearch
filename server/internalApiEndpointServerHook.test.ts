@@ -755,6 +755,7 @@ describe("internalApiEndpointServerHook", () => {
 
     it("retries the next model when the first model stalls before any content", async () => {
       useTwoRandomModels();
+      const before = getInferenceStats().attemptFailures;
 
       vi.mocked(streamText).mockImplementationOnce(
         ({ abortSignal }: { abortSignal?: AbortSignal } = {}) =>
@@ -766,6 +767,10 @@ describe("internalApiEndpointServerHook", () => {
 
       // Past the idle timeout, model-a stalls and aborts.
       const response = await sendRequestThroughTimers();
+
+      const after = getInferenceStats().attemptFailures;
+      expect(after.stalled).toBe(before.stalled + 1);
+      expect(after.other).toBe(before.other);
 
       expect(streamText).toHaveBeenCalledTimes(2);
       const writes = writtenFrames(response);
