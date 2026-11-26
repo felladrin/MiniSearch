@@ -7,7 +7,6 @@ import { streamText } from "ai";
 import { addLogEntry } from "@/modules/logEntries";
 import {
   getSettings,
-  getTextGenerationState,
   updateResponse,
   updateTextGenerationState,
 } from "@/modules/pubSub";
@@ -20,8 +19,6 @@ import {
 } from "@/modules/textGenerationUtilities";
 import type { ChatMessage } from "@/modules/types";
 
-let currentAbortController: AbortController | null = null;
-
 function describeError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
@@ -29,6 +26,7 @@ function describeError(error: unknown) {
 interface StreamOptions {
   messages: ChatMessage[];
   onUpdate: (text: string, reasoningContent?: string) => void;
+  signal?: AbortSignal;
 }
 
 interface StreamResult {
@@ -57,6 +55,7 @@ function composeResponseText(
 async function createOpenAiStream({
   messages,
   onUpdate,
+  signal,
 }: StreamOptions): Promise<StreamResult> {
   const settings = getSettings();
   const openaiProvider = createOpenAICompatible({
@@ -102,16 +101,16 @@ async function createOpenAiStream({
 
     currentAttempt++;
 
-    currentAbortController = new AbortController();
-
     try {
+      if (signal?.aborted) throw new Error("Chat generation interrupted");
+
       const result = streamText({
         model: openaiProvider.chatModel(effectiveModel),
         messages,
         maxOutputTokens: params.max_tokens,
         temperature: params.temperature,
         topP: params.top_p,
-        abortSignal: currentAbortController.signal,
+        abortSignal: signal,
         maxRetries: 0,
       });
 
@@ -120,11 +119,6 @@ async function createOpenAiStream({
       let streamError: unknown;
 
       for await (const part of result.stream) {
-        if (getTextGenerationState() === "interrupted") {
-          currentAbortController.abort();
-          throw new Error("Chat generation interrupted");
-        }
-
         if (part.type === "reasoning-delta") {
           reasoning += part.text;
           onUpdate(text, reasoning);
@@ -135,6 +129,8 @@ async function createOpenAiStream({
           streamError = part.error;
         }
       }
+
+      if (signal?.aborted) throw new Error("Chat generation interrupted");
 
       // A failing stream reports the problem as a part instead of rejecting,
       // and the SDK swallows whatever `onError` throws, so the retry decision
@@ -164,22 +160,22 @@ async function createOpenAiStream({
       return { text, reasoningContent: reasoning };
     } catch (error) {
       if (
-        getTextGenerationState() === "interrupted" ||
+        signal?.aborted ||
         (error instanceof DOMException && error.name === "AbortError")
       ) {
         throw new Error("Chat generation interrupted");
       }
 
       throw error;
-    } finally {
-      currentAbortController = null;
     }
   };
 
   return tryNextModel();
 }
 
-export async function generateTextWithOpenAi(): Promise<string> {
+export async function generateTextWithOpenAi(
+  signal?: AbortSignal,
+): Promise<string> {
   await canStartResponding();
   updateTextGenerationState("preparingToGenerate");
 
@@ -188,13 +184,17 @@ export async function generateTextWithOpenAi(): Promise<string> {
   );
   const settings = getSettings();
 
+  let generating = false;
+
   const result = await createOpenAiStream({
     messages,
+    signal,
     onUpdate: (text, reasoningContent) => {
       if (
-        getTextGenerationState() !== "generating" &&
+        !generating &&
         (text.length > 0 || (reasoningContent?.length ?? 0) > 0)
       ) {
+        generating = true;
         updateTextGenerationState("generating");
       }
 
@@ -208,10 +208,12 @@ export async function generateTextWithOpenAi(): Promise<string> {
 export async function generateChatWithOpenAi(
   messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
+  signal?: AbortSignal,
 ) {
   const settings = getSettings();
   const result = await createOpenAiStream({
     messages,
+    signal,
     onUpdate: (text, reasoningContent) => {
       onUpdate(composeResponseText(text, reasoningContent, settings));
     },

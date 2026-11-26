@@ -31,9 +31,7 @@ const statesKeepingTheScreenAwake: TextGenerationState[] = [
 export default function AiResponseSection() {
   const [query] = usePubSub(queryPubSub);
   const [response] = usePubSub(responsePubSub);
-  const [textGenerationState, setTextGenerationState] = usePubSub(
-    textGenerationStatePubSub,
-  );
+  const [textGenerationState] = usePubSub(textGenerationStatePubSub);
   const [modelLoadingProgress] = usePubSub(modelLoadingProgressPubSub);
   const [settings] = usePubSub(settingsPubSub);
   const [modelSizeInMegabytes] = usePubSub(modelSizeInMegabytesPubSub);
@@ -59,7 +57,6 @@ export default function AiResponseSection() {
           <AiResponseContent
             textGenerationState={textGenerationState}
             response={response}
-            setTextGenerationState={setTextGenerationState}
           />
 
           {textGenerationState === "completed" && (
@@ -106,7 +103,6 @@ export default function AiResponseSection() {
     chatMessages,
     modelLoadingProgress,
     modelSizeInMegabytes,
-    setTextGenerationState,
     isRestoringFromHistory,
   ]);
 }

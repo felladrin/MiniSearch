@@ -465,6 +465,36 @@ describe("ChatInterface generation state", () => {
     expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(false);
   });
 
+  it("aborts the chat answer when the chat unmounts", async () => {
+    let signal: AbortSignal | undefined;
+    vi.mocked(generateChatResponse).mockImplementationOnce(
+      (_messages, _onUpdate, chatSignal) => {
+        signal = chatSignal;
+        return new Promise((_resolve, reject) => {
+          chatSignal?.addEventListener("abort", () =>
+            reject(new Error("Chat generation interrupted")),
+          );
+        });
+      },
+    );
+
+    const { unmount } = renderChatInterface();
+
+    let send: Promise<void> = Promise.resolve();
+    await act(async () => {
+      send = sendMessage("And how do I use it?");
+    });
+
+    expect(signal?.aborted).toBe(false);
+
+    await act(async () => {
+      unmount();
+      await send;
+    });
+
+    expect(signal?.aborted).toBe(true);
+  });
+
   it("starts no follow-up question for a send that settles after unmount", async () => {
     const chatResponse = deferred<string>();
     vi.mocked(generateChatResponse).mockReturnValueOnce(chatResponse.promise);

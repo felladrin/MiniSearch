@@ -309,6 +309,14 @@ settings.inferenceType
 
 For browser inference, the system first loads the model from HuggingFace with a warmup pass, then streams tokens via the OAI-compatible `createChatCompletion` API. Each backend module implements the same contract: build context from search results + system prompt, call the inference API, stream tokens via PubSub updates.
 
+### Cancellation
+
+Every call to a backend takes an `AbortSignal` from its caller (`generateText(signal)`, `generateChat(messages, onUpdate, signal)`), and that signal is the only thing a backend stops on. No backend reads `textGenerationState` or keeps cancel state of its own between calls, so one generation can never stop another.
+
+- `searchAndRespond()` holds one controller for the current search and aborts it when a new search starts.
+- The Stop button calls `interruptSearch()`, which sets the state to `interrupted` and aborts that search's controller.
+- `ChatInterface` creates one controller per send and per regenerate, and aborts the ones still running when it unmounts.
+
 ## Conversation Memory
 
 ### Token Budget Management

@@ -1,10 +1,5 @@
 import { addLogEntry } from "./logEntries";
-import {
-  getTextGenerationState,
-  listenToTextGenerationStateChanges,
-  updateResponse,
-  updateTextGenerationState,
-} from "./pubSub";
+import { updateResponse, updateTextGenerationState } from "./pubSub";
 import { getSearchTokenHash } from "./searchTokenHash";
 import {
   ChatGenerationError,
@@ -20,7 +15,7 @@ interface InternalApiStreamPayload {
   choices?: Array<{ delta?: { content?: unknown }; finish_reason?: unknown }>;
 }
 
-export async function generateTextWithInternalApi() {
+export async function generateTextWithInternalApi(signal?: AbortSignal) {
   await canStartResponding();
   updateTextGenerationState("preparingToGenerate");
 
@@ -28,20 +23,20 @@ export async function generateTextWithInternalApi() {
     await getFormattedSearchResults(true),
   );
 
+  let generating = false;
+
   const streamedMessage = await processStreamResponse(
     messages,
     (message) => {
-      if (getTextGenerationState() === "interrupted") {
-        throw new ChatGenerationError("Generation interrupted");
-      }
-
-      if (getTextGenerationState() !== "generating") {
+      if (!generating) {
+        generating = true;
         updateTextGenerationState("generating");
       }
 
       updateResponse(message);
     },
     "Generation interrupted",
+    signal,
   );
 
   updateResponse(streamedMessage);
@@ -52,23 +47,21 @@ export async function generateTextWithInternalApi() {
 export async function generateChatWithInternalApi(
   messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
+  signal?: AbortSignal,
 ) {
   return processStreamResponse(
     messages,
-    (message) => {
-      onUpdate(message);
-      if (getTextGenerationState() === "interrupted") {
-        throw new ChatGenerationError("Chat generation interrupted");
-      }
-    },
+    onUpdate,
     "Chat generation interrupted",
+    signal,
   );
 }
 
 /**
  * Streams one answer from the server's `/inference` endpoint. The request is
- * cancelled whenever the answer does not finish: on Stop, which aborts it at
- * once even while the stream is silent, and on any error thrown while reading.
+ * cancelled whenever the answer does not finish: when the caller's signal
+ * aborts, at once even while the stream is silent, and on any error thrown
+ * while reading.
  * Cancelling closes the connection, which is how the server learns that the
  * reader is gone and stops streaming the run.
  */
@@ -76,14 +69,15 @@ async function processStreamResponse(
   messages: ChatMessage[],
   onChunk: (message: string) => void,
   interruptedMessage: string,
+  callerSignal?: AbortSignal,
 ): Promise<string> {
   const controller = new AbortController();
   const { signal } = controller;
-  const stopListening = listenToTextGenerationStateChanges((state) => {
-    if (state === "interrupted") {
-      controller.abort(new ChatGenerationError(interruptedMessage));
-    }
-  });
+  const interrupt = () => {
+    controller.abort(new ChatGenerationError(interruptedMessage));
+  };
+  if (callerSignal?.aborted) interrupt();
+  callerSignal?.addEventListener("abort", interrupt, { once: true });
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   // The browser also errors the body when its fetch is aborted, but only a
   // cancel ends a read that is already waiting on a silent stream everywhere.
@@ -168,7 +162,7 @@ async function processStreamResponse(
     completed = true;
     return streamedMessage;
   } finally {
-    stopListening();
+    callerSignal?.removeEventListener("abort", interrupt);
     // Any way out but a finished stream cancels the request.
     if (!completed) controller.abort();
     signal.removeEventListener("abort", cancelReader);

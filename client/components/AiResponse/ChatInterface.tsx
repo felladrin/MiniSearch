@@ -111,6 +111,8 @@ export default function ChatInterface({
    * unless it checks first.
    */
   const isMountedRef = useRef(true);
+  /** One per chat send or regenerate still running, aborted on unmount. */
+  const chatControllersRef = useRef(new Set<AbortController>());
   const updateStreamedResponse = useCallback(
     throttle((response: string) => {
       setStreamedResponse(response);
@@ -260,6 +262,8 @@ export default function ChatInterface({
       // is cleared: an orphaned flow's `finally` would otherwise resurrect them
       // there, and nothing else resets this channel on unmount.
       isMountedRef.current = false;
+      for (const controller of chatControllersRef.current) controller.abort();
+      chatControllersRef.current.clear();
       followUpInvocationRef.current += 1;
       setFollowUpQuestion("");
       setPreviousFollowUpQuestions([]);
@@ -305,10 +309,14 @@ export default function ChatInterface({
     setFollowUpQuestion("");
     setStreamedResponse("");
 
+    const controller = new AbortController();
+    chatControllersRef.current.add(controller);
+
     try {
       const finalResponse = await generateChatResponse(
         history,
         updateStreamedResponse,
+        controller.signal,
       );
 
       setMessages((prev) => [
@@ -340,6 +348,7 @@ export default function ChatInterface({
         });
       }
     } finally {
+      chatControllersRef.current.delete(controller);
       if (isMountedRef.current) {
         setGenerationState({
           ...getChatGenerationState(),
@@ -379,6 +388,9 @@ export default function ChatInterface({
       setFollowUpQuestion("");
       setStreamedResponse("");
 
+      const controller = new AbortController();
+      chatControllersRef.current.add(controller);
+
       try {
         await runFollowUpSearch(
           newMessages,
@@ -395,6 +407,7 @@ export default function ChatInterface({
         const finalResponse = await generateChatResponse(
           newMessages,
           updateStreamedResponse,
+          controller.signal,
         );
 
         setMessages((prevMessages) => [
@@ -417,6 +430,7 @@ export default function ChatInterface({
         regenerateFollowUpQuestion(currentInput, finalResponse);
       } catch (error) {
         addLogEntry(`Error in chat response: ${error}`);
+        if (controller.signal.aborted) return;
         setMessages((prevMessages) => [
           ...prevMessages,
           {
@@ -426,6 +440,7 @@ export default function ChatInterface({
           },
         ]);
       } finally {
+        chatControllersRef.current.delete(controller);
         if (isMountedRef.current) {
           setGenerationState({
             ...getChatGenerationState(),

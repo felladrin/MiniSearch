@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-27
+
+- Stop now ends the answer it was pressed for, and only that one. Stopping went through a shared flag, so with a search answer and a chat reply running at once, Stop could cancel the wrong request or none at all, and an answer from an OpenAI-compatible API that had not sent its first word yet kept going until it did. A chat reply also kept running after a new search replaced the chat, and Stop on that new search could end it instead. Each answer now has its own cancel signal: Stop cancels the search answer's request at once, even before any text arrives, a new search cancels the previous search's answer, and closing the chat cancels its reply.
+
 ## 2026-11-26
 
 - Reference-style links and footnotes in an AI answer now render. A definition such as `[1]: https://www.usgs.gov/` or `[^1]: USGS overview.` sits in its own paragraph, and each paragraph used to be rendered alone, so `[USGS][1]` and `[^1]` showed as plain text and the footnote text was lost. An answer that has a definition is now rendered as one document, with the footnotes listed once at the end. Links inside the answer, such as a footnote and its back-reference, now jump within the page instead of opening a new tab. Answers without definitions render as before.
