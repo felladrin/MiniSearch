@@ -171,15 +171,30 @@ async function createLlmSummary(
 
   try {
     const strategy = await getCurrentInferenceStrategy();
-    return (await strategy.generateChat(chat, () => {})).trim();
+    return capToSummaryLimit(
+      (await strategy.generateChat(chat, () => {})).trim(),
+    );
   } catch (e) {
     addLogEntry(
       `LLM summary failed, falling back to extractive: ${
         e instanceof Error ? e.message : String(e)
       }`,
     );
-    return summarizeDroppedMessages(dropped, previousSummary);
+    return capToSummaryLimit(
+      summarizeDroppedMessages(dropped, previousSummary),
+    );
   }
+}
+
+/**
+ * The token limit in the summarizer's instruction is only a request: the
+ * model can return more. The prompt reserves `SUMMARY_TOKEN_LIMIT` tokens for
+ * the summary, so anything past that is cut off.
+ */
+function capToSummaryLimit(summary: string): string {
+  const tokens = gptTokenizer.encode(summary);
+  if (tokens.length <= SUMMARY_TOKEN_LIMIT) return summary;
+  return gptTokenizer.decode(tokens.slice(0, SUMMARY_TOKEN_LIMIT)).trim();
 }
 
 function saveConversationSummary(summary: string, conversationId: string) {
@@ -421,26 +436,46 @@ export async function generateChatResponse(
     const initialResponseTokens = gptTokenizer.encode(
       initialResponse.content,
     ).length;
-    const reservedTokens = systemPromptTokens + initialResponseTokens;
     // Only the turns before the question compete for what the system prompt
     // and the question leave. Search results, page excerpts and the summary
     // can outgrow the history's share, so the budget is clamped at zero:
     // then every earlier turn is folded into the summary, never the question.
-    const earlierTurnsBudget = Math.max(
-      0,
-      contextSize * historyBudgetRatio - reservedTokens - questionTokens,
+    const earlierTurnsBudgetFor = (promptTokens: number) =>
+      Math.max(
+        0,
+        contextSize * historyBudgetRatio -
+          promptTokens -
+          initialResponseTokens -
+          questionTokens,
+      );
+    const keepWithinBudget = (budget: number) =>
+      question
+        ? [
+            ...keepNewestMessagesWithinBudget(newMessages.slice(0, -1), budget),
+            question,
+          ]
+        : [];
+
+    let processedMessages = keepWithinBudget(
+      earlierTurnsBudgetFor(systemPromptTokens),
     );
-    const processedMessages = question
-      ? [
-          ...keepNewestMessagesWithinBudget(
-            newMessages.slice(0, -1),
-            earlierTurnsBudget,
-          ),
-          question,
-        ]
-      : [];
 
     if (newMessages.length > processedMessages.length) {
+      // Turns are dropped, so a new summary of up to SUMMARY_TOKEN_LIMIT
+      // tokens replaces the stored one. Its length is only known once the
+      // turns to fold into it are chosen, so its full size is reserved before
+      // trimming again. Never trim less than the first pass did.
+      const summarySectionTokens =
+        gptTokenizer.encode(`\n\n${summaryLabel}\n`).length +
+        SUMMARY_TOKEN_LIMIT;
+      const basePromptTokens = gptTokenizer.encode(
+        await buildSystemPromptContent(""),
+      ).length;
+      processedMessages = keepWithinBudget(
+        earlierTurnsBudgetFor(
+          Math.max(systemPromptTokens, basePromptTokens + summarySectionTokens),
+        ),
+      );
       const droppedCount = newMessages.length - processedMessages.length;
       const droppedMessages = newMessages.slice(0, droppedCount);
       const updatedSummary =

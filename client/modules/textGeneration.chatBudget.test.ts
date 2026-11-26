@@ -52,7 +52,12 @@ vi.mock("./textGenerationUtilities", async (importOriginal) => ({
 }));
 // One token per character keeps the budget arithmetic readable.
 vi.mock("gpt-tokenizer", () => ({
-  default: { encode: vi.fn((text: string) => Array.from(text, () => 1)) },
+  default: {
+    encode: vi.fn((text: string) =>
+      Array.from(text, (char) => char.codePointAt(0) ?? 0),
+    ),
+    decode: vi.fn((tokens: number[]) => String.fromCodePoint(...tokens)),
+  },
 }));
 vi.mock("pretty-ms", () => ({ default: vi.fn(() => "100ms") }));
 vi.mock("./textGenerationWithWllama", () => ({
@@ -183,13 +188,14 @@ describe("generateChatResponse context budget", () => {
   });
 
   it("lets older turns share what the newest question leaves, starting on a user turn", async () => {
-    // Budget 3072 - 2000 - 3 ("Ok!") = 1069; the question takes 300, leaving
-    // 769 for older turns: the newest two (200) fit, the 600-token answer
-    // before them does not.
-    state.systemPrompt = "s".repeat(2000);
+    // Budget 3072 - 1000 - 3 ("Ok!") - 300 (question) = 1769. Turns are
+    // dropped, so a full 800-token summary and its 116-token label are
+    // reserved too, leaving 853 for older turns: the newest two (200) fit,
+    // the 900-token answer before them does not.
+    state.systemPrompt = "s".repeat(1000);
     const messages: ChatMessage[] = [
-      { role: "user", content: "u".repeat(600) },
-      { role: "assistant", content: "a".repeat(600) },
+      { role: "user", content: "u".repeat(900) },
+      { role: "assistant", content: "a".repeat(900) },
       { role: "user", content: "v".repeat(100) },
       { role: "assistant", content: "b".repeat(100) },
       { role: "user", content: "w".repeat(300) },
@@ -200,9 +206,48 @@ describe("generateChatResponse context budget", () => {
     const { answer, summarizer } = callsTo(generateChatWithWllama);
     expect(answer[0].slice(2)).toEqual(messages.slice(2));
     expect(summarizer).toHaveLength(1);
-    expect(summarizer[0][0].content).toContain("u".repeat(600));
+    expect(summarizer[0][0].content).toContain("u".repeat(900));
     expect(summarizer[0][0].content).not.toContain("w".repeat(300));
   });
+
+  it.each([800, 2000])(
+    "keeps the prompt within the budget when the summarizer returns %i tokens",
+    async (summaryTokens) => {
+      // Without the summary, 3072 - 1500 - 3 - 300 = 1269 would keep the
+      // newest two turns (800). With a full summary section reserved
+      // (800 + 116), 353 is left, so they are folded into the summary too.
+      state.systemPrompt = "s".repeat(1500);
+      const messages: ChatMessage[] = [
+        { role: "user", content: "a".repeat(600) },
+        { role: "assistant", content: "b".repeat(200) },
+        { role: "user", content: "c".repeat(400) },
+        { role: "assistant", content: "d".repeat(400) },
+        { role: "user", content: "q".repeat(300) },
+      ];
+      vi.mocked(generateChatWithWllama).mockImplementation(async (chat) =>
+        chat[0].content.startsWith(summarizerInstruction)
+          ? "z".repeat(summaryTokens)
+          : "the answer",
+      );
+
+      await generateChatResponse(messages, () => {});
+
+      const { answer, summarizer } = callsTo(generateChatWithWllama);
+      const sentTokens = answer[0].reduce(
+        (total, message) => total + message.content.length,
+        0,
+      );
+      expect(sentTokens).toBeLessThanOrEqual(3072);
+      expect(answer[0].slice(2)).toEqual(messages.slice(4));
+      for (const dropped of messages.slice(0, 4)) {
+        expect(summarizer[0][0].content).toContain(dropped.content);
+      }
+      expect(updateConversationSummary).toHaveBeenCalledWith({
+        conversationId: "a".repeat(600),
+        summary: "z".repeat(800),
+      });
+    },
+  );
 
   it("keeps the stored summary when the summarizer rejects and the fallback returns empty", async () => {
     state.systemPrompt = "s".repeat(3500);
