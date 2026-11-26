@@ -1124,7 +1124,11 @@ describe("ChatInterface chat storage", () => {
     expect(getChatMessages()).toEqual([]);
   });
 
-  it("keeps an in-flight follow-up when the chat remounts on the same search", async () => {
+  /**
+   * Sends a follow-up whose answer only ends when the chat aborts it, and
+   * returns a function that unmounts the chat and waits for that abort.
+   */
+  async function sendFollowUpUntilUnmount() {
     vi.mocked(generateChatResponse).mockImplementationOnce(
       (_messages, _onUpdate, chatSignal) =>
         new Promise((_resolve, reject) => {
@@ -1138,12 +1142,19 @@ describe("ChatInterface chat storage", () => {
     await act(async () => {
       send = sendMessage("How do I use it?");
     });
+    return async () => {
+      await act(async () => {
+        view.unmount();
+        await send;
+      });
+    };
+  }
+
+  it("keeps an in-flight follow-up when the chat remounts on the same search", async () => {
+    const unmountChat = await sendFollowUpUntilUnmount();
 
     // Turning the AI answer off unmounts the chat; nothing else changes.
-    await act(async () => {
-      view.unmount();
-      await send;
-    });
+    await unmountChat();
     render(
       <MantineProvider>
         <ChatInterface
@@ -1174,28 +1185,12 @@ describe("ChatInterface chat storage", () => {
   });
 
   it("stores nothing from a follow-up that started before the main answer was regenerated", async () => {
-    vi.mocked(generateChatResponse).mockImplementationOnce(
-      (_messages, _onUpdate, chatSignal) =>
-        new Promise((_resolve, reject) => {
-          chatSignal?.addEventListener("abort", () =>
-            reject(new Error("Chat generation interrupted")),
-          );
-        }),
-    );
-    const view = renderChatInterface();
-
-    let send: Promise<void> = Promise.resolve();
-    await act(async () => {
-      send = sendMessage("How do I use it?");
-    });
+    const unmountChat = await sendFollowUpUntilUnmount();
     vi.mocked(persistChatConversation).mockClear();
     // Regenerating starts a new attempt on the same run and unmounts the chat,
     // which aborts the follow-up into its "interrupted" commit.
     recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
-    await act(async () => {
-      view.unmount();
-      await send;
-    });
+    await unmountChat();
 
     expect(persistChatConversation).not.toHaveBeenCalled();
   });
