@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   chatGenerationStatePubSub,
   chatInputPubSub,
+  chatMessagesPubSub,
   followUpQuestionPubSub,
   getSuppressNextFollowUp,
   suppressNextFollowUpPubSub,
@@ -16,6 +17,7 @@ const [updateChatGenerationState, , getChatGenerationState] =
 const [updateChatInput] = chatInputPubSub;
 const [updateFollowUpQuestion, , getFollowUpQuestion] = followUpQuestionPubSub;
 const [updateSuppressNextFollowUp] = suppressNextFollowUpPubSub;
+const [updateChatMessages, , getChatMessages] = chatMessagesPubSub;
 
 vi.mock("@/modules/textGeneration", () => ({
   generateChatResponse: vi.fn(),
@@ -26,8 +28,14 @@ vi.mock("@/modules/followUpQuestions", () => ({
 }));
 
 vi.mock("@/modules/chatHelpers", () => ({
-  persistChatMessages: vi.fn(() => Promise.resolve()),
+  persistChatConversation: vi.fn(() => Promise.resolve()),
   runFollowUpSearch: vi.fn(() => Promise.resolve()),
+}));
+
+/** The search run the chat belongs to; a test changes it to start a new search. */
+let currentSearchRunId = "run-1";
+vi.mock("@/modules/history", () => ({
+  getCurrentSearchRunId: vi.fn(() => currentSearchRunId),
 }));
 
 vi.mock("@/modules/notifications", () => ({
@@ -44,6 +52,7 @@ vi.mock("./ChatHeader", () => ({ default: () => null }));
 
 let sendMessage: (textToSend?: string) => Promise<void>;
 let regenerateResponse: () => Promise<void>;
+let editMessage: (absoluteIndex: number) => void;
 let messageListMessages: ChatMessage[] = [];
 let messageListIsGenerating = false;
 let messageListFollowUpStartIndex: number | undefined;
@@ -61,8 +70,10 @@ vi.mock("./MessageList", () => ({
     followUpStartIndex: number;
     isGenerating: boolean;
     onRegenerate: () => Promise<void>;
+    onEditMessage: (absoluteIndex: number) => void;
   }) => {
     regenerateResponse = props.onRegenerate;
+    editMessage = props.onEditMessage;
     messageListMessages = props.messages;
     messageListFollowUpStartIndex = props.followUpStartIndex;
     messageListIsGenerating = props.isGenerating;
@@ -74,7 +85,8 @@ const { generateChatResponse } = await import("@/modules/textGeneration");
 const { generateFollowUpQuestion } = await import(
   "@/modules/followUpQuestions"
 );
-const { persistChatMessages } = await import("@/modules/chatHelpers");
+const { persistChatConversation } = await import("@/modules/chatHelpers");
+const { getCurrentSearchRunId } = await import("@/modules/history");
 const { addLogEntry } = await import("@/modules/logEntries");
 const { notifications } = await import("@mantine/notifications");
 
@@ -131,6 +143,10 @@ beforeEach(() => {
   messageListFollowUpStartIndex = undefined;
   vi.mocked(generateChatResponse).mockResolvedValue("An answer.");
   vi.mocked(generateFollowUpQuestion).mockResolvedValue("A question?");
+  vi.mocked(persistChatConversation).mockResolvedValue(undefined);
+  currentSearchRunId = "run-1";
+  vi.mocked(getCurrentSearchRunId).mockImplementation(() => currentSearchRunId);
+  updateChatMessages([]);
 });
 
 afterEach(() => {
@@ -676,7 +692,7 @@ describe("ChatInterface generation state", () => {
   });
 
   it("keeps the answer and the follow-up question when persisting fails", async () => {
-    vi.mocked(persistChatMessages).mockRejectedValueOnce(
+    vi.mocked(persistChatConversation).mockRejectedValueOnce(
       new Error("disk full"),
     );
 
@@ -694,8 +710,10 @@ describe("ChatInterface generation state", () => {
         message.content.includes("Sorry, I encountered an error"),
       ),
     ).toBe(false);
-    expect(addLogEntry).toHaveBeenCalledWith(
-      expect.stringContaining("Error persisting chat messages"),
+    await vi.waitFor(() =>
+      expect(addLogEntry).toHaveBeenCalledWith(
+        expect.stringContaining("Error persisting chat messages"),
+      ),
     );
     expect(generateFollowUpQuestion).toHaveBeenCalled();
   });
@@ -930,5 +948,150 @@ describe("ChatInterface previous follow-up questions", () => {
     expect(
       vi.mocked(generateFollowUpQuestion).mock.calls[2][0].previousQuestions,
     ).toEqual(["Is it supported in Safari?"]);
+  });
+});
+
+describe("ChatInterface chat storage", () => {
+  const followUps = (...pairs: [string, string][]): ChatMessage[] =>
+    pairs.flatMap(([question, answer]) => [
+      { role: "user" as const, content: question },
+      { role: "assistant" as const, content: answer },
+    ]);
+
+  /** What the last write stored for a conversation. */
+  function stored(conversationId = "run-1") {
+    const calls = vi
+      .mocked(persistChatConversation)
+      .mock.calls.filter(([id]) => id === conversationId);
+    return calls.at(-1)?.[1];
+  }
+
+  it("stores the regenerated answer in place of the one it replaced", async () => {
+    vi.mocked(generateChatResponse)
+      .mockResolvedValueOnce("First answer.")
+      .mockResolvedValueOnce("Regenerated answer.");
+    renderChatInterface();
+
+    await act(async () => {
+      await sendMessage("How do I use it?");
+    });
+    await act(async () => {
+      await regenerateResponse();
+    });
+
+    expect(stored()).toEqual(
+      followUps(["How do I use it?", "Regenerated answer."]),
+    );
+  });
+
+  it("stores only the corrected pair after an edit and a resend", async () => {
+    vi.mocked(generateChatResponse)
+      .mockResolvedValueOnce("Answer to the typo.")
+      .mockResolvedValueOnce("Answer to the fix.");
+    renderChatInterface();
+
+    await act(async () => {
+      await sendMessage("How do I use iy?");
+    });
+    act(() => editMessage(2));
+    await act(async () => {
+      await sendMessage("How do I use it?");
+    });
+
+    expect(stored()).toEqual(
+      followUps(["How do I use it?", "Answer to the fix."]),
+    );
+  });
+
+  it("matches the screen after an edit that is never resent", async () => {
+    renderChatInterface();
+
+    await act(async () => {
+      await sendMessage("How do I use it?");
+    });
+    act(() => editMessage(2));
+
+    expect(stored()).toEqual([]);
+    expect(messageListMessages).toHaveLength(2);
+  });
+
+  it("stores the question of a failed send, then the answer that regenerates it", async () => {
+    vi.mocked(generateChatResponse)
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce("A good answer.");
+    renderChatInterface();
+
+    await act(async () => {
+      await sendMessage("How do I use it?");
+    });
+    expect(stored()?.[0]).toEqual({
+      role: "user",
+      content: "How do I use it?",
+    });
+
+    await act(async () => {
+      await regenerateResponse();
+    });
+
+    expect(stored()).toEqual(followUps(["How do I use it?", "A good answer."]));
+  });
+
+  it("saves an answer under its own search when a new search starts meanwhile", async () => {
+    const answer = deferred<string>();
+    vi.mocked(generateChatResponse).mockReturnValueOnce(answer.promise);
+    renderChatInterface();
+
+    let send: Promise<void> = Promise.resolve();
+    await act(async () => {
+      send = sendMessage("How do I use it?");
+    });
+    currentSearchRunId = "run-2";
+    await act(async () => {
+      answer.resolve("A late answer.");
+      await send;
+    });
+
+    expect(stored("run-1")).toEqual(
+      followUps(["How do I use it?", "A late answer."]),
+    );
+    expect(stored("run-2")).toBeUndefined();
+    // The new search's copy is not given the old search's turns.
+    expect(getChatMessages()).toEqual([]);
+  });
+
+  it("keeps every turn on a remount without writing anything", async () => {
+    vi.mocked(generateChatResponse)
+      .mockResolvedValueOnce("One.")
+      .mockResolvedValueOnce("Two.");
+    const first = renderChatInterface();
+    await act(async () => {
+      await sendMessage("Q1");
+    });
+    await act(async () => {
+      await sendMessage("Q2");
+    });
+    first.unmount();
+    const writes = vi.mocked(persistChatConversation).mock.calls.length;
+
+    render(
+      <MantineProvider>
+        <ChatInterface
+          initialQuery={initialQuery}
+          initialResponse={initialResponse}
+          initialMessages={getChatMessages()}
+          suppressInitialFollowUp
+        />
+      </MantineProvider>,
+    );
+
+    expect(messageListMessages.map((m) => m.content)).toEqual([
+      initialQuery,
+      initialResponse,
+      "Q1",
+      "One.",
+      "Q2",
+      "Two.",
+    ]);
+    expect(persistChatConversation).toHaveBeenCalledTimes(writes);
   });
 });

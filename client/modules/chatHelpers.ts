@@ -2,7 +2,7 @@ import { normalizeFollowUpDates } from "@shared/relativeDates";
 import {
   getCurrentSearchRunId,
   type ImageResults,
-  saveChatMessageForQuery,
+  replaceChatConversation,
   type TextResults,
   updateSearchResults,
 } from "./history";
@@ -139,13 +139,19 @@ async function readFollowUpPageContents(
   updatePageContents({ ...getPageContents(), ...contents });
 }
 
-export async function persistChatMessages(
-  query: string,
-  userMessage: string,
-  assistantMessage: string,
+/**
+ * Stores a search's follow-up conversation as it now stands. The caller passes
+ * the search run id it captured when the change began, so an answer that
+ * arrives after a new search started is still saved under its own search.
+ */
+export async function persistChatConversation(
+  conversationId: string,
+  followUpMessages: ReadonlyArray<{
+    role: "user" | "assistant";
+    content: string;
+  }>,
 ): Promise<void> {
-  await saveChatMessageForQuery(query, "user", userMessage);
-  await saveChatMessageForQuery(query, "assistant", assistantMessage);
+  await replaceChatConversation(conversationId, followUpMessages);
 }
 
 export async function runFollowUpSearch(

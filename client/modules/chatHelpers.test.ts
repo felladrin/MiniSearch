@@ -8,7 +8,7 @@ vi.mock("./search", () => ({
 }));
 vi.mock("./history", () => ({
   getCurrentSearchRunId: vi.fn(() => "run-1"),
-  saveChatMessageForQuery: vi.fn(() => Promise.resolve()),
+  replaceChatConversation: vi.fn(() => Promise.resolve()),
   updateSearchResults: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("./pubSub", () => ({
@@ -33,12 +33,12 @@ vi.mock("./textGenerationUtilities", () => ({
 }));
 
 import {
-  persistChatMessages,
+  persistChatConversation,
   refreshImageSearchResults,
   refreshTextSearchResults,
   runFollowUpSearch,
 } from "./chatHelpers";
-import { saveChatMessageForQuery } from "./history";
+import { replaceChatConversation } from "./history";
 import { fetchPageContents } from "./pageContent";
 import {
   getPageContents,
@@ -54,7 +54,7 @@ import type { ImageSearchResults, TextSearchResults } from "./types";
 
 const mockSearchText = vi.mocked(searchText);
 const mockSearchImages = vi.mocked(searchImages);
-const mockSaveChat = vi.mocked(saveChatMessageForQuery);
+const mockReplaceChat = vi.mocked(replaceChatConversation);
 const mockUpdateText = vi.mocked(updateTextSearchResults);
 const mockUpdateImage = vi.mocked(updateImageSearchResults);
 const mockUpdateLlmText = vi.mocked(updateLlmTextSearchResults);
@@ -166,16 +166,16 @@ describe("refreshImageSearchResults", () => {
   });
 });
 
-describe("persistChatMessages", () => {
-  it("saves user and assistant messages", async () => {
-    await persistChatMessages("my query", "user msg", "assistant msg");
+describe("persistChatConversation", () => {
+  it("replaces the stored conversation of the given search run", async () => {
+    const messages = [
+      { role: "user" as const, content: "user msg" },
+      { role: "assistant" as const, content: "assistant msg" },
+    ];
 
-    expect(mockSaveChat).toHaveBeenCalledWith("my query", "user", "user msg");
-    expect(mockSaveChat).toHaveBeenCalledWith(
-      "my query",
-      "assistant",
-      "assistant msg",
-    );
+    await persistChatConversation("run-1", messages);
+
+    expect(mockReplaceChat).toHaveBeenCalledWith("run-1", messages);
   });
 });
 

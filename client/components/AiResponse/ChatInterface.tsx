@@ -10,8 +10,12 @@ import {
 } from "react";
 import throttle from "throttleit";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
-import { persistChatMessages, runFollowUpSearch } from "@/modules/chatHelpers";
+import {
+  persistChatConversation,
+  runFollowUpSearch,
+} from "@/modules/chatHelpers";
 import { generateFollowUpQuestion } from "@/modules/followUpQuestions";
+import { getCurrentSearchRunId } from "@/modules/history";
 import { handleEnterKeyDown } from "@/modules/keyboard";
 import { addLogEntry } from "@/modules/logEntries";
 import { showAiCompleteNotification } from "@/modules/notifications";
@@ -22,10 +26,10 @@ import {
   getChatGenerationState,
   getFollowUpQuestion,
   imageSearchResultsPubSub,
-  queryPubSub,
   settingsPubSub,
   suppressNextFollowUpPubSub,
   textSearchResultsPubSub,
+  updateChatMessages,
 } from "@/modules/pubSub";
 import { generateChatResponse } from "@/modules/textGeneration";
 import type { ChatMessage } from "@/modules/types";
@@ -86,7 +90,6 @@ export default function ChatInterface({
   const [, setFollowUpQuestion] = usePubSub(followUpQuestionPubSub);
   const [textSearchResults] = usePubSub(textSearchResultsPubSub);
   const [imageSearchResults] = usePubSub(imageSearchResultsPubSub);
-  const [currentQuery] = usePubSub(queryPubSub);
   const [suppressNextFollowUp, setSuppressNextFollowUp] = usePubSub(
     suppressNextFollowUpPubSub,
   );
@@ -270,15 +273,44 @@ export default function ChatInterface({
     };
   }, [setFollowUpQuestion, setGenerationState]);
 
+  /**
+   * The one way a change to the conversation is kept: it sets the screen, saves
+   * the follow-ups under `conversationId`, and updates the copy a remount
+   * rebuilds from, so storage, the screen and that copy cannot drift apart.
+   * Handlers capture `conversationId` when they start: if a new search began
+   * meanwhile, the change is still saved under the search it belongs to, and
+   * neither the screen nor the new search's copy is touched.
+   */
+  const commitMessages = useCallback(
+    (next: ChatMessage[], conversationId: string) => {
+      // Only user and assistant turns are stored; a system message never is.
+      const followUps = next
+        .slice(followUpStartIndex)
+        .filter(
+          (message): message is ChatMessage & { role: "user" | "assistant" } =>
+            message.role !== "system",
+        );
+      if (conversationId === getCurrentSearchRunId()) {
+        if (isMountedRef.current) setMessages(next);
+        updateChatMessages(followUps);
+      }
+      persistChatConversation(conversationId, followUps).catch((error) => {
+        addLogEntry(`Error persisting chat messages: ${error}`);
+      });
+    },
+    [followUpStartIndex],
+  );
+
   const handleEditMessage = useCallback(
     (absoluteIndex: number) => {
       const target = messages[absoluteIndex];
       if (target?.role !== "user") return;
       setInput(target.content);
-      setMessages(messages.slice(0, absoluteIndex));
+      // Kept even if the edit is never resent, so a restore matches the screen.
+      commitMessages(messages.slice(0, absoluteIndex), getCurrentSearchRunId());
       setFollowUpQuestion("");
     },
-    [messages, setInput, setFollowUpQuestion],
+    [messages, commitMessages, setInput, setFollowUpQuestion],
   );
 
   const handleRegenerateResponse = useCallback(async () => {
@@ -290,6 +322,7 @@ export default function ChatInterface({
     )
       return;
 
+    const conversationId = getCurrentSearchRunId();
     const history = messages.slice(0, -1);
     const lastUser = history[history.length - 1];
     // Streaming needs the old answer off the list, so keep it and the
@@ -311,10 +344,10 @@ export default function ChatInterface({
         updateStreamedResponse,
       );
 
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: finalResponse },
-      ]);
+      commitMessages(
+        [...history, { role: "assistant", content: finalResponse }],
+        conversationId,
+      );
 
       addLogEntry("AI response re-generated");
 
@@ -348,6 +381,7 @@ export default function ChatInterface({
       }
     }
   }, [
+    commitMessages,
     followUpStartIndex,
     messages,
     regenerateFollowUpQuestion,
@@ -367,6 +401,7 @@ export default function ChatInterface({
         return;
       }
 
+      const conversationId = getCurrentSearchRunId();
       const userMessage: ChatMessage = { role: "user", content: currentInput };
       const newMessages: ChatMessage[] = [...messages, userMessage];
 
@@ -397,10 +432,10 @@ export default function ChatInterface({
           updateStreamedResponse,
         );
 
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          { role: "assistant", content: finalResponse },
-        ]);
+        commitMessages(
+          [...newMessages, { role: "assistant", content: finalResponse }],
+          conversationId,
+        );
 
         addLogEntry("AI response completed");
 
@@ -408,23 +443,22 @@ export default function ChatInterface({
           showAiCompleteNotification(currentInput);
         }
 
-        try {
-          await persistChatMessages(currentQuery, currentInput, finalResponse);
-        } catch (error) {
-          addLogEntry(`Error persisting chat messages: ${error}`);
-        }
-
         regenerateFollowUpQuestion(currentInput, finalResponse);
       } catch (error) {
         addLogEntry(`Error in chat response: ${error}`);
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          {
-            role: "assistant",
-            content:
-              "Sorry, I encountered an error while generating a response.",
-          },
-        ]);
+        // Saved like any answer, so the question survives a restore and a
+        // later regenerate has a stored turn to replace.
+        commitMessages(
+          [
+            ...newMessages,
+            {
+              role: "assistant",
+              content:
+                "Sorry, I encountered an error while generating a response.",
+            },
+          ],
+          conversationId,
+        );
       } finally {
         if (isMountedRef.current) {
           setGenerationState({
@@ -435,6 +469,7 @@ export default function ChatInterface({
       }
     },
     [
+      commitMessages,
       messages,
       settings,
       input,
@@ -443,7 +478,6 @@ export default function ChatInterface({
       setGenerationState,
       setInput,
       updateStreamedResponse,
-      currentQuery,
       textSearchResults,
       imageSearchResults,
     ],
