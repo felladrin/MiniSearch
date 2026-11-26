@@ -698,6 +698,32 @@ describe("search supersession ownership", () => {
     });
   });
 
+  it("keeps a follow-up's images when the first image search finds none", async () => {
+    harness.state.settings.enableImageSearch = true;
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: [["A title", "A snippet", "https://a.example"]],
+      stale: false,
+    });
+    const deferredImages = deferImageSearch();
+
+    const running = searchAndRespond();
+    await vi.waitFor(() => expect(searchImages).toHaveBeenCalledTimes(1));
+    const followUpImage: ImageSearchResults[number] = [
+      "Follow-up",
+      "https://f.example/img.png",
+      "thumb-f",
+      "https://f.example",
+    ];
+    harness.state.imageSearchResults = [followUpImage];
+    deferredImages.release({ results: [], stale: false });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await running;
+
+    expect(vi.mocked(updateImageSearchResults)).toHaveBeenLastCalledWith([
+      followUpImage,
+    ]);
+  });
+
   it("keeps fire-and-forget image search results and state from an older search out of the newer search", async () => {
     harness.state.settings.enableImageSearch = true;
     vi.mocked(searchText).mockResolvedValueOnce({

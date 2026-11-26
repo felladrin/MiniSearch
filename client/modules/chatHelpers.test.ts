@@ -199,6 +199,27 @@ describe("refreshImageSearchResults", () => {
     });
   });
 
+  it("shows an image found by both searches once", async () => {
+    const firstImages: ImageSearchResults = [
+      ["First", "https://first.com", "thumb", "source"],
+    ];
+    mockSearchImages.mockResolvedValueOnce({
+      results: [
+        ["New", "https://new.com", "thumb", "source"],
+        ["First again", "https://first.com", "thumb", "source"],
+      ],
+      stale: false,
+    });
+    vi.mocked(getImageSearchResults).mockReturnValueOnce(firstImages);
+
+    await refreshImageSearchResults("query", 10, []);
+
+    expect(mockUpdateImage).toHaveBeenCalledWith([
+      ["New", "https://new.com", "thumb", "source"],
+      ...firstImages,
+    ]);
+  });
+
   it("skips updates when there are no fresh results", async () => {
     mockSearchImages.mockResolvedValueOnce({ results: [], stale: false });
 
