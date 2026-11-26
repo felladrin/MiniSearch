@@ -7,6 +7,7 @@ const harness = vi.hoisted(() => {
     textGenerationState: "idle",
     textSearchState: "idle",
     textSearchResults: [] as unknown[],
+    imageSearchResults: [] as unknown[],
     llmTextSearchResults: [] as unknown[],
     pageContents: {} as Record<string, string>,
     searchRunId: "run-1",
@@ -34,6 +35,7 @@ const harness = vi.hoisted(() => {
 });
 
 vi.mock("./pubSub", () => ({
+  getImageSearchResults: () => harness.state.imageSearchResults,
   getConversationSummary: () => ({ conversationId: "", summary: "" }),
   getLlmTextSearchResults: () => harness.state.llmTextSearchResults,
   getPageContents: () => harness.state.pageContents,
@@ -45,7 +47,9 @@ vi.mock("./pubSub", () => ({
   listenToTextGenerationStateChanges: vi.fn(() => vi.fn()),
   updateChatMessages: vi.fn(),
   updateConversationSummary: vi.fn(),
-  updateImageSearchResults: vi.fn(),
+  updateImageSearchResults: vi.fn((results: unknown[]) => {
+    harness.state.imageSearchResults = results;
+  }),
   updateImageSearchState: vi.fn(),
   updateLlmTextSearchResults: (results: unknown[]) => {
     harness.state.llmTextSearchResults = results;
@@ -510,6 +514,7 @@ describe("search supersession ownership", () => {
     harness.state.textGenerationState = "idle";
     harness.state.textSearchState = "idle";
     harness.state.textSearchResults = [];
+    harness.state.imageSearchResults = [];
     harness.state.llmTextSearchResults = [];
     harness.state.pageContents = {};
     harness.state.staleFlag = false;
@@ -640,6 +645,76 @@ describe("search supersession ownership", () => {
     expect(harness.state.textSearchState).toBe("completed");
     expect(harness.state.textSearchResults).toEqual(resultsB);
     expect(harness.state.llmTextSearchResults).toEqual(resultsB);
+  });
+
+  const followUpImage: ImageSearchResults[number] = [
+    "Follow-up",
+    "https://f.example/img.png",
+    "thumb-f",
+    "https://f.example",
+  ];
+
+  /** A search whose image search is still pending when a follow-up's images land. */
+  async function searchWithFollowUpImagesFirst() {
+    harness.state.settings.enableImageSearch = true;
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: [["A title", "A snippet", "https://a.example"]],
+      stale: false,
+    });
+    const deferredImages = deferImageSearch();
+    const running = searchAndRespond();
+    await vi.waitFor(() => expect(searchImages).toHaveBeenCalledTimes(1));
+    harness.state.imageSearchResults = [followUpImage];
+    return {
+      finishImages: async (results: ImageSearchResults) => {
+        deferredImages.release({ results, stale: false });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await running;
+      },
+    };
+  }
+
+  it("keeps the images a follow-up added while the first image search was still running", async () => {
+    const { finishImages } = await searchWithFollowUpImagesFirst();
+
+    const firstImage: ImageSearchResults[number] = [
+      "First",
+      "https://a.example/img.png",
+      "thumb-a",
+      "https://a.example",
+    ];
+    await finishImages([firstImage]);
+
+    expect(vi.mocked(updateImageSearchResults)).toHaveBeenLastCalledWith([
+      followUpImage,
+      firstImage,
+    ]);
+    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-a", {
+      type: "image",
+      items: [
+        {
+          title: "Follow-up",
+          url: "https://f.example/img.png",
+          thumbnail: "thumb-f",
+          sourceUrl: "https://f.example",
+        },
+        {
+          title: "First",
+          url: "https://a.example/img.png",
+          thumbnail: "thumb-a",
+          sourceUrl: "https://a.example",
+        },
+      ],
+    });
+  });
+
+  it("keeps a follow-up's images when the first image search finds none", async () => {
+    const { finishImages } = await searchWithFollowUpImagesFirst();
+    await finishImages([]);
+
+    expect(vi.mocked(updateImageSearchResults)).toHaveBeenLastCalledWith([
+      followUpImage,
+    ]);
   });
 
   it("keeps fire-and-forget image search results and state from an older search out of the newer search", async () => {
