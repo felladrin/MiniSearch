@@ -146,7 +146,8 @@ describe("textGenerationFunctions", () => {
       conversationId: "test-id",
       summary: "Covered",
       summarizedCount: count,
-      lastSummarizedFingerprint: `${history[count - 1].role}:${history[count - 1].content.length}:${history[count - 1].content}`,
+      lastSummarizedFingerprint:
+        textGenerationFunctions.coveredHistoryFingerprint(history, count),
     });
 
     it("returns the cursor when its last covered message is unchanged", () => {
@@ -158,13 +159,27 @@ describe("textGenerationFunctions", () => {
       });
     });
 
-    it("starts over when the last covered message was edited", () => {
+    it("starts over when a covered message before the last one was edited", () => {
       const { loadConversationSummary } = textGenerationFunctions;
-      mockGetConversationSummary.mockReturnValue(coveredUpTo(2));
+      mockGetConversationSummary.mockReturnValue(coveredUpTo(4));
       const edited = history.map((message, index) =>
-        index === 1 ? { ...message, content: "A regenerated answer" } : message,
+        index === 2
+          ? { ...message, content: "Second question, edited" }
+          : message,
       );
       expect(loadConversationSummary("test-id", edited)).toEqual({
+        summary: "",
+        summarizedCount: 0,
+      });
+    });
+
+    it("starts over when another chat with the same first question is restored", () => {
+      const { loadConversationSummary } = textGenerationFunctions;
+      mockGetConversationSummary.mockReturnValue(coveredUpTo(2));
+      const sameStart = history.map((message, index) =>
+        index === 1 ? { ...message, content: "Another first answer" } : message,
+      );
+      expect(loadConversationSummary("test-id", sameStart)).toEqual({
         summary: "",
         summarizedCount: 0,
       });

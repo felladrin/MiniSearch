@@ -139,16 +139,31 @@ function getConversationId(messages: ChatMessage[]): string {
   return (firstUser?.content || "").trim();
 }
 
-/** Cheap enough for every turn, and changes when an edit or regenerate does. */
-function messageFingerprint(message: ChatMessage): string {
-  return `${message.role}:${message.content.length}:${message.content.slice(0, 64)}`;
+/**
+ * FNV-1a over every covered message, so an edit anywhere in the covered part,
+ * or another chat with the same first question, gives another value. Fixed
+ * replies such as the error text would make a last-message check match.
+ */
+function coveredHistoryFingerprint(
+  messages: ChatMessage[],
+  count: number,
+): string {
+  let hash = 0x811c9dc5;
+  for (const message of messages.slice(0, count)) {
+    for (const char of `${message.role}\u0000${message.content}\u0001`) {
+      hash ^= char.codePointAt(0) ?? 0;
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+  }
+  return `${count}:${hash.toString(16)}`;
 }
 
 /**
  * The stored summary and how many of `messages` it already covers. A summary
- * whose last covered message is gone or changed (an edit or a regenerate
- * rewrote the history) describes another conversation, so it is dropped and
- * the conversation is folded again from the start.
+ * whose covered messages are gone or changed (an edit reached into them, or a
+ * restore brought back another chat with the same first question) describes
+ * another conversation, so it is dropped and the conversation is folded again
+ * from the start.
  */
 function loadConversationSummary(
   conversationId: string,
@@ -162,7 +177,8 @@ function loadConversationSummary(
   if (count === 0) return { summary: stored.summary, summarizedCount: 0 };
   if (
     count >= messages.length ||
-    stored.lastSummarizedFingerprint !== messageFingerprint(messages[count - 1])
+    stored.lastSummarizedFingerprint !==
+      coveredHistoryFingerprint(messages, count)
   ) {
     return { summary: "", summarizedCount: 0 };
   }
@@ -240,7 +256,7 @@ function saveConversationSummary(
     summarizedCount,
     lastSummarizedFingerprint:
       summarizedCount > 0
-        ? messageFingerprint(messages[summarizedCount - 1])
+        ? coveredHistoryFingerprint(messages, summarizedCount)
         : undefined,
   });
 }
@@ -854,6 +870,7 @@ function canDownloadModels(): Promise<void> {
 export const textGenerationFunctions = {
   getCurrentModelName,
   getConversationId,
+  coveredHistoryFingerprint,
   loadConversationSummary,
   createLlmSummary,
   summarizeDroppedMessages,

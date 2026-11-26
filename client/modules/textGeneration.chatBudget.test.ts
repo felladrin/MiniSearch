@@ -328,6 +328,44 @@ describe("generateChatResponse context budget", () => {
     expect(slot.summarizedCount).toBe(4);
   });
 
+  it("folds again from the start once an edit reaches into the summary", async () => {
+    let slot: ReturnType<typeof getConversationSummary> = {
+      conversationId: "",
+      summary: "",
+    };
+    vi.mocked(getConversationSummary).mockImplementation(() => slot);
+    vi.mocked(updateConversationSummary).mockImplementation((next) => {
+      slot = next;
+    });
+    mockGenerateChat(generateChatWithWllama);
+    state.systemPrompt = "s".repeat(2000);
+    const question: ChatMessage = { role: "user", content: "c".repeat(300) };
+
+    await generateChatResponse(
+      [
+        { role: "user", content: "a".repeat(500) },
+        { role: "assistant", content: "b".repeat(500) },
+        question,
+      ],
+      () => {},
+    );
+    await generateChatResponse(
+      [
+        { role: "user", content: "a".repeat(500) },
+        { role: "assistant", content: "x".repeat(500) },
+        question,
+      ],
+      () => {},
+    );
+
+    const { summarizer } = callsTo(generateChatWithWllama);
+    expect(summarizer).toHaveLength(2);
+    expect(summarizer[1][0].content).toContain("a".repeat(500));
+    expect(summarizer[1][0].content).toContain("x".repeat(500));
+    expect(summarizer[1][0].content).toContain("Previous summary:\n(none)");
+    expect(slot.summarizedCount).toBe(2);
+  });
+
   it("keeps the stored summary when the summarizer rejects and the fallback returns empty", async () => {
     state.systemPrompt = "s".repeat(2000);
     const messages: ChatMessage[] = [
@@ -352,6 +390,7 @@ describe("generateChatResponse context budget", () => {
       expect.objectContaining({
         conversationId: "first question",
         summary: "S1",
+        summarizedCount: 0,
       }),
     );
     const { answer } = callsTo(generateChatWithWllama);
@@ -380,6 +419,7 @@ describe("generateChatResponse context budget", () => {
       expect.objectContaining({
         conversationId: "first question",
         summary: "S1",
+        summarizedCount: 0,
       }),
     );
     const { answer } = callsTo(generateChatWithWllama);

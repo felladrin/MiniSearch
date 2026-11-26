@@ -324,7 +324,7 @@ const conversationSummaryPubSub = createPubSub<{
   summary: string;
   /** How many of the conversation's first messages the summary covers. */
   summarizedCount?: number;
-  /** Identifies the last covered message, to notice an edited history. */
+  /** Identifies the covered messages, to notice a rewritten history. */
   lastSummarizedFingerprint?: string;
 }>({
   conversationId: "",
