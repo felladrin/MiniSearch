@@ -47,6 +47,9 @@ export async function generateTextWithWllama(
       shouldCheckCanRespond: true,
       signal,
     });
+    // An abort while the session exits still returns the whole answer.
+    if (signal?.aborted)
+      throw new ChatGenerationError("Generation interrupted");
     updateResponse(response);
     return response;
   } catch (error) {

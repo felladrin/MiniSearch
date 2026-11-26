@@ -462,10 +462,10 @@ export async function saveLlmResponseForQuery(
   query: string,
   response: string,
   model: string = "",
+  searchRunId = getCurrentSearchRunId(),
 ): Promise<void> {
   if (!isHistoryEnabled()) return;
   try {
-    const searchRunId = getCurrentSearchRunId();
     const latest = await historyDatabase.searches
       .where("searchRunId")
       .equals(searchRunId)

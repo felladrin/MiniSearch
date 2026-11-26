@@ -11,7 +11,7 @@ import {
   updateTextSearchState,
 } from "@/modules/pubSub";
 import { sleep } from "@/modules/sleep";
-import { searchAndRespond } from "@/modules/textGeneration";
+import { cancelSearchAnswer, searchAndRespond } from "@/modules/textGeneration";
 
 const addToHistory = vi.fn();
 const navigate = vi.fn((path: string) => {
@@ -44,6 +44,7 @@ vi.mock("../History/HistoryButton", () => ({
 }));
 
 vi.mock("@/modules/textGeneration", () => ({
+  cancelSearchAnswer: vi.fn(),
   searchAndRespond: vi.fn(),
 }));
 
@@ -108,6 +109,16 @@ describe("SearchForm with the real history restore", () => {
     expect(screen.getByRole("textbox")).toHaveValue("failed search");
     expect(addToHistory).not.toHaveBeenCalled();
     expect(searchAndRespond).not.toHaveBeenCalled();
+  });
+
+  it("cancels the live answer before restoring an entry", async () => {
+    renderSearchForm();
+    await screen.findByRole("textbox");
+    vi.mocked(cancelSearchAnswer).mockClear();
+
+    await restore({ query: "earlier search", timestamp: 2 });
+
+    expect(cancelSearchAnswer).toHaveBeenCalledOnce();
   });
 
   it("does not re-run the auto-search when results and response are cleared after a restore", async () => {

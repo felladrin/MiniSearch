@@ -316,6 +316,8 @@ Every call to a backend takes an `AbortSignal` from its caller (`generateText(si
 - `searchAndRespond()` holds one controller for the current search and aborts it when a new search starts.
 - The Stop button calls `interruptSearch()`, which sets the state to `interrupted` and aborts that search's controller.
 - `ChatInterface` creates one controller per send and per regenerate, and aborts the ones still running when it unmounts.
+- A history restore calls `cancelSearchAnswer()`, which aborts the search's controller without writing a state, since the restore publishes its own answer and state.
+- An answer that returns after its signal was aborted saves nothing and writes no state. An answer that finishes is saved under the query and search run id captured when its search started, not under whatever search is current when it returns.
 
 ## Conversation Memory
 
