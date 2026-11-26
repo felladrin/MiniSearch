@@ -287,7 +287,8 @@ export const [updateTextSearchResults] = textSearchResultsPubSub;
 export const [updateLlmTextSearchResults, , getLlmTextSearchResults] =
   llmTextSearchResultsPubSub;
 
-export const [updateImageSearchResults] = imageSearchResultsPubSub;
+export const [updateImageSearchResults, , getImageSearchResults] =
+  imageSearchResultsPubSub;
 
 export const textSearchStalePubSub = createPubSub<boolean>(false);
 

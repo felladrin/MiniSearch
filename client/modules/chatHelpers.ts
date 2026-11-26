@@ -9,6 +9,7 @@ import {
 import { addLogEntry } from "./logEntries";
 import { fetchPageContents } from "./pageContent";
 import {
+  getImageSearchResults,
   getPageContents,
   updateImageSearchResults,
   updateLlmTextSearchResults,
@@ -137,7 +138,15 @@ export async function refreshImageSearchResults(
 
   if (imageResults.length === 0) return;
 
-  const existingUrls = new Set(existingResults.map(([, url]) => url));
+  // The first search's images can land after this refresh started, so it adds
+  // to the list on screen now as well as the one it was handed then.
+  const shown = isCurrent() ? getImageSearchResults() : [];
+  const shownUrls = new Set(shown.map(([, url]) => url));
+  const baseResults: ImageSearchResults = [
+    ...shown,
+    ...existingResults.filter(([, url]) => !shownUrls.has(url)),
+  ];
+  const existingUrls = new Set(baseResults.map(([, url]) => url));
   const uniqueFreshResults = imageResults.filter(
     ([, url]) => !existingUrls.has(url),
   );
@@ -145,7 +154,7 @@ export async function refreshImageSearchResults(
   if (uniqueFreshResults.length > 0) {
     const updatedImageResults: ImageSearchResults = [
       ...uniqueFreshResults,
-      ...existingResults,
+      ...baseResults,
     ];
 
     if (isCurrent()) {
