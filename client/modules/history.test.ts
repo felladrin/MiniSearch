@@ -457,32 +457,62 @@ describe("History Module - Dexie CRUD", () => {
     });
   });
 
-  describe("saveChatMessageForQuery / getChatMessagesForQuery", () => {
-    it("should save and retrieve chat messages in order", async () => {
-      const {
-        addSearchToHistory,
-        getCurrentSearchRunId,
-        saveChatMessageForQuery,
-        getChatMessagesForQuery,
-      } = await import("./history");
-      const results = {
-        type: "text" as const,
-        items: [{ title: "T", url: "https://t.com", snippet: "S" }],
-      };
-      const runId = getCurrentSearchRunId();
+  describe("replaceChatConversation / getChatMessagesForQuery", () => {
+    const pair = (question: string, answer: string) => [
+      { role: "user" as const, content: question },
+      { role: "assistant" as const, content: answer },
+    ];
 
-      await addSearchToHistory("chat test", results);
-      // Save assistant message with earlier timestamp so it proves sort by timestamp.
-      vi.setSystemTime(new Date(2000, 0, 2));
-      await saveChatMessageForQuery("chat test", "user", "Hello");
-      vi.setSystemTime(new Date(2000, 0, 1));
-      await saveChatMessageForQuery("chat test", "assistant", "Hi there");
+    it("stores the messages in the order given", async () => {
+      const { replaceChatConversation, getChatMessagesForQuery } = await import(
+        "./history"
+      );
 
-      const messages = await getChatMessagesForQuery(runId);
-      expect(messages).toHaveLength(2);
-      // sortBy("timestamp") puts the assistant (Jan 1) before user (Jan 2).
-      expect(messages[0]).toEqual({ role: "assistant", content: "Hi there" });
-      expect(messages[1]).toEqual({ role: "user", content: "Hello" });
+      await replaceChatConversation("run-a", [
+        ...pair("Q1", "A1"),
+        ...pair("Q2", "A2"),
+      ]);
+
+      expect(await getChatMessagesForQuery("run-a")).toEqual([
+        ...pair("Q1", "A1"),
+        ...pair("Q2", "A2"),
+      ]);
+    });
+
+    it("replaces the conversation instead of appending to it", async () => {
+      const { replaceChatConversation, getChatMessagesForQuery } = await import(
+        "./history"
+      );
+
+      await replaceChatConversation("run-a", pair("Q1", "First answer"));
+      await replaceChatConversation("run-a", pair("Q1", "Regenerated"));
+
+      expect(await getChatMessagesForQuery("run-a")).toEqual(
+        pair("Q1", "Regenerated"),
+      );
+    });
+
+    it("leaves other conversations untouched", async () => {
+      const { replaceChatConversation, getChatMessagesForQuery } = await import(
+        "./history"
+      );
+
+      await replaceChatConversation("run-a", pair("A?", "A."));
+      await replaceChatConversation("run-b", pair("B?", "B."));
+      await replaceChatConversation("run-a", []);
+
+      expect(await getChatMessagesForQuery("run-b")).toEqual(pair("B?", "B."));
+    });
+
+    it("removes the conversation when given an empty list", async () => {
+      const { replaceChatConversation, historyDatabase } = await import(
+        "./history"
+      );
+
+      await replaceChatConversation("run-a", pair("Q1", "A1"));
+      await replaceChatConversation("run-a", []);
+
+      expect(await historyDatabase.chatHistory.count()).toBe(0);
     });
 
     it("should return empty array when no messages exist", async () => {
@@ -673,7 +703,7 @@ describe("History Module - Enable Search History off", () => {
       addSearchToHistory,
       getCurrentSearchRunId,
       historyDatabase,
-      saveChatMessageForQuery,
+      replaceChatConversation,
       saveLlmResponseForQuery,
       updateSearchResults,
     } = await import("./history");
@@ -681,7 +711,9 @@ describe("History Module - Enable Search History off", () => {
     const id = await addSearchToHistory("private query", textResults);
     await updateSearchResults(getCurrentSearchRunId(), textResults);
     await saveLlmResponseForQuery("private query", "answer", "m");
-    await saveChatMessageForQuery("private query", "user", "follow-up");
+    await replaceChatConversation(getCurrentSearchRunId(), [
+      { role: "user", content: "follow-up" },
+    ]);
 
     expect(id).toBeUndefined();
     expect(await historyDatabase.searches.count()).toBe(0);
