@@ -13,7 +13,6 @@ import {
   getConversationSummary,
   getQuery,
   getSettings,
-  getTextGenerationState,
   listenToSettingsChanges,
   updateChatMessages,
   updateConversationSummary,
@@ -52,10 +51,11 @@ import type {
 const SUMMARY_TOKEN_LIMIT = 800;
 
 type InferenceStrategy = {
-  generateText: () => Promise<string>;
+  generateText: (signal: AbortSignal) => Promise<string>;
   generateChat: (
     messages: ChatMessage[],
     onUpdate: (partialResponse: string) => void,
+    signal?: AbortSignal,
   ) => Promise<string>;
 };
 
@@ -148,6 +148,7 @@ function loadConversationSummary(conversationId: string): string {
 async function createLlmSummary(
   dropped: ChatMessage[],
   previousSummary: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const instructionLines = [
     "You are the conversation memory manager.",
@@ -173,9 +174,11 @@ async function createLlmSummary(
   try {
     const strategy = await getCurrentInferenceStrategy();
     return capToSummaryLimit(
-      (await strategy.generateChat(chat, () => {})).trim(),
+      (await strategy.generateChat(chat, () => {}, signal)).trim(),
     );
   } catch (e) {
+    // A stopped chat needs no summary at all.
+    if (signal?.aborted) throw e;
     addLogEntry(
       `LLM summary failed, falling back to extractive: ${
         e instanceof Error ? e.message : String(e)
@@ -257,6 +260,18 @@ function summarizeDroppedMessages(
 
 let searchInvocation = 0;
 
+/** Cancels the answer of the search that is currently generating one. */
+let activeSearchController: AbortController | null = null;
+
+/**
+ * Stops the answer being generated for the current search. Only that run is
+ * cancelled: a chat reply has its own signal.
+ */
+export function interruptSearch() {
+  updateTextGenerationState("interrupted");
+  activeSearchController?.abort();
+}
+
 export async function searchAndRespond() {
   if (getQuery() === "") return;
 
@@ -284,9 +299,21 @@ export async function searchAndRespond() {
 
   updateSearchPromise(startTextSearch(getQuery(), invocation));
 
-  if (!getSettings().enableAiResponse) return;
+  const previousSearchController = activeSearchController;
+  previousSearchController?.abort();
+  activeSearchController = null;
+
+  if (!getSettings().enableAiResponse) {
+    // The aborted answer writes no state of its own, so it would stay
+    // "generating" (and keep the screen awake) with no run behind it.
+    if (previousSearchController) updateTextGenerationState("idle");
+    return;
+  }
 
   const responseGenerationStartTime = Date.now();
+
+  const controller = new AbortController();
+  activeSearchController = controller;
 
   try {
     const settings = getSettings();
@@ -299,7 +326,7 @@ export async function searchAndRespond() {
       updateTextGenerationState("loadingModel");
     }
     const strategy = await getCurrentInferenceStrategy();
-    const finalResponse = await strategy.generateText();
+    const finalResponse = await strategy.generateText(controller.signal);
 
     try {
       await saveLlmResponseForQuery(
@@ -325,10 +352,12 @@ export async function searchAndRespond() {
       showAiCompleteNotification(getQuery());
     }
   } catch (error) {
-    if (getTextGenerationState() !== "interrupted") {
+    if (!controller.signal.aborted) {
       addLogEntry(`Error generating text: ${error}`);
       updateTextGenerationState("failed");
     }
+  } finally {
+    if (activeSearchController === controller) activeSearchController = null;
   }
 
   addLogEntry(
@@ -388,6 +417,7 @@ function keepNewestMessagesWithinBudget(
  */
 export async function generateReplyToMessages(
   messages: ChatMessage[],
+  signal?: AbortSignal,
 ): Promise<string> {
   const keptMessages = keepNewestMessagesWithinBudget(
     withoutReasoning(messages),
@@ -399,12 +429,13 @@ export async function generateReplyToMessages(
   }
 
   const strategy = await getCurrentInferenceStrategy();
-  return strategy.generateChat(keptMessages, () => {});
+  return strategy.generateChat(keptMessages, () => {}, signal);
 }
 
 export async function generateChatResponse(
   messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
+  signal?: AbortSignal,
 ) {
   const newMessages = withoutReasoning(messages);
   let response = "";
@@ -484,7 +515,7 @@ export async function generateChatResponse(
       const droppedCount = newMessages.length - processedMessages.length;
       const droppedMessages = newMessages.slice(0, droppedCount);
       const updatedSummary =
-        (await createLlmSummary(droppedMessages, existingSummary)) ||
+        (await createLlmSummary(droppedMessages, existingSummary, signal)) ||
         existingSummary;
       // The stored summary keeps up to SUMMARY_TOKEN_LIMIT tokens for a later
       // turn with more room; this prompt gets only what fits.
@@ -500,7 +531,7 @@ export async function generateChatResponse(
     const lastMessages = [systemPrompt, initialResponse, ...processedMessages];
 
     const strategy = await getCurrentInferenceStrategy();
-    response = await strategy.generateChat(lastMessages, onUpdate);
+    response = await strategy.generateChat(lastMessages, onUpdate, signal);
   } catch (error) {
     if (error instanceof ChatGenerationError) {
       addLogEntry(`Chat generation interrupted: ${error.message}`);

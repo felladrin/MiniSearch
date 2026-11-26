@@ -68,6 +68,38 @@ function sseResponse(lines: unknown[], { truncated = false } = {}) {
   });
 }
 
+/**
+ * An event stream that stays open until the test sends `close`, so a request
+ * can be caught while it is still waiting on the server. Aborting the fetch
+ * errors the body the way a browser does.
+ */
+function heldOpenSseResponse(init: RequestInit | undefined) {
+  const encoder = new TextEncoder();
+  let controller!: ReadableStreamDefaultController<Uint8Array>;
+  const body = new ReadableStream<Uint8Array>({
+    start(streamController) {
+      controller = streamController;
+    },
+  });
+  init?.signal?.addEventListener("abort", () => {
+    controller.error(new DOMException("aborted", "AbortError"));
+  });
+  const send = (chunk: unknown) =>
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+  return {
+    response: new Response(body, {
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
+    }),
+    send,
+    close: () => {
+      send({ choices: [{ delta: {}, finish_reason: "stop" }] });
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  };
+}
+
 function mockSettings(overrides: Partial<typeof defaultSettings> = {}) {
   vi.mocked(getSettings).mockReturnValue({
     ...defaultSettings,
@@ -83,8 +115,8 @@ function mockSettings(overrides: Partial<typeof defaultSettings> = {}) {
 describe("textGenerationWithOpenAi", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSettings();
     vi.mocked(getTextGenerationState).mockReturnValue("idle");
+    mockSettings();
   });
 
   describe("generateTextWithOpenAi", () => {
@@ -156,12 +188,20 @@ describe("textGenerationWithOpenAi", () => {
       );
 
       mockFetch.mockResolvedValueOnce(
-        sseResponse([{ choices: [{ delta: { content: "partial" } }] }]),
+        sseResponse([
+          { choices: [{ delta: { content: "partial" } }] },
+          { choices: [{ delta: { content: " answer" } }] },
+        ]),
       );
-      vi.mocked(getTextGenerationState).mockReturnValue("interrupted");
+      const controller = new AbortController();
+      const onUpdate = vi.fn(() => controller.abort());
 
       await expect(
-        generateChatWithOpenAi([{ role: "user", content: "Hi" }], vi.fn()),
+        generateChatWithOpenAi(
+          [{ role: "user", content: "Hi" }],
+          onUpdate,
+          controller.signal,
+        ),
       ).rejects.toThrow("Chat generation interrupted");
     });
 
@@ -221,6 +261,91 @@ describe("textGenerationWithOpenAi", () => {
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("keeping what arrived"),
       );
+    });
+
+    it("does not stop when the shared state says interrupted", async () => {
+      // The state belongs to the search answer; a chat with its own signal
+      // that was not aborted has to finish.
+      vi.mocked(getTextGenerationState).mockReturnValue("interrupted");
+      mockFetch.mockResolvedValueOnce(
+        sseResponse([{ choices: [{ delta: { content: "Hello" } }] }]),
+      );
+      const { generateChatWithOpenAi } = await import(
+        "./textGenerationWithOpenAi"
+      );
+
+      await expect(
+        generateChatWithOpenAi(
+          [{ role: "user", content: "Hi" }],
+          vi.fn(),
+          new AbortController().signal,
+        ),
+      ).resolves.toBe("Hello");
+    });
+
+    it("aborts only the request of the chat whose signal aborts", async () => {
+      const streams: ReturnType<typeof heldOpenSseResponse>[] = [];
+      const fetchSignals: (AbortSignal | null | undefined)[] = [];
+      mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+        const stream = heldOpenSseResponse(init);
+        streams.push(stream);
+        fetchSignals.push(init?.signal);
+        return Promise.resolve(stream.response);
+      });
+      const { generateChatWithOpenAi } = await import(
+        "./textGenerationWithOpenAi"
+      );
+
+      const first = generateChatWithOpenAi(
+        [{ role: "user", content: "First" }],
+        vi.fn(),
+        new AbortController().signal,
+      );
+      const secondController = new AbortController();
+      const second = generateChatWithOpenAi(
+        [{ role: "user", content: "Second" }],
+        vi.fn(),
+        secondController.signal,
+      );
+      await vi.waitFor(() => expect(streams).toHaveLength(2));
+
+      const secondOutcome = expect(second).rejects.toThrow(
+        "Chat generation interrupted",
+      );
+      secondController.abort();
+      await secondOutcome;
+
+      expect(fetchSignals[1]?.aborted).toBe(true);
+      expect(fetchSignals[0]?.aborted).toBe(false);
+
+      streams[0].send({ choices: [{ delta: { content: "First answer" } }] });
+      streams[0].close();
+      await expect(first).resolves.toBe("First answer");
+    });
+
+    it("stops at once when aborted before any chunk arrives", async () => {
+      let stream: ReturnType<typeof heldOpenSseResponse> | undefined;
+      mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+        stream = heldOpenSseResponse(init);
+        return Promise.resolve(stream.response);
+      });
+      const { generateChatWithOpenAi } = await import(
+        "./textGenerationWithOpenAi"
+      );
+      const controller = new AbortController();
+
+      const chat = generateChatWithOpenAi(
+        [{ role: "user", content: "Hi" }],
+        vi.fn(),
+        controller.signal,
+      );
+      await vi.waitFor(() => expect(stream).toBeDefined());
+      const outcome = expect(chat).rejects.toThrow(
+        "Chat generation interrupted",
+      );
+      // The server never sends a chunk, so only the signal can end the wait.
+      controller.abort();
+      await outcome;
     });
 
     it("gives up once no untried model is left", async () => {

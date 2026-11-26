@@ -157,7 +157,7 @@ import {
   updateTextSearchStale,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
-import { searchAndRespond } from "./textGeneration";
+import { interruptSearch, searchAndRespond } from "./textGeneration";
 import { generateTextWithWllama } from "./textGenerationWithWllama";
 import type { ImageSearchResults, TextSearchResults } from "./types";
 
@@ -1053,9 +1053,7 @@ describe("inference degradation", () => {
       ]),
     );
     harness.onResponseUpdate.current = (value: string) => {
-      if (value === "Partial answer") {
-        harness.state.textGenerationState = "interrupted";
-      }
+      if (value === "Partial answer") interruptSearch();
     };
 
     await searchAndRespond();

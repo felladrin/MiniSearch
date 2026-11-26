@@ -2,7 +2,6 @@ import { appName, appRepository, appVersion } from "./appInfo";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
-  getTextGenerationState,
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
@@ -200,6 +199,7 @@ async function handleGenerationStatus(
   generationId: string,
   onUpdate: (text: string) => void,
   signal?: AbortSignal,
+  interruptSignal?: AbortSignal,
 ): Promise<string> {
   const aiHordeApiKey = getEffectiveHordeApiKey();
   let lastText = "";
@@ -252,6 +252,10 @@ async function handleGenerationStatus(
       if (polled) {
         status = polled;
         const generation = status.generations?.[0];
+        // A stopped or superseded run must not publish a late answer.
+        if (interruptSignal?.aborted) {
+          throw new ChatGenerationError("Generation interrupted");
+        }
         if (generation?.text && generation.text !== lastText) {
           lastText = generation.text;
           if (generation.model) {
@@ -278,7 +282,7 @@ async function handleGenerationStatus(
         );
       }
 
-      if (getTextGenerationState() === "interrupted") {
+      if (interruptSignal?.aborted) {
         // Stop only ends the polling here; runHordeJob cancels the queued job
         // on the way out so it doesn't keep running and spending kudos.
         throw new ChatGenerationError("Generation interrupted");
@@ -370,12 +374,18 @@ async function runHordeJob(
   onUpdate: (text: string) => void,
   signal?: AbortSignal,
   onStarted?: () => void,
+  interruptSignal?: AbortSignal,
 ): Promise<string> {
   const generation = await startGeneration(messages, models);
   onStarted?.();
   let answered = false;
   try {
-    const text = await handleGenerationStatus(generation.id, onUpdate, signal);
+    const text = await handleGenerationStatus(
+      generation.id,
+      onUpdate,
+      signal,
+      interruptSignal,
+    );
     answered = true;
     return text;
   } finally {
@@ -515,8 +525,8 @@ export async function fetchHordeUserInfo(
   };
 }
 
-export async function generateTextWithHorde() {
-  await canStartResponding();
+export async function generateTextWithHorde(signal?: AbortSignal) {
+  await canStartResponding(signal);
   updateTextGenerationState("preparingToGenerate");
   const messages = getDefaultChatMessages(
     await getFormattedSearchResults(true),
@@ -525,17 +535,23 @@ export async function generateTextWithHorde() {
   // arrives on the poll that ends the loop. Entering "generating" before the
   // job is submitted shows the response card and its Stop button for the
   // whole queue wait, which is what makes an interrupt possible at all.
+  if (signal?.aborted) throw new ChatGenerationError("Generation interrupted");
   updateTextGenerationState("generating");
-  return await executeHordeGeneration(messages, (text) => {
-    updateResponse(text);
-  });
+  return await executeHordeGeneration(
+    messages,
+    (text) => {
+      updateResponse(text);
+    },
+    signal,
+  );
 }
 
 export async function generateChatWithHorde(
   messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
+  signal?: AbortSignal,
 ) {
-  return await executeHordeGeneration(messages, onUpdate);
+  return await executeHordeGeneration(messages, onUpdate, signal);
 }
 
 /**
@@ -561,6 +577,7 @@ async function raceGenerations(
   messages: ChatMessage[],
   models: string[] | undefined,
   onUpdate: (text: string) => void,
+  interruptSignal?: AbortSignal,
 ): Promise<string> {
   const controllers: AbortController[] = [
     new AbortController(),
@@ -580,6 +597,7 @@ async function raceGenerations(
       () => {
         started[index] = true;
       },
+      interruptSignal,
     ).then((result) => ({ result, index })),
   );
 
@@ -611,11 +629,19 @@ async function raceGenerations(
 async function executeHordeGeneration(
   messages: ChatMessage[],
   onUpdate: (text: string) => void,
+  interruptSignal?: AbortSignal,
 ): Promise<string> {
   const settings = getSettings();
 
   if (settings.hordeModel) {
-    return await runHordeJob(messages, [settings.hordeModel], onUpdate);
+    return await runHordeJob(
+      messages,
+      [settings.hordeModel],
+      onUpdate,
+      undefined,
+      undefined,
+      interruptSignal,
+    );
   }
 
   let topModels: string[] = [];
@@ -629,7 +655,7 @@ async function executeHordeGeneration(
 
   // The ranking fetch widened the window between the user pressing stop and
   // the jobs being submitted; close it before submitting.
-  if (getTextGenerationState() === "interrupted") {
+  if (interruptSignal?.aborted) {
     throw new ChatGenerationError("Generation interrupted");
   }
 
@@ -638,6 +664,7 @@ async function executeHordeGeneration(
       messages,
       topModels.length > 0 ? topModels : undefined,
       onUpdate,
+      interruptSignal,
     );
   } catch (error) {
     if (
@@ -648,7 +675,12 @@ async function executeHordeGeneration(
       addLogEntry(
         "None of the top AI Horde models could take the generation, retrying with any available model",
       );
-      return await raceGenerations(messages, undefined, onUpdate);
+      return await raceGenerations(
+        messages,
+        undefined,
+        onUpdate,
+        interruptSignal,
+      );
     }
     throw error;
   }

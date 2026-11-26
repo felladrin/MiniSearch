@@ -25,6 +25,9 @@ vi.mock("./pubSub", () => ({
   updateTextGenerationState: vi.fn(),
   updateTextSearchResults: vi.fn(),
   updateTextSearchState: vi.fn(),
+  updateTextSearchStale: vi.fn(),
+  updateSuppressNextFollowUp: vi.fn(),
+  updatePageContents: vi.fn(),
 }));
 vi.mock("./history", () => ({
   getCurrentSearchRunId: vi.fn(() => "run-1"),
@@ -57,12 +60,17 @@ vi.mock("./textGenerationWithWllama", () => ({
 }));
 
 import gptTokenizer from "gpt-tokenizer";
-import { getSettings } from "./pubSub";
+import { getQuery, getSettings, updateTextGenerationState } from "./pubSub";
 import {
   generateReplyToMessages,
+  interruptSearch,
+  searchAndRespond,
   textGenerationFunctions,
 } from "./textGeneration";
-import { generateChatWithWllama } from "./textGenerationWithWllama";
+import {
+  generateChatWithWllama,
+  generateTextWithWllama,
+} from "./textGenerationWithWllama";
 
 const mockGetSettings = vi.mocked(getSettings);
 
@@ -101,6 +109,74 @@ describe("generateReplyToMessages", () => {
     expect(generateChatWithWllama).toHaveBeenCalledWith(
       [{ role: "user", content: "question" }],
       expect.any(Function),
+      undefined,
     );
+  });
+});
+
+describe("searchAndRespond", () => {
+  it("cancels the previous search's answer, and Stop cancels the current one", async () => {
+    vi.mocked(getQuery).mockReturnValue("question");
+    mockGetSettings.mockReturnValue({
+      inferenceType: "browser",
+      enableAiResponse: true,
+      enableTextSearch: false,
+      enableImageSearch: false,
+      allowAiModelDownload: true,
+    } as never);
+    const signals: AbortSignal[] = [];
+    vi.mocked(generateTextWithWllama).mockImplementation(
+      (signal) =>
+        new Promise((_resolve, reject) => {
+          if (!signal) throw new Error("no signal");
+          signals.push(signal);
+          signal.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    );
+
+    const first = searchAndRespond();
+    await vi.waitFor(() => expect(signals).toHaveLength(1));
+    const second = searchAndRespond();
+    await vi.waitFor(() => expect(signals).toHaveLength(2));
+
+    expect(signals[0].aborted).toBe(true);
+    expect(signals[1].aborted).toBe(false);
+
+    interruptSearch();
+    await Promise.all([first, second]);
+
+    expect(signals[1].aborted).toBe(true);
+    expect(updateTextGenerationState).toHaveBeenCalledWith("interrupted");
+    expect(updateTextGenerationState).not.toHaveBeenCalledWith("failed");
+  });
+
+  it("leaves no stuck state when a search with AI off replaces a running answer", async () => {
+    vi.mocked(getQuery).mockReturnValue("question");
+    const settings = {
+      inferenceType: "browser",
+      enableAiResponse: true,
+      enableTextSearch: false,
+      enableImageSearch: false,
+      allowAiModelDownload: true,
+    };
+    mockGetSettings.mockImplementation(() => settings as never);
+    let running: AbortSignal | undefined;
+    vi.mocked(generateTextWithWllama).mockImplementation(
+      (signal) =>
+        new Promise((_resolve, reject) => {
+          running = signal;
+          signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    );
+
+    const first = searchAndRespond();
+    await vi.waitFor(() => expect(running).toBeDefined());
+    vi.mocked(updateTextGenerationState).mockClear();
+    settings.enableAiResponse = false;
+    await searchAndRespond();
+    await first;
+
+    expect(running?.aborted).toBe(true);
+    expect(updateTextGenerationState).toHaveBeenLastCalledWith("idle");
   });
 });

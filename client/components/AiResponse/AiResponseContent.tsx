@@ -17,11 +17,10 @@ import {
   IconRefresh,
   IconVolume2,
 } from "@tabler/icons-react";
-import type { PublishFunction } from "create-pubsub";
 import { usePubSub } from "create-pubsub/react";
 import { type ReactNode, useMemo } from "react";
 import { settingsPubSub, textToSpeechStatePubSub } from "@/modules/pubSub";
-import { searchAndRespond } from "@/modules/textGeneration";
+import { interruptSearch, searchAndRespond } from "@/modules/textGeneration";
 import { speak } from "@/modules/textToSpeech";
 import CopyIconButton from "./CopyIconButton";
 import FormattedMarkdown from "./FormattedMarkdown";
@@ -29,20 +28,9 @@ import FormattedMarkdown from "./FormattedMarkdown";
 export default function AiResponseContent({
   textGenerationState,
   response,
-  setTextGenerationState,
 }: {
   textGenerationState: string;
   response: string;
-  setTextGenerationState: PublishFunction<
-    | "failed"
-    | "awaitingSearchResults"
-    | "preparingToGenerate"
-    | "idle"
-    | "loadingModel"
-    | "generating"
-    | "interrupted"
-    | "completed"
-  >;
 }) {
   const [settings, setSettings] = usePubSub(settingsPubSub);
   const [textToSpeechState] = usePubSub(textToSpeechStatePubSub);
@@ -89,7 +77,7 @@ export default function AiResponseContent({
               <Tooltip label="Interrupt generation">
                 <ActionIcon
                   aria-label="Interrupt generation"
-                  onClick={() => setTextGenerationState("interrupted")}
+                  onClick={interruptSearch}
                   variant="subtle"
                   color="gray"
                 >

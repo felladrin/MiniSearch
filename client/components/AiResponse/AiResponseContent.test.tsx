@@ -9,6 +9,7 @@ vi.mock("create-pubsub/react", () => ({
 }));
 
 vi.mock("@/modules/textGeneration", () => ({
+  interruptSearch: vi.fn(),
   searchAndRespond: vi.fn(),
 }));
 
@@ -43,7 +44,6 @@ function renderContent(textGenerationState: string) {
       <AiResponseContent
         textGenerationState={textGenerationState}
         response="Hello world"
-        setTextGenerationState={vi.fn()}
       />
     </MantineProvider>,
   );

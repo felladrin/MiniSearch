@@ -45,8 +45,10 @@ vi.mock("./systemPrompt", () => ({
   getSystemPrompt: (searchResults: string) => `prompt: ${searchResults}`,
 }));
 
+import { getSearchPromise, updateTextGenerationState } from "./pubSub";
 import {
   answerOnly,
+  canStartResponding,
   getDefaultChatCompletionCreateParamsStreaming,
   getDefaultChatMessages,
   getEffectiveContextSize,
@@ -568,5 +570,30 @@ describe("answerOnly", () => {
       messages[0],
       { role: "assistant", content: "Hello!" },
     ]);
+  });
+});
+
+describe("canStartResponding", () => {
+  it("stops a run that a newer search aborted while it waited for results", async () => {
+    const controller = new AbortController();
+    vi.mocked(getSearchPromise).mockImplementation(async () => {
+      controller.abort();
+      return { textResults: [], imageResults: [] };
+    });
+
+    await expect(canStartResponding(controller.signal)).rejects.toThrow(
+      "Generation interrupted",
+    );
+  });
+
+  it("leaves the state alone for a run that was already aborted", async () => {
+    vi.mocked(updateTextGenerationState).mockClear();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(canStartResponding(controller.signal)).rejects.toThrow(
+      "Generation interrupted",
+    );
+    expect(updateTextGenerationState).not.toHaveBeenCalled();
   });
 });

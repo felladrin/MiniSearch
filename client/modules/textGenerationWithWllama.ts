@@ -3,7 +3,6 @@ import { FALLBACK_CONFIG, getConfig } from "./config";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
-  getTextGenerationState,
   updateModelLoadingProgress,
   updateModelSizeInMegabytes,
   updateResponse,
@@ -29,7 +28,9 @@ type ProgressCallback = ({
   total: number;
 }) => void;
 
-export async function generateTextWithWllama(): Promise<string> {
+export async function generateTextWithWllama(
+  signal?: AbortSignal,
+): Promise<string> {
   if (!getSettings().enableAiResponse) return "";
 
   try {
@@ -44,6 +45,7 @@ export async function generateTextWithWllama(): Promise<string> {
       },
       onUpdate: updateResponse,
       shouldCheckCanRespond: true,
+      signal,
     });
     updateResponse(response);
     return response;
@@ -60,6 +62,7 @@ export async function generateTextWithWllama(): Promise<string> {
 export async function generateChatWithWllama(
   messages: ChatMessage[],
   onUpdate: (partialResponse: string) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
   if (messages.length === 0) {
     throw new Error("No messages provided for chat generation");
@@ -69,6 +72,7 @@ export async function generateChatWithWllama(
     messages,
     onUpdate,
     shouldCheckCanRespond: false,
+    signal,
   });
 }
 
@@ -76,6 +80,7 @@ interface WllamaConfig {
   messages: ChatMessage[] | (() => ChatMessage[] | Promise<ChatMessage[]>);
   onUpdate: (text: string) => void;
   shouldCheckCanRespond?: boolean;
+  signal?: AbortSignal;
 }
 
 /**
@@ -105,12 +110,22 @@ async function runWllamaGeneration({
   messages: messagesOrBuilder,
   onUpdate,
   shouldCheckCanRespond = false,
+  signal,
 }: WllamaConfig): Promise<string> {
   let loadingPercentage = 0;
   let wllamaInstance: Wllama | undefined;
   const abortController = new AbortController();
+  const interrupt = () => abortController.abort();
+  signal?.addEventListener("abort", interrupt, { once: true });
+  const throwIfInterrupted = () => {
+    if (signal?.aborted) {
+      throw new ChatGenerationError("Chat generation interrupted");
+    }
+  };
 
   try {
+    throwIfInterrupted();
+
     const progressCallback: ProgressCallback | undefined = shouldCheckCanRespond
       ? ({ loaded, total }) => {
           if (total <= 0) return;
@@ -127,9 +142,11 @@ async function runWllamaGeneration({
 
     const { wllama, model } = await initializeWllamaInstance(progressCallback);
     wllamaInstance = wllama;
+    // The load cannot be cancelled, so a run aborted meanwhile stops here.
+    throwIfInterrupted();
 
     if (shouldCheckCanRespond) {
-      await canStartResponding();
+      await canStartResponding(signal);
       updateTextGenerationState("preparingToGenerate");
     }
 
@@ -137,6 +154,8 @@ async function runWllamaGeneration({
       typeof messagesOrBuilder === "function"
         ? await messagesOrBuilder()
         : messagesOrBuilder;
+
+    throwIfInterrupted();
 
     let reasoningText = "";
     let answerText = "";
@@ -153,13 +172,10 @@ async function runWllamaGeneration({
         : {}),
     });
 
+    let generating = false;
+
     for await (const chunk of stream) {
-      if (shouldCheckCanRespond) {
-        if (getTextGenerationState() === "interrupted") {
-          abortController.abort();
-          throw new ChatGenerationError("Chat generation interrupted");
-        }
-      }
+      throwIfInterrupted();
 
       const delta = chunk.choices[0]?.delta?.content ?? "";
       // wllama splits a thinking model's chain of thought into its own
@@ -169,7 +185,8 @@ async function runWllamaGeneration({
           ?.reasoning_content ?? "";
       if (!delta && !reasoningDelta) continue;
 
-      if (shouldCheckCanRespond && getTextGenerationState() !== "generating") {
+      if (shouldCheckCanRespond && !generating) {
+        generating = true;
         updateTextGenerationState("generating");
       }
 
@@ -184,6 +201,8 @@ async function runWllamaGeneration({
       );
     }
 
+    throwIfInterrupted();
+
     return streamedMessage;
   } catch (error) {
     addLogEntry(
@@ -193,6 +212,7 @@ async function runWllamaGeneration({
     );
     throw error;
   } finally {
+    signal?.removeEventListener("abort", interrupt);
     if (wllamaInstance) {
       await wllamaInstance.exit().catch((error) => {
         addLogEntry(

@@ -2,14 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
-  getTextGenerationState,
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
 import { defaultSettings } from "./settings";
 import { sleep } from "./sleep";
 import { canStartResponding } from "./textGenerationUtilities";
-import type { ChatMessage, TextGenerationState } from "./types";
+import type { ChatMessage } from "./types";
 
 vi.mock("./logEntries", () => ({
   addLogEntry: vi.fn(),
@@ -17,7 +16,6 @@ vi.mock("./logEntries", () => ({
 
 vi.mock("./pubSub", () => ({
   getSettings: vi.fn(),
-  getTextGenerationState: vi.fn().mockReturnValue("idle"),
   updateResponse: vi.fn(),
   updateTextGenerationState: vi.fn(),
 }));
@@ -66,7 +64,6 @@ describe("textGenerationWithHorde", () => {
     // The module caches the model ranking; each test starts from a clean slate.
     vi.resetModules();
     mockSettings({ hordeModel: "chosen-model" });
-    vi.mocked(getTextGenerationState).mockReturnValue("idle");
   });
 
   describe("generateTextWithHorde", () => {
@@ -135,7 +132,11 @@ describe("textGenerationWithHorde", () => {
       );
     });
 
-    it("stops polling and throws once the user interrupts generation", async () => {
+    it("stops polling and publishes nothing once the user interrupts generation", async () => {
+      const controller = new AbortController();
+      vi.mocked(updateTextGenerationState).mockImplementation((next) => {
+        if (next === "generating") controller.abort();
+      });
       const { generateTextWithHorde } = await import(
         "./textGenerationWithHorde"
       );
@@ -148,25 +149,38 @@ describe("textGenerationWithHorde", () => {
             is_possible: true,
             generations: [{ text: "partial", model: "chosen-model" }],
           }),
-        );
-      vi.mocked(getTextGenerationState).mockReturnValue("interrupted");
+        )
+        .mockResolvedValueOnce(jsonResponse({}));
 
-      await expect(generateTextWithHorde()).rejects.toThrow(
+      await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
         "Generation interrupted",
       );
-      expect(sleep).toHaveBeenCalled();
+      expect(updateResponse).not.toHaveBeenCalledWith("partial");
+      expect(sleep).not.toHaveBeenCalled();
+      expect(cancelledIds()).toEqual(["gen-4"]);
+    });
+
+    it('submits nothing and never enters "generating" once a newer search aborted it', async () => {
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
+        "Generation interrupted",
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(updateTextGenerationState).not.toHaveBeenCalledWith("generating");
     });
 
     it("can be interrupted once it is generating, and cancels the queued job", async () => {
       // The UI only offers Stop while the state is "generating", so the
       // interrupt can only happen after the engine has entered it.
-      let state: TextGenerationState = "idle";
+      const controller = new AbortController();
       vi.mocked(updateTextGenerationState).mockImplementation((next) => {
-        state = next;
+        if (next === "generating") controller.abort();
       });
-      vi.mocked(getTextGenerationState).mockImplementation(() =>
-        state === "generating" ? "interrupted" : state,
-      );
       const { generateTextWithHorde } = await import(
         "./textGenerationWithHorde"
       );
@@ -178,7 +192,7 @@ describe("textGenerationWithHorde", () => {
         )
         .mockResolvedValueOnce(jsonResponse({}));
 
-      await expect(generateTextWithHorde()).rejects.toThrow(
+      await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
         "Generation interrupted",
       );
 
@@ -188,13 +202,10 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("cancels the job exactly once when the user interrupts", async () => {
-      let state: TextGenerationState = "idle";
+      const controller = new AbortController();
       vi.mocked(updateTextGenerationState).mockImplementation((next) => {
-        state = next;
+        if (next === "generating") controller.abort();
       });
-      vi.mocked(getTextGenerationState).mockImplementation(() =>
-        state === "generating" ? "interrupted" : state,
-      );
       const { generateTextWithHorde } = await import(
         "./textGenerationWithHorde"
       );
@@ -205,7 +216,7 @@ describe("textGenerationWithHorde", () => {
         )
         .mockResolvedValueOnce(jsonResponse({}));
 
-      await expect(generateTextWithHorde()).rejects.toThrow(
+      await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
         "Generation interrupted",
       );
       expect(cancelledIds()).toEqual(["gen-stop"]);
@@ -717,10 +728,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("reports an interrupt during the race and submits no retry", async () => {
-      let interrupted = false;
-      vi.mocked(getTextGenerationState).mockImplementation(() =>
-        interrupted ? "interrupted" : "generating",
-      );
+      const controller = new AbortController();
       routeHordeFetch({
         workers: [{ models: ["m-a"], max_length: 1024 }],
         monthStats: { "m-a": 10 },
@@ -729,7 +737,7 @@ describe("textGenerationWithHorde", () => {
           "gen-2": (poll) => {
             // The user presses Stop while this job is still queued, after its
             // sibling has already reported it cannot take the job.
-            if (poll >= 1) interrupted = true;
+            if (poll >= 1) controller.abort();
             return pendingResponse;
           },
         }),
@@ -738,7 +746,7 @@ describe("textGenerationWithHorde", () => {
       const { generateTextWithHorde } = await import(
         "./textGenerationWithHorde"
       );
-      await expect(generateTextWithHorde()).rejects.toThrow(
+      await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
         "Generation interrupted",
       );
 

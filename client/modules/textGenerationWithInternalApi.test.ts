@@ -1,22 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { addLogEntry } from "./logEntries";
-import {
-  getQuery,
-  getTextGenerationState,
-  listenToTextGenerationStateChanges,
-  updateResponse,
-  updateTextGenerationState,
-} from "./pubSub";
+import { getQuery, updateResponse, updateTextGenerationState } from "./pubSub";
 import {
   ChatGenerationError,
   canStartResponding,
 } from "./textGenerationUtilities";
-import type { ChatMessage, TextGenerationState } from "./types";
+import type { ChatMessage } from "./types";
 
 vi.mock("./pubSub", () => ({
   getQuery: vi.fn().mockReturnValue("test query"),
-  getTextGenerationState: vi.fn().mockReturnValue("idle"),
-  listenToTextGenerationStateChanges: vi.fn(() => vi.fn()),
   updateResponse: vi.fn(),
   updateTextGenerationState: vi.fn(),
 }));
@@ -100,13 +92,6 @@ function closedStreamResponse(chunks: string[]) {
   return { response: new Response(body), cancel };
 }
 
-/** The state listener the module registered last. */
-function lastStateListener() {
-  const call = vi.mocked(listenToTextGenerationStateChanges).mock.calls.at(-1);
-  if (!call) throw new Error("no state listener was registered");
-  return call[0] as (state: TextGenerationState) => void;
-}
-
 function fetchSignal(): AbortSignal {
   return mockFetch.mock.calls[0][1].signal;
 }
@@ -130,7 +115,6 @@ describe("textGenerationWithInternalApi", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getQuery).mockReturnValue("test query");
-    vi.mocked(getTextGenerationState).mockReturnValue("idle");
   });
 
   describe("generateTextWithInternalApi", () => {
@@ -236,14 +220,21 @@ describe("textGenerationWithInternalApi", () => {
 
       mockFetch.mockResolvedValueOnce(
         streamResponse(
-          sseChunks(['{"choices":[{"delta":{"content":"partial"}}]}']),
+          sseChunks([
+            '{"choices":[{"delta":{"content":"partial"}}]}',
+            '{"choices":[{"delta":{"content":" answer"}}]}',
+          ]),
         ),
       );
-      vi.mocked(getTextGenerationState).mockReturnValue("interrupted");
-
-      await expect(generateTextWithInternalApi()).rejects.toThrow(
-        "Generation interrupted",
+      const controller = new AbortController();
+      vi.mocked(updateResponse).mockImplementationOnce(() =>
+        controller.abort(),
       );
+
+      await expect(
+        generateTextWithInternalApi(controller.signal),
+      ).rejects.toThrow("Generation interrupted");
+      expect(updateResponse).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -353,11 +344,14 @@ describe("textGenerationWithInternalApi", () => {
         'data: {"choices":[{"delta":{"content":"partial"}}]}\n',
       ]);
       mockFetch.mockResolvedValueOnce(stream.response);
-      vi.mocked(getTextGenerationState).mockReturnValue("interrupted");
-
-      await expect(generateTextWithInternalApi()).rejects.toThrow(
-        "Generation interrupted",
+      const controller = new AbortController();
+      vi.mocked(updateResponse).mockImplementationOnce(() =>
+        controller.abort(),
       );
+
+      await expect(
+        generateTextWithInternalApi(controller.signal),
+      ).rejects.toThrow("Generation interrupted");
 
       expect(fetchSignal().aborted).toBe(true);
       expect(stream.cancel).toHaveBeenCalled();
@@ -388,16 +382,18 @@ describe("textGenerationWithInternalApi", () => {
       const stream = openStreamResponse([]);
       mockFetch.mockResolvedValueOnce(stream.response);
 
+      const controller = new AbortController();
       const chat = generateChatWithInternalApi(
         [{ role: "user", content: "Hi" }],
         vi.fn(),
+        controller.signal,
       );
       const outcome = expect(chat).rejects.toThrow(
         "Chat generation interrupted",
       );
       await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled());
-      // No chunk ever arrives, so only the state change can end the wait.
-      lastStateListener()("interrupted");
+      // No chunk ever arrives, so only the signal can end the wait.
+      controller.abort();
       await outcome;
 
       expect(fetchSignal().aborted).toBe(true);
@@ -412,16 +408,20 @@ describe("textGenerationWithInternalApi", () => {
         sseChunks(['{"choices":[{"delta":{"content":"Hello"}}]}']),
       );
       mockFetch.mockResolvedValueOnce(stream.response);
+      const controller = new AbortController();
 
       await expect(
-        generateChatWithInternalApi([{ role: "user", content: "Hi" }], vi.fn()),
+        generateChatWithInternalApi(
+          [{ role: "user", content: "Hi" }],
+          vi.fn(),
+          controller.signal,
+        ),
       ).resolves.toBe("Hello");
 
+      // Aborting the caller's signal afterwards reaches nothing.
+      controller.abort();
       expect(fetchSignal().aborted).toBe(false);
       expect(stream.cancel).not.toHaveBeenCalled();
-      const stopListening = vi.mocked(listenToTextGenerationStateChanges).mock
-        .results[0].value;
-      expect(stopListening).toHaveBeenCalledTimes(1);
     });
   });
 });

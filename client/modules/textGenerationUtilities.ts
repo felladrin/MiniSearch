@@ -257,9 +257,16 @@ export async function getFormattedSearchResults(
   return `${disclaimers.join("\n\n")}\n\n${formattedResults}`;
 }
 
-export async function canStartResponding() {
+/**
+ * Waits for the search results the answer reads. A newer search aborts this
+ * run's signal, and a superseded run that went on to write the shared state
+ * would cover the newer answer, so it stops here instead.
+ */
+export async function canStartResponding(signal?: AbortSignal) {
+  if (signal?.aborted) throw new ChatGenerationError("Generation interrupted");
   updateTextGenerationState("awaitingSearchResults");
   await getSearchPromise();
+  if (signal?.aborted) throw new ChatGenerationError("Generation interrupted");
 }
 
 /**

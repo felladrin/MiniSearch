@@ -28,7 +28,7 @@ Long-running chats can easily exceed the model context window. MiniSearch addres
 
 ## Failure Modes & Logging
 
-- Every summarization attempt is wrapped in try/catch; failures emit `addLogEntry` notifications and fall back to extractive summaries so the chat loop never stalls.
+- Every summarization attempt is wrapped in try/catch; failures emit `addLogEntry` notifications and fall back to extractive summaries so the chat loop never stalls. The exception is a chat whose signal was aborted (the chat unmounted): the error is rethrown, since no answer will use the summary.
 - If generation is interrupted (user stop), a custom `ChatGenerationError` ensures the loop exits gracefully without corrupting the stored summary.
 
 ## Reset Rules
