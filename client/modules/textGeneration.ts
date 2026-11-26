@@ -11,6 +11,7 @@ import { showAiCompleteNotification } from "./notifications";
 import { fetchPageContents } from "./pageContent";
 import {
   getConversationSummary,
+  getImageSearchResults,
   getQuery,
   getSettings,
   listenToSettingsChanges,
@@ -845,15 +846,24 @@ async function startImageSearch(
     );
     results.imageResults = imageResults;
 
+    // A follow-up can add images while this search is still running; they
+    // stay, ahead of this search's own.
+    const shown = isCurrent() ? getImageSearchResults() : [];
+    const shownUrls = new Set(shown.map(([, url]) => url));
+    const mergedResults: ImageSearchResults = [
+      ...shown,
+      ...imageResults.filter(([, url]) => !shownUrls.has(url)),
+    ];
+
     if (isCurrent()) {
       updateImageSearchState("completed");
-      updateImageSearchResults(imageResults);
+      updateImageSearchResults(mergedResults);
     }
 
     if (isRunCurrent()) {
       updateSearchResults(searchRunId, {
         type: "image",
-        items: imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
+        items: mergedResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
           title,
           url,
           thumbnail: thumbnailUrl,

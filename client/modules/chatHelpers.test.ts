@@ -12,6 +12,7 @@ vi.mock("./history", () => ({
   updateSearchResults: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("./pubSub", () => ({
+  getImageSearchResults: vi.fn(() => []),
   getPageContents: vi.fn(() => ({})),
   updateImageSearchResults: vi.fn(),
   updateLlmTextSearchResults: vi.fn(),
@@ -45,6 +46,7 @@ import {
 } from "./history";
 import { fetchPageContents } from "./pageContent";
 import {
+  getImageSearchResults,
   getPageContents,
   updateImageSearchResults,
   updateLlmTextSearchResults,
@@ -162,6 +164,39 @@ describe("refreshImageSearchResults", () => {
       ["New", "https://new.com", "thumb", "source"],
       ["Existing", "https://existing.com", "thumb", "source"],
     ]);
+  });
+
+  it("keeps the first search's images that landed after the follow-up started", async () => {
+    const firstImages: ImageSearchResults = [
+      ["First", "https://first.com", "thumb", "source"],
+    ];
+    const fresh: ImageSearchResults = [
+      ["New", "https://new.com", "thumb", "source"],
+    ];
+    mockSearchImages.mockResolvedValueOnce({ results: fresh, stale: false });
+    // The follow-up was handed an empty list; the first images arrived since.
+    vi.mocked(getImageSearchResults).mockReturnValueOnce(firstImages);
+
+    await refreshImageSearchResults("query", 10, []);
+
+    expect(mockUpdateImage).toHaveBeenCalledWith([...fresh, ...firstImages]);
+    expect(mockUpdateSearchResults).toHaveBeenCalledWith("run-1", {
+      type: "image",
+      items: [
+        {
+          title: "New",
+          url: "https://new.com",
+          thumbnail: "thumb",
+          sourceUrl: "source",
+        },
+        {
+          title: "First",
+          url: "https://first.com",
+          thumbnail: "thumb",
+          sourceUrl: "source",
+        },
+      ],
+    });
   });
 
   it("skips updates when there are no fresh results", async () => {
