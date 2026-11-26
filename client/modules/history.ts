@@ -506,23 +506,37 @@ export async function getLatestLlmResponseForEntry(
   }
 }
 
-export async function saveChatMessageForQuery(
-  _query: string,
-  role: "user" | "assistant",
-  content: string,
+/**
+ * The only chat write: makes `messages` the stored follow-up conversation of
+ * `conversationId`. Regenerate and edit rewrite the conversation rather than
+ * append to it, so one transaction deletes the conversation's rows and adds
+ * the new ones, with increasing timestamps to keep their order. Other
+ * conversations are untouched, and an empty list removes the conversation.
+ */
+export async function replaceChatConversation(
+  conversationId: string,
+  messages: ReadonlyArray<{ role: "user" | "assistant"; content: string }>,
 ): Promise<void> {
   if (!isHistoryEnabled()) return;
-  try {
-    const searchRunId = getCurrentSearchRunId();
-    await historyDatabase.chatHistory.add({
-      role,
-      content,
-      timestamp: Date.now(),
-      conversationId: searchRunId,
-    });
-  } catch (error) {
-    addLogEntry(`Error saving chat message: ${error}`);
-  }
+  const firstTimestamp = Date.now();
+  await historyDatabase.transaction(
+    "rw",
+    historyDatabase.chatHistory,
+    async () => {
+      await historyDatabase.chatHistory
+        .where("conversationId")
+        .equals(conversationId)
+        .delete();
+      await historyDatabase.chatHistory.bulkAdd(
+        messages.map((message, index) => ({
+          role: message.role,
+          content: message.content,
+          timestamp: firstTimestamp + index,
+          conversationId,
+        })),
+      );
+    },
+  );
 }
 
 export async function getChatMessagesForQuery(
