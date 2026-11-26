@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-26
 
+- Restoring the search already on screen while a follow-up is being answered keeps the live text results and page excerpts used by that answer.
 - A search's saved images no longer lose the first search's or a follow-up's images when you leave the search before both arrive. Whichever image search finished last replaced the other's images in history, so restoring that search later showed only one set. Images that arrive after you left a search are now added to the ones it already saved.
 - A follow-up answer no longer disappears when the same search is restored from history while that answer is still coming. If the answer arrived while the restore was reading the saved chat, the restore put back the older list without it, and the next message sent then removed it from history too. The question being answered also vanished from the chat until its answer arrived. Restoring the search already on screen now leaves a chat that is still answering as it is; restoring any other search still shows that search's saved chat.
 - A follow-up question no longer disappears when "AI response" is turned off and back on while it is still being answered. Turning the setting off stopped the follow-up and saved the question with "The answer was interrupted.", but the chat shown after turning it back on was rebuilt without it, and the next message sent from that chat then removed it from history too. The question and its note now stay, on screen and in history.
