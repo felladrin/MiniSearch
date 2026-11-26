@@ -3,6 +3,7 @@ import gptTokenizer from "gpt-tokenizer";
 import prettyMilliseconds from "pretty-ms";
 import {
   getCurrentSearchRunId,
+  replaceChatConversation,
   saveLlmResponseForQuery,
   updateSearchResults,
 } from "./history";
@@ -362,6 +363,11 @@ export async function searchAndRespond() {
   updateImageSearchResults([]);
 
   updateChatMessages([]);
+  // A regenerated answer or a retry keeps the run id, and the follow-ups asked
+  // under the old answer would come back on a restore.
+  replaceChatConversation(searchRunId, []).catch((error) => {
+    addLogEntry(`Error clearing the stored follow-ups: ${error}`);
+  });
 
   updateSuppressNextFollowUp(false);
 

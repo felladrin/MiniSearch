@@ -10,7 +10,7 @@ The `HistoryDatabase` Dexie instance stores three related tables:
 
 1. `searches` – canonical log of each query plus hydrated results payloads (text, image, run metadata, source, pin state).
 2. `llmResponses` – snapshot of every AI answer tied to its originating search run, enabling restoration of the assistant output.
-3. `chatHistory` – chronological record of chat turns (user/assistant roles) scoped by `conversationId` (the `searchRunId`). It is written only by `replaceChatConversation`, which replaces a conversation's rows in one transaction, so a regenerated answer, an edit or a failed send is stored exactly as the chat shows it.
+3. `chatHistory` – chronological record of chat turns (user/assistant roles) scoped by `conversationId` (the `searchRunId`). It is written only by `replaceChatConversation`, which replaces a conversation's rows in one transaction, so a regenerated answer, an edit or a failed send is stored exactly as the chat shows it. Regenerating or retrying the main answer keeps the `searchRunId`, so `searchAndRespond` also clears that run's conversation, and a follow-up that started before it stores nothing.
 
 A pinned search carries `pinned: true` and a `pinnedAt` timestamp, and `togglePin` writes both in one update. Schema version 3 indexes `pinnedAt` in place of `pinned`: IndexedDB does not index boolean values, so the `pinned` index never held an entry, while an entry without `pinnedAt` simply stays out of its index. The version 3 upgrade gives searches pinned before it a `pinnedAt` equal to their own `timestamp`, since their real pin time is unknown.
 

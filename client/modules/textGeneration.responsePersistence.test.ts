@@ -6,6 +6,7 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock("./history", () => ({
+  replaceChatConversation: vi.fn(() => Promise.resolve()),
   getCurrentSearchRunId: vi.fn(() => "run-1"),
   saveLlmResponseForQuery: vi.fn(
     (query: string, response: string, model: string) => {

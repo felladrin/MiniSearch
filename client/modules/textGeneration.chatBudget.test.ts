@@ -30,6 +30,7 @@ vi.mock("./pubSub", () => ({
   updateTextSearchState: vi.fn(),
 }));
 vi.mock("./history", () => ({
+  replaceChatConversation: vi.fn(() => Promise.resolve()),
   getCurrentSearchRunId: vi.fn(() => "run-1"),
   saveLlmResponseForQuery: vi.fn(() => Promise.resolve()),
   updateSearchResults: vi.fn(() => Promise.resolve()),

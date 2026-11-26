@@ -9,6 +9,10 @@ import {
   getSuppressNextFollowUp,
   suppressNextFollowUpPubSub,
 } from "@/modules/pubSub";
+import {
+  getLatestSearchAttempt,
+  recordSearchAttempt,
+} from "@/modules/searchAttempts";
 import type { ChatMessage } from "@/modules/types";
 import ChatInterface from "./ChatInterface";
 
@@ -1117,6 +1121,27 @@ describe("ChatInterface chat storage", () => {
     });
 
     expect(getChatMessages()).toEqual([]);
+  });
+
+  it("stores nothing from a follow-up that started before the main answer was regenerated", async () => {
+    const answer = deferred<string>();
+    vi.mocked(generateChatResponse).mockReturnValueOnce(answer.promise);
+    const view = renderChatInterface();
+
+    let send: Promise<void> = Promise.resolve();
+    await act(async () => {
+      send = sendMessage("How do I use it?");
+    });
+    vi.mocked(persistChatConversation).mockClear();
+    // Regenerating starts a new attempt on the same run and unmounts the chat.
+    recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
+    view.unmount();
+    await act(async () => {
+      answer.resolve("A late answer.");
+      await send;
+    });
+
+    expect(persistChatConversation).not.toHaveBeenCalled();
   });
 
   it("keeps every turn on a remount without writing anything", async () => {

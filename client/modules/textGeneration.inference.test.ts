@@ -30,6 +30,7 @@ vi.mock("./pubSub", () => ({
   updatePageContents: vi.fn(),
 }));
 vi.mock("./history", () => ({
+  replaceChatConversation: vi.fn(() => Promise.resolve()),
   getCurrentSearchRunId: vi.fn(() => "run-1"),
   saveLlmResponseForQuery: vi.fn(() => Promise.resolve()),
   updateSearchResults: vi.fn(() => Promise.resolve()),
@@ -60,7 +61,11 @@ vi.mock("./textGenerationWithWllama", () => ({
 }));
 
 import gptTokenizer from "gpt-tokenizer";
-import { getCurrentSearchRunId, saveLlmResponseForQuery } from "./history";
+import {
+  getCurrentSearchRunId,
+  replaceChatConversation,
+  saveLlmResponseForQuery,
+} from "./history";
 import {
   getQuery,
   getSettings,
@@ -216,6 +221,15 @@ describe("answers that return after their search was replaced", () => {
     vi.mocked(getCurrentSearchRunId).mockReturnValue(searchRunId);
     return searchAndRespond();
   }
+
+  it("clears the stored follow-ups of the run it starts on", async () => {
+    const running = startSearch("A", "run-a");
+    await vi.waitFor(() => expect(finish).toHaveLength(1));
+
+    expect(replaceChatConversation).toHaveBeenCalledWith("run-a", []);
+    finish[0]("answer A");
+    await running;
+  });
 
   it("saves and shows only the newer search's answer", async () => {
     const first = startSearch("A", "run-a");
