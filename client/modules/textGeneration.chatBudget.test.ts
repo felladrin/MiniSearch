@@ -242,10 +242,12 @@ describe("generateChatResponse context budget", () => {
       for (const dropped of messages.slice(0, 4)) {
         expect(summarizer[0][0].content).toContain(dropped.content);
       }
-      expect(updateConversationSummary).toHaveBeenCalledWith({
-        conversationId: "a".repeat(600),
-        summary: "z".repeat(800),
-      });
+      expect(updateConversationSummary).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "a".repeat(600),
+          summary: "z".repeat(800),
+        }),
+      );
     },
   );
 
@@ -275,10 +277,55 @@ describe("generateChatResponse context budget", () => {
     expect(sentTokens).toBeLessThanOrEqual(3072);
     expect(answer[0][0].content).toContain("z");
     expect(answer[0].slice(2)).toEqual(messages.slice(2));
-    expect(updateConversationSummary).toHaveBeenCalledWith({
-      conversationId: "a".repeat(600),
-      summary: "z".repeat(800),
+    expect(updateConversationSummary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: "a".repeat(600),
+        summary: "z".repeat(800),
+      }),
+    );
+  });
+
+  it("folds each dropped turn into the summary once across turns", async () => {
+    // The summary slot persists between turns, as the pubsub store does.
+    let slot: ReturnType<typeof getConversationSummary> = {
+      conversationId: "",
+      summary: "",
+    };
+    vi.mocked(getConversationSummary).mockImplementation(() => slot);
+    vi.mocked(updateConversationSummary).mockImplementation((next) => {
+      slot = next;
     });
+    mockGenerateChat(generateChatWithWllama);
+    state.systemPrompt = "s".repeat(2000);
+    const firstExchange: ChatMessage[] = [
+      { role: "user", content: "a".repeat(500) },
+      { role: "assistant", content: "b".repeat(500) },
+    ];
+    const secondExchange: ChatMessage[] = [
+      { role: "user", content: "c".repeat(300) },
+      { role: "assistant", content: "d".repeat(300) },
+    ];
+    const question: ChatMessage = { role: "user", content: "e".repeat(300) };
+
+    await generateChatResponse(
+      [...firstExchange, { role: "user", content: "c".repeat(300) }],
+      () => {},
+    );
+    expect(slot.summarizedCount).toBe(2);
+
+    const turnTwo = [...firstExchange, ...secondExchange, question];
+    await generateChatResponse(turnTwo, () => {});
+    // The same history again (a regenerated answer) drops nothing new.
+    await generateChatResponse(turnTwo, () => {});
+
+    const { summarizer } = callsTo(generateChatWithWllama);
+    expect(summarizer).toHaveLength(2);
+    expect(summarizer[0][0].content).toContain("a".repeat(500));
+    expect(summarizer[1][0].content).toContain("c".repeat(300));
+    expect(summarizer[1][0].content).toContain("d".repeat(300));
+    expect(summarizer[1][0].content).not.toContain("a".repeat(500));
+    expect(summarizer[1][0].content).not.toContain("b".repeat(500));
+    expect(slot.summarizedCount).toBe(4);
   });
 
   it("keeps the stored summary when the summarizer rejects and the fallback returns empty", async () => {
@@ -301,10 +348,12 @@ describe("generateChatResponse context budget", () => {
 
     await generateChatResponse(messages, () => {});
 
-    expect(updateConversationSummary).toHaveBeenCalledWith({
-      conversationId: "first question",
-      summary: "S1",
-    });
+    expect(updateConversationSummary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: "first question",
+        summary: "S1",
+      }),
+    );
     const { answer } = callsTo(generateChatWithWllama);
     expect(answer).toHaveLength(1);
     expect(answer[0][0].content).toContain("S1");
@@ -327,10 +376,12 @@ describe("generateChatResponse context budget", () => {
 
     await generateChatResponse(messages, () => {});
 
-    expect(updateConversationSummary).toHaveBeenCalledWith({
-      conversationId: "first question",
-      summary: "S1",
-    });
+    expect(updateConversationSummary).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: "first question",
+        summary: "S1",
+      }),
+    );
     const { answer } = callsTo(generateChatWithWllama);
     expect(answer).toHaveLength(1);
     expect(answer[0][0].content).toContain("S1");
