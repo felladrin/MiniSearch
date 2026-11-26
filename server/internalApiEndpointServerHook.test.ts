@@ -165,6 +165,14 @@ async function sendRequestThroughTimers(body: unknown = helloBody) {
   }
 }
 
+/** A response the client already closed: nothing can be written to it. */
+function closedResponse() {
+  return Object.assign(createResponse(), {
+    writableEnded: true,
+    destroyed: true,
+  });
+}
+
 function endPayload(response: ReturnType<typeof createResponse>) {
   return JSON.parse(response.end.mock.calls[0][0]);
 }
@@ -788,13 +796,7 @@ describe("internalApiEndpointServerHook", () => {
 
     it("returns early when response is no longer writable", async () => {
       streamEveryCall(() => streamOf([{ type: "text-delta", text: "Hello" }]));
-      const response = createResponse();
-      const mutable = response as {
-        writableEnded: boolean;
-        destroyed: boolean;
-      };
-      mutable.writableEnded = true;
-      mutable.destroyed = true;
+      const response = closedResponse();
       await sendRequest(helloBody, response);
       expect(response.setHeader).not.toHaveBeenCalledWith(
         "Content-Type",
@@ -1099,13 +1101,7 @@ describe("internalApiEndpointServerHook", () => {
     it("counts a request the client walked away from", async () => {
       const before = getInferenceStats();
       streamEveryCall(() => streamOf([{ type: "text-delta", text: "Hello" }]));
-      const response = createResponse();
-      const mutable = response as {
-        writableEnded: boolean;
-        destroyed: boolean;
-      };
-      mutable.writableEnded = true;
-      mutable.destroyed = true;
+      const response = closedResponse();
 
       await sendRequest(helloBody, response);
 
