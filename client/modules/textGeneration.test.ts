@@ -150,7 +150,7 @@ describe("textGenerationFunctions", () => {
         textGenerationFunctions.coveredHistoryFingerprint(history, count),
     });
 
-    it("returns the cursor when its last covered message is unchanged", () => {
+    it("returns the cursor when the covered messages are unchanged", () => {
       const { loadConversationSummary } = textGenerationFunctions;
       mockGetConversationSummary.mockReturnValue(coveredUpTo(2));
       expect(loadConversationSummary("test-id", history)).toEqual({
