@@ -31,6 +31,7 @@ import {
   textSearchResultsPubSub,
   updateChatMessages,
 } from "@/modules/pubSub";
+import { getLatestSearchAttempt } from "@/modules/searchAttempts";
 import { generateChatResponse } from "@/modules/textGeneration";
 import type { ChatMessage } from "@/modules/types";
 import ChatHeader from "./ChatHeader";
@@ -283,10 +284,18 @@ export default function ChatInterface({
    * rebuilds from, so storage, the screen and that copy cannot drift apart.
    * Handlers capture `conversationId` when they start: if a new search began
    * meanwhile, the change is still saved under the search it belongs to, and
-   * neither the screen nor the new search's copy is touched.
+   * neither the screen nor the new search's copy is touched. They also capture
+   * the search's `attempt`: a regenerated main answer or a retry keeps the run
+   * id but drops the follow-ups, so a change that started before it is not
+   * kept at all.
    */
   const commitMessages = useCallback(
-    (next: ChatMessage[], conversationId: string) => {
+    (
+      next: ChatMessage[],
+      conversationId: string,
+      attempt: number | undefined,
+    ) => {
+      if (getLatestSearchAttempt(conversationId) !== attempt) return;
       // Only user and assistant turns are stored; a system message never is.
       const followUps = next
         .slice(followUpStartIndex)
@@ -294,8 +303,9 @@ export default function ChatInterface({
           (message): message is ChatMessage & { role: "user" | "assistant" } =>
             message.role !== "system",
         );
-      // An unmounted chat was replaced: a regenerated main answer keeps the
-      // run id but clears the channel, and the old turns must not come back.
+      // An unmounted chat no longer owns the screen or the copy a remount
+      // rebuilds from (the AI answer was turned off, or the same run was
+      // restored); only storage keeps its change.
       if (conversationId === getCurrentSearchRunId() && isMountedRef.current) {
         setMessages(next);
         updateChatMessages(followUps);
@@ -313,7 +323,12 @@ export default function ChatInterface({
       if (target?.role !== "user") return;
       setInput(target.content);
       // Kept even if the edit is never resent, so a restore matches the screen.
-      commitMessages(messages.slice(0, absoluteIndex), getCurrentSearchRunId());
+      const conversationId = getCurrentSearchRunId();
+      commitMessages(
+        messages.slice(0, absoluteIndex),
+        conversationId,
+        getLatestSearchAttempt(conversationId),
+      );
       setFollowUpQuestion("");
     },
     [messages, commitMessages, setInput, setFollowUpQuestion],
@@ -329,6 +344,7 @@ export default function ChatInterface({
       return;
 
     const conversationId = getCurrentSearchRunId();
+    const attempt = getLatestSearchAttempt(conversationId);
     const history = messages.slice(0, -1);
     const lastUser = history[history.length - 1];
     // Streaming needs the old answer off the list, so keep it and the
@@ -357,6 +373,7 @@ export default function ChatInterface({
       commitMessages(
         [...history, { role: "assistant", content: finalResponse }],
         conversationId,
+        attempt,
       );
 
       addLogEntry("AI response re-generated");
@@ -413,6 +430,7 @@ export default function ChatInterface({
       }
 
       const conversationId = getCurrentSearchRunId();
+      const attempt = getLatestSearchAttempt(conversationId);
       const userMessage: ChatMessage = { role: "user", content: currentInput };
       const newMessages: ChatMessage[] = [...messages, userMessage];
 
@@ -450,6 +468,7 @@ export default function ChatInterface({
         commitMessages(
           [...newMessages, { role: "assistant", content: finalResponse }],
           conversationId,
+          attempt,
         );
 
         addLogEntry("AI response completed");
@@ -475,6 +494,7 @@ export default function ChatInterface({
             },
           ],
           conversationId,
+          attempt,
         );
       } finally {
         chatControllersRef.current.delete(controller);

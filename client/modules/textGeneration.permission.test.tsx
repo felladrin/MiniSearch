@@ -48,6 +48,7 @@ vi.mock("./pubSub", async (importOriginal) => {
 });
 
 vi.mock("./history", () => ({
+  replaceChatConversation: vi.fn(() => Promise.resolve()),
   getCurrentSearchRunId: vi.fn(() => "permission-test"),
   saveLlmResponseForQuery: vi.fn().mockResolvedValue(undefined),
   updateSearchResults: vi.fn().mockResolvedValue(undefined),

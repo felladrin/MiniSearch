@@ -93,6 +93,7 @@ vi.mock("./config", () => ({
 }));
 
 vi.mock("./history", () => ({
+  replaceChatConversation: vi.fn(() => Promise.resolve()),
   getCurrentSearchRunId: vi.fn(() => harness.state.searchRunId),
   saveLlmResponseForQuery: vi.fn(() => Promise.resolve()),
   updateSearchResults: vi.fn(() => Promise.resolve()),

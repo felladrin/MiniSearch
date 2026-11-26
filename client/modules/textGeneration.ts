@@ -3,6 +3,7 @@ import gptTokenizer from "gpt-tokenizer";
 import prettyMilliseconds from "pretty-ms";
 import {
   getCurrentSearchRunId,
+  replaceChatConversation,
   saveLlmResponseForQuery,
   updateSearchResults,
 } from "./history";
@@ -415,6 +416,13 @@ export async function searchAndRespond() {
         `Failed to persist LLM response: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+    // A regenerated answer or a retry keeps the run id, so the follow-ups
+    // asked under the old answer would come back on a restore. Cleared only
+    // once the new answer is saved: a stopped or failed regenerate keeps the
+    // old answer stored, and its follow-ups with it.
+    replaceChatConversation(searchRunId, []).catch((error) => {
+      addLogEntry(`Error clearing the stored follow-ups: ${error}`);
+    });
 
     // The streaming writes are throttled, so the last chunk may still be
     // queued here. Publishing the returned text unthrottled before the state
