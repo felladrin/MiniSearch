@@ -89,7 +89,9 @@ const { generateChatResponse } = await import("@/modules/textGeneration");
 const { generateFollowUpQuestion } = await import(
   "@/modules/followUpQuestions"
 );
-const { persistChatConversation } = await import("@/modules/chatHelpers");
+const { persistChatConversation, runFollowUpSearch } = await import(
+  "@/modules/chatHelpers"
+);
 const { getCurrentSearchRunId } = await import("@/modules/history");
 const { addLogEntry } = await import("@/modules/logEntries");
 const { notifications } = await import("@mantine/notifications");
@@ -1111,8 +1113,9 @@ describe("ChatInterface chat storage", () => {
     await act(async () => {
       send = sendMessage("How do I use it?");
     });
-    // Regenerating the main answer unmounts the chat and clears its copy,
-    // without starting a new search run.
+    // Regenerating the main answer starts a new attempt on the same run (as
+    // startTextSearch records it), unmounts the chat and clears its copy.
+    recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
     view.unmount();
     updateChatMessages([]);
     await act(async () => {
@@ -1123,7 +1126,11 @@ describe("ChatInterface chat storage", () => {
     expect(getChatMessages()).toEqual([]);
   });
 
-  it("stores nothing from a follow-up that started before the main answer was regenerated", async () => {
+  /**
+   * Sends a follow-up whose answer only ends when the chat aborts it, and
+   * returns a function that unmounts the chat and waits for that abort.
+   */
+  async function sendFollowUpUntilUnmount() {
     vi.mocked(generateChatResponse).mockImplementationOnce(
       (_messages, _onUpdate, chatSignal) =>
         new Promise((_resolve, reject) => {
@@ -1133,19 +1140,85 @@ describe("ChatInterface chat storage", () => {
         }),
     );
     const view = renderChatInterface();
-
     let send: Promise<void> = Promise.resolve();
     await act(async () => {
       send = sendMessage("How do I use it?");
     });
-    vi.mocked(persistChatConversation).mockClear();
-    // Regenerating starts a new attempt on the same run and unmounts the chat,
-    // which aborts the follow-up into its "interrupted" commit.
-    recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
+    return async () => {
+      await act(async () => {
+        view.unmount();
+        await send;
+      });
+    };
+  }
+
+  it("keeps an interrupted follow-up when the AI response is turned off and on", async () => {
+    const unmountChat = await sendFollowUpUntilUnmount();
+    vi.mocked(generateChatResponse).mockResolvedValueOnce("Next answer.");
+    // Turning "AI response" off unmounts the chat on the same run and
+    // attempt, which aborts the follow-up into its "interrupted" commit.
+    await unmountChat();
+    const interrupted = [
+      { role: "user", content: "How do I use it?" },
+      { role: "assistant", content: "The answer was interrupted." },
+    ];
+    expect(getChatMessages()).toEqual(interrupted);
+
+    // Turning it back on mounts a new chat from that copy.
+    render(
+      <MantineProvider>
+        <ChatInterface
+          initialQuery={initialQuery}
+          initialResponse={initialResponse}
+          initialMessages={getChatMessages()}
+          suppressInitialFollowUp
+        />
+      </MantineProvider>,
+    );
+    expect(messageListMessages.slice(2)).toEqual(interrupted);
+
+    await act(async () => {
+      await sendMessage("And then?");
+    });
+    expect(persistChatConversation).toHaveBeenLastCalledWith("run-1", [
+      ...interrupted,
+      { role: "user", content: "And then?" },
+      { role: "assistant", content: "Next answer." },
+    ]);
+  });
+
+  it("commits the interrupted turn at unmount even while the follow-up search runs", async () => {
+    vi.mocked(runFollowUpSearch).mockReturnValueOnce(new Promise(() => {}));
+    vi.mocked(generateChatResponse).mockImplementationOnce(
+      async (_messages, _onUpdate, chatSignal) => {
+        if (chatSignal?.aborted) throw new Error("Chat generation interrupted");
+        return "An answer.";
+      },
+    );
+    const view = renderChatInterface();
+    let send: Promise<void> = Promise.resolve();
+    await act(async () => {
+      send = sendMessage("How do I use it?");
+    });
+
     await act(async () => {
       view.unmount();
       await send;
     });
+
+    expect(getChatMessages()).toEqual([
+      { role: "user", content: "How do I use it?" },
+      { role: "assistant", content: "The answer was interrupted." },
+    ]);
+  });
+
+  it("stores nothing from a follow-up that started before the main answer was regenerated", async () => {
+    const unmountChat = await sendFollowUpUntilUnmount();
+    vi.mocked(persistChatConversation).mockClear();
+    // Regenerating starts a new attempt on the same run and unmounts the chat,
+    // which aborts the follow-up into its "interrupted" commit.
+    recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
+    await unmountChat();
 
     expect(persistChatConversation).not.toHaveBeenCalled();
   });

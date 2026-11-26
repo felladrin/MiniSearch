@@ -303,11 +303,14 @@ export default function ChatInterface({
           (message): message is ChatMessage & { role: "user" | "assistant" } =>
             message.role !== "system",
         );
-      // An unmounted chat no longer owns the screen or the copy a remount
-      // rebuilds from (the AI answer was turned off, or the same run was
-      // restored); only storage keeps its change.
-      if (conversationId === getCurrentSearchRunId() && isMountedRef.current) {
-        setMessages(next);
+      // A chat replaced by a new search or a regenerated main answer was
+      // already turned away above (another run, or another attempt). On the
+      // same run and attempt, an unmounted chat was only remounted (the AI
+      // answer was turned off and on): it no longer owns the screen, but the
+      // copy the remount rebuilds from must still get its change, or the
+      // remounted chat and its next save drop the turn.
+      if (conversationId === getCurrentSearchRunId()) {
+        if (isMountedRef.current) setMessages(next);
         updateChatMessages(followUps);
       }
       persistChatConversation(conversationId, followUps).catch((error) => {
@@ -447,13 +450,22 @@ export default function ChatInterface({
       chatControllersRef.current.add(controller);
 
       try {
-        await runFollowUpSearch(
-          newMessages,
-          currentInput,
-          settings,
-          textSearchResults,
-          imageSearchResults,
-        );
+        // The search takes no signal; an abort stops waiting on it, so the
+        // interrupted turn is committed before a remounted chat can take over.
+        await Promise.race([
+          runFollowUpSearch(
+            newMessages,
+            currentInput,
+            settings,
+            textSearchResults,
+            imageSearchResults,
+          ),
+          new Promise((resolve) =>
+            controller.signal.addEventListener("abort", resolve, {
+              once: true,
+            }),
+          ),
+        ]);
       } catch (error) {
         addLogEntry(`Error in follow-up search: ${error}`);
       }
@@ -482,7 +494,8 @@ export default function ChatInterface({
         addLogEntry(`Error in chat response: ${error}`);
         // Saved like any answer, so the question survives a restore and a
         // later regenerate has a stored turn to replace. An abort comes from
-        // the chat unmounting: a new search or a regenerated main answer.
+        // the chat unmounting: a new search, a regenerated main answer, or the
+        // AI answer turned off.
         commitMessages(
           [
             ...newMessages,
