@@ -16,7 +16,7 @@ interface InternalApiStreamPayload {
 }
 
 export async function generateTextWithInternalApi(signal?: AbortSignal) {
-  await canStartResponding();
+  await canStartResponding(signal);
   updateTextGenerationState("preparingToGenerate");
 
   const messages = getDefaultChatMessages(

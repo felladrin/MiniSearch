@@ -461,16 +461,17 @@ export default function ChatInterface({
         regenerateFollowUpQuestion(currentInput, finalResponse);
       } catch (error) {
         addLogEntry(`Error in chat response: ${error}`);
-        if (controller.signal.aborted) return;
         // Saved like any answer, so the question survives a restore and a
-        // later regenerate has a stored turn to replace.
+        // later regenerate has a stored turn to replace. An abort comes from
+        // the chat unmounting: a new search or a regenerated main answer.
         commitMessages(
           [
             ...newMessages,
             {
               role: "assistant",
-              content:
-                "Sorry, I encountered an error while generating a response.",
+              content: controller.signal.aborted
+                ? "The answer was interrupted."
+                : "Sorry, I encountered an error while generating a response.",
             },
           ],
           conversationId,

@@ -142,9 +142,11 @@ async function runWllamaGeneration({
 
     const { wllama, model } = await initializeWllamaInstance(progressCallback);
     wllamaInstance = wllama;
+    // The load cannot be cancelled, so a run aborted meanwhile stops here.
+    throwIfInterrupted();
 
     if (shouldCheckCanRespond) {
-      await canStartResponding();
+      await canStartResponding(signal);
       updateTextGenerationState("preparingToGenerate");
     }
 

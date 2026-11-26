@@ -509,6 +509,12 @@ describe("ChatInterface generation state", () => {
     });
 
     expect(signal?.aborted).toBe(true);
+    // The question is kept, so a restore shows it and a regenerate can
+    // replace the interrupted answer.
+    expect(persistChatConversation).toHaveBeenLastCalledWith("run-1", [
+      { role: "user", content: "And how do I use it?" },
+      { role: "assistant", content: "The answer was interrupted." },
+    ]);
   });
 
   it("starts no follow-up question for a send that settles after unmount", async () => {

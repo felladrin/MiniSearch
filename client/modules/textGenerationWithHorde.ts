@@ -252,6 +252,10 @@ async function handleGenerationStatus(
       if (polled) {
         status = polled;
         const generation = status.generations?.[0];
+        // A stopped or superseded run must not publish a late answer.
+        if (interruptSignal?.aborted) {
+          throw new ChatGenerationError("Generation interrupted");
+        }
         if (generation?.text && generation.text !== lastText) {
           lastText = generation.text;
           if (generation.model) {
@@ -522,7 +526,7 @@ export async function fetchHordeUserInfo(
 }
 
 export async function generateTextWithHorde(signal?: AbortSignal) {
-  await canStartResponding();
+  await canStartResponding(signal);
   updateTextGenerationState("preparingToGenerate");
   const messages = getDefaultChatMessages(
     await getFormattedSearchResults(true),
@@ -531,6 +535,7 @@ export async function generateTextWithHorde(signal?: AbortSignal) {
   // arrives on the poll that ends the loop. Entering "generating" before the
   // job is submitted shows the response card and its Stop button for the
   // whole queue wait, which is what makes an interrupt possible at all.
+  if (signal?.aborted) throw new ChatGenerationError("Generation interrupted");
   updateTextGenerationState("generating");
   return await executeHordeGeneration(
     messages,

@@ -177,6 +177,8 @@ async function createLlmSummary(
       (await strategy.generateChat(chat, () => {}, signal)).trim(),
     );
   } catch (e) {
+    // A stopped chat needs no summary at all.
+    if (signal?.aborted) throw e;
     addLogEntry(
       `LLM summary failed, falling back to extractive: ${
         e instanceof Error ? e.message : String(e)
@@ -263,7 +265,7 @@ let activeSearchController: AbortController | null = null;
 
 /**
  * Stops the answer being generated for the current search. Only that run is
- * cancelled: a chat reply or a follow-up question has its own signal.
+ * cancelled: a chat reply has its own signal.
  */
 export function interruptSearch() {
   updateTextGenerationState("interrupted");
@@ -297,11 +299,13 @@ export async function searchAndRespond() {
 
   updateSearchPromise(startTextSearch(getQuery(), invocation));
 
+  activeSearchController?.abort();
+  activeSearchController = null;
+
   if (!getSettings().enableAiResponse) return;
 
   const responseGenerationStartTime = Date.now();
 
-  activeSearchController?.abort();
   const controller = new AbortController();
   activeSearchController = controller;
 

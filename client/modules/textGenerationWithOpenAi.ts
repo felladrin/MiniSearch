@@ -176,7 +176,7 @@ async function createOpenAiStream({
 export async function generateTextWithOpenAi(
   signal?: AbortSignal,
 ): Promise<string> {
-  await canStartResponding();
+  await canStartResponding(signal);
   updateTextGenerationState("preparingToGenerate");
 
   const messages = getDefaultChatMessages(

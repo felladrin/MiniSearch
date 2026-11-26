@@ -132,7 +132,11 @@ describe("textGenerationWithHorde", () => {
       );
     });
 
-    it("stops polling and throws once the user interrupts generation", async () => {
+    it("stops polling and publishes nothing once the user interrupts generation", async () => {
+      const controller = new AbortController();
+      vi.mocked(updateTextGenerationState).mockImplementation((next) => {
+        if (next === "generating") controller.abort();
+      });
       const { generateTextWithHorde } = await import(
         "./textGenerationWithHorde"
       );
@@ -145,14 +149,29 @@ describe("textGenerationWithHorde", () => {
             is_possible: true,
             generations: [{ text: "partial", model: "chosen-model" }],
           }),
-        );
+        )
+        .mockResolvedValueOnce(jsonResponse({}));
+
+      await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
+        "Generation interrupted",
+      );
+      expect(updateResponse).not.toHaveBeenCalledWith("partial");
+      expect(sleep).not.toHaveBeenCalled();
+      expect(cancelledIds()).toEqual(["gen-4"]);
+    });
+
+    it("submits nothing and leaves the state alone once a newer search aborted it", async () => {
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
       const controller = new AbortController();
       controller.abort();
 
       await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
         "Generation interrupted",
       );
-      expect(sleep).toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(updateTextGenerationState).not.toHaveBeenCalledWith("generating");
     });
 
     it("can be interrupted once it is generating, and cancels the queued job", async () => {
