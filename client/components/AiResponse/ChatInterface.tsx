@@ -303,8 +303,9 @@ export default function ChatInterface({
           (message): message is ChatMessage & { role: "user" | "assistant" } =>
             message.role !== "system",
         );
-      // An unmounted chat was replaced: a regenerated main answer keeps the
-      // run id but clears the channel, and the old turns must not come back.
+      // An unmounted chat no longer owns the screen or the copy a remount
+      // rebuilds from (the AI answer was turned off, or the same run was
+      // restored); only storage keeps its change.
       if (conversationId === getCurrentSearchRunId() && isMountedRef.current) {
         setMessages(next);
         updateChatMessages(followUps);
