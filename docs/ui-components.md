@@ -378,6 +378,8 @@ const { restoreSearch } = useHistoryRestore(updateQuery, textAreaRef);
 
 `restoreSearch` marks the entry's query as handled in `modules/autoSearch.ts` before it changes the URL, the same mark the URL auto-search and a submit set, so an entry that restores empty (a failed search, zero results with AI off, an abandoned search) does not fall through to the URL auto-search and get a duplicate history entry.
 
+It replaces the chat with the entry's stored conversation, except when the entry is the search already on screen and one of its follow-ups is still being answered: that chat stays mounted and saves the answer when it lands, so the stored list, which lacks the turn, is not published over it.
+
 **Features:**
 
 - Fuzzy search through history
