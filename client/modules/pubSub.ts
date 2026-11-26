@@ -319,7 +319,14 @@ export const followUpQuestionPubSub = createPubSub("");
 export const [updateFollowUpQuestion, , getFollowUpQuestion] =
   followUpQuestionPubSub;
 
-const conversationSummaryPubSub = createPubSub({
+const conversationSummaryPubSub = createPubSub<{
+  conversationId: string;
+  summary: string;
+  /** How many of the conversation's first messages the summary covers. */
+  summarizedCount?: number;
+  /** Identifies the covered messages, to notice a rewritten history. */
+  lastSummarizedFingerprint?: string;
+}>({
   conversationId: "",
   summary: "",
 });
