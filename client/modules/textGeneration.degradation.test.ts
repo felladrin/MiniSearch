@@ -581,9 +581,6 @@ describe("search supersession ownership", () => {
     const resultsA: TextSearchResults = [
       ["A title", "A snippet", "https://a.example"],
     ];
-    vi.mocked(fetchPageContents).mockResolvedValueOnce({
-      "https://a.example": "A page excerpt",
-    });
     deferredA.release({ results: resultsA, stale: true });
     await new Promise((resolve) => setTimeout(resolve, 0));
     await first;
@@ -595,6 +592,7 @@ describe("search supersession ownership", () => {
     expect(harness.state.pageContents).toEqual({
       "https://b.example": "B page excerpt",
     });
+    expect(fetchPageContents).toHaveBeenCalledTimes(1);
     expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-b", {
       type: "text",
       items: [

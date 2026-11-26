@@ -17,6 +17,7 @@ import {
   updateTextSearchStale,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
+import { getLatestSearchAttempt } from "./searchAttempts";
 import { selectLlmSearchResults } from "./searchResultSelection";
 import type { defaultSettings } from "./settings";
 import { searchResultsToConsider } from "./textGenerationUtilities";
@@ -30,6 +31,15 @@ import type {
 type Settings = typeof defaultSettings;
 
 let followUpSearchInvocation = 0;
+
+/**
+ * True while no retry has started on the run since the call: a retry keeps the
+ * run id, so a follow-up that lands after it would otherwise pass as current.
+ */
+function sameSearchAttempt(searchRunId: string): () => boolean {
+  const attempt = getLatestSearchAttempt(searchRunId);
+  return () => getLatestSearchAttempt(searchRunId) === attempt;
+}
 let textRefreshInvocation = 0;
 let imageRefreshInvocation = 0;
 let pageContentsReadInvocation = 0;
@@ -48,11 +58,13 @@ export async function refreshTextSearchResults(
 ): Promise<TextSearchResults> {
   const invocation = ++textRefreshInvocation;
   latestTextRefreshByRunId.set(searchRunId, invocation);
+  const isSameAttempt = sameSearchAttempt(searchRunId);
   const isCurrent = () =>
     invocation === textRefreshInvocation &&
-    searchRunId === getCurrentSearchRunId();
+    searchRunId === getCurrentSearchRunId() &&
+    isSameAttempt();
   const isRunCurrent = () =>
-    latestTextRefreshByRunId.get(searchRunId) === invocation;
+    latestTextRefreshByRunId.get(searchRunId) === invocation && isSameAttempt();
 
   const { results: freshResults, stale } = await searchText(
     searchQuery,
@@ -109,11 +121,14 @@ export async function refreshImageSearchResults(
 ): Promise<void> {
   const invocation = ++imageRefreshInvocation;
   latestImageRefreshByRunId.set(searchRunId, invocation);
+  const isSameAttempt = sameSearchAttempt(searchRunId);
   const isCurrent = () =>
     invocation === imageRefreshInvocation &&
-    searchRunId === getCurrentSearchRunId();
+    searchRunId === getCurrentSearchRunId() &&
+    isSameAttempt();
   const isRunCurrent = () =>
-    latestImageRefreshByRunId.get(searchRunId) === invocation;
+    latestImageRefreshByRunId.get(searchRunId) === invocation &&
+    isSameAttempt();
 
   const { results: imageResults } = await searchImages(
     searchQuery,
@@ -164,6 +179,7 @@ async function readFollowUpPageContents(
   searchRunId: string,
 ): Promise<void> {
   const invocation = ++pageContentsReadInvocation;
+  const isSameAttempt = sameSearchAttempt(searchRunId);
   const contents: PageContents = await fetchPageContents(
     searchQuery,
     results.map(([, , url]) => url),
@@ -172,7 +188,8 @@ async function readFollowUpPageContents(
   // A newer search or follow-up has already started; its pages own the channel now.
   if (
     invocation !== pageContentsReadInvocation ||
-    getCurrentSearchRunId() !== searchRunId
+    getCurrentSearchRunId() !== searchRunId ||
+    !isSameAttempt()
   ) {
     return;
   }
@@ -200,9 +217,11 @@ export async function runFollowUpSearch(
 ): Promise<void> {
   const searchRunId = getCurrentSearchRunId();
   const followUpInvocation = ++followUpSearchInvocation;
+  const isSameAttempt = sameSearchAttempt(searchRunId);
   const isFollowUpCurrent = () =>
     followUpInvocation === followUpSearchInvocation &&
-    searchRunId === getCurrentSearchRunId();
+    searchRunId === getCurrentSearchRunId() &&
+    isSameAttempt();
 
   const { generateRelatedSearchQuery } = await import("./relatedSearchQuery");
   const relatedQuery = await generateRelatedSearchQuery([...messages]);

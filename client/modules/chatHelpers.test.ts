@@ -54,6 +54,7 @@ import {
 } from "./pubSub";
 import { generateRelatedSearchQuery } from "./relatedSearchQuery";
 import { searchImages, searchText } from "./search";
+import { getLatestSearchAttempt, recordSearchAttempt } from "./searchAttempts";
 import type { ImageSearchResults, TextSearchResults } from "./types";
 
 const mockGetCurrentSearchRunId = vi.mocked(getCurrentSearchRunId);
@@ -385,6 +386,47 @@ describe("runFollowUpSearch", () => {
 });
 
 describe("follow-up supersession ownership", () => {
+  it("keeps a follow-up from publishing after a retry on the same run", async () => {
+    let releaseText: (value: {
+      results: TextSearchResults;
+      stale: boolean;
+    }) => void = () => {};
+    mockSearchText.mockReturnValueOnce(
+      new Promise((resolve) => {
+        releaseText = resolve;
+      }),
+    );
+
+    const followUp = runFollowUpSearch(
+      [{ role: "user", content: "follow up" }],
+      "follow up",
+      {
+        enableTextSearch: true,
+        enableImageSearch: true,
+        enablePageContentFetch: true,
+        searchResultsLimit: 10,
+      } as unknown as Parameters<typeof runFollowUpSearch>[2],
+      [],
+      [],
+    );
+    await vi.waitFor(() => expect(mockSearchText).toHaveBeenCalledTimes(1));
+
+    // "Regenerate response" starts a new attempt and keeps the run id.
+    recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
+    releaseText({
+      results: [["Old text", "snippet", "https://old.example"]],
+      stale: false,
+    });
+    await followUp;
+
+    expect(mockUpdateText).not.toHaveBeenCalled();
+    expect(mockUpdateLlmText).not.toHaveBeenCalled();
+    expect(mockUpdateTextStale).not.toHaveBeenCalled();
+    expect(mockUpdateSearchResults).not.toHaveBeenCalled();
+    expect(mockFetchPageContents).not.toHaveBeenCalled();
+    expect(mockSearchImages).not.toHaveBeenCalled();
+  });
+
   const makeSettings = (overrides = {}) =>
     ({
       enableTextSearch: true,
@@ -519,6 +561,12 @@ describe("follow-up supersession ownership", () => {
       "run-2",
       expect.anything(),
     );
+    expect(mockUpdateSearchResults).toHaveBeenCalledWith("run-1", {
+      type: "text",
+      items: [
+        { title: "Old text", url: "https://old.example", snippet: "snippet" },
+      ],
+    });
 
     mockGetCurrentSearchRunId.mockReturnValue("run-1");
     const imageFollowUp = runFollowUpSearch(

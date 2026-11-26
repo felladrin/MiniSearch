@@ -31,6 +31,7 @@ import {
   updateTextSearchState,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
+import { getLatestSearchAttempt, recordSearchAttempt } from "./searchAttempts";
 import { selectLlmSearchResults } from "./searchResultSelection";
 import { getSystemPrompt } from "./systemPrompt";
 import {
@@ -237,7 +238,6 @@ function summarizeDroppedMessages(
 }
 
 let searchInvocation = 0;
-const latestSearchInvocationByRunId = new Map<string, number>();
 
 export async function searchAndRespond() {
   if (getQuery() === "") return;
@@ -523,11 +523,10 @@ async function readPageContents(
 
 async function startTextSearch(query: string, invocation: number) {
   const searchRunId = getCurrentSearchRunId();
-  latestSearchInvocationByRunId.set(searchRunId, invocation);
+  recordSearchAttempt(searchRunId, invocation);
   const isCurrent = () =>
     invocation === searchInvocation && searchRunId === getCurrentSearchRunId();
-  const isRunCurrent = () =>
-    latestSearchInvocationByRunId.get(searchRunId) === invocation;
+  const isRunCurrent = () => getLatestSearchAttempt(searchRunId) === invocation;
 
   const results = {
     textResults: [] as TextSearchResults,
