@@ -155,18 +155,13 @@ function getEffectiveHordeApiKey(
   return settings.hordeApiKey || aiHordeDefaultApiKey;
 }
 
-async function startGeneration(
-  messages: ChatMessage[],
-  signal?: AbortSignal,
-  models?: string[],
-) {
+async function startGeneration(messages: ChatMessage[], models?: string[]) {
   const settings = getSettings();
   const aiHordeApiKey = getEffectiveHordeApiKey(settings);
   const aiHordeMaxResponseLengthInTokens =
     aiHordeApiKey === aiHordeDefaultApiKey ? 512 : 1024;
   const response = await fetch(buildHordeUrl("/generate/text/async"), {
     method: "POST",
-    signal,
     headers: {
       [HTTP_HEADERS.CONTENT_TYPE]: "application/json",
       [HTTP_HEADERS.CLIENT_AGENT]: aiHordeClientAgent,
@@ -363,6 +358,11 @@ async function cancelGeneration(generationId: string): Promise<void> {
  * round) the job is cancelled, so no worker spends GPU time and kudos on an
  * answer nobody reads. The cancel is not awaited: a slow or failed DELETE
  * never delays or changes the outcome.
+ *
+ * The signal stops the polling, never the submit: a submit aborted in flight
+ * may still queue the job on the Horde without the browser ever learning its
+ * id, leaving no way to cancel it. A submit that returns after the abort gets
+ * its id, its first poll throws, and the job is cancelled like any other.
  */
 async function runHordeJob(
   messages: ChatMessage[],
@@ -371,7 +371,7 @@ async function runHordeJob(
   signal?: AbortSignal,
   onStarted?: () => void,
 ): Promise<string> {
-  const generation = await startGeneration(messages, signal, models);
+  const generation = await startGeneration(messages, models);
   onStarted?.();
   let answered = false;
   try {
