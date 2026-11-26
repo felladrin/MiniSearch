@@ -1,0 +1,409 @@
+{
+  "schemaVersion": "0.3.1",
+  "kind": "graph",
+  "title": "How MiniSearch works",
+  "summary": "The browser sends the query to the app server, which asks the bundled SearXNG instance for results, reranks them with a small cross-encoder, and returns them for the browser to cache. With AI responses on, the browser then has a model write a cited answer from the top results, either in the browser or through a remote backend.",
+  "lenses": ["architecture", "data-flow"],
+  "provenance": {
+    "repo": {
+      "owner": "felladrin",
+      "name": "MiniSearch",
+      "host": "github.com"
+    },
+    "base": {
+      "sha": "1eb22896ed98119182965d1f75823a7ea4dd980c",
+      "ref": "main"
+    },
+    "head": {
+      "sha": "1eb22896ed98119182965d1f75823a7ea4dd980c",
+      "ref": "main"
+    }
+  },
+  "lanes": [
+    {
+      "id": "browser",
+      "label": "Your browser",
+      "order": 0
+    },
+    {
+      "id": "container",
+      "label": "Docker container",
+      "order": 1
+    },
+    {
+      "id": "outside",
+      "label": "Internet",
+      "order": 2
+    }
+  ],
+  "nodes": [
+    {
+      "id": "search-ui",
+      "label": "Search UI",
+      "kind": "ui",
+      "delta": "unchanged",
+      "lane": "browser",
+      "subtitle": "React + Mantine",
+      "summary": "Takes the query, shows results and streams the answer.",
+      "files": [
+        {
+          "path": "client/modules/search.ts"
+        },
+        {
+          "path": "client/modules/textGeneration.ts"
+        }
+      ],
+      "badges": []
+    },
+    {
+      "id": "indexeddb",
+      "label": "IndexedDB",
+      "kind": "datastore",
+      "delta": "unchanged",
+      "lane": "browser",
+      "subtitle": "history and cache",
+      "summary": "Caches results for 15 minutes and keeps the search history.",
+      "files": [
+        {
+          "path": "client/modules/history.ts"
+        }
+      ],
+      "badges": []
+    },
+    {
+      "id": "in-browser-model",
+      "label": "In-browser model",
+      "kind": "package",
+      "delta": "unchanged",
+      "lane": "browser",
+      "subtitle": "WebGPU or CPU",
+      "summary": "Runs a GGUF model with wllama, so the query and answer never leave the device.",
+      "files": [
+        {
+          "path": "client/modules/textGenerationWithWllama.ts"
+        }
+      ],
+      "badges": []
+    },
+    {
+      "id": "app-server",
+      "label": "App server",
+      "kind": "service",
+      "delta": "unchanged",
+      "lane": "container",
+      "subtitle": "Node.js",
+      "summary": "Serves the app and the /search endpoints.",
+      "files": [
+        {
+          "path": "server/searchEndpointServerHook.ts"
+        }
+      ],
+      "badges": []
+    },
+    {
+      "id": "searxng",
+      "label": "SearXNG",
+      "kind": "service",
+      "delta": "unchanged",
+      "lane": "container",
+      "subtitle": "metasearch",
+      "summary": "Asks several search engines at once and merges what they return.",
+      "files": [
+        {
+          "path": "server/webSearchService.ts"
+        }
+      ],
+      "badges": []
+    },
+    {
+      "id": "reranker",
+      "label": "Reranker",
+      "kind": "package",
+      "delta": "unchanged",
+      "lane": "container",
+      "subtitle": "ONNX Runtime",
+      "summary": "A small cross-encoder that scores each result against the query.",
+      "files": [
+        {
+          "path": "server/rerankerService.ts"
+        }
+      ],
+      "badges": []
+    },
+    {
+      "id": "web",
+      "label": "Search engines",
+      "kind": "service",
+      "delta": "unchanged",
+      "lane": "outside",
+      "subtitle": "the web",
+      "summary": "The engines SearXNG queries.",
+      "files": [],
+      "badges": []
+    },
+    {
+      "id": "remote-api",
+      "label": "Remote AI",
+      "kind": "service",
+      "delta": "unchanged",
+      "lane": "outside",
+      "subtitle": "OpenAI-compatible API or AI Horde",
+      "summary": "Optional backend for the answer, called from the browser.",
+      "files": [
+        {
+          "path": "client/modules/textGenerationWithOpenAi.ts"
+        },
+        {
+          "path": "client/modules/textGenerationWithHorde.ts"
+        }
+      ],
+      "badges": ["optional"]
+    }
+  ],
+  "edges": [
+    {
+      "id": "ui-to-cache",
+      "from": "search-ui",
+      "to": "indexeddb",
+      "kind": "data",
+      "delta": "unchanged",
+      "label": "cache and history",
+      "emphasis": "normal",
+      "animated": false
+    },
+    {
+      "id": "ui-to-server",
+      "from": "search-ui",
+      "to": "app-server",
+      "kind": "http",
+      "delta": "unchanged",
+      "label": "search",
+      "emphasis": "hero",
+      "animated": true
+    },
+    {
+      "id": "server-to-searxng",
+      "from": "app-server",
+      "to": "searxng",
+      "kind": "http",
+      "delta": "unchanged",
+      "label": "query",
+      "emphasis": "normal",
+      "animated": true
+    },
+    {
+      "id": "searxng-to-web",
+      "from": "searxng",
+      "to": "web",
+      "kind": "http",
+      "delta": "unchanged",
+      "label": "fan out",
+      "emphasis": "normal",
+      "animated": true
+    },
+    {
+      "id": "server-to-reranker",
+      "from": "app-server",
+      "to": "reranker",
+      "kind": "call",
+      "delta": "unchanged",
+      "label": "rerank",
+      "emphasis": "normal",
+      "animated": true
+    },
+    {
+      "id": "ui-to-local-model",
+      "from": "search-ui",
+      "to": "in-browser-model",
+      "kind": "call",
+      "delta": "unchanged",
+      "label": "in-browser inference",
+      "emphasis": "normal",
+      "animated": true
+    },
+    {
+      "id": "ui-to-remote-api",
+      "from": "search-ui",
+      "to": "remote-api",
+      "kind": "http",
+      "delta": "unchanged",
+      "label": "remote inference, optional",
+      "emphasis": "muted",
+      "animated": false
+    }
+  ],
+  "flows": [
+    {
+      "id": "search-and-answer",
+      "title": "A search with an AI answer",
+      "summary": "What happens between pressing Enter and reading a cited answer.",
+      "delta": "unchanged",
+      "participants": [
+        {
+          "node": "indexeddb"
+        },
+        {
+          "node": "search-ui"
+        },
+        {
+          "node": "in-browser-model"
+        },
+        {
+          "node": "app-server"
+        },
+        {
+          "node": "reranker"
+        },
+        {
+          "node": "searxng"
+        },
+        {
+          "node": "web"
+        }
+      ],
+      "messages": [
+        {
+          "id": "cache-lookup",
+          "from": "search-ui",
+          "to": "indexeddb",
+          "label": "look up cached results",
+          "kind": "sync",
+          "delta": "unchanged"
+        },
+        {
+          "id": "cache-miss",
+          "from": "indexeddb",
+          "to": "search-ui",
+          "label": "nothing fresh",
+          "kind": "return",
+          "delta": "unchanged"
+        },
+        {
+          "id": "search-request",
+          "from": "search-ui",
+          "to": "app-server",
+          "label": "GET /search/text",
+          "kind": "sync",
+          "delta": "unchanged"
+        },
+        {
+          "id": "metasearch",
+          "from": "app-server",
+          "to": "searxng",
+          "label": "query",
+          "kind": "sync",
+          "delta": "unchanged"
+        },
+        {
+          "id": "fan-out",
+          "from": "searxng",
+          "to": "web",
+          "label": "ask each engine",
+          "kind": "sync",
+          "delta": "unchanged",
+          "repeat": 3
+        },
+        {
+          "id": "engine-results",
+          "from": "web",
+          "to": "searxng",
+          "label": "results",
+          "kind": "return",
+          "delta": "unchanged"
+        },
+        {
+          "id": "merged-results",
+          "from": "searxng",
+          "to": "app-server",
+          "label": "merged results",
+          "kind": "return",
+          "delta": "unchanged"
+        },
+        {
+          "id": "rerank",
+          "from": "app-server",
+          "to": "reranker",
+          "label": "score against the query",
+          "kind": "sync",
+          "delta": "unchanged"
+        },
+        {
+          "id": "ranked",
+          "from": "reranker",
+          "to": "app-server",
+          "label": "best first, weak ones dropped",
+          "kind": "return",
+          "delta": "unchanged"
+        },
+        {
+          "id": "search-response",
+          "from": "app-server",
+          "to": "search-ui",
+          "label": "ranked results",
+          "kind": "return",
+          "delta": "unchanged"
+        },
+        {
+          "id": "cache-write",
+          "from": "search-ui",
+          "to": "indexeddb",
+          "label": "cache for 15 minutes",
+          "kind": "async",
+          "delta": "unchanged"
+        },
+        {
+          "id": "prompt",
+          "from": "search-ui",
+          "to": "in-browser-model",
+          "label": "question + top results",
+          "kind": "sync",
+          "delta": "unchanged"
+        },
+        {
+          "id": "answer",
+          "from": "in-browser-model",
+          "to": "search-ui",
+          "label": "cited answer, streamed",
+          "kind": "return",
+          "delta": "unchanged"
+        },
+        {
+          "id": "save-answer",
+          "from": "search-ui",
+          "to": "indexeddb",
+          "label": "save to history",
+          "kind": "async",
+          "delta": "unchanged"
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "overview",
+      "title": "Where each part runs",
+      "lens": "architecture",
+      "summary": "The browser, the Docker container and what they reach on the internet.",
+      "scope": {
+        "kind": "all"
+      },
+      "defaultOpen": true,
+      "children": []
+    },
+    {
+      "id": "search-flow",
+      "title": "A search with an AI answer",
+      "lens": "data-flow",
+      "scope": {
+        "kind": "selection",
+        "flows": ["search-and-answer"]
+      },
+      "defaultOpen": false,
+      "children": []
+    }
+  ],
+  "layout": {
+    "direction": "right",
+    "laneOrder": ["browser", "container", "outside"]
+  }
+}
