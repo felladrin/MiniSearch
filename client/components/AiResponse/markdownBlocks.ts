@@ -121,12 +121,14 @@ export function splitMarkdownBlocks(content: string): string[] {
   }
 
   if (hasDefinitions) {
-    return [
-      lines
-        .join("\n")
-        .replace(/^(?:[ \t\r]*\n)+/, "")
-        .replace(/(?:\n[ \t\r]*)+$/, ""),
-    ];
+    // Trim on the lines rather than with a regex on the joined string: a
+    // trailing-blank-lines regex backtracks quadratically on a long blank
+    // run followed by more text.
+    let start = 0;
+    let end = lines.length;
+    while (start < end && BLANK_LINE_RE.test(lines[start])) start++;
+    while (end > start && BLANK_LINE_RE.test(lines[end - 1])) end--;
+    return [lines.slice(start, end).join("\n")];
   }
 
   flush();
