@@ -45,7 +45,16 @@ function createRequest(
   method = "POST",
   contentType = "application/json",
 ): IncomingMessage {
-  const request = Readable.from([JSON.stringify(body)]) as IncomingMessage;
+  return createRawRequest([JSON.stringify(body)], method, contentType);
+}
+
+/** A request whose body arrives as these chunks, sent as they are. */
+function createRawRequest(
+  chunks: string[],
+  method = "POST",
+  contentType = "application/json",
+): IncomingMessage {
+  const request = Readable.from(chunks) as IncomingMessage;
   request.url = "/inference?token=abc";
   request.method = method;
   request.headers = {
@@ -122,6 +131,177 @@ function streamOf(
   };
 }
 
+const helloBody = { messages: [{ role: "user", content: "hi" }] };
+
+/** Sends a request to the hook and returns the response with its pending run. */
+function startRequest(body: unknown = helloBody) {
+  const response = createResponse();
+  const pending = getRegisteredHandler()(
+    createRequest(body),
+    response,
+    vi.fn(),
+  );
+  return { response, pending };
+}
+
+async function sendRequest(body: unknown = helloBody) {
+  const { response, pending } = startRequest(body);
+  await pending;
+  return response;
+}
+
+function endPayload(response: ReturnType<typeof createResponse>) {
+  return JSON.parse(response.end.mock.calls[0][0]);
+}
+
+function writtenFrames(response: ReturnType<typeof createResponse>) {
+  return response.write.mock.calls.map((c) => c[0] as string);
+}
+
+function writtenText(response: ReturnType<typeof createResponse>) {
+  return response.write.mock.calls.map((c) => c[0]).join("");
+}
+
+/** A stream that answers `text` in one piece, then finishes. */
+function answerStream(text: string) {
+  return streamOf([{ type: "text-delta", text }, { type: "finish" }]);
+}
+
+/** Runs the request with fake timers until it settles, so retries and stalls play out. */
+async function sendRequestThroughTimers(body: unknown = helloBody) {
+  vi.useFakeTimers();
+  try {
+    const { response, pending } = startRequest(body);
+    await vi.runAllTimersAsync();
+    await pending;
+    return response;
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
+/**
+ * A stream that yields `before`, then waits for the request's abort and yields
+ * an abort part, as the AI SDK's pull handler does.
+ */
+function stallUntilAborted(
+  abortSignal: AbortSignal | undefined,
+  before: Array<{ type: string; text?: string }> = [],
+) {
+  return {
+    stream: (async function* () {
+      for (const piece of before) yield piece as never;
+      await new Promise<void>((resolve) => {
+        if (abortSignal?.aborted) resolve();
+        else
+          abortSignal?.addEventListener("abort", () => resolve(), {
+            once: true,
+          });
+      });
+      yield { type: "abort" } as never;
+    })(),
+  };
+}
+
+/** The first upstream call streams `first()`; every later call, `then()`. */
+function streamFirstThen(
+  first: () => ReturnType<typeof streamOf>,
+  then: () => ReturnType<typeof streamOf>,
+) {
+  vi.mocked(streamText)
+    .mockImplementationOnce(() => first() as never)
+    .mockImplementation(() => then() as never);
+}
+
+/** The internal API is configured, and the provider hands back a chat model. */
+function configureStreamingApi() {
+  vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL", "http://test-api");
+  vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_KEY", "test-key");
+  vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "test-model");
+  vi.mocked(createOpenAICompatible).mockReturnValue({
+    chatModel: vi.fn().mockReturnValue("mock-chat-model"),
+  } as never);
+}
+
+/** Every upstream call streams a fresh `stream()`. */
+function streamEveryCall(stream: () => ReturnType<typeof streamOf>) {
+  vi.mocked(streamText).mockImplementation(() => stream() as never);
+}
+
+/** Sends a hello request with `extra` fields; returns what reached `streamText`. */
+async function upstreamArgsFor(extra: Record<string, unknown>) {
+  await sendRequest({ ...helloBody, ...extra });
+  return vi.mocked(streamText).mock.calls[0][0];
+}
+
+/** The second attempt answers "Recovered"; returns everything written. */
+async function sendExpectingSecondAttemptToRecover() {
+  const response = await sendRequestThroughTimers();
+  expect(streamText).toHaveBeenCalledTimes(2);
+  const writes = writtenText(response);
+  expect(writes).toContain("Recovered");
+  return writes;
+}
+
+function expectAllModelsFailedJson(
+  response: ReturnType<typeof createResponse>,
+  lastError: string,
+) {
+  expect(response.statusCode).toBe(503);
+  expect(response.setHeader).toHaveBeenCalledWith(
+    "Content-Type",
+    "application/json",
+  );
+  expect(endPayload(response)).toEqual({
+    error: "Service unavailable - all models failed",
+    lastError,
+  });
+}
+
+/** Each listing returns one model (model-a, then model-b), so a retry re-lists. */
+function useOneModelPoolsThatRelist() {
+  vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
+  vi.mocked(listOpenAiCompatibleModels)
+    .mockResolvedValueOnce([{ id: "model-a" }])
+    .mockResolvedValueOnce([{ id: "model-b" }]);
+  vi.mocked(selectRandomModel)
+    .mockReturnValueOnce("model-a")
+    .mockReturnValueOnce("model-b");
+}
+
+function failModelListing() {
+  vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
+  vi.mocked(listOpenAiCompatibleModels).mockRejectedValue(
+    new Error("registry timeout"),
+  );
+}
+
+/** `label` was logged with the message only, and no Error object reached the log. */
+function expectOnlyMessageLogged(
+  errorSpy: { mock: { calls: unknown[][] } },
+  label: string,
+  message: string,
+) {
+  const call = errorSpy.mock.calls.find((logged) => logged[0] === label);
+  expect(call).toBeDefined();
+  expect(call?.[1]).toBe(message);
+  expect(
+    errorSpy.mock.calls.every((logged) => !(logged[1] instanceof Error)),
+  ).toBe(true);
+}
+
+/** No configured model: each attempt picks model-a, then model-b. */
+function useTwoRandomModels() {
+  vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
+  vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
+    { id: "model-a" },
+    { id: "model-b" },
+  ]);
+  vi.mocked(selectRandomModel)
+    .mockReturnValueOnce("model-a")
+    .mockReturnValueOnce("model-b");
+}
+
 describe("internalApiEndpointServerHook", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -156,7 +336,7 @@ describe("internalApiEndpointServerHook", () => {
       await handler(request, response, vi.fn());
       expect(response.statusCode).toBe(405);
       expect(response.setHeader).toHaveBeenCalledWith("Allow", "POST");
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      const payload = endPayload(response);
       expect(payload.error).toBe("Method Not Allowed");
     });
 
@@ -166,7 +346,7 @@ describe("internalApiEndpointServerHook", () => {
       const request = createRequest({}, "POST", "text/plain");
       await handler(request, response, vi.fn());
       expect(response.statusCode).toBe(415);
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      const payload = endPayload(response);
       expect(payload.error).toBe("Unsupported Media Type");
     });
 
@@ -250,7 +430,7 @@ describe("internalApiEndpointServerHook", () => {
       const response = createResponse();
       await handler(createRequest(body), response, vi.fn());
       expect(response.statusCode).toBe(400);
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      const payload = endPayload(response);
       expect(payload.error).toContain(`Invalid request body: ${expectedPath}`);
     });
 
@@ -258,32 +438,20 @@ describe("internalApiEndpointServerHook", () => {
       const handler = getRegisteredHandler();
       const response = createResponse();
       const chunk600k = "x".repeat(600 * 1024);
-      const request = Readable.from([chunk600k, chunk600k]) as IncomingMessage;
-      request.url = "/inference?token=abc";
-      request.method = "POST";
-      request.headers = {
-        host: "localhost:3000",
-        "content-type": "application/json",
-      };
+      const request = createRawRequest([chunk600k, chunk600k]);
       await handler(request, response, vi.fn());
       expect(response.statusCode).toBe(413);
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      const payload = endPayload(response);
       expect(payload.error).toBe("Request body too large");
     });
 
     it("responds 400 when body is not valid JSON", async () => {
       const handler = getRegisteredHandler();
       const response = createResponse();
-      const request = Readable.from(["not json at all"]) as IncomingMessage;
-      request.url = "/inference?token=abc";
-      request.method = "POST";
-      request.headers = {
-        host: "localhost:3000",
-        "content-type": "application/json",
-      };
+      const request = createRawRequest(["not json at all"]);
       await handler(request, response, vi.fn());
       expect(response.statusCode).toBe(400);
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      const payload = endPayload(response);
       expect(payload.error).toBe("Invalid request body");
     });
   });
@@ -292,15 +460,9 @@ describe("internalApiEndpointServerHook", () => {
     it("responds 500 when API configuration is missing", async () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL", undefined);
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_KEY", undefined);
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
+      const response = await sendRequest();
       expect(response.statusCode).toBe(500);
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      const payload = endPayload(response);
       expect(payload.error).toBe("OpenAI API configuration is missing");
     });
   });
@@ -310,13 +472,7 @@ describe("internalApiEndpointServerHook", () => {
       vi.mocked(handleTokenVerification).mockResolvedValue({
         shouldContinue: false,
       });
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
+      const response = await sendRequest();
       expect(handleTokenVerification).toHaveBeenCalledWith(
         "abc",
         expect.anything(),
@@ -327,32 +483,7 @@ describe("internalApiEndpointServerHook", () => {
   });
 
   describe("streaming path", () => {
-    const setupStreaming = () => {
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL", "http://test-api");
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_KEY", "test-key");
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "test-model");
-      vi.mocked(createOpenAICompatible).mockReturnValue({
-        chatModel: vi.fn().mockReturnValue("mock-chat-model"),
-      } as never);
-    };
-
-    beforeEach(setupStreaming);
-
-    async function callWithFakeTimers(response = createResponse()) {
-      vi.useFakeTimers();
-      try {
-        const pending = getRegisteredHandler()(
-          createRequest({ messages: [{ role: "user", content: "hi" }] }),
-          response,
-          vi.fn(),
-        );
-        await vi.runAllTimersAsync();
-        await pending;
-      } finally {
-        vi.useRealTimers();
-      }
-      return response;
-    }
+    beforeEach(configureStreamingApi);
 
     function requestedModels() {
       const provider = vi.mocked(createOpenAICompatible).mock.results[0]
@@ -362,11 +493,9 @@ describe("internalApiEndpointServerHook", () => {
 
     it("sends the configured reasoning effort upstream", async () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_REASONING_EFFORT", " low ");
-      vi.mocked(streamText).mockImplementation(
-        () => streamOf([{ type: "finish" }]) as never,
-      );
+      streamEveryCall(() => streamOf([{ type: "finish" }]));
 
-      await callWithFakeTimers();
+      await sendRequestThroughTimers();
 
       expect(vi.mocked(streamText).mock.calls[0][0].providerOptions).toEqual({
         openai: { reasoningEffort: "low" },
@@ -375,11 +504,9 @@ describe("internalApiEndpointServerHook", () => {
 
     it("leaves the reasoning effort to the upstream when unset", async () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_REASONING_EFFORT", "");
-      vi.mocked(streamText).mockImplementation(
-        () => streamOf([{ type: "finish" }]) as never,
-      );
+      streamEveryCall(() => streamOf([{ type: "finish" }]));
 
-      await callWithFakeTimers();
+      await sendRequestThroughTimers();
 
       expect(
         vi.mocked(streamText).mock.calls[0][0].providerOptions,
@@ -390,20 +517,14 @@ describe("internalApiEndpointServerHook", () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", " model-a , model-b ");
       vi.mocked(streamText)
         .mockImplementationOnce(() => streamOf([]) as never)
-        .mockImplementationOnce(
-          () =>
-            streamOf([
-              { type: "text-delta", text: "Recovered" },
-              { type: "finish" },
-            ]) as never,
-        );
+        .mockImplementationOnce(() => answerStream("Recovered") as never);
 
-      const response = await callWithFakeTimers();
+      const response = await sendRequestThroughTimers();
 
       expect(requestedModels()).toEqual(["model-a", "model-b"]);
       expect(listOpenAiCompatibleModels).not.toHaveBeenCalled();
       expect(selectRandomModel).not.toHaveBeenCalled();
-      const writes = response.write.mock.calls.map((c) => c[0]).join("");
+      const writes = writtenText(response);
       expect(writes).toContain("Recovered");
     });
 
@@ -411,9 +532,9 @@ describe("internalApiEndpointServerHook", () => {
     // would end the request after two attempts instead of four.
     it("walks the configured list a second time before giving up", async () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "model-a,model-b,");
-      vi.mocked(streamText).mockImplementation(() => streamOf([]) as never);
+      streamEveryCall(() => streamOf([]));
 
-      const response = await callWithFakeTimers();
+      const response = await sendRequestThroughTimers();
 
       expect(requestedModels()).toEqual([
         "model-a",
@@ -429,36 +550,18 @@ describe("internalApiEndpointServerHook", () => {
     it("retries a single configured model once", async () => {
       vi.mocked(streamText)
         .mockImplementationOnce(() => streamOf([]) as never)
-        .mockImplementationOnce(
-          () =>
-            streamOf([
-              { type: "text-delta", text: "Second try" },
-              { type: "finish" },
-            ]) as never,
-        );
+        .mockImplementationOnce(() => answerStream("Second try") as never);
 
-      const response = await callWithFakeTimers();
+      const response = await sendRequestThroughTimers();
 
       expect(requestedModels()).toEqual(["test-model", "test-model"]);
-      const writes = response.write.mock.calls.map((c) => c[0]).join("");
+      const writes = writtenText(response);
       expect(writes).toContain("Second try");
     });
 
     it("emits SSE frames on successful stream", async () => {
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "Hello" },
-            { type: "finish" },
-          ]) as never,
-      );
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
+      streamEveryCall(() => answerStream("Hello"));
+      const response = await sendRequest();
       expect(response.setHeader).toHaveBeenCalledWith(
         "Content-Type",
         "text/event-stream",
@@ -489,15 +592,9 @@ describe("internalApiEndpointServerHook", () => {
             { type: "finish", finishReason: "length" },
           ]) as never,
       );
-      const response = createResponse();
+      const response = await sendRequest();
 
-      await getRegisteredHandler()(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
-
-      const writes = response.write.mock.calls.map((c) => c[0]).join("");
+      const writes = writtenText(response);
       expect(writes).toContain('"finish_reason":"length"');
       expect(writes).not.toContain('"finish_reason":"stop"');
     });
@@ -509,15 +606,9 @@ describe("internalApiEndpointServerHook", () => {
             { type: "finish", finishReason: "content-filter" },
           ]) as never,
       );
-      const response = createResponse();
+      const response = await sendRequest();
 
-      await getRegisteredHandler()(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
-
-      const writes = response.write.mock.calls.map((c) => c[0]).join("");
+      const writes = writtenText(response);
       expect(writes).toContain('"finish_reason":"content_filter"');
     });
 
@@ -530,65 +621,25 @@ describe("internalApiEndpointServerHook", () => {
       async (maxTokens, expected) => {
         vi.stubEnv("MODEL_DEFAULT_MAX_TOKENS", maxTokens);
         vi.spyOn(console, "error").mockImplementation(() => {});
-        vi.mocked(streamText).mockImplementation(
-          () =>
-            streamOf([
-              { type: "text-delta", text: "Ok" },
-              { type: "finish" },
-            ]) as never,
-        );
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        await handler(
-          createRequest({
-            messages: [{ role: "user", content: "hi" }],
-            max_tokens: 9999,
-          }),
-          response,
-          vi.fn(),
-        );
-        const callArgs = vi.mocked(streamText).mock.calls[0][0];
+        streamEveryCall(() => answerStream("Ok"));
+        const callArgs = await upstreamArgsFor({
+          max_tokens: 9999,
+        });
         expect(callArgs.maxOutputTokens).toBe(expected);
       },
     );
 
     it("passes max_tokens unchanged when under cap", async () => {
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "Ok" },
-            { type: "finish" },
-          ]) as never,
-      );
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({
-          messages: [{ role: "user", content: "hi" }],
-          max_tokens: 100,
-        }),
-        response,
-        vi.fn(),
-      );
-      const callArgs = vi.mocked(streamText).mock.calls[0][0];
+      streamEveryCall(() => answerStream("Ok"));
+      const callArgs = await upstreamArgsFor({
+        max_tokens: 100,
+      });
       expect(callArgs.maxOutputTokens).toBe(100);
     });
 
     it("passes undefined maxOutputTokens when max_tokens not provided", async () => {
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "Ok" },
-            { type: "finish" },
-          ]) as never,
-      );
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
+      streamEveryCall(() => answerStream("Ok"));
+      await sendRequest();
       const callArgs = vi.mocked(streamText).mock.calls[0][0];
       expect(callArgs.maxOutputTokens).toBeUndefined();
     });
@@ -612,20 +663,10 @@ describe("internalApiEndpointServerHook", () => {
     ])(
       "passes $param: 0 through instead of dropping it",
       async ({ reqKey, argKey }) => {
-        vi.mocked(streamText).mockImplementation(
-          () => streamOf([{ type: "finish" }]) as never,
-        );
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        await handler(
-          createRequest({
-            messages: [{ role: "user", content: "hi" }],
-            [reqKey]: 0,
-          }),
-          response,
-          vi.fn(),
-        );
-        const callArgs = vi.mocked(streamText).mock.calls[0][0];
+        streamEveryCall(() => streamOf([{ type: "finish" }]));
+        const callArgs = await upstreamArgsFor({
+          [reqKey]: 0,
+        });
         expect(callArgs[argKey]).toBe(0);
       },
     );
@@ -648,35 +689,19 @@ describe("internalApiEndpointServerHook", () => {
     ])(
       "clamps $param to its upper bound (reqValue=$reqValue → clampedTo=$clampedTo)",
       async ({ reqKey, reqValue, clampedTo, argKey }) => {
-        vi.mocked(streamText).mockImplementation(
-          () => streamOf([{ type: "finish" }]) as never,
-        );
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        await handler(
-          createRequest({
-            messages: [{ role: "user", content: "hi" }],
-            [reqKey]: reqValue,
-          }),
-          response,
-          vi.fn(),
-        );
-        const callArgs = vi.mocked(streamText).mock.calls[0][0];
+        streamEveryCall(() => streamOf([{ type: "finish" }]));
+        const callArgs = await upstreamArgsFor({
+          [reqKey]: reqValue,
+        });
         expect(callArgs[argKey]).toBe(clampedTo);
       },
     );
 
     it("emits error SSE when stream ends without finish", async () => {
-      vi.mocked(streamText).mockImplementation(
-        () => streamOf([{ type: "text-delta", text: "Partial" }]) as never,
+      streamEveryCall(() =>
+        streamOf([{ type: "text-delta", text: "Partial" }]),
       );
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
+      const response = await sendRequest();
       const writeCalls = response.write.mock.calls.map((c) => c[0]);
       expect(
         writeCalls.some((s: string) => s.includes("Stream ended unexpectedly")),
@@ -691,28 +716,10 @@ describe("internalApiEndpointServerHook", () => {
       async (timeout, timeoutMs) => {
         vi.stubEnv("MODEL_REQUEST_TIMEOUT_MS", timeout);
         vi.mocked(streamText).mockImplementation(
-          ({ abortSignal }: { abortSignal?: AbortSignal } = {}) => {
-            // Yields one part, then yields an abort part when the signal fires —
-            // mirrors the AI SDK v7 pull handler behavior.
-            return {
-              stream: (async function* () {
-                yield { type: "text-delta", text: "Half" } as never;
-                await new Promise<void>((resolve) => {
-                  const check = () => {
-                    if (abortSignal?.aborted) {
-                      resolve();
-                    } else {
-                      abortSignal?.addEventListener("abort", () => resolve(), {
-                        once: true,
-                      });
-                    }
-                  };
-                  check();
-                });
-                yield { type: "abort" } as never;
-              })(),
-            } as never;
-          },
+          ({ abortSignal }: { abortSignal?: AbortSignal } = {}) =>
+            stallUntilAborted(abortSignal, [
+              { type: "text-delta", text: "Half" },
+            ]) as never,
         );
 
         const handler = getRegisteredHandler();
@@ -735,7 +742,7 @@ describe("internalApiEndpointServerHook", () => {
 
           // The abort is treated as an attempt failure: the stalled stream is
           // cut and the SSE error frame carries the message.
-          const writes = response.write.mock.calls.map((c) => c[0] as string);
+          const writes = writtenFrames(response);
           expect(
             writes.some((s: string) => s.includes("Service unavailable")),
           ).toBe(true);
@@ -747,59 +754,25 @@ describe("internalApiEndpointServerHook", () => {
     );
 
     it("retries the next model when the first model stalls before any content", async () => {
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-      vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
-        { id: "model-a" },
-        { id: "model-b" },
-      ]);
-      vi.mocked(selectRandomModel)
-        .mockReturnValueOnce("model-a")
-        .mockReturnValueOnce("model-b");
+      useTwoRandomModels();
 
       vi.mocked(streamText).mockImplementationOnce(
-        ({ abortSignal }: { abortSignal?: AbortSignal } = {}) => {
-          return {
-            stream: (async function* () {
-              await new Promise<void>((resolve) => {
-                const check = () => {
-                  if (abortSignal?.aborted) {
-                    resolve();
-                  } else {
-                    abortSignal?.addEventListener("abort", () => resolve(), {
-                      once: true,
-                    });
-                  }
-                };
-                check();
-              });
-              yield { type: "abort" } as never;
-            })(),
-          } as never;
-        },
+        ({ abortSignal }: { abortSignal?: AbortSignal } = {}) =>
+          stallUntilAborted(abortSignal) as never,
       );
       vi.mocked(streamText).mockImplementationOnce(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "Recovered" },
-            { type: "finish" },
-          ]) as never,
+        () => answerStream("Recovered") as never,
       );
 
       vi.useFakeTimers();
       try {
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        const pending = handler(
-          createRequest({ messages: [{ role: "user", content: "hi" }] }),
-          response,
-          vi.fn(),
-        );
+        const { response, pending } = startRequest();
         // Advance past the idle timeout; model-a stalls and aborts.
         await vi.runAllTimersAsync();
         await pending;
 
         expect(streamText).toHaveBeenCalledTimes(2);
-        const writes = response.write.mock.calls.map((c) => c[0] as string);
+        const writes = writtenFrames(response);
         expect(writes.some((s: string) => s.includes("Recovered"))).toBe(true);
         expect(writes.some((s: string) => s.includes("stalled"))).toBe(false);
       } finally {
@@ -808,68 +781,28 @@ describe("internalApiEndpointServerHook", () => {
     });
 
     it("responds 503 JSON when the stream ends before any content", async () => {
-      vi.mocked(streamText).mockImplementation(() => streamOf([]) as never);
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
+      streamEveryCall(() => streamOf([]));
+      const response = await sendRequest();
       expect(response.statusCode).toBe(503);
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      const payload = endPayload(response);
       expect(payload.lastError).toBe("Stream ended unexpectedly");
       expect(response.write).not.toHaveBeenCalled();
     });
 
     it("retries with another model when the stream ends before any content", async () => {
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-      vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
-        { id: "model-a" },
-        { id: "model-b" },
-      ]);
-      vi.mocked(selectRandomModel)
-        .mockReturnValueOnce("model-a")
-        .mockReturnValueOnce("model-b");
+      useTwoRandomModels();
 
-      let callCount = 0;
-      vi.mocked(streamText).mockImplementation(() => {
-        callCount += 1;
-        return (
-          callCount === 1
-            ? streamOf([])
-            : streamOf([
-                { type: "text-delta", text: "Recovered" },
-                { type: "finish" },
-              ])
-        ) as never;
-      });
+      streamFirstThen(
+        () => streamOf([]),
+        () => answerStream("Recovered"),
+      );
 
-      vi.useFakeTimers();
-      try {
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        const pending = handler(
-          createRequest({ messages: [{ role: "user", content: "hi" }] }),
-          response,
-          vi.fn(),
-        );
-        await vi.runAllTimersAsync();
-        await pending;
-
-        expect(streamText).toHaveBeenCalledTimes(2);
-        const writes = response.write.mock.calls.map((c) => c[0]).join("");
-        expect(writes).toContain("Recovered");
-        expect(writes).not.toContain("Stream ended unexpectedly");
-      } finally {
-        vi.useRealTimers();
-      }
+      const writes = await sendExpectingSecondAttemptToRecover();
+      expect(writes).not.toContain("Stream ended unexpectedly");
     });
 
     it("returns early when response is no longer writable", async () => {
-      vi.mocked(streamText).mockImplementation(
-        () => streamOf([{ type: "text-delta", text: "Hello" }]) as never,
-      );
+      streamEveryCall(() => streamOf([{ type: "text-delta", text: "Hello" }]));
       const handler = getRegisteredHandler();
       const response = createResponse();
       const mutable = response as {
@@ -898,62 +831,23 @@ describe("internalApiEndpointServerHook", () => {
             { type: "error", error: new Error("upstream exploded") },
           ]) as never,
       );
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
-      const writes = response.write.mock.calls.map((c) => c[0]).join("");
+      const response = await sendRequest();
+      const writes = writtenText(response);
       expect(writes).toContain("all models failed: upstream exploded");
       expect(writes).not.toContain("Stream ended unexpectedly");
     });
 
     it("retries with another model when the stream errors before any content", async () => {
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-      vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
-        { id: "model-a" },
-        { id: "model-b" },
-      ]);
-      vi.mocked(selectRandomModel)
-        .mockReturnValueOnce("model-a")
-        .mockReturnValueOnce("model-b");
+      useTwoRandomModels();
 
-      let callCount = 0;
-      vi.mocked(streamText).mockImplementation(() => {
-        callCount += 1;
-        return (
-          callCount === 1
-            ? streamOf([
-                { type: "error", error: new Error("upstream exploded") },
-              ])
-            : streamOf([
-                { type: "text-delta", text: "Recovered" },
-                { type: "finish" },
-              ])
-        ) as never;
-      });
+      streamFirstThen(
+        () =>
+          streamOf([{ type: "error", error: new Error("upstream exploded") }]),
+        () => answerStream("Recovered"),
+      );
 
-      vi.useFakeTimers();
-      try {
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        const pending = handler(
-          createRequest({ messages: [{ role: "user", content: "hi" }] }),
-          response,
-          vi.fn(),
-        );
-        await vi.runAllTimersAsync();
-        await pending;
-
-        expect(streamText).toHaveBeenCalledTimes(2);
-        const writes = response.write.mock.calls.map((c) => c[0]).join("");
-        expect(writes).toContain("Recovered");
-        expect(writes).not.toContain("all models failed");
-      } finally {
-        vi.useRealTimers();
-      }
+      const writes = await sendExpectingSecondAttemptToRecover();
+      expect(writes).not.toContain("all models failed");
     });
 
     it("responds 503 JSON when the only model's stream fails before any content", async () => {
@@ -963,23 +857,8 @@ describe("internalApiEndpointServerHook", () => {
             { type: "error", error: new Error("upstream down") },
           ]) as never,
       );
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
-      expect(response.statusCode).toBe(503);
-      expect(response.setHeader).toHaveBeenCalledWith(
-        "Content-Type",
-        "application/json",
-      );
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
-      expect(payload).toEqual({
-        error: "Service unavailable - all models failed",
-        lastError: "upstream down",
-      });
+      const response = await sendRequest();
+      expectAllModelsFailedJson(response, "upstream down");
       expect(response.setHeader).not.toHaveBeenCalledWith(
         "Content-Type",
         "text/event-stream",
@@ -993,37 +872,14 @@ describe("internalApiEndpointServerHook", () => {
       vi.mocked(streamText).mockImplementation(() => {
         throw new Error("upstream down");
       });
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
-      expect(response.statusCode).toBe(503);
-      expect(response.setHeader).toHaveBeenCalledWith(
-        "Content-Type",
-        "application/json",
-      );
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
-      expect(payload).toEqual({
-        error: "Service unavailable - all models failed",
-        lastError: "upstream down",
-      });
+      const response = await sendRequest();
+      expectAllModelsFailedJson(response, "upstream down");
       expect(response.write).not.toHaveBeenCalled();
       expect(vi.mocked(streamText)).toHaveBeenCalledTimes(2);
     });
 
     it("retries on model failure and succeeds on second attempt", async () => {
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-
-      vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
-        { id: "model-a" },
-        { id: "model-b" },
-      ]);
-      vi.mocked(selectRandomModel)
-        .mockReturnValueOnce("model-a")
-        .mockReturnValueOnce("model-b");
+      useTwoRandomModels();
 
       let callCount = 0;
       vi.mocked(streamText).mockImplementation(() => {
@@ -1031,170 +887,69 @@ describe("internalApiEndpointServerHook", () => {
         if (callCount === 1) {
           throw new Error("upstream down");
         }
-        return streamOf([
-          { type: "text-delta", text: "Ok" },
-          { type: "finish" },
-        ]) as never;
+        return answerStream("Ok") as never;
       });
 
-      vi.useFakeTimers();
-      try {
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        const pending = handler(
-          createRequest({ messages: [{ role: "user", content: "hi" }] }),
-          response,
-          vi.fn(),
-        );
-        await vi.runAllTimersAsync();
-        await pending;
+      const response = await sendRequestThroughTimers();
 
-        expect(streamText).toHaveBeenCalledTimes(2);
-        const secondCallArgs = vi.mocked(selectRandomModel).mock.calls[1][1];
-        expect(secondCallArgs).toBeInstanceOf(Set);
-        expect((secondCallArgs as Set<string>).has("model-a")).toBe(true);
-        const writeCalls = response.write.mock.calls.map((c) => c[0]);
-        expect(writeCalls.some((s: string) => s.includes("[DONE]"))).toBe(true);
-      } finally {
-        vi.useRealTimers();
-      }
+      expect(streamText).toHaveBeenCalledTimes(2);
+      const secondCallArgs = vi.mocked(selectRandomModel).mock.calls[1][1];
+      expect(secondCallArgs).toBeInstanceOf(Set);
+      expect((secondCallArgs as Set<string>).has("model-a")).toBe(true);
+      const writeCalls = response.write.mock.calls.map((c) => c[0]);
+      expect(writeCalls.some((s: string) => s.includes("[DONE]"))).toBe(true);
     });
 
     it("does not retry after content was already sent to the client", async () => {
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-      vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
-        { id: "model-a" },
-        { id: "model-b" },
-      ]);
-      vi.mocked(selectRandomModel)
-        .mockReturnValueOnce("model-a")
-        .mockReturnValueOnce("model-b");
+      useTwoRandomModels();
 
-      let callCount = 0;
-      vi.mocked(streamText).mockImplementation(() => {
-        callCount += 1;
-        return (
-          callCount === 1
-            ? streamOf([
-                { type: "text-delta", text: "Half an answer" },
-                { type: "error", error: new Error("upstream exploded") },
-              ])
-            : streamOf([
-                { type: "text-delta", text: "A different answer" },
-                { type: "finish" },
-              ])
-        ) as never;
-      });
-
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
+      streamFirstThen(
+        () =>
+          streamOf([
+            { type: "text-delta", text: "Half an answer" },
+            { type: "error", error: new Error("upstream exploded") },
+          ]),
+        () => answerStream("A different answer"),
       );
 
+      const response = await sendRequest();
+
       expect(streamText).toHaveBeenCalledTimes(1);
-      const writes = response.write.mock.calls.map((c) => c[0]).join("");
+      const writes = writtenText(response);
       expect(writes).not.toContain("A different answer");
       expect(writes).toContain("all models failed");
       expect(writes).toContain("[DONE]");
     });
 
     it("re-lists the model pool when every model has been attempted", async () => {
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-      vi.mocked(listOpenAiCompatibleModels)
-        .mockResolvedValueOnce([{ id: "model-a" }])
-        .mockResolvedValueOnce([{ id: "model-b" }]);
-      vi.mocked(selectRandomModel)
-        .mockReturnValueOnce("model-a")
-        .mockReturnValueOnce("model-b");
+      useOneModelPoolsThatRelist();
 
-      let callCount = 0;
-      vi.mocked(streamText).mockImplementation(() => {
-        callCount += 1;
-        return (
-          callCount === 1
-            ? streamOf([{ type: "error", error: new Error("upstream down") }])
-            : streamOf([
-                { type: "text-delta", text: "Recovered" },
-                { type: "finish" },
-              ])
-        ) as never;
-      });
+      streamFirstThen(
+        () => streamOf([{ type: "error", error: new Error("upstream down") }]),
+        () => answerStream("Recovered"),
+      );
 
-      vi.useFakeTimers();
-      try {
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        const pending = handler(
-          createRequest({ messages: [{ role: "user", content: "hi" }] }),
-          response,
-          vi.fn(),
-        );
-        await vi.runAllTimersAsync();
-        await pending;
-
-        expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(2);
-        expect(streamText).toHaveBeenCalledTimes(2);
-        const writes = response.write.mock.calls.map((c) => c[0]).join("");
-        expect(writes).toContain("Recovered");
-        expect(writes).not.toContain("all models failed");
-      } finally {
-        vi.useRealTimers();
-      }
+      const writes = await sendExpectingSecondAttemptToRecover();
+      expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(2);
+      expect(writes).not.toContain("all models failed");
     });
 
     it("does not re-list when a model remains in the pool", async () => {
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-      vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
-        { id: "model-a" },
-        { id: "model-b" },
-      ]);
-      vi.mocked(selectRandomModel)
-        .mockReturnValueOnce("model-a")
-        .mockReturnValueOnce("model-b");
+      useTwoRandomModels();
 
-      let callCount = 0;
-      vi.mocked(streamText).mockImplementation(() => {
-        callCount += 1;
-        return (
-          callCount === 1
-            ? streamOf([{ type: "error", error: new Error("upstream down") }])
-            : streamOf([
-                { type: "text-delta", text: "Recovered" },
-                { type: "finish" },
-              ])
-        ) as never;
-      });
+      streamFirstThen(
+        () => streamOf([{ type: "error", error: new Error("upstream down") }]),
+        () => answerStream("Recovered"),
+      );
 
-      vi.useFakeTimers();
-      try {
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        const pending = handler(
-          createRequest({ messages: [{ role: "user", content: "hi" }] }),
-          response,
-          vi.fn(),
-        );
-        await vi.runAllTimersAsync();
-        await pending;
+      await sendRequestThroughTimers();
 
-        expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(1);
-        expect(streamText).toHaveBeenCalledTimes(2);
-      } finally {
-        vi.useRealTimers();
-      }
+      expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(1);
+      expect(streamText).toHaveBeenCalledTimes(2);
     });
 
     it("re-lists only once even when both the original and refetched pools fail", async () => {
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-      vi.mocked(listOpenAiCompatibleModels)
-        .mockResolvedValueOnce([{ id: "model-a" }])
-        .mockResolvedValueOnce([{ id: "model-b" }]);
-      vi.mocked(selectRandomModel)
-        .mockReturnValueOnce("model-a")
-        .mockReturnValueOnce("model-b");
+      useOneModelPoolsThatRelist();
 
       vi.mocked(streamText).mockImplementation(
         () =>
@@ -1204,31 +959,18 @@ describe("internalApiEndpointServerHook", () => {
       );
 
       const before = getInferenceStats();
-      vi.useFakeTimers();
-      try {
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        const pending = handler(
-          createRequest({ messages: [{ role: "user", content: "hi" }] }),
-          response,
-          vi.fn(),
-        );
-        await vi.runAllTimersAsync();
-        await pending;
+      const response = await sendRequestThroughTimers();
 
-        // The pool was refreshed once; even though both models failed we do not
-        // loop on a failing /models endpoint.
-        expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(2);
-        expect(vi.mocked(selectRandomModel).mock.calls[1][0]).toEqual([
-          { id: "model-b" },
-        ]);
-        expect(response.statusCode).toBe(503);
-        expect(getInferenceStats().modelsRefetched).toBe(
-          before.modelsRefetched + 1,
-        );
-      } finally {
-        vi.useRealTimers();
-      }
+      // The pool was refreshed once; even though both models failed we do not
+      // loop on a failing /models endpoint.
+      expect(listOpenAiCompatibleModels).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(selectRandomModel).mock.calls[1][0]).toEqual([
+        { id: "model-b" },
+      ]);
+      expect(response.statusCode).toBe(503);
+      expect(getInferenceStats().modelsRefetched).toBe(
+        before.modelsRefetched + 1,
+      );
     });
 
     it("still answers 503 when the mid-retry re-list fails", async () => {
@@ -1249,13 +991,7 @@ describe("internalApiEndpointServerHook", () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       vi.useFakeTimers();
       try {
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-        const pending = handler(
-          createRequest({ messages: [{ role: "user", content: "hi" }] }),
-          response,
-          vi.fn(),
-        );
+        const { response, pending } = startRequest();
         await vi.runAllTimersAsync();
         await pending;
 
@@ -1286,15 +1022,9 @@ describe("internalApiEndpointServerHook", () => {
       vi.mocked(listOpenAiCompatibleModels).mockRejectedValue(
         new Error("network error"),
       );
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
+      const response = await sendRequest();
       expect(response.statusCode).toBe(500);
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      const payload = endPayload(response);
       expect(payload.error).toBe("Failed to fetch available models");
     });
 
@@ -1302,15 +1032,9 @@ describe("internalApiEndpointServerHook", () => {
       vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
       vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([]);
       vi.mocked(selectRandomModel).mockReturnValue(null);
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
+      const response = await sendRequest();
       expect(response.statusCode).toBe(500);
-      const payload = JSON.parse(response.end.mock.calls[0][0]);
+      const payload = endPayload(response);
       expect(payload.error).toBe("No model available");
     });
 
@@ -1326,21 +1050,12 @@ describe("internalApiEndpointServerHook", () => {
           .spyOn(console, "error")
           .mockImplementation(() => {});
         try {
-          const handler = getRegisteredHandler();
-          const response = createResponse();
-          await handler(
-            createRequest({ messages: [{ role: "user", content: "hi" }] }),
-            response,
-            vi.fn(),
+          await sendRequest();
+          expectOnlyMessageLogged(
+            errorSpy,
+            "Error during streaming:",
+            "upstream exploded",
           );
-          const streamingCall = errorSpy.mock.calls.find(
-            (call) => call[0] === "Error during streaming:",
-          );
-          expect(streamingCall).toBeDefined();
-          expect(streamingCall?.[1]).toBe("upstream exploded");
-          expect(
-            errorSpy.mock.calls.every((call) => !(call[1] instanceof Error)),
-          ).toBe(true);
         } finally {
           errorSpy.mockRestore();
         }
@@ -1368,14 +1083,11 @@ describe("internalApiEndpointServerHook", () => {
             response,
             vi.fn(),
           );
-          const endpointCall = errorSpy.mock.calls.find(
-            (call) => call[0] === "Error in internal API endpoint:",
+          expectOnlyMessageLogged(
+            errorSpy,
+            "Error in internal API endpoint:",
+            "setHeader exploded",
           );
-          expect(endpointCall).toBeDefined();
-          expect(endpointCall?.[1]).toBe("setHeader exploded");
-          expect(
-            errorSpy.mock.calls.every((call) => !(call[1] instanceof Error)),
-          ).toBe(true);
           expect(response.statusCode).toBe(500);
         } finally {
           errorSpy.mockRestore();
@@ -1383,29 +1095,17 @@ describe("internalApiEndpointServerHook", () => {
       });
 
       it("logs only the error message when the model list fetch fails", async () => {
-        vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-        vi.mocked(listOpenAiCompatibleModels).mockRejectedValue(
-          new Error("registry timeout"),
-        );
+        failModelListing();
         const errorSpy = vi
           .spyOn(console, "error")
           .mockImplementation(() => {});
         try {
-          const handler = getRegisteredHandler();
-          const response = createResponse();
-          await handler(
-            createRequest({ messages: [{ role: "user", content: "hi" }] }),
-            response,
-            vi.fn(),
+          const response = await sendRequest();
+          expectOnlyMessageLogged(
+            errorSpy,
+            "Error fetching models:",
+            "registry timeout",
           );
-          const fetchCall = errorSpy.mock.calls.find(
-            (call) => call[0] === "Error fetching models:",
-          );
-          expect(fetchCall).toBeDefined();
-          expect(fetchCall?.[1]).toBe("registry timeout");
-          expect(
-            errorSpy.mock.calls.every((call) => !(call[1] instanceof Error)),
-          ).toBe(true);
           expect(response.statusCode).toBe(500);
         } finally {
           errorSpy.mockRestore();
@@ -1414,15 +1114,6 @@ describe("internalApiEndpointServerHook", () => {
     });
   });
   describe("inference counters", () => {
-    const setupStreaming = () => {
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_BASE_URL", "http://test-api");
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_KEY", "test-key");
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", "test-model");
-      vi.mocked(createOpenAICompatible).mockReturnValue({
-        chatModel: vi.fn().mockReturnValue("mock-chat-model"),
-      } as never);
-    };
-
     async function callInference(response = createResponse()) {
       const handler = getRegisteredHandler();
       await handler(
@@ -1433,7 +1124,7 @@ describe("internalApiEndpointServerHook", () => {
       return response;
     }
 
-    beforeEach(setupStreaming);
+    beforeEach(configureStreamingApi);
 
     // Every case in this block goes through the handler, so this covers all of
     // them rather than whichever one happened to run last.
@@ -1443,13 +1134,7 @@ describe("internalApiEndpointServerHook", () => {
 
     it("counts a finished answer under its model", async () => {
       const before = getInferenceStats(["test-model"]);
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "Hello" },
-            { type: "finish" },
-          ]) as never,
-      );
+      streamEveryCall(() => answerStream("Hello"));
 
       await callInference();
 
@@ -1467,9 +1152,7 @@ describe("internalApiEndpointServerHook", () => {
 
     it("counts a request the client walked away from", async () => {
       const before = getInferenceStats();
-      vi.mocked(streamText).mockImplementation(
-        () => streamOf([{ type: "text-delta", text: "Hello" }]) as never,
-      );
+      streamEveryCall(() => streamOf([{ type: "text-delta", text: "Hello" }]));
       const response = createResponse();
       const mutable = response as {
         writableEnded: boolean;
@@ -1522,7 +1205,7 @@ describe("internalApiEndpointServerHook", () => {
 
     it("counts an exhausted ladder as a failure before the first token", async () => {
       const before = getInferenceStats(["test-model"]);
-      vi.mocked(streamText).mockImplementation(() => streamOf([]) as never);
+      streamEveryCall(() => streamOf([]));
 
       const response = await callInference();
 
@@ -1599,24 +1282,12 @@ describe("internalApiEndpointServerHook", () => {
 
     it("counts a fallback to another model", async () => {
       const before = getInferenceStats(["model-a", "model-b"]);
-      vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-      vi.mocked(listOpenAiCompatibleModels).mockResolvedValue([
-        { id: "model-a" },
-        { id: "model-b" },
-      ]);
-      vi.mocked(selectRandomModel)
-        .mockReturnValueOnce("model-a")
-        .mockReturnValueOnce("model-b");
+      useTwoRandomModels();
       let calls = 0;
       vi.mocked(streamText).mockImplementation(() => {
         calls += 1;
         return (
-          calls === 1
-            ? streamOf([])
-            : streamOf([
-                { type: "text-delta", text: "Recovered" },
-                { type: "finish" },
-              ])
+          calls === 1 ? streamOf([]) : answerStream("Recovered")
         ) as never;
       });
 
@@ -1670,10 +1341,7 @@ describe("internalApiEndpointServerHook", () => {
       [
         "modelListUnavailable",
         async () => {
-          vi.stubEnv("INTERNAL_OPENAI_COMPATIBLE_API_MODEL", undefined);
-          vi.mocked(listOpenAiCompatibleModels).mockRejectedValue(
-            new Error("registry timeout"),
-          );
+          failModelListing();
           const errorSpy = vi
             .spyOn(console, "error")
             .mockImplementation(() => {});
@@ -1699,13 +1367,7 @@ describe("internalApiEndpointServerHook", () => {
 
     it("counts every request exactly once and classifies all of them", async () => {
       const before = getInferenceStats();
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "Hello" },
-            { type: "finish" },
-          ]) as never,
-      );
+      streamEveryCall(() => answerStream("Hello"));
 
       await callInference();
       await callInference();
@@ -1721,13 +1383,7 @@ describe("internalApiEndpointServerHook", () => {
     });
 
     it("keeps no part of the conversation", async () => {
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "borogoves" },
-            { type: "finish" },
-          ]) as never,
-      );
+      streamEveryCall(() => answerStream("borogoves"));
       const handler = getRegisteredHandler();
       await handler(
         createRequest({
