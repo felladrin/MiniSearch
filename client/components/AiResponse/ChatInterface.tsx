@@ -303,11 +303,14 @@ export default function ChatInterface({
           (message): message is ChatMessage & { role: "user" | "assistant" } =>
             message.role !== "system",
         );
-      // An unmounted chat no longer owns the screen or the copy a remount
-      // rebuilds from (the AI answer was turned off, or the same run was
-      // restored); only storage keeps its change.
-      if (conversationId === getCurrentSearchRunId() && isMountedRef.current) {
-        setMessages(next);
+      // A chat replaced by a new search or a regenerated main answer was
+      // already turned away above (another run, or another attempt). On the
+      // same run and attempt, an unmounted chat was only remounted (the AI
+      // answer was turned off and on): it no longer owns the screen, but the
+      // copy the remount rebuilds from must still get its change, or the
+      // remounted chat and its next save drop the turn.
+      if (conversationId === getCurrentSearchRunId()) {
+        if (isMountedRef.current) setMessages(next);
         updateChatMessages(followUps);
       }
       persistChatConversation(conversationId, followUps).catch((error) => {

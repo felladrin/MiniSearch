@@ -1111,8 +1111,9 @@ describe("ChatInterface chat storage", () => {
     await act(async () => {
       send = sendMessage("How do I use it?");
     });
-    // Regenerating the main answer unmounts the chat and clears its copy,
-    // without starting a new search run.
+    // Regenerating the main answer starts a new attempt on the same run (as
+    // startTextSearch records it), unmounts the chat and clears its copy.
+    recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
     view.unmount();
     updateChatMessages([]);
     await act(async () => {
@@ -1121,6 +1122,63 @@ describe("ChatInterface chat storage", () => {
     });
 
     expect(getChatMessages()).toEqual([]);
+  });
+
+  it("keeps an interrupted follow-up when the AI response is turned off and on", async () => {
+    vi.mocked(generateChatResponse)
+      .mockImplementationOnce(
+        (_messages, _onUpdate, chatSignal) =>
+          new Promise((_resolve, reject) => {
+            chatSignal?.addEventListener("abort", () =>
+              reject(new Error("Chat generation interrupted")),
+            );
+          }),
+      )
+      .mockResolvedValueOnce("Next answer.");
+    const view = renderChatInterface();
+
+    let send: Promise<void> = Promise.resolve();
+    await act(async () => {
+      send = sendMessage("How do I use it?");
+    });
+    // Turning "AI response" off unmounts the chat on the same run and
+    // attempt, which aborts the follow-up into its "interrupted" commit.
+    await act(async () => {
+      view.unmount();
+      await send;
+    });
+    const interrupted = [
+      { role: "user", content: "How do I use it?" },
+      { role: "assistant", content: "The answer was interrupted." },
+    ];
+    expect(getChatMessages()).toEqual(interrupted);
+
+    // Turning it back on mounts a new chat from that copy.
+    render(
+      <MantineProvider>
+        <ChatInterface
+          initialQuery={initialQuery}
+          initialResponse={initialResponse}
+          initialMessages={getChatMessages()}
+          suppressInitialFollowUp
+        />
+      </MantineProvider>,
+    );
+    expect(messageListMessages.map((m) => m.content)).toEqual([
+      initialQuery,
+      initialResponse,
+      "How do I use it?",
+      "The answer was interrupted.",
+    ]);
+
+    await act(async () => {
+      await sendMessage("And then?");
+    });
+    expect(persistChatConversation).toHaveBeenLastCalledWith("run-1", [
+      ...interrupted,
+      { role: "user", content: "And then?" },
+      { role: "assistant", content: "Next answer." },
+    ]);
   });
 
   it("stores nothing from a follow-up that started before the main answer was regenerated", async () => {
