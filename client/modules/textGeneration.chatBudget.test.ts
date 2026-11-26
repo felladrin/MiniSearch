@@ -249,11 +249,43 @@ describe("generateChatResponse context budget", () => {
     },
   );
 
+  it("cuts the summary to the room a large prompt leaves, and stores it whole", async () => {
+    // 3072 - 2600 - 3 - 300 leaves under 800 tokens for the summary section,
+    // so the summary in the prompt is cut to fit, while the stored one keeps
+    // its 800 tokens for a later turn with more room.
+    state.systemPrompt = "s".repeat(2600);
+    const messages: ChatMessage[] = [
+      { role: "user", content: "a".repeat(600) },
+      { role: "assistant", content: "b".repeat(200) },
+      { role: "user", content: "q".repeat(300) },
+    ];
+    vi.mocked(generateChatWithWllama).mockImplementation(async (chat) =>
+      chat[0].content.startsWith(summarizerInstruction)
+        ? "z".repeat(2000)
+        : "the answer",
+    );
+
+    await generateChatResponse(messages, () => {});
+
+    const { answer } = callsTo(generateChatWithWllama);
+    const sentTokens = answer[0].reduce(
+      (total, message) => total + message.content.length,
+      0,
+    );
+    expect(sentTokens).toBeLessThanOrEqual(3072);
+    expect(answer[0][0].content).toContain("z");
+    expect(answer[0].slice(2)).toEqual(messages.slice(2));
+    expect(updateConversationSummary).toHaveBeenCalledWith({
+      conversationId: "a".repeat(600),
+      summary: "z".repeat(800),
+    });
+  });
+
   it("keeps the stored summary when the summarizer rejects and the fallback returns empty", async () => {
-    state.systemPrompt = "s".repeat(3500);
+    state.systemPrompt = "s".repeat(2000);
     const messages: ChatMessage[] = [
       { role: "user", content: "first question" },
-      { role: "assistant", content: "x".repeat(900) },
+      { role: "assistant", content: "x".repeat(1500) },
       { role: "user", content: "follow-up question" },
     ];
     vi.mocked(getConversationSummary).mockReturnValue({
@@ -279,10 +311,10 @@ describe("generateChatResponse context budget", () => {
   });
 
   it("keeps the stored summary when the summarizer resolves to an empty string", async () => {
-    state.systemPrompt = "s".repeat(3500);
+    state.systemPrompt = "s".repeat(2000);
     const messages: ChatMessage[] = [
       { role: "user", content: "first question" },
-      { role: "assistant", content: "x".repeat(900) },
+      { role: "assistant", content: "x".repeat(1500) },
       { role: "user", content: "follow-up question" },
     ];
     vi.mocked(getConversationSummary).mockReturnValue({
