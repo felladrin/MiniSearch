@@ -762,6 +762,44 @@ describe("textGenerationWithHorde", () => {
       expect(cancelledIds()).toEqual(["gen-2"]);
     });
 
+    it("cancels the loser whose submit was still in flight when the race ended", async () => {
+      routeHordeFetch({
+        workers: [{ models: ["m-a"], max_length: 1024 }],
+        monthStats: { "m-a": 10 },
+        statusResponder: perJobResponder({
+          "gen-1": () => doneResponse,
+          "gen-2": () => pendingResponse,
+        }),
+      });
+      const routed = mockFetch.getMockImplementation();
+      let submits = 0;
+      let releaseSecondSubmit: () => void = () => {};
+      // The second submit is held until the test releases it, and rejects
+      // when its signal aborts, the way a real fetch does.
+      mockFetch.mockImplementation(
+        (url: string, init?: { method?: string; signal?: AbortSignal }) => {
+          if (!url.includes("/generate/text/async") || ++submits === 1) {
+            return routed?.(url, init);
+          }
+          return new Promise((resolve, reject) => {
+            init?.signal?.addEventListener("abort", () =>
+              reject(new DOMException("Aborted", "AbortError")),
+            );
+            releaseSecondSubmit = () => resolve(jsonResponse({ id: "gen-2" }));
+          });
+        },
+      );
+
+      const { generateTextWithHorde } = await import(
+        "./textGenerationWithHorde"
+      );
+      await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
+      expect(cancelledIds()).toEqual([]);
+
+      releaseSecondSubmit();
+      await vi.waitFor(() => expect(cancelledIds()).toEqual(["gen-2"]));
+    });
+
     it("returns the winner's answer without waiting for the loser's cancel", async () => {
       routeHordeFetch({
         workers: [{ models: ["m-a"], max_length: 1024 }],
