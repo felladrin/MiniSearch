@@ -69,7 +69,7 @@ async function getRegisteredHandler() {
   ) => unknown;
 }
 
-/** Posts `body` to the endpoint, lets the request end, and returns the response. */
+/** Posts `body` to the endpoint, lets the request end, waits 50 ms, and returns the response. */
 async function postAccessKeyRequest(body: string) {
   const handler = await getRegisteredHandler();
   const res = makeMockResponse();
