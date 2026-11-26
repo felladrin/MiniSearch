@@ -1024,10 +1024,12 @@ describe("ChatInterface chat storage", () => {
     await act(async () => {
       await sendMessage("How do I use it?");
     });
-    expect(stored()?.[0]).toEqual({
-      role: "user",
-      content: "How do I use it?",
-    });
+    expect(stored()).toEqual(
+      followUps([
+        "How do I use it?",
+        "Sorry, I encountered an error while generating a response.",
+      ]),
+    );
 
     await act(async () => {
       await regenerateResponse();
@@ -1055,7 +1057,29 @@ describe("ChatInterface chat storage", () => {
       followUps(["How do I use it?", "A late answer."]),
     );
     expect(stored("run-2")).toBeUndefined();
-    // The new search's copy is not given the old search's turns.
+    // Neither the screen nor the new search's copy gets the old search's turns.
+    expect(messageListMessages.at(-1)?.content).toBe("How do I use it?");
+    expect(getChatMessages()).toEqual([]);
+  });
+
+  it("keeps a late answer out of the chat that replaced it on the same search", async () => {
+    const answer = deferred<string>();
+    vi.mocked(generateChatResponse).mockReturnValueOnce(answer.promise);
+    const view = renderChatInterface();
+
+    let send: Promise<void> = Promise.resolve();
+    await act(async () => {
+      send = sendMessage("How do I use it?");
+    });
+    // Regenerating the main answer unmounts the chat and clears its copy,
+    // without starting a new search run.
+    view.unmount();
+    updateChatMessages([]);
+    await act(async () => {
+      answer.resolve("A late answer.");
+      await send;
+    });
+
     expect(getChatMessages()).toEqual([]);
   });
 

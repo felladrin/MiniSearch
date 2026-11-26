@@ -290,8 +290,10 @@ export default function ChatInterface({
           (message): message is ChatMessage & { role: "user" | "assistant" } =>
             message.role !== "system",
         );
-      if (conversationId === getCurrentSearchRunId()) {
-        if (isMountedRef.current) setMessages(next);
+      // An unmounted chat was replaced: a regenerated main answer keeps the
+      // run id but clears the channel, and the old turns must not come back.
+      if (conversationId === getCurrentSearchRunId() && isMountedRef.current) {
+        setMessages(next);
         updateChatMessages(followUps);
       }
       persistChatConversation(conversationId, followUps).catch((error) => {
