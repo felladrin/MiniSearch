@@ -450,7 +450,7 @@ Why Qwen3-ASR replaced Moonshine, and which other models were tried, is in
 
 ### Browser Inference Failures
 
-Wllama handles both WebGPU and CPU paths internally. If the model fails to load or generation is interrupted, the error propagates to `textGeneration.ts`, which sets `textGenerationState` to `failed` and surfaces a retry option to the user. There is no separate fallback engine to switch to.
+Wllama handles both WebGPU and CPU paths internally. If the model fails to load or generation fails, the error propagates to `textGeneration.ts`, which sets `textGenerationState` to `failed` and surfaces a retry option to the user. A generation whose signal was aborted (Stop, or a newer search) sets no state of its own: Stop has already set `interrupted`, and a newer search owns the state. There is no separate fallback engine to switch to.
 
 ### API Failures
 

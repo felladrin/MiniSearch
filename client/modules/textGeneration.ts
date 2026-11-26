@@ -299,10 +299,16 @@ export async function searchAndRespond() {
 
   updateSearchPromise(startTextSearch(getQuery(), invocation));
 
-  activeSearchController?.abort();
+  const previousSearchController = activeSearchController;
+  previousSearchController?.abort();
   activeSearchController = null;
 
-  if (!getSettings().enableAiResponse) return;
+  if (!getSettings().enableAiResponse) {
+    // The aborted answer writes no state of its own, so it would stay
+    // "generating" (and keep the screen awake) with no run behind it.
+    if (previousSearchController) updateTextGenerationState("idle");
+    return;
+  }
 
   const responseGenerationStartTime = Date.now();
 

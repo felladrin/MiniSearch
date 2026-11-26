@@ -160,7 +160,7 @@ describe("textGenerationWithHorde", () => {
       expect(cancelledIds()).toEqual(["gen-4"]);
     });
 
-    it("submits nothing and leaves the state alone once a newer search aborted it", async () => {
+    it('submits nothing and never enters "generating" once a newer search aborted it', async () => {
       const { generateTextWithHorde } = await import(
         "./textGenerationWithHorde"
       );

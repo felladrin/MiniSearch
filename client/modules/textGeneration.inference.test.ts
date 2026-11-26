@@ -149,4 +149,34 @@ describe("searchAndRespond", () => {
     expect(updateTextGenerationState).toHaveBeenCalledWith("interrupted");
     expect(updateTextGenerationState).not.toHaveBeenCalledWith("failed");
   });
+
+  it("leaves no stuck state when a search with AI off replaces a running answer", async () => {
+    vi.mocked(getQuery).mockReturnValue("question");
+    const settings = {
+      inferenceType: "browser",
+      enableAiResponse: true,
+      enableTextSearch: false,
+      enableImageSearch: false,
+      allowAiModelDownload: true,
+    };
+    mockGetSettings.mockImplementation(() => settings as never);
+    let running: AbortSignal | undefined;
+    vi.mocked(generateTextWithWllama).mockImplementation(
+      (signal) =>
+        new Promise((_resolve, reject) => {
+          running = signal;
+          signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    );
+
+    const first = searchAndRespond();
+    await vi.waitFor(() => expect(running).toBeDefined());
+    vi.mocked(updateTextGenerationState).mockClear();
+    settings.enableAiResponse = false;
+    await searchAndRespond();
+    await first;
+
+    expect(running?.aborted).toBe(true);
+    expect(updateTextGenerationState).toHaveBeenLastCalledWith("idle");
+  });
 });
