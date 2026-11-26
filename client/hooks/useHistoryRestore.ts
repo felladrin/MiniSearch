@@ -4,6 +4,7 @@ import { markQueryAsHandled } from "../modules/autoSearch";
 import type { SearchEntry } from "../modules/history";
 import {
   getChatMessagesForQuery,
+  getCurrentSearchRunId,
   getLatestLlmResponseForEntry,
   getResultsFromEntry,
   hasImageResults,
@@ -12,6 +13,7 @@ import {
 } from "../modules/history";
 import { postMessageToParentWindow } from "../modules/parentWindow";
 import {
+  getChatGenerationState,
   updateChatInput,
   updateChatMessages,
   updateFollowUpQuestion,
@@ -52,6 +54,15 @@ export function useHistoryRestore(
       cancelSearchAnswer();
 
       const searchRunId = entry.searchRunId || entry.query;
+      // Restoring the search already on screen leaves its chat mounted, so a
+      // follow-up still being answered keeps going and saves its turn when it
+      // lands. The stored list read below would not have that turn, and
+      // publishing it would reset the chat to the shorter list, which the next
+      // send then saves over storage. That chat already shows this search's
+      // conversation, so it is left as it is.
+      const keepsChat =
+        searchRunId === getCurrentSearchRunId() &&
+        getChatGenerationState().isGeneratingResponse;
       setCurrentSearchRunId(searchRunId);
 
       updateIsRestoringFromHistory(true);
@@ -125,9 +136,11 @@ export function useHistoryRestore(
         updateTextGenerationState("idle");
       }
 
-      updateChatMessages([]);
-      const chatMessages = await getChatMessagesForQuery(searchRunId);
-      updateChatMessages(chatMessages);
+      if (!keepsChat) {
+        updateChatMessages([]);
+        const chatMessages = await getChatMessagesForQuery(searchRunId);
+        updateChatMessages(chatMessages);
+      }
 
       updateFollowUpQuestion("");
 
