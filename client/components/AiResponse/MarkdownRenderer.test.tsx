@@ -148,7 +148,10 @@ describe("MarkdownRenderer rendered output", () => {
     expect(container.querySelectorAll("section[data-footnotes]")).toHaveLength(
       1,
     );
-    const note = container.querySelector("li#user-content-fn-1");
+    const href = container
+      .querySelector("a[data-footnote-ref]")
+      ?.getAttribute("href");
+    const note = container.querySelector(`li[id="${href?.slice(1)}"]`);
     expect(note?.textContent).toContain("USGS overview.");
   });
 
@@ -158,10 +161,43 @@ describe("MarkdownRenderer rendered output", () => {
     );
 
     const reference = container.querySelector("a[data-footnote-ref]");
-    expect(reference?.getAttribute("href")).toBe("#user-content-fn-1");
+    const note = container.querySelector("section[data-footnotes] li");
+    expect(reference?.getAttribute("href")).toBe(`#${note?.id}`);
     expect(reference?.getAttribute("target")).toBeNull();
     const backReference = container.querySelector("a[data-footnote-backref]");
-    expect(backReference?.getAttribute("href")).toBe("#user-content-fnref-1");
+    expect(backReference?.getAttribute("href")).toBe(`#${reference?.id}`);
     expect(backReference?.getAttribute("target")).toBeNull();
+  });
+
+  it("gives each renderer on the page its own footnote ids", () => {
+    const { container } = render(
+      <MantineProvider>
+        <MarkdownRenderer content={"First answer[^1].\n\n[^1]: First note."} />
+        <MarkdownRenderer
+          content={"Second answer[^1].\n\n[^1]: Second note."}
+        />
+      </MantineProvider>,
+    );
+
+    const references = container.querySelectorAll("a[data-footnote-ref]");
+    const notes = container.querySelectorAll("section[data-footnotes] li");
+    const backReferences = container.querySelectorAll(
+      "a[data-footnote-backref]",
+    );
+    expect(references).toHaveLength(2);
+    expect(notes).toHaveLength(2);
+    expect(notes[0].id).not.toBe(notes[1].id);
+    expect(references[0].id).not.toBe(references[1].id);
+
+    for (const [index, text] of ["First note.", "Second note."].entries()) {
+      const target = container.querySelector(
+        `[id="${references[index].getAttribute("href")?.slice(1)}"]`,
+      );
+      expect(target).toBe(notes[index]);
+      expect(target?.textContent).toContain(text);
+      expect(backReferences[index].getAttribute("href")).toBe(
+        `#${references[index].id}`,
+      );
+    }
   });
 });
