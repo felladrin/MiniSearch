@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./pubSub", () => ({
   getConversationSummary: vi.fn(() => ({ conversationId: "", summary: "" })),
@@ -60,8 +60,16 @@ vi.mock("./textGenerationWithWllama", () => ({
 }));
 
 import gptTokenizer from "gpt-tokenizer";
-import { getQuery, getSettings, updateTextGenerationState } from "./pubSub";
+import { getCurrentSearchRunId, saveLlmResponseForQuery } from "./history";
 import {
+  getQuery,
+  getSettings,
+  listenToSettingsChanges,
+  updateResponseImmediately,
+  updateTextGenerationState,
+} from "./pubSub";
+import {
+  cancelSearchAnswer,
   generateReplyToMessages,
   interruptSearch,
   searchAndRespond,
@@ -178,5 +186,176 @@ describe("searchAndRespond", () => {
 
     expect(running?.aborted).toBe(true);
     expect(updateTextGenerationState).toHaveBeenLastCalledWith("idle");
+  });
+});
+
+describe("answers that return after their search was replaced", () => {
+  /** Engine calls the test resolves by hand, even after an abort. */
+  let finish: Array<(answer: string) => void>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    finish = [];
+    mockGetSettings.mockReturnValue({
+      inferenceType: "browser",
+      enableAiResponse: true,
+      enableTextSearch: false,
+      enableImageSearch: false,
+      allowAiModelDownload: true,
+    } as never);
+    vi.mocked(generateTextWithWllama).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish.push(resolve);
+        }),
+    );
+  });
+
+  function startSearch(query: string, searchRunId: string) {
+    vi.mocked(getQuery).mockReturnValue(query);
+    vi.mocked(getCurrentSearchRunId).mockReturnValue(searchRunId);
+    return searchAndRespond();
+  }
+
+  it("saves and shows only the newer search's answer", async () => {
+    const first = startSearch("A", "run-a");
+    await vi.waitFor(() => expect(finish).toHaveLength(1));
+    const second = startSearch("B", "run-b");
+    await vi.waitFor(() => expect(finish).toHaveLength(2));
+
+    finish[1]("answer B");
+    await second;
+    const stateWritesAfterB = vi.mocked(updateTextGenerationState).mock.calls
+      .length;
+    finish[0]("answer A");
+    await first;
+
+    expect(saveLlmResponseForQuery).toHaveBeenCalledOnce();
+    expect(saveLlmResponseForQuery).toHaveBeenCalledWith(
+      "B",
+      "answer B",
+      expect.anything(),
+      "run-b",
+    );
+    expect(updateResponseImmediately).toHaveBeenLastCalledWith("answer B");
+    expect(vi.mocked(updateTextGenerationState).mock.calls).toHaveLength(
+      stateWritesAfterB,
+    );
+    expect(vi.mocked(generateTextWithWllama).mock.calls[0][0]?.aborted).toBe(
+      true,
+    );
+  });
+
+  it("leaves a restored answer alone and saves nothing under it", async () => {
+    const running = startSearch("A", "run-a");
+    await vi.waitFor(() => expect(finish).toHaveLength(1));
+
+    // The history restore cancels the answer, then switches to its entry.
+    cancelSearchAnswer();
+    vi.mocked(getCurrentSearchRunId).mockReturnValue("run-restored");
+    vi.mocked(updateTextGenerationState).mockClear();
+    finish[0]("answer A");
+    await running;
+
+    expect(saveLlmResponseForQuery).not.toHaveBeenCalled();
+    expect(updateResponseImmediately).not.toHaveBeenCalled();
+    expect(updateTextGenerationState).not.toHaveBeenCalled();
+  });
+
+  it("saves only the regenerated answer after Stop", async () => {
+    const stopped = startSearch("A", "run-a");
+    await vi.waitFor(() => expect(finish).toHaveLength(1));
+    interruptSearch();
+    const regenerated = startSearch("A", "run-a");
+    await vi.waitFor(() => expect(finish).toHaveLength(2));
+
+    expect(vi.mocked(generateTextWithWllama).mock.calls[0][0]?.aborted).toBe(
+      true,
+    );
+    finish[1]("new answer");
+    await regenerated;
+    finish[0]("stopped answer");
+    await stopped;
+
+    expect(saveLlmResponseForQuery).toHaveBeenCalledOnce();
+    expect(saveLlmResponseForQuery).toHaveBeenCalledWith(
+      "A",
+      "new answer",
+      expect.anything(),
+      "run-a",
+    );
+  });
+
+  it("saves an answer under its own search when a new one is being set up", async () => {
+    const running = startSearch("A", "run-a");
+    await vi.waitFor(() => expect(finish).toHaveLength(1));
+
+    // The search form switches the query and run id, then awaits the history
+    // write before it starts the new search.
+    vi.mocked(getQuery).mockReturnValue("B");
+    vi.mocked(getCurrentSearchRunId).mockReturnValue("run-b");
+    finish[0]("answer A");
+    await running;
+
+    expect(saveLlmResponseForQuery).toHaveBeenCalledWith(
+      "A",
+      "answer A",
+      expect.anything(),
+      "run-a",
+    );
+  });
+
+  it("publishes nothing when replaced while the answer is being saved", async () => {
+    let finishSave: () => void = () => {};
+    vi.mocked(saveLlmResponseForQuery).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSave = () => resolve();
+        }),
+    );
+    const first = startSearch("A", "run-a");
+    await vi.waitFor(() => expect(finish).toHaveLength(1));
+    finish[0]("answer A");
+    await vi.waitFor(() => expect(saveLlmResponseForQuery).toHaveBeenCalled());
+
+    const second = startSearch("B", "run-b");
+    await vi.waitFor(() => expect(finish).toHaveLength(2));
+    vi.mocked(updateTextGenerationState).mockClear();
+    finishSave();
+    await first;
+
+    expect(updateResponseImmediately).not.toHaveBeenCalledWith("answer A");
+    expect(updateTextGenerationState).not.toHaveBeenCalled();
+    finish[1]("answer B");
+    await second;
+  });
+
+  it("does not leave the download gate once a restore cancelled the run", async () => {
+    mockGetSettings.mockReturnValue({
+      inferenceType: "browser",
+      enableAiResponse: true,
+      enableTextSearch: false,
+      enableImageSearch: false,
+      allowAiModelDownload: false,
+    } as never);
+    let allowDownload: (settings: never) => void = () => {};
+    vi.mocked(listenToSettingsChanges).mockImplementation((listener) => {
+      allowDownload = listener as unknown as (settings: never) => void;
+      return vi.fn();
+    });
+    const parked = startSearch("A", "run-a");
+    await vi.waitFor(() =>
+      expect(updateTextGenerationState).toHaveBeenCalledWith(
+        "awaitingModelDownloadAllowance",
+      ),
+    );
+
+    cancelSearchAnswer();
+    vi.mocked(updateTextGenerationState).mockClear();
+    allowDownload({ allowAiModelDownload: true } as never);
+    await parked;
+
+    expect(updateTextGenerationState).not.toHaveBeenCalled();
+    expect(generateTextWithWllama).not.toHaveBeenCalled();
   });
 });

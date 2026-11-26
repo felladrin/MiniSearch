@@ -264,6 +264,15 @@ let searchInvocation = 0;
 let activeSearchController: AbortController | null = null;
 
 /**
+ * Stops the current search's answer without writing a state: a history
+ * restore publishes its own answer and state right after.
+ */
+export function cancelSearchAnswer() {
+  activeSearchController?.abort();
+  activeSearchController = null;
+}
+
+/**
  * Stops the answer being generated for the current search. Only that run is
  * cancelled: a chat reply has its own signal.
  */
@@ -276,6 +285,10 @@ export async function searchAndRespond() {
   if (getQuery() === "") return;
 
   const invocation = ++searchInvocation;
+  // A newer search, a restore or Stop can change both before the answer
+  // returns; the answer belongs to the search that asked for it.
+  const query = getQuery();
+  const searchRunId = getCurrentSearchRunId();
 
   document.title = getQuery();
 
@@ -321,18 +334,23 @@ export async function searchAndRespond() {
       await canDownloadModels();
       // Every search waiting here is released by the same allowance, and each
       // would load its own copy of the model; two loads at once fail on the
-      // browser's file lock, so only the newest search goes on.
-      if (invocation !== searchInvocation) return;
+      // browser's file lock, so only the newest search goes on. A restore
+      // keeps the counter but aborts the run.
+      if (invocation !== searchInvocation || controller.signal.aborted) return;
       updateTextGenerationState("loadingModel");
     }
     const strategy = await getCurrentInferenceStrategy();
     const finalResponse = await strategy.generateText(controller.signal);
+    // Superseded or stopped while the engine returned: the screen and the
+    // history now belong to someone else.
+    if (controller.signal.aborted) return;
 
     try {
       await saveLlmResponseForQuery(
-        getQuery(),
+        query,
         finalResponse,
         getCurrentModelName(),
+        searchRunId,
       );
     } catch (e) {
       addLogEntry(
@@ -344,12 +362,13 @@ export async function searchAndRespond() {
     // queued here. Publishing the returned text unthrottled before the state
     // flips to "completed" is what makes the mounted chat read the whole
     // answer.
+    if (controller.signal.aborted) return;
     updateResponseImmediately(finalResponse);
 
     updateTextGenerationState("completed");
 
     if (settings.enableNotificationOnAiComplete) {
-      showAiCompleteNotification(getQuery());
+      showAiCompleteNotification(query);
     }
   } catch (error) {
     if (!controller.signal.aborted) {

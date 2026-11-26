@@ -27,6 +27,7 @@ import {
   updateTextSearchStale,
   updateTextSearchState,
 } from "../modules/pubSub";
+import { cancelSearchAnswer } from "../modules/textGeneration";
 import type { ImageSearchResults, TextSearchResults } from "../modules/types";
 
 /** Restores a full search (results, AI response, chat) from a history entry and navigates to it. */
@@ -45,6 +46,10 @@ export function useHistoryRestore(
       // entry and starting a live search.
       markQueryAsHandled(selectedQuery);
       updateQuery(selectedQuery);
+
+      // A live answer would keep streaming over the restored one, and save
+      // itself under the restored entry.
+      cancelSearchAnswer();
 
       const searchRunId = entry.searchRunId || entry.query;
       setCurrentSearchRunId(searchRunId);
