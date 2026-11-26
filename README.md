@@ -95,26 +95,21 @@ docker compose -f docker-compose.production.yml up --build
 
 ## How it works
 
-```mermaid
-flowchart LR
-    subgraph browser [Your browser]
-        UI[Search UI]
-        LocalAI[In-browser model<br/>WebGPU or CPU]
-        Storage[(IndexedDB<br/>history and cache)]
-    end
-    subgraph container [Docker container]
-        Server[App server]
-        SearXNG[SearXNG<br/>metasearch]
-        Reranker[Reranker<br/>ONNX Runtime]
-    end
-    UI <--> Storage
-    UI -->|search| Server
-    Server --> SearXNG
-    SearXNG --> Web((Web))
-    Server --> Reranker
-    UI -.->|in-browser inference| LocalAI
-    UI -.->|remote inference, optional| RemoteAPI[OpenAI-compatible API<br/>or AI Horde]
-```
+<!-- Drawn by PR Lens from docs/diagrams/how-it-works.graph.json. After editing that file, run `npx @coldtea/pr-lens-cli@latest render docs/diagrams/how-it-works.graph.json -o <scratch dir>` and copy its overview-* and search-flow-* SVGs over the how-it-works-overview-* and how-it-works-flow-* files. -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/how-it-works-overview-dark.svg">
+  <img alt="The search UI, IndexedDB and the in-browser model run in your browser. The app server, SearXNG and the reranker run in the Docker container. SearXNG asks the search engines on the web, and the browser can call a remote AI API instead of the in-browser model." src="docs/diagrams/how-it-works-overview-light.svg">
+</picture>
+
+<details>
+<summary>Follow one search from the query to the answer</summary>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/how-it-works-flow-dark.svg">
+  <img alt="Sequence of one search: the browser misses its cache and calls the app server, which asks SearXNG, which asks each search engine. The reranker orders the merged results, the browser caches them, and the in-browser model writes a cited answer that is saved to history." src="docs/diagrams/how-it-works-flow-light.svg">
+</picture>
+
+</details>
 
 Your query goes to the app server, which asks the bundled SearXNG instance to aggregate results from multiple search engines. The server reranks them with a small cross-encoder model before returning them, and the browser caches them locally. If the AI response is enabled, the assistant reads the top results and writes a cited answer, either with a model running in your browser or through the backend you configured. The full picture is in [docs/overview.md](docs/overview.md).
 
