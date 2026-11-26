@@ -163,12 +163,7 @@ export async function refreshImageSearchResults(
     }
 
     if (isRunCurrent()) {
-      // Off the search, the screen no longer holds this run's images, so the
-      // stored list is the one to add to.
-      const saveImages = isCurrent()
-        ? updateSearchResults
-        : mergeSearchImageResults;
-      saveImages(searchRunId, {
+      mergeSearchImageResults(searchRunId, {
         type: "image",
         items: updatedImageResults.map(
           ([title, url, thumbnailUrl, sourceUrl]) => ({

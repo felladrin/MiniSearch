@@ -182,7 +182,7 @@ describe("refreshImageSearchResults", () => {
     await refreshImageSearchResults("query", 10, []);
 
     expect(mockUpdateImage).toHaveBeenCalledWith([...fresh, ...firstImages]);
-    expect(mockUpdateSearchResults).toHaveBeenCalledWith("run-1", {
+    expect(mergeSearchImageResults).toHaveBeenCalledWith("run-1", {
       type: "image",
       items: [
         {
@@ -536,7 +536,7 @@ describe("follow-up supersession ownership", () => {
       ["B1", "https://b1.com", "thumb-b1", "src-b1"],
       ...existingB,
     ]);
-    expect(mockUpdateSearchResults).toHaveBeenCalledTimes(1);
+    expect(mergeSearchImageResults).toHaveBeenCalledTimes(1);
   });
 
   it("drops a stale text refresh that resolves after a newer text refresh on the same run", async () => {

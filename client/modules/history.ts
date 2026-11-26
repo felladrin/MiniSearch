@@ -356,40 +356,42 @@ export async function updateSearchResults(
 
 /**
  * Adds `results` to the images stored for the search instead of replacing them.
- * For a write that lands after the user left the search: the screen then shows
- * another search, so only the stored list still has the other writer's images.
- * The caller's images come first; a URL already stored is not repeated.
+ * Every image write goes through here: the screen can lack images the stored
+ * list has (a late first search merged after the user left and came back), so
+ * replacing it with the screen's list would drop them. A URL is stored once.
+ * With `newFirst`, the new images go ahead of the stored ones; otherwise after.
  */
 export async function mergeSearchImageResults(
   searchRunId: string,
   results: ImageResults,
+  { newFirst = true } = {},
 ): Promise<void> {
   if (!isHistoryEnabled()) return;
   try {
-    await historyDatabase.transaction(
-      "rw",
-      historyDatabase.searches,
-      async () => {
+    await measurePerformance("Merge image results", () =>
+      historyDatabase.transaction("rw", historyDatabase.searches, async () => {
         const latest = await historyDatabase.searches
           .where("searchRunId")
           .equals(searchRunId)
           .first();
         if (latest?.id === undefined) return;
 
-        const stored =
-          latest.imageResults ??
-          (latest.results?.type === "image" ? latest.results : undefined);
+        const storedItems =
+          (
+            latest.imageResults ??
+            (latest.results?.type === "image" ? latest.results : undefined)
+          )?.items ?? [];
         const newUrls = new Set(results.items.map((item) => item.url));
+        const keptItems = storedItems.filter((item) => !newUrls.has(item.url));
         await historyDatabase.searches.update(latest.id, {
           imageResults: {
             type: "image",
-            items: [
-              ...results.items,
-              ...(stored?.items ?? []).filter((item) => !newUrls.has(item.url)),
-            ],
+            items: newFirst
+              ? [...results.items, ...keptItems]
+              : [...keptItems, ...results.items],
           },
         });
-      },
+      }),
     );
   } catch (error) {
     addLogEntry(`Error merging image results: ${error}`);
