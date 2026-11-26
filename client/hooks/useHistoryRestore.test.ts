@@ -1,8 +1,14 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ImageResults, SearchEntry, TextResults } from "@/modules/history";
-import { getLatestLlmResponseForEntry } from "@/modules/history";
 import {
+  getChatMessagesForQuery,
+  getLatestLlmResponseForEntry,
+  setCurrentSearchRunId,
+} from "@/modules/history";
+import {
+  chatGenerationStatePubSub,
+  chatMessagesPubSub,
   getLlmTextSearchResults,
   getSuppressNextFollowUp,
   imageSearchResultsPubSub,
@@ -13,6 +19,13 @@ import {
   updateSuppressNextFollowUp,
 } from "@/modules/pubSub";
 import { useHistoryRestore } from "./useHistoryRestore";
+
+/** A chat turn as history stores it: never a system message. */
+type StoredTurn = { role: "user" | "assistant"; content: string };
+
+const [updateChatGenerationState] = chatGenerationStatePubSub;
+const [updateChatMessages, subscribeToChatMessages, getChatMessages] =
+  chatMessagesPubSub;
 
 vi.mock("wouter", () => ({
   useLocation: () => ["/", vi.fn()],
@@ -78,7 +91,13 @@ const expectedImages = [
 beforeEach(() => {
   vi.useFakeTimers();
   vi.mocked(getLatestLlmResponseForEntry).mockResolvedValue(null);
+  vi.mocked(getChatMessagesForQuery).mockReset().mockResolvedValue([]);
   updateSuppressNextFollowUp(false);
+  updateChatMessages([]);
+  updateChatGenerationState({
+    isGeneratingResponse: false,
+    isGeneratingFollowUpQuestion: false,
+  });
   updateImageSearchResults([
     ["Previous image", "old.png", "old-thumb.png", ""],
   ]);
@@ -183,5 +202,114 @@ describe("useHistoryRestore", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  describe("chat of the search being restored", () => {
+    const savedTurns: StoredTurn[] = [
+      { role: "user", content: "First follow-up?" },
+      { role: "assistant", content: "First answer." },
+    ];
+    const landedTurns: StoredTurn[] = [
+      ...savedTurns,
+      { role: "user", content: "Second follow-up?" },
+      { role: "assistant", content: "Second answer." },
+    ];
+
+    /**
+     * Restores `searchRunId` while the stored chat read is held open, and runs
+     * `whileReading` before it returns `storedTurns`, the list as it was
+     * before the chat's last write. Records every list the restore publishes.
+     */
+    async function restoreWhileChatReadIsOpen(
+      searchRunId: string,
+      storedTurns: StoredTurn[],
+      whileReading: () => void,
+    ) {
+      vi.mocked(getLatestLlmResponseForEntry).mockResolvedValue(
+        "Saved AI answer.",
+      );
+      let returnStoredTurns: (turns: StoredTurn[]) => void = () => undefined;
+      vi.mocked(getChatMessagesForQuery).mockReturnValue(
+        new Promise((resolve) => {
+          returnStoredTurns = resolve;
+        }),
+      );
+      const published: StoredTurn[][] = [];
+      const unsubscribe = subscribeToChatMessages((messages) => {
+        published.push(messages);
+      });
+      const { result } = renderHook(() => useHistoryRestore(vi.fn()));
+
+      try {
+        await act(async () => {
+          const restoring = result.current.restoreSearch({
+            query: "saved search",
+            timestamp: 1,
+            searchRunId,
+          });
+          // Let the restore reach the chat read, as far as it goes.
+          for (let i = 0; i < 10; i++) await Promise.resolve();
+          whileReading();
+          returnStoredTurns(storedTurns);
+          await restoring;
+        });
+      } finally {
+        unsubscribe();
+      }
+      return published;
+    }
+
+    /** What ChatInterface's `commitMessages` publishes when an answer lands. */
+    function landFollowUpAnswer() {
+      updateChatMessages(landedTurns);
+      updateChatGenerationState({
+        isGeneratingResponse: false,
+        isGeneratingFollowUpQuestion: false,
+      });
+    }
+
+    it("keeps a follow-up answer that lands while the same search is restored", async () => {
+      setCurrentSearchRunId("run-1");
+      updateChatMessages(savedTurns);
+      updateChatGenerationState({
+        isGeneratingResponse: true,
+        isGeneratingFollowUpQuestion: false,
+      });
+
+      const published = await restoreWhileChatReadIsOpen(
+        "run-1",
+        savedTurns,
+        landFollowUpAnswer,
+      );
+
+      expect(getChatMessages()).toEqual(landedTurns);
+      // Only the chat's own write: the restore never blanked the list or put
+      // the older one back over it.
+      expect(published).toEqual([landedTurns]);
+    });
+
+    it("replaces the chat with the stored one when another search is restored", async () => {
+      setCurrentSearchRunId("run-1");
+      updateChatMessages(landedTurns);
+      updateChatGenerationState({
+        isGeneratingResponse: true,
+        isGeneratingFollowUpQuestion: false,
+      });
+
+      await restoreWhileChatReadIsOpen("run-2", savedTurns, () => undefined);
+
+      expect(getChatMessagesForQuery).toHaveBeenCalledWith("run-2");
+      expect(getChatMessages()).toEqual(savedTurns);
+    });
+
+    it("reloads the stored chat when the same search is restored with nothing generating", async () => {
+      setCurrentSearchRunId("run-1");
+      updateChatMessages([]);
+
+      await restoreWhileChatReadIsOpen("run-1", savedTurns, () => undefined);
+
+      expect(getChatMessagesForQuery).toHaveBeenCalledWith("run-1");
+      expect(getChatMessages()).toEqual(savedTurns);
+    });
   });
 });
