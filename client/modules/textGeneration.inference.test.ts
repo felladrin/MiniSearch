@@ -30,6 +30,7 @@ vi.mock("./pubSub", () => ({
   updatePageContents: vi.fn(),
 }));
 vi.mock("./history", () => ({
+  replaceChatConversation: vi.fn(() => Promise.resolve()),
   getCurrentSearchRunId: vi.fn(() => "run-1"),
   saveLlmResponseForQuery: vi.fn(() => Promise.resolve()),
   updateSearchResults: vi.fn(() => Promise.resolve()),
@@ -60,7 +61,11 @@ vi.mock("./textGenerationWithWllama", () => ({
 }));
 
 import gptTokenizer from "gpt-tokenizer";
-import { getCurrentSearchRunId, saveLlmResponseForQuery } from "./history";
+import {
+  getCurrentSearchRunId,
+  replaceChatConversation,
+  saveLlmResponseForQuery,
+} from "./history";
 import {
   getQuery,
   getSettings,
@@ -68,6 +73,7 @@ import {
   updateResponseImmediately,
   updateTextGenerationState,
 } from "./pubSub";
+import { getLatestSearchAttempt } from "./searchAttempts";
 import {
   cancelSearchAnswer,
   generateReplyToMessages,
@@ -216,6 +222,38 @@ describe("answers that return after their search was replaced", () => {
     vi.mocked(getCurrentSearchRunId).mockReturnValue(searchRunId);
     return searchAndRespond();
   }
+
+  it("clears the run's stored follow-ups once the new answer is saved", async () => {
+    const running = startSearch("A", "run-a");
+    await vi.waitFor(() => expect(finish).toHaveLength(1));
+    expect(replaceChatConversation).not.toHaveBeenCalled();
+
+    finish[0]("answer A");
+    await running;
+
+    expect(replaceChatConversation).toHaveBeenCalledWith("run-a", []);
+  });
+
+  it("keeps the stored follow-ups when the regenerated answer is stopped", async () => {
+    const running = startSearch("A", "run-a");
+    await vi.waitFor(() => expect(finish).toHaveLength(1));
+    interruptSearch();
+    finish[0]("partial answer");
+    await running;
+
+    expect(replaceChatConversation).not.toHaveBeenCalled();
+  });
+
+  it("records the new attempt before the chat can unmount", async () => {
+    const before = getLatestSearchAttempt("run-a");
+    const running = startSearch("A", "run-a");
+
+    // Synchronous: a follow-up that commits after this tick sees the change.
+    expect(getLatestSearchAttempt("run-a")).not.toBe(before);
+    await vi.waitFor(() => expect(finish).toHaveLength(1));
+    finish[0]("answer A");
+    await running;
+  });
 
   it("saves and shows only the newer search's answer", async () => {
     const first = startSearch("A", "run-a");

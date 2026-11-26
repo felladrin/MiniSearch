@@ -9,6 +9,10 @@ import {
   getSuppressNextFollowUp,
   suppressNextFollowUpPubSub,
 } from "@/modules/pubSub";
+import {
+  getLatestSearchAttempt,
+  recordSearchAttempt,
+} from "@/modules/searchAttempts";
 import type { ChatMessage } from "@/modules/types";
 import ChatInterface from "./ChatInterface";
 
@@ -1117,6 +1121,48 @@ describe("ChatInterface chat storage", () => {
     });
 
     expect(getChatMessages()).toEqual([]);
+  });
+
+  it("stores nothing from a follow-up that started before the main answer was regenerated", async () => {
+    vi.mocked(generateChatResponse).mockImplementationOnce(
+      (_messages, _onUpdate, chatSignal) =>
+        new Promise((_resolve, reject) => {
+          chatSignal?.addEventListener("abort", () =>
+            reject(new Error("Chat generation interrupted")),
+          );
+        }),
+    );
+    const view = renderChatInterface();
+
+    let send: Promise<void> = Promise.resolve();
+    await act(async () => {
+      send = sendMessage("How do I use it?");
+    });
+    vi.mocked(persistChatConversation).mockClear();
+    // Regenerating starts a new attempt on the same run and unmounts the chat,
+    // which aborts the follow-up into its "interrupted" commit.
+    recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
+    await act(async () => {
+      view.unmount();
+      await send;
+    });
+
+    expect(persistChatConversation).not.toHaveBeenCalled();
+  });
+
+  it("stores a follow-up sent after the main answer was regenerated", async () => {
+    recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
+    vi.mocked(generateChatResponse).mockResolvedValueOnce("A new answer.");
+    renderChatInterface();
+
+    await act(async () => {
+      await sendMessage("And now?");
+    });
+
+    expect(persistChatConversation).toHaveBeenLastCalledWith("run-1", [
+      { role: "user", content: "And now?" },
+      { role: "assistant", content: "A new answer." },
+    ]);
   });
 
   it("keeps every turn on a remount without writing anything", async () => {
