@@ -88,7 +88,11 @@ function requestUrlFor(thumbnailUrl: string): string {
   return `/thumbnail?u=${encodeURIComponent(thumbnailUrl)}&token=abc`;
 }
 
-/** Sends `path` through the hook; returns the response and the `next` it was given. */
+/**
+ * Sends `path` through the hook; returns the response and the `next` it was
+ * given. Registers a fresh hook per call; the cache is module state, so calls
+ * still share it.
+ */
 async function requestPath(path: string) {
   const response = createResponse();
   const next = vi.fn();
@@ -96,12 +100,22 @@ async function requestPath(path: string) {
   return { response, next };
 }
 
-/** Requests the thumbnail at `thumbnailUrl` through the hook; returns the response. */
+/**
+ * Requests the thumbnail at `thumbnailUrl` through the hook; returns the
+ * response. The default is a new URL each time, so it never hits the cache.
+ */
 async function requestThumbnail(thumbnailUrl = publicThumbnailUrl()) {
   return (await requestPath(requestUrlFor(thumbnailUrl))).response;
 }
 
-/** Requests a thumbnail and lets `ms` of fake time pass while the hook waits. */
+// Matches THUMBNAIL_TIMEOUT_MS in thumbnailEndpointServerHook.ts, which does
+// not export it.
+const THUMBNAIL_TIMEOUT_MS = 3000;
+
+/**
+ * Requests a thumbnail and lets `ms` of fake time pass while the hook waits.
+ * Needs `vi.useFakeTimers()`.
+ */
 async function requestThumbnailPast(ms: number) {
   const response = createResponse();
   const handled = getRegisteredHandler()(
@@ -433,12 +447,11 @@ describe("thumbnailEndpointServerHook", () => {
 
   it("bounds a hanging DNS lookup with the same deadline", async () => {
     // A resolver that never settles must not add its own timeout on top of
-    // the documented one. Matches THUMBNAIL_TIMEOUT_MS.
-    const thumbnailTimeoutMs = 3000;
+    // the documented one.
     lookupMock.mockImplementation(() => new Promise(() => {}));
     vi.useFakeTimers();
     try {
-      const response = await requestThumbnailPast(thumbnailTimeoutMs);
+      const response = await requestThumbnailPast(THUMBNAIL_TIMEOUT_MS);
 
       expect(response.statusCode).toBe(502);
       expect(pinnedRequestMock).not.toHaveBeenCalled();
@@ -449,8 +462,6 @@ describe("thumbnailEndpointServerHook", () => {
   });
 
   it("answers 502 when the host never answers within the timeout", async () => {
-    // Matches THUMBNAIL_TIMEOUT_MS in thumbnailEndpointServerHook.ts.
-    const thumbnailTimeoutMs = 3000;
     vi.useFakeTimers();
     try {
       pinnedRequestMock.mockImplementation(
@@ -461,7 +472,7 @@ describe("thumbnailEndpointServerHook", () => {
             );
           }),
       );
-      const response = await requestThumbnailPast(thumbnailTimeoutMs);
+      const response = await requestThumbnailPast(THUMBNAIL_TIMEOUT_MS);
 
       expect(response.statusCode).toBe(502);
       expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
@@ -525,29 +536,28 @@ describe("thumbnailEndpointServerHook", () => {
     const firstUrl = publicThumbnailUrl();
     const secondUrl = publicThumbnailUrl();
     const maxEntries = getThumbnailCacheLimits().entries;
-    const load = (url: string) => requestThumbnail(url);
     const fetched = (url: string) =>
       pinnedRequestMock.mock.calls.filter((call) => String(call[0]) === url)
         .length;
 
-    await load(firstUrl);
-    await load(secondUrl);
+    await requestThumbnail(firstUrl);
+    await requestThumbnail(secondUrl);
 
     // Re-reading firstUrl promotes it, so secondUrl is the eviction candidate.
-    await load(firstUrl);
+    await requestThumbnail(firstUrl);
 
     for (let i = 0; i < maxEntries - 2; i += 1) {
-      await load(publicThumbnailUrl());
+      await requestThumbnail(publicThumbnailUrl());
     }
     // This insert pushes the cache past the cap: exactly one entry is evicted.
-    await load(publicThumbnailUrl());
+    await requestThumbnail(publicThumbnailUrl());
 
     // firstUrl (promoted by the re-read) survived and serves from the cache.
     // A cache without promote-on-hit would have evicted it, being the oldest
     // load.
-    await load(firstUrl);
+    await requestThumbnail(firstUrl);
     expect(fetched(firstUrl)).toBe(1);
-    await load(secondUrl);
+    await requestThumbnail(secondUrl);
     expect(fetched(secondUrl)).toBe(2);
   });
 });
