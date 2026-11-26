@@ -1,6 +1,6 @@
 import { CodeHighlight } from "@mantine/code-highlight";
 import { Blockquote, Box, Code, Divider, Text } from "@mantine/core";
-import React, { type ComponentProps, memo, useMemo } from "react";
+import React, { type ComponentProps, memo, useId, useMemo } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import Markdown from "react-markdown";
 import rehypeExternalLinks from "rehype-external-links";
@@ -38,6 +38,7 @@ const unwrapParagraphs = (children: React.ReactNode) => {
 interface MarkdownBlockProps {
   content: string;
   enableCopy: boolean;
+  remarkRehypeOptions: ComponentProps<typeof Markdown>["remarkRehypeOptions"];
 }
 
 /**
@@ -50,11 +51,13 @@ interface MarkdownBlockProps {
 const MarkdownBlock = memo(function MarkdownBlock({
   content,
   enableCopy,
+  remarkRehypeOptions,
 }: MarkdownBlockProps) {
   return (
     <Markdown
       remarkPlugins={REMARK_PLUGINS}
       rehypePlugins={REHYPE_PLUGINS}
+      remarkRehypeOptions={remarkRehypeOptions}
       components={{
         a(props) {
           const { href, children, node: _node, ...anchorProps } = props;
@@ -133,6 +136,15 @@ export default function MarkdownRenderer({
   className = "",
 }: MarkdownRendererProps) {
   const blocks = useMemo(() => splitMarkdownBlocks(content), [content]);
+  // Several renderers share the page (answer, chat replies, reasoning), so
+  // each needs its own footnote id prefix; remark-rehype's default
+  // `user-content-` would give every `[^1]` the same id. Memoized so the
+  // blocks' memo props stay stable across streamed frames.
+  const id = useId();
+  const remarkRehypeOptions = useMemo(
+    () => ({ clobberPrefix: `${id}-` }),
+    [id],
+  );
 
   if (!content) {
     return null;
@@ -145,8 +157,13 @@ export default function MarkdownRenderer({
         // prefix blocks keep their index and their memo hit. A content key
         // would change every frame for the growing last block and remount
         // it instead of re-rendering it.
-        // biome-ignore lint/suspicious/noArrayIndexKey: append-only block list
-        <MarkdownBlock key={index} content={block} enableCopy={enableCopy} />
+        <MarkdownBlock
+          // biome-ignore lint/suspicious/noArrayIndexKey: append-only block list
+          key={index}
+          content={block}
+          enableCopy={enableCopy}
+          remarkRehypeOptions={remarkRehypeOptions}
+        />
       ))}
     </Box>
   );
