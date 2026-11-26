@@ -10,14 +10,19 @@ import {
   chatGenerationStatePubSub,
   chatMessagesPubSub,
   getLlmTextSearchResults,
+  getPageContents,
   getSuppressNextFollowUp,
   imageSearchResultsPubSub,
   imageSearchStatePubSub,
   isRestoringFromHistoryPubSub,
   textSearchResultsPubSub,
   updateImageSearchResults,
+  updateLlmTextSearchResults,
+  updatePageContents,
   updateSuppressNextFollowUp,
+  updateTextSearchResults,
 } from "@/modules/pubSub";
+import type { TextSearchResults } from "@/modules/types";
 import { useHistoryRestore } from "./useHistoryRestore";
 
 /** A chat turn as history stores it: never a system message. */
@@ -132,6 +137,45 @@ describe("useHistoryRestore", () => {
     expect(getLlmTextSearchResults()).toEqual(expectedText);
     expect(imageSearchStatePubSub[2]()).toBe("completed");
   });
+
+  it.each([
+    { searchRunId: "live-run", generating: true, keepsGrounding: true },
+    { searchRunId: "other-run", generating: true, keepsGrounding: false },
+    { searchRunId: "live-run", generating: false, keepsGrounding: false },
+  ])(
+    "restores text grounding for $searchRunId with generating=$generating",
+    async ({ searchRunId, generating, keepsGrounding }) => {
+      const savedText: TextSearchResults = [
+        ["Saved text", "Saved snippet", "https://example.com/text"],
+      ];
+      const liveText: TextSearchResults = [
+        ...savedText,
+        ["Follow-up result", "Fresh snippet", "https://example.com/follow-up"],
+      ];
+      const excerpts = {
+        "https://example.com/text": "First excerpt",
+        "https://example.com/follow-up": "Fresh excerpt",
+      };
+      setCurrentSearchRunId("live-run");
+      updateChatGenerationState({
+        isGeneratingResponse: generating,
+        isGeneratingFollowUpQuestion: false,
+      });
+      updateTextSearchResults(liveText);
+      updateLlmTextSearchResults(liveText);
+      updatePageContents(excerpts);
+      vi.mocked(getLatestLlmResponseForEntry).mockResolvedValueOnce(
+        "Saved AI answer.",
+      );
+
+      await restoreEntry({ searchRunId, textResults });
+
+      const expectedText = keepsGrounding ? liveText : savedText;
+      expect(textSearchResultsPubSub[2]()).toEqual(expectedText);
+      expect(getLlmTextSearchResults()).toEqual(expectedText);
+      expect(getPageContents()).toEqual(keepsGrounding ? excerpts : {});
+    },
+  );
 
   it.each([
     { name: "image-only entry", payload: { imageResults } },

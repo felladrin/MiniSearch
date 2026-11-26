@@ -66,12 +66,8 @@ export function useHistoryRestore(
       setCurrentSearchRunId(searchRunId);
 
       updateIsRestoringFromHistory(true);
-      // Excerpts belong to the search that fetched them; a follow-up on the
-      // restored entry must not be grounded on the live search's pages.
-      updatePageContents({});
       updateFollowUpQuestion("");
       updateChatInput("");
-      updateTextSearchStale(false);
 
       const queryString = `q=${encodeURIComponent(selectedQuery)}`;
       postMessageToParentWindow({ queryString, hash: "" });
@@ -79,26 +75,24 @@ export function useHistoryRestore(
 
       document.title = selectedQuery;
 
-      if (hasTextResults(entry)) {
-        const results = getResultsFromEntry(entry);
-        if (results && results.type === "text") {
-          const textTuples: TextSearchResults = results.items.map((it) => [
-            it.title,
-            it.snippet,
-            it.url,
-          ]);
-          updateTextSearchResults(textTuples);
-          updateTextSearchState("completed");
-          updateLlmTextSearchResults(textTuples);
-        } else {
-          updateTextSearchResults([]);
-          updateTextSearchState("completed");
-          updateLlmTextSearchResults([]);
-        }
-      } else {
-        updateTextSearchResults([]);
+      if (!keepsChat) {
+        // Replacing the chat also replaces the source material it can use.
+        updatePageContents({});
+        updateTextSearchStale(false);
+        const results = hasTextResults(entry)
+          ? getResultsFromEntry(entry)
+          : null;
+        const textTuples: TextSearchResults =
+          results?.type === "text"
+            ? results.items.map(({ title, snippet, url }) => [
+                title,
+                snippet,
+                url,
+              ])
+            : [];
+        updateTextSearchResults(textTuples);
         updateTextSearchState("completed");
-        updateLlmTextSearchResults([]);
+        updateLlmTextSearchResults(textTuples);
       }
 
       if (hasImageResults(entry)) {
