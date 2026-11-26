@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Long-running chats can easily exceed the model context window. MiniSearch addresses this by keeping a rolling summary of prior turns, written by the model, and only feeding the freshest messages into the model alongside that summary. All context handling happens locally in the browser to preserve privacy.
+Long-running chats can easily exceed the model context window. MiniSearch addresses this by keeping a rolling summary of prior turns, written by the model, and only feeding the freshest messages into the model alongside that summary. Budgeting and storage stay in the browser; the summary is written by the selected backend, so a remote backend (an OpenAI-compatible API, the Internal API or AI Horde) receives the dropped turns, as it receives the chat itself.
 
 ## Components
 
