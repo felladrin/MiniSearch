@@ -148,9 +148,14 @@ vi.mock("./textGenerationWithWllama", () => ({
   generateChatWithWllama: vi.fn(() => Promise.resolve("")),
 }));
 
-import { saveLlmResponseForQuery } from "./history";
+import { saveLlmResponseForQuery, updateSearchResults } from "./history";
 import { fetchPageContents } from "./pageContent";
-import { listenToSettingsChanges, updateTextSearchStale } from "./pubSub";
+import {
+  listenToSettingsChanges,
+  updateImageSearchResults,
+  updateImageSearchState,
+  updateTextSearchStale,
+} from "./pubSub";
 import { searchImages, searchText } from "./search";
 import { searchAndRespond } from "./textGeneration";
 import { generateTextWithWllama } from "./textGenerationWithWllama";
@@ -492,6 +497,377 @@ describe("search degradation", () => {
     await harness.state.searchPromise;
 
     expect(harness.state.suppressNextFollowUp).toBe(false);
+  });
+});
+
+describe("search supersession ownership", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    harness.state.query = "search a";
+    harness.state.response = "";
+    harness.state.searchRunId = "run-a";
+    harness.state.textGenerationState = "idle";
+    harness.state.textSearchState = "idle";
+    harness.state.textSearchResults = [];
+    harness.state.llmTextSearchResults = [];
+    harness.state.pageContents = {};
+    harness.state.staleFlag = false;
+    harness.state.settings.enableAiResponse = false;
+    harness.state.settings.enableTextSearch = true;
+    harness.state.settings.enableImageSearch = false;
+    harness.state.settings.enablePageContentFetch = false;
+    harness.stateTransitions.length = 0;
+    harness.onResponseUpdate.current = () => {};
+    mockFetch.mockResolvedValue(
+      sseStream([contentFrame("Answer"), "data: [DONE]\\n"]),
+    );
+  });
+
+  function deferTextSearch() {
+    let release: (value: {
+      results: TextSearchResults;
+      stale: boolean;
+    }) => void = () => {};
+    let fail: (error: Error) => void = () => {};
+    vi.mocked(searchText).mockReturnValueOnce(
+      new Promise((resolve, reject) => {
+        release = resolve;
+        fail = reject;
+      }),
+    );
+    return { release, fail };
+  }
+
+  function deferImageSearch() {
+    let release: (value: {
+      results: ImageSearchResults;
+      stale: boolean;
+    }) => void = () => {};
+    let fail: (error: Error) => void = () => {};
+    vi.mocked(searchImages).mockReturnValueOnce(
+      new Promise((resolve, reject) => {
+        release = resolve;
+        fail = reject;
+      }),
+    );
+    return { release, fail };
+  }
+
+  it("keeps the newer search UI, grounding, page contents, and history untouched when a slow search resolves late", async () => {
+    harness.state.settings.enableAiResponse = true;
+    harness.state.settings.enablePageContentFetch = true;
+    const deferredA = deferTextSearch();
+
+    const first = searchAndRespond();
+    await vi.waitFor(() => expect(searchText).toHaveBeenCalledTimes(1));
+
+    const resultsB: TextSearchResults = [
+      ["B title", "B snippet", "https://b.example"],
+    ];
+    harness.state.query = "search b";
+    harness.state.searchRunId = "run-b";
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: resultsB,
+      stale: false,
+    });
+    vi.mocked(fetchPageContents).mockResolvedValueOnce({
+      "https://b.example": "B page excerpt",
+    });
+
+    const second = searchAndRespond();
+    await second;
+    await harness.state.searchPromise;
+
+    const resultsA: TextSearchResults = [
+      ["A title", "A snippet", "https://a.example"],
+    ];
+    vi.mocked(fetchPageContents).mockResolvedValueOnce({
+      "https://a.example": "A page excerpt",
+    });
+    deferredA.release({ results: resultsA, stale: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await first;
+
+    expect(harness.state.textSearchResults).toEqual(resultsB);
+    expect(harness.state.llmTextSearchResults).toEqual(resultsB);
+    expect(harness.state.textSearchState).toBe("completed");
+    expect(harness.state.staleFlag).toBe(false);
+    expect(harness.state.pageContents).toEqual({
+      "https://b.example": "B page excerpt",
+    });
+    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-b", {
+      type: "text",
+      items: [
+        { title: "B title", url: "https://b.example", snippet: "B snippet" },
+      ],
+    });
+    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-a", {
+      type: "text",
+      items: [
+        { title: "A title", url: "https://a.example", snippet: "A snippet" },
+      ],
+    });
+    expect(
+      vi
+        .mocked(updateSearchResults)
+        .mock.calls.filter(([runId]) => runId === "run-b"),
+    ).toHaveLength(1);
+  });
+
+  it("does not mark the newer search failed when an older search rejects late", async () => {
+    const deferredA = deferTextSearch();
+
+    const first = searchAndRespond();
+    await vi.waitFor(() => expect(searchText).toHaveBeenCalledTimes(1));
+
+    const resultsB: TextSearchResults = [
+      ["B title", "B snippet", "https://b.example"],
+    ];
+    harness.state.query = "search b";
+    harness.state.searchRunId = "run-b";
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: resultsB,
+      stale: false,
+    });
+
+    const second = searchAndRespond();
+    await second;
+    await harness.state.searchPromise;
+
+    deferredA.fail(new Error("late failure"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await first;
+
+    expect(harness.state.textSearchState).toBe("completed");
+    expect(harness.state.textSearchResults).toEqual(resultsB);
+    expect(harness.state.llmTextSearchResults).toEqual(resultsB);
+  });
+
+  it("keeps fire-and-forget image search results and state from an older search out of the newer search", async () => {
+    harness.state.settings.enableImageSearch = true;
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: [["A title", "A snippet", "https://a.example"]],
+      stale: false,
+    });
+    const deferredImagesA = deferImageSearch();
+
+    const first = searchAndRespond();
+    await vi.waitFor(() => expect(searchImages).toHaveBeenCalledTimes(1));
+
+    const imagesB: ImageSearchResults = [
+      ["Img B", "https://b.example/img.png", "thumb-b", "https://b.example"],
+    ];
+    harness.state.query = "search b";
+    harness.state.searchRunId = "run-b";
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: [["B title", "B snippet", "https://b.example"]],
+      stale: false,
+    });
+    vi.mocked(searchImages).mockResolvedValueOnce({
+      results: imagesB,
+      stale: false,
+    });
+
+    const second = searchAndRespond();
+    await second;
+    await harness.state.searchPromise;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const imagesA: ImageSearchResults = [
+      ["Img A", "https://a.example/img.png", "thumb-a", "https://a.example"],
+    ];
+    deferredImagesA.release({ results: imagesA, stale: false });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await first;
+
+    expect(vi.mocked(updateImageSearchResults)).toHaveBeenLastCalledWith(
+      imagesB,
+    );
+    expect(vi.mocked(updateImageSearchResults)).not.toHaveBeenCalledWith(
+      imagesA,
+    );
+    expect(vi.mocked(updateImageSearchState)).toHaveBeenLastCalledWith(
+      "completed",
+    );
+    expect(
+      vi
+        .mocked(updateImageSearchState)
+        .mock.calls.filter(([state]) => state === "completed"),
+    ).toHaveLength(1);
+    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-a", {
+      type: "image",
+      items: [
+        {
+          title: "Img A",
+          url: "https://a.example/img.png",
+          thumbnail: "thumb-a",
+          sourceUrl: "https://a.example",
+        },
+      ],
+    });
+    expect(
+      vi
+        .mocked(updateSearchResults)
+        .mock.calls.filter(
+          ([runId, payload]) => runId === "run-b" && payload.type === "image",
+        ),
+    ).toHaveLength(1);
+  });
+
+  it("ignores late image failures on both fire-and-forget and fallback paths", async () => {
+    harness.state.settings.enableAiResponse = true;
+    harness.state.settings.enableImageSearch = true;
+    vi.mocked(searchText).mockRejectedValueOnce(new Error("text failed"));
+    const deferredImagesA = deferImageSearch();
+
+    const first = searchAndRespond();
+    await vi.waitFor(() => expect(searchImages).toHaveBeenCalledTimes(1));
+
+    harness.state.query = "search b";
+    harness.state.searchRunId = "run-b";
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: [["B title", "B snippet", "https://b.example"]],
+      stale: false,
+    });
+    vi.mocked(searchImages).mockResolvedValueOnce({
+      results: [
+        ["Img B", "https://b.example/img.png", "thumb-b", "https://b.example"],
+      ],
+      stale: false,
+    });
+
+    const second = searchAndRespond();
+    await second;
+    await harness.state.searchPromise;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    deferredImagesA.fail(new Error("late image error"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await first;
+
+    expect(vi.mocked(updateImageSearchState)).not.toHaveBeenCalledWith(
+      "failed",
+    );
+
+    vi.clearAllMocks();
+    harness.state.settings.enableAiResponse = false;
+    harness.state.query = "search c";
+    harness.state.searchRunId = "run-c";
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: [["C title", "C snippet", "https://c.example"]],
+      stale: false,
+    });
+    const deferredImagesC = deferImageSearch();
+    const third = searchAndRespond();
+    await vi.waitFor(() => expect(searchImages).toHaveBeenCalledTimes(1));
+
+    harness.state.query = "search d";
+    harness.state.searchRunId = "run-d";
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: [["D title", "D snippet", "https://d.example"]],
+      stale: false,
+    });
+    vi.mocked(searchImages).mockResolvedValueOnce({
+      results: [
+        ["Img D", "https://d.example/img.png", "thumb-d", "https://d.example"],
+      ],
+      stale: false,
+    });
+    const fourth = searchAndRespond();
+    await fourth;
+    await harness.state.searchPromise;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    deferredImagesC.fail(new Error("late fire-and-forget image error"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await third;
+
+    expect(vi.mocked(updateImageSearchState)).not.toHaveBeenCalledWith(
+      "failed",
+    );
+  });
+
+  it("blocks a superseded attempt from publishing or overwriting history after a retry on the same run", async () => {
+    const deferredFirst = deferTextSearch();
+
+    const first = searchAndRespond();
+    await vi.waitFor(() => expect(searchText).toHaveBeenCalledTimes(1));
+
+    const retryResults: TextSearchResults = [
+      ["Retry", "Retry snippet", "https://retry.example"],
+    ];
+    vi.mocked(searchText).mockResolvedValueOnce({
+      results: retryResults,
+      stale: false,
+    });
+
+    const retry = searchAndRespond();
+    await retry;
+    await harness.state.searchPromise;
+
+    deferredFirst.release({
+      results: [["Old", "Old snippet", "https://old.example"]],
+      stale: true,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await first;
+
+    expect(harness.state.textSearchResults).toEqual(retryResults);
+    expect(harness.state.llmTextSearchResults).toEqual(retryResults);
+    expect(harness.state.staleFlag).toBe(false);
+    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-a", {
+      type: "text",
+      items: [
+        {
+          title: "Retry",
+          url: "https://retry.example",
+          snippet: "Retry snippet",
+        },
+      ],
+    });
+  });
+
+  it("stops a late search from publishing UI state after a history restore changes the run id", async () => {
+    const deferredA = deferTextSearch();
+
+    const first = searchAndRespond();
+    await vi.waitFor(() => expect(searchText).toHaveBeenCalledTimes(1));
+
+    const restoredResults: TextSearchResults = [
+      ["Restored", "Restored snippet", "https://restored.example"],
+    ];
+    harness.state.searchRunId = "run-restored";
+    harness.state.textSearchResults = restoredResults;
+    harness.state.llmTextSearchResults = restoredResults;
+    harness.state.textSearchState = "completed";
+    harness.state.staleFlag = false;
+
+    deferredA.release({
+      results: [["Late A", "Late snippet", "https://late.example"]],
+      stale: true,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await first;
+
+    expect(harness.state.textSearchResults).toEqual(restoredResults);
+    expect(harness.state.llmTextSearchResults).toEqual(restoredResults);
+    expect(harness.state.textSearchState).toBe("completed");
+    expect(harness.state.staleFlag).toBe(false);
+    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-a", {
+      type: "text",
+      items: [
+        {
+          title: "Late A",
+          url: "https://late.example",
+          snippet: "Late snippet",
+        },
+      ],
+    });
+    expect(vi.mocked(updateSearchResults)).not.toHaveBeenCalledWith(
+      "run-restored",
+      expect.anything(),
+    );
   });
 });
 

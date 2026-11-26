@@ -237,6 +237,7 @@ function summarizeDroppedMessages(
 }
 
 let searchInvocation = 0;
+const latestSearchInvocationByRunId = new Map<string, number>();
 
 export async function searchAndRespond() {
   if (getQuery() === "") return;
@@ -492,18 +493,22 @@ async function getLongQuerySearchText(query: string) {
  * text instead of on search snippets alone. Awaited by the search promise, so
  * generation waits for it while the results are already on screen.
  */
-async function readPageContents(query: string, results: TextSearchResults) {
+async function readPageContents(
+  query: string,
+  results: TextSearchResults,
+  isCurrent: () => boolean,
+) {
   const settings = getSettings();
 
   if (
     !settings.enablePageContentFetch ||
     !settings.enableAiResponse ||
-    results.length === 0
+    results.length === 0 ||
+    !isCurrent()
   ) {
     return;
   }
 
-  const searchRunId = getCurrentSearchRunId();
   const contents = await fetchPageContents(
     query,
     results.map(([, , url]) => url),
@@ -511,13 +516,19 @@ async function readPageContents(query: string, results: TextSearchResults) {
 
   // A newer search has already cleared the channel; publishing now would mix
   // this run's pages into the next one's answer.
-  if (getCurrentSearchRunId() !== searchRunId) return;
+  if (!isCurrent()) return;
 
   updatePageContents(contents);
 }
 
 async function startTextSearch(query: string, invocation: number) {
   const searchRunId = getCurrentSearchRunId();
+  latestSearchInvocationByRunId.set(searchRunId, invocation);
+  const isCurrent = () =>
+    invocation === searchInvocation && searchRunId === getCurrentSearchRunId();
+  const isRunCurrent = () =>
+    latestSearchInvocationByRunId.get(searchRunId) === invocation;
+
   const results = {
     textResults: [] as TextSearchResults,
     imageResults: [] as ImageSearchResults,
@@ -539,12 +550,14 @@ async function startTextSearch(query: string, invocation: number) {
     { maxLength: 2000 },
   ).searchQuery;
 
-  if (getSettings().enableImageSearch) {
+  if (isCurrent() && getSettings().enableImageSearch) {
     updateImageSearchState("running");
   }
 
   if (getSettings().enableTextSearch) {
-    updateTextSearchState("running");
+    if (isCurrent()) {
+      updateTextSearchState("running");
+    }
 
     try {
       // A query with no keywords left has nothing to send, which is an empty
@@ -572,45 +585,57 @@ async function startTextSearch(query: string, invocation: number) {
 
       results.textResults = textResults;
 
-      updateTextSearchStale(stale);
-      updateTextSearchState("completed");
-      updateTextSearchResults(textResults);
-
       const resultsForLlm = selectLlmSearchResults(
         textResults,
         searchResultsToConsider,
       );
-      updateLlmTextSearchResults(resultsForLlm);
 
-      updateSearchResults(getCurrentSearchRunId(), {
-        type: "text",
-        items: textResults.map(([title, snippet, url]) => ({
-          title,
-          url,
-          snippet,
-        })),
-      });
+      if (isCurrent()) {
+        updateTextSearchStale(stale);
+        updateTextSearchState("completed");
+        updateTextSearchResults(textResults);
+        updateLlmTextSearchResults(resultsForLlm);
+      }
+
+      if (isRunCurrent()) {
+        updateSearchResults(searchRunId, {
+          type: "text",
+          items: textResults.map(([title, snippet, url]) => ({
+            title,
+            url,
+            snippet,
+          })),
+        });
+      }
 
       // Started here but awaited last: only the AI answer waits on it, while
       // image search and the history write carry on.
-      pageContentsRead = readPageContents(searchQuery, resultsForLlm);
+      pageContentsRead = readPageContents(
+        searchQuery,
+        resultsForLlm,
+        isCurrent,
+      );
     } catch (error) {
       addLogEntry(`Text search failed: ${error}`);
-      updateTextSearchStale(false);
-      updateTextSearchState("failed");
+      if (isCurrent()) {
+        updateTextSearchStale(false);
+        updateTextSearchState("failed");
+      }
       textSearchFailed = true;
     }
   }
 
   if (getSettings().enableImageSearch) {
     if (textSearchFailed && getSettings().enableAiResponse) {
-      await startImageSearch(searchQuery, results);
+      await startImageSearch(
+        searchQuery,
+        results,
+        searchRunId,
+        isCurrent,
+        isRunCurrent,
+      );
 
-      if (
-        results.imageResults.length > 0 &&
-        invocation === searchInvocation &&
-        searchRunId === getCurrentSearchRunId()
-      ) {
+      if (results.imageResults.length > 0 && isCurrent()) {
         updateLlmTextSearchResults(
           results.imageResults
             .slice(0, searchResultsToConsider)
@@ -622,7 +647,13 @@ async function startTextSearch(query: string, invocation: number) {
         );
       }
     } else {
-      startImageSearch(searchQuery, results);
+      startImageSearch(
+        searchQuery,
+        results,
+        searchRunId,
+        isCurrent,
+        isRunCurrent,
+      );
     }
   }
 
@@ -634,6 +665,9 @@ async function startTextSearch(query: string, invocation: number) {
 async function startImageSearch(
   searchQuery: string,
   results: { textResults: TextSearchResults; imageResults: ImageSearchResults },
+  searchRunId: string,
+  isCurrent: () => boolean,
+  isRunCurrent: () => boolean,
 ) {
   try {
     const { results: imageResults } = await searchImages(
@@ -641,22 +675,29 @@ async function startImageSearch(
       getSettings().searchResultsLimit,
     );
     results.imageResults = imageResults;
-    updateImageSearchState("completed");
-    updateImageSearchResults(imageResults);
 
-    updateSearchResults(getCurrentSearchRunId(), {
-      type: "image",
-      items: imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
-        title,
-        url,
-        thumbnail: thumbnailUrl,
-        sourceUrl,
-      })),
-    });
+    if (isCurrent()) {
+      updateImageSearchState("completed");
+      updateImageSearchResults(imageResults);
+    }
+
+    if (isRunCurrent()) {
+      updateSearchResults(searchRunId, {
+        type: "image",
+        items: imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
+          title,
+          url,
+          thumbnail: thumbnailUrl,
+          sourceUrl,
+        })),
+      });
+    }
   } catch {
     // Same distinction as the text path: an outage fails the search, an empty
     // result set does not.
-    updateImageSearchState("failed");
+    if (isCurrent()) {
+      updateImageSearchState("failed");
+    }
   }
 }
 

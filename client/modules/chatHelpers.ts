@@ -29,6 +29,13 @@ import type {
 
 type Settings = typeof defaultSettings;
 
+let followUpSearchInvocation = 0;
+let textRefreshInvocation = 0;
+let imageRefreshInvocation = 0;
+let pageContentsReadInvocation = 0;
+const latestTextRefreshByRunId = new Map<string, number>();
+const latestImageRefreshByRunId = new Map<string, number>();
+
 /**
  * Returns the fresh results the answer is grounded on (empty when nothing came
  * back), not the merged list shown in the UI.
@@ -37,7 +44,16 @@ export async function refreshTextSearchResults(
   searchQuery: string,
   resultsLimit: number,
   existingResults: TextSearchResults,
+  searchRunId = getCurrentSearchRunId(),
 ): Promise<TextSearchResults> {
+  const invocation = ++textRefreshInvocation;
+  latestTextRefreshByRunId.set(searchRunId, invocation);
+  const isCurrent = () =>
+    invocation === textRefreshInvocation &&
+    searchRunId === getCurrentSearchRunId();
+  const isRunCurrent = () =>
+    latestTextRefreshByRunId.get(searchRunId) === invocation;
+
   const { results: freshResults, stale } = await searchText(
     searchQuery,
     resultsLimit,
@@ -45,13 +61,15 @@ export async function refreshTextSearchResults(
 
   if (freshResults.length === 0) return [];
 
-  updateTextSearchStale(stale);
-
   const llmResults = selectLlmSearchResults(
     freshResults,
     searchResultsToConsider,
   );
-  updateLlmTextSearchResults(llmResults);
+
+  if (isCurrent()) {
+    updateTextSearchStale(stale);
+    updateLlmTextSearchResults(llmResults);
+  }
 
   const existingUrls = new Set(existingResults.map(([, , url]) => url));
   const uniqueFreshResults = freshResults.filter(
@@ -63,26 +81,40 @@ export async function refreshTextSearchResults(
       ...existingResults,
       ...uniqueFreshResults,
     ];
-    updateTextSearchResults(updatedResults);
 
-    updateSearchResults(getCurrentSearchRunId(), {
-      type: "text",
-      items: updatedResults.map(([title, snippet, url]) => ({
-        title,
-        url,
-        snippet,
-      })),
-    } satisfies TextResults);
+    if (isCurrent()) {
+      updateTextSearchResults(updatedResults);
+    }
+
+    if (isRunCurrent()) {
+      updateSearchResults(searchRunId, {
+        type: "text",
+        items: updatedResults.map(([title, snippet, url]) => ({
+          title,
+          url,
+          snippet,
+        })),
+      } satisfies TextResults);
+    }
   }
 
-  return llmResults;
+  return isCurrent() ? llmResults : [];
 }
 
 export async function refreshImageSearchResults(
   searchQuery: string,
   resultsLimit: number,
   existingResults: ImageSearchResults,
+  searchRunId = getCurrentSearchRunId(),
 ): Promise<void> {
+  const invocation = ++imageRefreshInvocation;
+  latestImageRefreshByRunId.set(searchRunId, invocation);
+  const isCurrent = () =>
+    invocation === imageRefreshInvocation &&
+    searchRunId === getCurrentSearchRunId();
+  const isRunCurrent = () =>
+    latestImageRefreshByRunId.get(searchRunId) === invocation;
+
   const { results: imageResults } = await searchImages(
     searchQuery,
     resultsLimit,
@@ -100,19 +132,24 @@ export async function refreshImageSearchResults(
       ...uniqueFreshResults,
       ...existingResults,
     ];
-    updateImageSearchResults(updatedImageResults);
 
-    updateSearchResults(getCurrentSearchRunId(), {
-      type: "image",
-      items: updatedImageResults.map(
-        ([title, url, thumbnailUrl, sourceUrl]) => ({
-          title,
-          url,
-          thumbnail: thumbnailUrl,
-          sourceUrl,
-        }),
-      ),
-    } satisfies ImageResults);
+    if (isCurrent()) {
+      updateImageSearchResults(updatedImageResults);
+    }
+
+    if (isRunCurrent()) {
+      updateSearchResults(searchRunId, {
+        type: "image",
+        items: updatedImageResults.map(
+          ([title, url, thumbnailUrl, sourceUrl]) => ({
+            title,
+            url,
+            thumbnail: thumbnailUrl,
+            sourceUrl,
+          }),
+        ),
+      } satisfies ImageResults);
+    }
   }
 }
 
@@ -126,13 +163,19 @@ async function readFollowUpPageContents(
   results: TextSearchResults,
   searchRunId: string,
 ): Promise<void> {
+  const invocation = ++pageContentsReadInvocation;
   const contents: PageContents = await fetchPageContents(
     searchQuery,
     results.map(([, , url]) => url),
   );
 
-  // A newer search has already started; its pages own the channel now.
-  if (getCurrentSearchRunId() !== searchRunId) return;
+  // A newer search or follow-up has already started; its pages own the channel now.
+  if (
+    invocation !== pageContentsReadInvocation ||
+    getCurrentSearchRunId() !== searchRunId
+  ) {
+    return;
+  }
 
   if (Object.keys(contents).length === 0) return;
 
@@ -155,8 +198,16 @@ export async function runFollowUpSearch(
   existingTextResults: TextSearchResults,
   existingImageResults: ImageSearchResults,
 ): Promise<void> {
+  const searchRunId = getCurrentSearchRunId();
+  const followUpInvocation = ++followUpSearchInvocation;
+  const isFollowUpCurrent = () =>
+    followUpInvocation === followUpSearchInvocation &&
+    searchRunId === getCurrentSearchRunId();
+
   const { generateRelatedSearchQuery } = await import("./relatedSearchQuery");
   const relatedQuery = await generateRelatedSearchQuery([...messages]);
+  if (!isFollowUpCurrent()) return;
+
   // Same anchor as the first search in `startTextSearch`: "next month" names no
   // year to the engine, and only this machine's clock knows which one is meant.
   const searchQuery = normalizeFollowUpDates(
@@ -168,7 +219,6 @@ export async function runFollowUpSearch(
     { maxLength: 2000 },
   ).searchQuery;
 
-  const searchRunId = getCurrentSearchRunId();
   let pageContentsRead = Promise.resolve();
 
   if (settings.enableTextSearch) {
@@ -177,9 +227,14 @@ export async function runFollowUpSearch(
         searchQuery,
         settings.searchResultsLimit,
         existingTextResults,
+        searchRunId,
       );
 
-      if (freshResults.length > 0 && settings.enablePageContentFetch) {
+      if (
+        freshResults.length > 0 &&
+        settings.enablePageContentFetch &&
+        isFollowUpCurrent()
+      ) {
         // Started here but awaited last, as in the first search, so the image
         // refresh below does not wait on the pages.
         pageContentsRead = readFollowUpPageContents(
@@ -193,11 +248,12 @@ export async function runFollowUpSearch(
     }
   }
 
-  if (settings.enableImageSearch) {
+  if (settings.enableImageSearch && isFollowUpCurrent()) {
     refreshImageSearchResults(
       searchQuery,
       settings.searchResultsLimit,
       existingImageResults,
+      searchRunId,
     ).catch((error) => {
       addLogEntry(`Error in follow-up image search: ${error}`);
     });
