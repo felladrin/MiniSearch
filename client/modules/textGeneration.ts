@@ -139,10 +139,50 @@ function getConversationId(messages: ChatMessage[]): string {
   return (firstUser?.content || "").trim();
 }
 
-function loadConversationSummary(conversationId: string): string {
+/**
+ * FNV-1a over every covered message, so an edit anywhere in the covered part,
+ * or another chat with the same first question, gives another value. Fixed
+ * replies such as the error text would make a last-message check match.
+ */
+function coveredHistoryFingerprint(
+  messages: ChatMessage[],
+  count: number,
+): string {
+  let hash = 0x811c9dc5;
+  for (const message of messages.slice(0, count)) {
+    for (const char of `${message.role}\u0000${message.content}\u0001`) {
+      hash ^= char.codePointAt(0) ?? 0;
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+  }
+  return `${count}:${hash.toString(16)}`;
+}
+
+/**
+ * The stored summary and how many of `messages` it already covers. A summary
+ * whose covered messages are gone or changed (an edit reached into them, or a
+ * restore brought back another chat with the same first question) describes
+ * another conversation, so it is dropped and the conversation is folded again
+ * from the start.
+ */
+function loadConversationSummary(
+  conversationId: string,
+  messages: ChatMessage[],
+): { summary: string; summarizedCount: number } {
   const stored = getConversationSummary();
-  if (stored.conversationId !== conversationId) return "";
-  return stored.summary;
+  if (stored.conversationId !== conversationId) {
+    return { summary: "", summarizedCount: 0 };
+  }
+  const count = stored.summarizedCount ?? 0;
+  if (count === 0) return { summary: stored.summary, summarizedCount: 0 };
+  if (
+    count >= messages.length ||
+    stored.lastSummarizedFingerprint !==
+      coveredHistoryFingerprint(messages, count)
+  ) {
+    return { summary: "", summarizedCount: 0 };
+  }
+  return { summary: stored.summary, summarizedCount: count };
 }
 
 async function createLlmSummary(
@@ -204,12 +244,29 @@ function capToSummaryLimit(
   return gptTokenizer.decode(tokens.slice(0, limit)).trim();
 }
 
-function saveConversationSummary(summary: string, conversationId: string) {
-  updateConversationSummary({ conversationId, summary });
+function saveConversationSummary(
+  summary: string,
+  conversationId: string,
+  messages: ChatMessage[],
+  summarizedCount: number,
+) {
+  updateConversationSummary({
+    conversationId,
+    summary,
+    summarizedCount,
+    lastSummarizedFingerprint:
+      summarizedCount > 0
+        ? coveredHistoryFingerprint(messages, summarizedCount)
+        : undefined,
+  });
 }
 
 function clearConversationSummary() {
-  updateConversationSummary({ conversationId: "", summary: "" });
+  updateConversationSummary({
+    conversationId: "",
+    summary: "",
+    summarizedCount: 0,
+  });
 }
 
 /**
@@ -454,7 +511,8 @@ export async function generateChatResponse(
     }
 
     const conversationId = getConversationId(newMessages);
-    const existingSummary = loadConversationSummary(conversationId);
+    const { summary: existingSummary, summarizedCount } =
+      loadConversationSummary(conversationId, newMessages);
     // Built once: formatting the search results reads the page excerpts again.
     const basePrompt = getSystemPrompt(await getFormattedSearchResults(true));
 
@@ -513,13 +571,32 @@ export async function generateChatResponse(
         ),
       );
       const droppedCount = newMessages.length - processedMessages.length;
-      const droppedMessages = newMessages.slice(0, droppedCount);
-      const updatedSummary =
-        (await createLlmSummary(droppedMessages, existingSummary, signal)) ||
-        existingSummary;
+      // Only the turns dropped since the last fold: the summary already
+      // covers the rest, and folding them again on every turn grows the
+      // summarizer's prompt with the whole history.
+      const newlyDropped = newMessages.slice(summarizedCount, droppedCount);
+      let updatedSummary = existingSummary;
+      let updatedCount = summarizedCount;
+      if (newlyDropped.length > 0) {
+        const folded = await createLlmSummary(
+          newlyDropped,
+          existingSummary,
+          signal,
+        );
+        // An empty summary folded nothing, so the cursor stays where it was.
+        if (folded) {
+          updatedSummary = folded;
+          updatedCount = droppedCount;
+        }
+      }
       // The stored summary keeps up to SUMMARY_TOKEN_LIMIT tokens for a later
       // turn with more room; this prompt gets only what fits.
-      saveConversationSummary(updatedSummary, conversationId);
+      saveConversationSummary(
+        updatedSummary,
+        conversationId,
+        newMessages,
+        updatedCount,
+      );
       systemPrompt = {
         role: "user",
         content:
@@ -793,6 +870,7 @@ function canDownloadModels(): Promise<void> {
 export const textGenerationFunctions = {
   getCurrentModelName,
   getConversationId,
+  coveredHistoryFingerprint,
   loadConversationSummary,
   createLlmSummary,
   summarizeDroppedMessages,

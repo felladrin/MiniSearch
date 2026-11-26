@@ -135,14 +135,76 @@ describe("textGenerationFunctions", () => {
   });
 
   describe("loadConversationSummary", () => {
+    const history: ChatMessage[] = [
+      { role: "user", content: "test-id" },
+      { role: "assistant", content: "First answer" },
+      { role: "user", content: "Second question" },
+      { role: "assistant", content: "Second answer" },
+      { role: "user", content: "Third question" },
+    ];
+    const coveredUpTo = (count: number) => ({
+      conversationId: "test-id",
+      summary: "Covered",
+      summarizedCount: count,
+      lastSummarizedFingerprint:
+        textGenerationFunctions.coveredHistoryFingerprint(history, count),
+    });
+
+    it("returns the cursor when the covered messages are unchanged", () => {
+      const { loadConversationSummary } = textGenerationFunctions;
+      mockGetConversationSummary.mockReturnValue(coveredUpTo(2));
+      expect(loadConversationSummary("test-id", history)).toEqual({
+        summary: "Covered",
+        summarizedCount: 2,
+      });
+    });
+
+    it("starts over when a covered message before the last one was edited", () => {
+      const { loadConversationSummary } = textGenerationFunctions;
+      mockGetConversationSummary.mockReturnValue(coveredUpTo(4));
+      const edited = history.map((message, index) =>
+        index === 2
+          ? { ...message, content: "Second question, edited" }
+          : message,
+      );
+      expect(loadConversationSummary("test-id", edited)).toEqual({
+        summary: "",
+        summarizedCount: 0,
+      });
+    });
+
+    it("starts over when another chat with the same first question is restored", () => {
+      const { loadConversationSummary } = textGenerationFunctions;
+      mockGetConversationSummary.mockReturnValue(coveredUpTo(2));
+      const sameStart = history.map((message, index) =>
+        index === 1 ? { ...message, content: "Another first answer" } : message,
+      );
+      expect(loadConversationSummary("test-id", sameStart)).toEqual({
+        summary: "",
+        summarizedCount: 0,
+      });
+    });
+
+    it("starts over when the cursor runs past a shortened history", () => {
+      const { loadConversationSummary } = textGenerationFunctions;
+      mockGetConversationSummary.mockReturnValue(coveredUpTo(4));
+      expect(loadConversationSummary("test-id", history.slice(0, 3))).toEqual({
+        summary: "",
+        summarizedCount: 0,
+      });
+    });
+
     it("should return summary when conversationId matches", () => {
       const { loadConversationSummary } = textGenerationFunctions;
       mockGetConversationSummary.mockReturnValue({
         conversationId: "test-id",
         summary: "Previous summary",
       });
-      const result = loadConversationSummary("test-id");
-      expect(result).toBe("Previous summary");
+      const result = loadConversationSummary("test-id", []);
+      expect(result).toEqual({
+        summary: "Previous summary",
+        summarizedCount: 0,
+      });
     });
 
     it("should return empty string when conversationId does not match", () => {
@@ -151,8 +213,8 @@ describe("textGenerationFunctions", () => {
         conversationId: "different-id",
         summary: "Previous summary",
       });
-      const result = loadConversationSummary("test-id");
-      expect(result).toBe("");
+      const result = loadConversationSummary("test-id", []);
+      expect(result).toEqual({ summary: "", summarizedCount: 0 });
     });
 
     it("should return empty string when no summary stored", () => {
@@ -161,8 +223,8 @@ describe("textGenerationFunctions", () => {
         conversationId: "",
         summary: "",
       });
-      const result = loadConversationSummary("test-id");
-      expect(result).toBe("");
+      const result = loadConversationSummary("test-id", []);
+      expect(result).toEqual({ summary: "", summarizedCount: 0 });
     });
   });
 
