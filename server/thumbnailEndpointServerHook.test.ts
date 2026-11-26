@@ -88,6 +88,59 @@ function requestUrlFor(thumbnailUrl: string): string {
   return `/thumbnail?u=${encodeURIComponent(thumbnailUrl)}&token=abc`;
 }
 
+/** Sends `path` through the hook; returns the response and the `next` it was given. */
+async function requestPath(path: string) {
+  const response = createResponse();
+  const next = vi.fn();
+  await getRegisteredHandler()(createRequest(path), response, next);
+  return { response, next };
+}
+
+/** Requests the thumbnail at `thumbnailUrl` through the hook; returns the response. */
+async function requestThumbnail(thumbnailUrl = publicThumbnailUrl()) {
+  return (await requestPath(requestUrlFor(thumbnailUrl))).response;
+}
+
+/** Requests a thumbnail and lets `ms` of fake time pass while the hook waits. */
+async function requestThumbnailPast(ms: number) {
+  const response = createResponse();
+  const handled = getRegisteredHandler()(
+    createRequest(requestUrlFor(publicThumbnailUrl())),
+    response,
+    vi.fn(),
+  );
+  await vi.advanceTimersByTimeAsync(ms);
+  await handled;
+  return response;
+}
+
+/** Refused at validation: no socket opened, counted as blocked and dropped. */
+function expectRefusedBeforeFetch(response: ReturnType<typeof createResponse>) {
+  expect(response.statusCode).toBe(403);
+  expect(pinnedRequestMock).not.toHaveBeenCalled();
+  expect(recordThumbnailBlocked).toHaveBeenCalledTimes(1);
+  expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+}
+
+/** The generic 502, never cached by the browser, counted as dropped. */
+function expectCouldNotFetch(response: ReturnType<typeof createResponse>) {
+  expect(response.statusCode).toBe(502);
+  expect(response.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
+  expect(response.end).toHaveBeenCalledWith(
+    JSON.stringify({ error: "Thumbnail could not be fetched" }),
+  );
+  expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+}
+
+/** The first load of `url` fails; the second fetches again and succeeds. */
+async function expectFailureIsRetried(url: string) {
+  const first = await requestThumbnail(url);
+  expect(first.statusCode).toBe(502);
+  const second = await requestThumbnail(url);
+  expect(second.statusCode).toBe(200);
+  expect(pinnedRequestMock).toHaveBeenCalledTimes(2);
+}
+
 // Shaped like the IncomingMessage the pinned request resolves with: the
 // fields the hook reads, plus the async iteration readCappedStream drives.
 function fakeIncoming(
@@ -136,10 +189,7 @@ describe("thumbnailEndpointServerHook", () => {
   });
 
   it("passes through requests that aren't under /thumbnail", async () => {
-    const handler = getRegisteredHandler();
-    const next = vi.fn();
-
-    await handler(createRequest("/status"), createResponse(), next);
+    const { next } = await requestPath("/status");
 
     expect(next).toHaveBeenCalled();
     expect(pinnedRequestMock).not.toHaveBeenCalled();
@@ -150,11 +200,7 @@ describe("thumbnailEndpointServerHook", () => {
     "/thumbnailX?token=abc",
     "/thumbnail/extra?token=abc",
   ])("passes through %s, which is not the /thumbnail route", async (url) => {
-    const handler = getRegisteredHandler();
-    const next = vi.fn();
-    const response = createResponse();
-
-    await handler(createRequest(url), response, next);
+    const { response, next } = await requestPath(url);
 
     expect(next).toHaveBeenCalledTimes(1);
     expect(response.end).not.toHaveBeenCalled();
@@ -166,23 +212,15 @@ describe("thumbnailEndpointServerHook", () => {
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: false,
     });
-    const handler = getRegisteredHandler();
 
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      createResponse(),
-      vi.fn(),
-    );
+    await requestThumbnail();
 
     expect(pinnedRequestMock).not.toHaveBeenCalled();
     expect(recordThumbnailRequested).not.toHaveBeenCalled();
   });
 
   it("responds 400 when the thumbnail URL is missing", async () => {
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(createRequest("/thumbnail?token=abc"), response, vi.fn());
+    const { response } = await requestPath("/thumbnail?token=abc");
 
     expect(response.statusCode).toBe(400);
     expect(response.end).toHaveBeenCalledWith(
@@ -196,14 +234,7 @@ describe("thumbnailEndpointServerHook", () => {
     pinnedRequestMock.mockResolvedValue(
       imageResponse(new Uint8Array([1, 2, 3]), "IMAGE/JPEG; charset=binary"),
     );
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
+    const response = await requestThumbnail();
 
     expect(response.statusCode).toBe(200);
     expect(response.setHeader).toHaveBeenCalledWith(
@@ -233,13 +264,8 @@ describe("thumbnailEndpointServerHook", () => {
   it("verifies through the thumbnail's own rate-limit budget", async () => {
     pinnedRequestMock.mockResolvedValue(imageResponse());
     const { thumbnailRateLimiter } = await import("./verifyTokenAndRateLimit");
-    const handler = getRegisteredHandler();
 
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      createResponse(),
-      vi.fn(),
-    );
+    await requestThumbnail();
 
     // The whole separate-budget design rests on this wiring: delete the
     // options argument and the grid's 30 tile loads draw from the search
@@ -256,10 +282,9 @@ describe("thumbnailEndpointServerHook", () => {
     const url = publicThumbnailUrl();
     // A fresh response per call: a body can only be read once.
     pinnedRequestMock.mockImplementation(async () => imageResponse());
-    const handler = getRegisteredHandler();
 
-    await handler(createRequest(requestUrlFor(url)), createResponse(), vi.fn());
-    await handler(createRequest(requestUrlFor(url)), createResponse(), vi.fn());
+    await requestThumbnail(url);
+    await requestThumbnail(url);
 
     expect(pinnedRequestMock).toHaveBeenCalledTimes(1);
     // Both requests are demand, so both count even though only one fetched.
@@ -268,43 +293,21 @@ describe("thumbnailEndpointServerHook", () => {
 
   it("refuses a URL that resolves into a private address", async () => {
     lookupMock.mockResolvedValue([{ address: "192.168.1.5", family: 4 }]);
-    const handler = getRegisteredHandler();
-    const response = createResponse();
+    const response = await requestThumbnail();
 
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
-
-    expect(response.statusCode).toBe(403);
-    expect(pinnedRequestMock).not.toHaveBeenCalled();
-    expect(recordThumbnailBlocked).toHaveBeenCalledTimes(1);
-    expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+    expectRefusedBeforeFetch(response);
   });
 
   it("refuses a URL with a non-HTTP scheme", async () => {
-    const handler = getRegisteredHandler();
-    const response = createResponse();
+    const response = await requestThumbnail("file:///etc/passwd");
 
-    await handler(
-      createRequest(requestUrlFor("file:///etc/passwd")),
-      response,
-      vi.fn(),
-    );
-
-    expect(response.statusCode).toBe(403);
-    expect(pinnedRequestMock).not.toHaveBeenCalled();
-    expect(recordThumbnailBlocked).toHaveBeenCalledTimes(1);
-    expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+    expectRefusedBeforeFetch(response);
   });
 
   it("refuses a URL longer than the cap", async () => {
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-    const longUrl = `https://thumbs.example.com/${"a".repeat(2050)}`;
-
-    await handler(createRequest(requestUrlFor(longUrl)), response, vi.fn());
+    const response = await requestThumbnail(
+      `https://thumbs.example.com/${"a".repeat(2050)}`,
+    );
 
     expect(response.statusCode).toBe(400);
     expect(pinnedRequestMock).not.toHaveBeenCalled();
@@ -320,14 +323,7 @@ describe("thumbnailEndpointServerHook", () => {
       .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
       .mockResolvedValue([{ address: "10.0.0.7", family: 4 }]);
     pinnedRequestMock.mockResolvedValue(imageResponse());
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
+    const response = await requestThumbnail();
 
     expect(response.statusCode).toBe(200);
     expect(pinnedRequestMock).toHaveBeenCalledTimes(1);
@@ -346,14 +342,7 @@ describe("thumbnailEndpointServerHook", () => {
         location: "http://10.0.0.7/thumb.jpg",
       }),
     );
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
+    const response = await requestThumbnail();
 
     expect(response.statusCode).toBe(403);
     // The redirect target was refused at validation: its socket was never
@@ -367,38 +356,18 @@ describe("thumbnailEndpointServerHook", () => {
     pinnedRequestMock.mockResolvedValue(
       fakeIncoming(new Uint8Array(), 404, {}),
     );
-    const handler = getRegisteredHandler();
-    const response = createResponse();
+    const response = await requestThumbnail();
 
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
-
-    expect(response.statusCode).toBe(502);
-    expect(response.setHeader).toHaveBeenCalledWith(
-      "Cache-Control",
-      "no-store",
-    );
-    expect(response.end).toHaveBeenCalledWith(
-      JSON.stringify({ error: "Thumbnail could not be fetched" }),
-    );
-    expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+    expectCouldNotFetch(response);
   });
 
   it("logs why a fetch failed, never the thumbnail URL or its host", async () => {
     pinnedRequestMock.mockResolvedValue(
       fakeIncoming(new Uint8Array(), 403, {}),
     );
-    const handler = getRegisteredHandler();
     const thumbnailUrl = publicThumbnailUrl();
 
-    await handler(
-      createRequest(requestUrlFor(thumbnailUrl)),
-      createResponse(),
-      vi.fn(),
-    );
+    await requestThumbnail(thumbnailUrl);
 
     const output = logLines.join("\n");
     expect(output).toContain("Thumbnail fetch failed: HTTP 403");
@@ -411,14 +380,7 @@ describe("thumbnailEndpointServerHook", () => {
         "content-type": "text/html",
       }),
     );
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
+    const response = await requestThumbnail();
 
     expect(response.statusCode).toBe(502);
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
@@ -433,14 +395,7 @@ describe("thumbnailEndpointServerHook", () => {
         { "content-type": "image/svg+xml" },
       ),
     );
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
+    const response = await requestThumbnail();
 
     expect(response.statusCode).toBe(502);
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
@@ -450,14 +405,7 @@ describe("thumbnailEndpointServerHook", () => {
     pinnedRequestMock.mockResolvedValueOnce(
       fakeIncoming(new Uint8Array(), 302, { location: "http://[" }),
     );
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
+    const response = await requestThumbnail();
 
     expect(response.statusCode).toBe(502);
     expect(pinnedRequestMock).toHaveBeenCalledTimes(1);
@@ -469,30 +417,15 @@ describe("thumbnailEndpointServerHook", () => {
     pinnedRequestMock
       .mockResolvedValueOnce(fakeIncoming(new Uint8Array(), 404, {}))
       .mockResolvedValueOnce(imageResponse());
-    const handler = getRegisteredHandler();
 
-    const first = createResponse();
-    await handler(createRequest(requestUrlFor(url)), first, vi.fn());
-    expect(first.statusCode).toBe(502);
-
-    const second = createResponse();
-    await handler(createRequest(requestUrlFor(url)), second, vi.fn());
-    expect(second.statusCode).toBe(200);
-    expect(pinnedRequestMock).toHaveBeenCalledTimes(2);
+    await expectFailureIsRetried(url);
   });
 
   it("answers 502 when the upstream body is empty", async () => {
     pinnedRequestMock.mockResolvedValue(
       fakeIncoming(new Uint8Array(), 200, { "content-type": "image/jpeg" }),
     );
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
+    const response = await requestThumbnail();
 
     expect(response.statusCode).toBe(502);
     expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
@@ -505,15 +438,7 @@ describe("thumbnailEndpointServerHook", () => {
     lookupMock.mockImplementation(() => new Promise(() => {}));
     vi.useFakeTimers();
     try {
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      const handled = handler(
-        createRequest(requestUrlFor(publicThumbnailUrl())),
-        response,
-        vi.fn(),
-      );
-      await vi.advanceTimersByTimeAsync(thumbnailTimeoutMs);
-      await handled;
+      const response = await requestThumbnailPast(thumbnailTimeoutMs);
 
       expect(response.statusCode).toBe(502);
       expect(pinnedRequestMock).not.toHaveBeenCalled();
@@ -536,15 +461,7 @@ describe("thumbnailEndpointServerHook", () => {
             );
           }),
       );
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-      const handled = handler(
-        createRequest(requestUrlFor(publicThumbnailUrl())),
-        response,
-        vi.fn(),
-      );
-      await vi.advanceTimersByTimeAsync(thumbnailTimeoutMs);
-      await handled;
+      const response = await requestThumbnailPast(thumbnailTimeoutMs);
 
       expect(response.statusCode).toBe(502);
       expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
@@ -559,14 +476,7 @@ describe("thumbnailEndpointServerHook", () => {
         location: "https://thumbs.example.com/loop.jpg",
       }),
     );
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
+    const response = await requestThumbnail();
 
     expect(response.statusCode).toBe(502);
     // One request per hop, four hops for three redirects.
@@ -579,24 +489,9 @@ describe("thumbnailEndpointServerHook", () => {
     // as a damaged image.
     const bigBody = new Uint8Array(600_000).fill(7);
     pinnedRequestMock.mockResolvedValue(imageResponse(bigBody));
-    const handler = getRegisteredHandler();
-    const response = createResponse();
+    const response = await requestThumbnail();
 
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
-
-    expect(response.statusCode).toBe(502);
-    expect(response.setHeader).toHaveBeenCalledWith(
-      "Cache-Control",
-      "no-store",
-    );
-    expect(response.end).toHaveBeenCalledWith(
-      JSON.stringify({ error: "Thumbnail could not be fetched" }),
-    );
-    expect(recordThumbnailDropped).toHaveBeenCalledTimes(1);
+    expectCouldNotFetch(response);
     expect(logLines.join("\n")).toContain(
       "Thumbnail fetch failed: larger than 500000 bytes",
     );
@@ -607,29 +502,14 @@ describe("thumbnailEndpointServerHook", () => {
     pinnedRequestMock
       .mockResolvedValueOnce(imageResponse(new Uint8Array(600_000).fill(7)))
       .mockResolvedValueOnce(imageResponse());
-    const handler = getRegisteredHandler();
 
-    const first = createResponse();
-    await handler(createRequest(requestUrlFor(url)), first, vi.fn());
-    expect(first.statusCode).toBe(502);
-
-    const second = createResponse();
-    await handler(createRequest(requestUrlFor(url)), second, vi.fn());
-    expect(second.statusCode).toBe(200);
-    expect(pinnedRequestMock).toHaveBeenCalledTimes(2);
+    await expectFailureIsRetried(url);
   });
 
   it("serves a body of exactly the byte cap", async () => {
     const capSizedBody = new Uint8Array(500_000).fill(7);
     pinnedRequestMock.mockResolvedValue(imageResponse(capSizedBody));
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest(requestUrlFor(publicThumbnailUrl())),
-      response,
-      vi.fn(),
-    );
+    const response = await requestThumbnail();
 
     expect(response.statusCode).toBe(200);
     const body = response.end.mock.calls[0][0] as Buffer;
@@ -640,14 +520,12 @@ describe("thumbnailEndpointServerHook", () => {
   it("evicts the least recently used entry, not the least recently loaded one", async () => {
     // A fresh response per call: a body can only be read once.
     pinnedRequestMock.mockImplementation(async () => imageResponse());
-    const handler = getRegisteredHandler();
     // A clean slate, so the eviction side is exactly where this test puts it.
     resetThumbnailCache();
     const firstUrl = publicThumbnailUrl();
     const secondUrl = publicThumbnailUrl();
     const maxEntries = getThumbnailCacheLimits().entries;
-    const load = (url: string) =>
-      handler(createRequest(requestUrlFor(url)), createResponse(), vi.fn());
+    const load = (url: string) => requestThumbnail(url);
     const fetched = (url: string) =>
       pinnedRequestMock.mock.calls.filter((call) => String(call[0]) === url)
         .length;
