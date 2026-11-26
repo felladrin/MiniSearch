@@ -587,12 +587,11 @@ describe("internalApiEndpointServerHook", () => {
     });
 
     it("passes on why the upstream stopped, so a cut answer is not reported as complete", async () => {
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "Cut" },
-            { type: "finish", finishReason: "length" },
-          ]) as never,
+      streamEveryCall(() =>
+        streamOf([
+          { type: "text-delta", text: "Cut" },
+          { type: "finish", finishReason: "length" },
+        ]),
       );
       const response = await sendRequest();
 
@@ -602,11 +601,8 @@ describe("internalApiEndpointServerHook", () => {
     });
 
     it("spells the finish reason the way OpenAI does", async () => {
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "finish", finishReason: "content-filter" },
-          ]) as never,
+      streamEveryCall(() =>
+        streamOf([{ type: "finish", finishReason: "content-filter" }]),
       );
       const response = await sendRequest();
 
@@ -792,7 +788,6 @@ describe("internalApiEndpointServerHook", () => {
 
     it("returns early when response is no longer writable", async () => {
       streamEveryCall(() => streamOf([{ type: "text-delta", text: "Hello" }]));
-      const handler = getRegisteredHandler();
       const response = createResponse();
       const mutable = response as {
         writableEnded: boolean;
@@ -800,11 +795,7 @@ describe("internalApiEndpointServerHook", () => {
       };
       mutable.writableEnded = true;
       mutable.destroyed = true;
-      await handler(
-        createRequest({ messages: [{ role: "user", content: "hi" }] }),
-        response,
-        vi.fn(),
-      );
+      await sendRequest(helloBody, response);
       expect(response.setHeader).not.toHaveBeenCalledWith(
         "Content-Type",
         "text/event-stream",
@@ -813,12 +804,11 @@ describe("internalApiEndpointServerHook", () => {
     });
 
     it("surfaces an error part instead of reporting unexpected stream end", async () => {
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "Partial" },
-            { type: "error", error: new Error("upstream exploded") },
-          ]) as never,
+      streamEveryCall(() =>
+        streamOf([
+          { type: "text-delta", text: "Partial" },
+          { type: "error", error: new Error("upstream exploded") },
+        ]),
       );
       const response = await sendRequest();
       const writes = writtenText(response);
@@ -840,11 +830,8 @@ describe("internalApiEndpointServerHook", () => {
     });
 
     it("responds 503 JSON when the only model's stream fails before any content", async () => {
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "error", error: new Error("upstream down") },
-          ]) as never,
+      streamEveryCall(() =>
+        streamOf([{ type: "error", error: new Error("upstream down") }]),
       );
       const response = await sendRequest();
       expectAllModelsFailedJson(response, "upstream down");
@@ -858,7 +845,7 @@ describe("internalApiEndpointServerHook", () => {
     });
 
     it("responds 503 JSON when the only model cannot start", async () => {
-      vi.mocked(streamText).mockImplementation(() => {
+      streamEveryCall(() => {
         throw new Error("upstream down");
       });
       const response = await sendRequest();
@@ -938,11 +925,8 @@ describe("internalApiEndpointServerHook", () => {
     it("re-lists only once even when both the original and refetched pools fail", async () => {
       useSingleModelPoolThatRelists();
 
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "error", error: new Error("upstream down") },
-          ]) as never,
+      streamEveryCall(() =>
+        streamOf([{ type: "error", error: new Error("upstream down") }]),
       );
 
       const before = getInferenceStats();
@@ -967,11 +951,8 @@ describe("internalApiEndpointServerHook", () => {
         .mockRejectedValueOnce(new Error("models endpoint down"));
       vi.mocked(selectRandomModel).mockReturnValueOnce("model-a");
 
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "error", error: new Error("upstream down") },
-          ]) as never,
+      streamEveryCall(() =>
+        streamOf([{ type: "error", error: new Error("upstream down") }]),
       );
 
       const before = getInferenceStats();
@@ -1023,11 +1004,8 @@ describe("internalApiEndpointServerHook", () => {
 
     describe("error logging", () => {
       it("logs only the error message when a stream fails", async () => {
-        vi.mocked(streamText).mockImplementation(
-          () =>
-            streamOf([
-              { type: "error", error: new Error("upstream exploded") },
-            ]) as never,
+        streamEveryCall(() =>
+          streamOf([{ type: "error", error: new Error("upstream exploded") }]),
         );
         const errorSpy = vi
           .spyOn(console, "error")
@@ -1045,14 +1023,13 @@ describe("internalApiEndpointServerHook", () => {
       });
 
       it("logs only the error message on unexpected endpoint failure", async () => {
-        vi.mocked(streamText).mockImplementation(() => {
+        streamEveryCall(() => {
           throw new Error("upstream down");
         });
         const errorSpy = vi
           .spyOn(console, "error")
           .mockImplementation(() => {});
         try {
-          const handler = getRegisteredHandler();
           const response = createResponse();
           let thrown = false;
           response.setHeader.mockImplementation((name: string) => {
@@ -1061,11 +1038,7 @@ describe("internalApiEndpointServerHook", () => {
               throw new Error("setHeader exploded");
             }
           });
-          await handler(
-            createRequest({ messages: [{ role: "user", content: "hi" }] }),
-            response,
-            vi.fn(),
-          );
+          await sendRequest(helloBody, response);
           expectOnlyMessageLogged(
             errorSpy,
             "Error in internal API endpoint:",
@@ -1150,12 +1123,11 @@ describe("internalApiEndpointServerHook", () => {
         writableEnded: boolean;
         destroyed: boolean;
       };
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "Half an answer" },
-            { type: "text-delta", text: "never read" },
-          ]) as never,
+      streamEveryCall(() =>
+        streamOf([
+          { type: "text-delta", text: "Half an answer" },
+          { type: "text-delta", text: "never read" },
+        ]),
       );
       response.write.mockImplementation(() => {
         // Writable for the first part, gone before the second, which is the
@@ -1231,12 +1203,11 @@ describe("internalApiEndpointServerHook", () => {
 
     it("counts a failure after content as a mid-stream failure", async () => {
       const before = getInferenceStats();
-      vi.mocked(streamText).mockImplementation(
-        () =>
-          streamOf([
-            { type: "text-delta", text: "Half an answer" },
-            { type: "error", error: new Error("upstream died") },
-          ]) as never,
+      streamEveryCall(() =>
+        streamOf([
+          { type: "text-delta", text: "Half an answer" },
+          { type: "error", error: new Error("upstream died") },
+        ]),
       );
 
       await sendRequest();
@@ -1271,15 +1242,11 @@ describe("internalApiEndpointServerHook", () => {
       [
         "badRequest",
         async () => {
-          const handler = getRegisteredHandler();
-          const request = Readable.from(["{invalid"]) as IncomingMessage;
-          request.url = "/inference?token=abc";
-          request.method = "POST";
-          request.headers = {
-            host: "localhost:3000",
-            "content-type": "application/json",
-          };
-          await handler(request, createResponse(), vi.fn());
+          await getRegisteredHandler()(
+            createRawRequest(["{invalid"]),
+            createResponse(),
+            vi.fn(),
+          );
         },
       ],
       [
@@ -1335,14 +1302,9 @@ describe("internalApiEndpointServerHook", () => {
 
     it("keeps no part of the conversation", async () => {
       streamEveryCall(() => answerStream("borogoves"));
-      const handler = getRegisteredHandler();
-      await handler(
-        createRequest({
-          messages: [{ role: "user", content: "outgrabe mimsy-42" }],
-        }),
-        createResponse(),
-        vi.fn(),
-      );
+      await sendRequest({
+        messages: [{ role: "user", content: "outgrabe mimsy-42" }],
+      });
 
       const serialized = JSON.stringify(getInferenceStats());
       expect(serialized).not.toContain("outgrabe");
