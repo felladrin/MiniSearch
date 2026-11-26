@@ -329,24 +329,70 @@ export async function updateSearchResults(
 ): Promise<void> {
   if (!isHistoryEnabled()) return;
   try {
-    await measurePerformance("Update search results", async () => {
-      const latest = await historyDatabase.searches
-        .where("searchRunId")
-        .equals(searchRunId)
-        .first();
+    await measurePerformance("Update search results", () =>
+      // One transaction, so a text write and an image write that overlap
+      // cannot each put back the other's old field.
+      historyDatabase.transaction("rw", historyDatabase.searches, async () => {
+        const latest = await historyDatabase.searches
+          .where("searchRunId")
+          .equals(searchRunId)
+          .first();
 
-      if (latest?.id !== undefined) {
-        const updatedEntry = { ...latest };
-        if (results.type === "text") {
-          updatedEntry.textResults = results;
-        } else {
-          updatedEntry.imageResults = results;
+        if (latest?.id !== undefined) {
+          const updatedEntry = { ...latest };
+          if (results.type === "text") {
+            updatedEntry.textResults = results;
+          } else {
+            updatedEntry.imageResults = results;
+          }
+          await historyDatabase.searches.update(latest.id, updatedEntry);
         }
-        await historyDatabase.searches.update(latest.id, updatedEntry);
-      }
-    });
+      }),
+    );
   } catch (error) {
     addLogEntry(`Error updating search results: ${error}`);
+  }
+}
+
+/**
+ * Adds `results` to the images stored for the search instead of replacing them.
+ * For a write that lands after the user left the search: the screen then shows
+ * another search, so only the stored list still has the other writer's images.
+ * The caller's images come first; a URL already stored is not repeated.
+ */
+export async function mergeSearchImageResults(
+  searchRunId: string,
+  results: ImageResults,
+): Promise<void> {
+  if (!isHistoryEnabled()) return;
+  try {
+    await historyDatabase.transaction(
+      "rw",
+      historyDatabase.searches,
+      async () => {
+        const latest = await historyDatabase.searches
+          .where("searchRunId")
+          .equals(searchRunId)
+          .first();
+        if (latest?.id === undefined) return;
+
+        const stored =
+          latest.imageResults ??
+          (latest.results?.type === "image" ? latest.results : undefined);
+        const newUrls = new Set(results.items.map((item) => item.url));
+        await historyDatabase.searches.update(latest.id, {
+          imageResults: {
+            type: "image",
+            items: [
+              ...results.items,
+              ...(stored?.items ?? []).filter((item) => !newUrls.has(item.url)),
+            ],
+          },
+        });
+      },
+    );
+  } catch (error) {
+    addLogEntry(`Error merging image results: ${error}`);
   }
 }
 

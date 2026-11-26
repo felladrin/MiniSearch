@@ -10,6 +10,7 @@ vi.mock("./history", () => ({
   getCurrentSearchRunId: vi.fn(() => "run-1"),
   replaceChatConversation: vi.fn(() => Promise.resolve()),
   updateSearchResults: vi.fn(() => Promise.resolve()),
+  mergeSearchImageResults: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("./pubSub", () => ({
   getImageSearchResults: vi.fn(() => []),
@@ -41,6 +42,7 @@ import {
 } from "./chatHelpers";
 import {
   getCurrentSearchRunId,
+  mergeSearchImageResults,
   replaceChatConversation,
   updateSearchResults,
 } from "./history";
@@ -568,6 +570,51 @@ describe("follow-up supersession ownership", () => {
     expect(mockUpdateTextStale).toHaveBeenCalledTimes(1);
     expect(mockUpdateTextStale).toHaveBeenCalledWith(false);
     expect(mockUpdateSearchResults).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds a late image refresh to its own run's stored images after leaving the search", async () => {
+    let releaseImages: (value: {
+      results: ImageSearchResults;
+      stale: boolean;
+    }) => void = () => {};
+    mockSearchImages.mockReturnValueOnce(
+      new Promise((resolve) => {
+        releaseImages = resolve;
+      }),
+    );
+    const handed: ImageSearchResults = [
+      ["Shown", "https://shown.com", "thumb-s", "src-s"],
+    ];
+    const refresh = refreshImageSearchResults("query", 10, handed, "run-1");
+    await vi.waitFor(() => expect(mockSearchImages).toHaveBeenCalledTimes(1));
+
+    // The user restored or started another search meanwhile.
+    mockGetCurrentSearchRunId.mockReturnValue("run-2");
+    releaseImages({
+      results: [["Fresh", "https://fresh.com", "thumb-f", "src-f"]],
+      stale: false,
+    });
+    await refresh;
+
+    expect(mockUpdateImage).not.toHaveBeenCalled();
+    expect(mockUpdateSearchResults).not.toHaveBeenCalled();
+    expect(mergeSearchImageResults).toHaveBeenCalledWith("run-1", {
+      type: "image",
+      items: [
+        {
+          title: "Fresh",
+          url: "https://fresh.com",
+          thumbnail: "thumb-f",
+          sourceUrl: "src-f",
+        },
+        {
+          title: "Shown",
+          url: "https://shown.com",
+          thumbnail: "thumb-s",
+          sourceUrl: "src-s",
+        },
+      ],
+    });
   });
 
   it("keeps a follow-up refresh from touching screen or new run history after a new search starts", async () => {

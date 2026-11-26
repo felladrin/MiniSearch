@@ -3,6 +3,7 @@ import gptTokenizer from "gpt-tokenizer";
 import prettyMilliseconds from "pretty-ms";
 import {
   getCurrentSearchRunId,
+  mergeSearchImageResults,
   replaceChatConversation,
   saveLlmResponseForQuery,
   updateSearchResults,
@@ -869,7 +870,12 @@ async function startImageSearch(
     }
 
     if (isRunCurrent()) {
-      updateSearchResults(searchRunId, {
+      // Off the search, the screen no longer holds a follow-up's images, so
+      // the stored list is the one to add to.
+      const saveImages = isCurrent()
+        ? updateSearchResults
+        : mergeSearchImageResults;
+      saveImages(searchRunId, {
         type: "image",
         items: mergedResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
           title,

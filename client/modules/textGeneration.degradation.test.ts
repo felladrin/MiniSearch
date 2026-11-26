@@ -97,6 +97,7 @@ vi.mock("./history", () => ({
   getCurrentSearchRunId: vi.fn(() => harness.state.searchRunId),
   saveLlmResponseForQuery: vi.fn(() => Promise.resolve()),
   updateSearchResults: vi.fn(() => Promise.resolve()),
+  mergeSearchImageResults: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("./logEntries", () => ({ addLogEntry: vi.fn() }));
@@ -153,7 +154,11 @@ vi.mock("./textGenerationWithWllama", () => ({
   generateChatWithWllama: vi.fn(() => Promise.resolve("")),
 }));
 
-import { saveLlmResponseForQuery, updateSearchResults } from "./history";
+import {
+  mergeSearchImageResults,
+  saveLlmResponseForQuery,
+  updateSearchResults,
+} from "./history";
 import { fetchPageContents } from "./pageContent";
 import {
   listenToSettingsChanges,
@@ -768,7 +773,8 @@ describe("search supersession ownership", () => {
         .mocked(updateImageSearchState)
         .mock.calls.filter(([state]) => state === "completed"),
     ).toHaveLength(1);
-    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-a", {
+    // Search A was left, so its images are added to its own stored list.
+    expect(vi.mocked(mergeSearchImageResults)).toHaveBeenCalledWith("run-a", {
       type: "image",
       items: [
         {

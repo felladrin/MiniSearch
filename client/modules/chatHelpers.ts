@@ -2,6 +2,7 @@ import { normalizeFollowUpDates } from "@shared/relativeDates";
 import {
   getCurrentSearchRunId,
   type ImageResults,
+  mergeSearchImageResults,
   replaceChatConversation,
   type TextResults,
   updateSearchResults,
@@ -162,7 +163,12 @@ export async function refreshImageSearchResults(
     }
 
     if (isRunCurrent()) {
-      updateSearchResults(searchRunId, {
+      // Off the search, the screen no longer holds this run's images, so the
+      // stored list is the one to add to.
+      const saveImages = isCurrent()
+        ? updateSearchResults
+        : mergeSearchImageResults;
+      saveImages(searchRunId, {
         type: "image",
         items: updatedImageResults.map(
           ([title, url, thumbnailUrl, sourceUrl]) => ({
