@@ -1111,8 +1111,9 @@ describe("ChatInterface chat storage", () => {
     await act(async () => {
       send = sendMessage("How do I use it?");
     });
-    // Regenerating the main answer unmounts the chat and clears its copy,
-    // without starting a new search run.
+    // Regenerating the main answer starts a new attempt on the same run,
+    // unmounts the chat and clears its copy.
+    recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
     view.unmount();
     updateChatMessages([]);
     await act(async () => {
@@ -1121,6 +1122,55 @@ describe("ChatInterface chat storage", () => {
     });
 
     expect(getChatMessages()).toEqual([]);
+  });
+
+  it("keeps an in-flight follow-up when the chat remounts on the same search", async () => {
+    vi.mocked(generateChatResponse).mockImplementationOnce(
+      (_messages, _onUpdate, chatSignal) =>
+        new Promise((_resolve, reject) => {
+          chatSignal?.addEventListener("abort", () =>
+            reject(new Error("Chat generation interrupted")),
+          );
+        }),
+    );
+    const view = renderChatInterface();
+    let send: Promise<void> = Promise.resolve();
+    await act(async () => {
+      send = sendMessage("How do I use it?");
+    });
+
+    // Turning the AI answer off unmounts the chat; nothing else changes.
+    await act(async () => {
+      view.unmount();
+      await send;
+    });
+    render(
+      <MantineProvider>
+        <ChatInterface
+          initialQuery={initialQuery}
+          initialResponse={initialResponse}
+          initialMessages={getChatMessages()}
+          suppressInitialFollowUp
+        />
+      </MantineProvider>,
+    );
+
+    const interruptedTurn: ChatMessage[] = [
+      { role: "user", content: "How do I use it?" },
+      { role: "assistant", content: "The answer was interrupted." },
+    ];
+    expect(messageListMessages.slice(2)).toEqual(interruptedTurn);
+
+    // The next send keeps that turn in storage too.
+    vi.mocked(generateChatResponse).mockResolvedValueOnce("Next answer.");
+    await act(async () => {
+      await sendMessage("Next?");
+    });
+    expect(persistChatConversation).toHaveBeenLastCalledWith("run-1", [
+      ...interruptedTurn,
+      { role: "user", content: "Next?" },
+      { role: "assistant", content: "Next answer." },
+    ]);
   });
 
   it("stores nothing from a follow-up that started before the main answer was regenerated", async () => {
