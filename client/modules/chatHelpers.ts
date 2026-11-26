@@ -2,6 +2,7 @@ import { normalizeFollowUpDates } from "@shared/relativeDates";
 import {
   getCurrentSearchRunId,
   type ImageResults,
+  mergeSearchImageResults,
   replaceChatConversation,
   type TextResults,
   updateSearchResults,
@@ -162,7 +163,7 @@ export async function refreshImageSearchResults(
     }
 
     if (isRunCurrent()) {
-      updateSearchResults(searchRunId, {
+      mergeSearchImageResults(searchRunId, {
         type: "image",
         items: updatedImageResults.map(
           ([title, url, thumbnailUrl, sourceUrl]) => ({

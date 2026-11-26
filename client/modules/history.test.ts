@@ -374,6 +374,117 @@ describe("History Module - Dexie CRUD", () => {
     });
   });
 
+  describe("mergeSearchImageResults", () => {
+    const image = (title: string, url: string) => ({
+      title,
+      url,
+      thumbnail: `${url}/thumb`,
+    });
+
+    it("adds the images to the stored ones, its own first, each URL once", async () => {
+      const {
+        addSearchToHistory,
+        mergeSearchImageResults,
+        getRecentSearches,
+        getCurrentSearchRunId,
+      } = await import("./history");
+      await addSearchToHistory("merge test", {
+        type: "image",
+        items: [
+          image("Stored A", "https://a.com"),
+          image("Stored B", "https://b.com"),
+        ],
+      });
+
+      await mergeSearchImageResults(getCurrentSearchRunId(), {
+        type: "image",
+        items: [
+          image("New C", "https://c.com"),
+          image("New A", "https://a.com"),
+        ],
+      });
+
+      const [entry] = await getRecentSearches();
+      expect(entry.imageResults?.items).toEqual([
+        image("New C", "https://c.com"),
+        image("New A", "https://a.com"),
+        image("Stored B", "https://b.com"),
+      ]);
+    });
+
+    it("keeps both sets whichever image search lands first, and a retry starts over", async () => {
+      const {
+        addSearchToHistory,
+        mergeSearchImageResults,
+        updateSearchResults,
+        getRecentSearches,
+        getCurrentSearchRunId,
+      } = await import("./history");
+      const runId = getCurrentSearchRunId();
+      await addSearchToHistory("both orders", { type: "image", items: [] });
+      const storedItems = async () =>
+        (await getRecentSearches())[0].imageResults?.items;
+
+      // The first search lands late, after the user left and came back...
+      await mergeSearchImageResults(
+        runId,
+        { type: "image", items: [image("First", "https://first.com")] },
+        { newFirst: false },
+      );
+      // ...then a follow-up saves the screen's list, which never showed it.
+      await mergeSearchImageResults(runId, {
+        type: "image",
+        items: [image("Fresh", "https://fresh.com")],
+      });
+      expect(await storedItems()).toEqual([
+        image("Fresh", "https://fresh.com"),
+        image("First", "https://first.com"),
+      ]);
+
+      // The reverse order: a follow-up stored first, the first search lands
+      // after it. Its images go after the follow-up's, as on screen.
+      await updateSearchResults(runId, { type: "image", items: [] });
+      await mergeSearchImageResults(runId, {
+        type: "image",
+        items: [image("Fresh", "https://fresh.com")],
+      });
+      await mergeSearchImageResults(
+        runId,
+        { type: "image", items: [image("First", "https://first.com")] },
+        { newFirst: false },
+      );
+      expect(await storedItems()).toEqual([
+        image("Fresh", "https://fresh.com"),
+        image("First", "https://first.com"),
+      ]);
+
+      // A retry on the run clears the list before its own images arrive.
+      await updateSearchResults(runId, { type: "image", items: [] });
+      await mergeSearchImageResults(
+        runId,
+        { type: "image", items: [image("Retry", "https://retry.com")] },
+        { newFirst: false },
+      );
+      expect(await storedItems()).toEqual([
+        image("Retry", "https://retry.com"),
+      ]);
+    });
+
+    it("writes nothing when no search has the run id", async () => {
+      const { mergeSearchImageResults, getRecentSearches } = await import(
+        "./history"
+      );
+      const before = await getRecentSearches();
+
+      await mergeSearchImageResults("no-such-run", {
+        type: "image",
+        items: [image("Lost", "https://lost.com")],
+      });
+
+      expect(await getRecentSearches()).toEqual(before);
+    });
+  });
+
   describe("saveLlmResponseForQuery / getLatestLlmResponseForEntry", () => {
     it("should save and retrieve an LLM response for a search entry", async () => {
       const {

@@ -329,24 +329,72 @@ export async function updateSearchResults(
 ): Promise<void> {
   if (!isHistoryEnabled()) return;
   try {
-    await measurePerformance("Update search results", async () => {
-      const latest = await historyDatabase.searches
-        .where("searchRunId")
-        .equals(searchRunId)
-        .first();
+    await measurePerformance("Update search results", () =>
+      // One transaction, so a text write and an image write that overlap
+      // cannot each put back the other's old field.
+      historyDatabase.transaction("rw", historyDatabase.searches, async () => {
+        const latest = await historyDatabase.searches
+          .where("searchRunId")
+          .equals(searchRunId)
+          .first();
 
-      if (latest?.id !== undefined) {
-        const updatedEntry = { ...latest };
-        if (results.type === "text") {
-          updatedEntry.textResults = results;
-        } else {
-          updatedEntry.imageResults = results;
+        if (latest?.id !== undefined) {
+          const updatedEntry = { ...latest };
+          if (results.type === "text") {
+            updatedEntry.textResults = results;
+          } else {
+            updatedEntry.imageResults = results;
+          }
+          await historyDatabase.searches.update(latest.id, updatedEntry);
         }
-        await historyDatabase.searches.update(latest.id, updatedEntry);
-      }
-    });
+      }),
+    );
   } catch (error) {
     addLogEntry(`Error updating search results: ${error}`);
+  }
+}
+
+/**
+ * Adds `results` to the images stored for the search instead of replacing them.
+ * Every image write goes through here: the screen can lack images the stored
+ * list has (a late first search merged after the user left and came back), so
+ * replacing it with the screen's list would drop them. A URL is stored once.
+ * With `newFirst`, the new images go ahead of the stored ones; otherwise after.
+ */
+export async function mergeSearchImageResults(
+  searchRunId: string,
+  results: ImageResults,
+  { newFirst = true } = {},
+): Promise<void> {
+  if (!isHistoryEnabled()) return;
+  try {
+    await measurePerformance("Merge image results", () =>
+      historyDatabase.transaction("rw", historyDatabase.searches, async () => {
+        const latest = await historyDatabase.searches
+          .where("searchRunId")
+          .equals(searchRunId)
+          .first();
+        if (latest?.id === undefined) return;
+
+        const storedItems =
+          (
+            latest.imageResults ??
+            (latest.results?.type === "image" ? latest.results : undefined)
+          )?.items ?? [];
+        const newUrls = new Set(results.items.map((item) => item.url));
+        const keptItems = storedItems.filter((item) => !newUrls.has(item.url));
+        await historyDatabase.searches.update(latest.id, {
+          imageResults: {
+            type: "image",
+            items: newFirst
+              ? [...results.items, ...keptItems]
+              : [...keptItems, ...results.items],
+          },
+        });
+      }),
+    );
+  } catch (error) {
+    addLogEntry(`Error merging image results: ${error}`);
   }
 }
 

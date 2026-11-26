@@ -3,6 +3,7 @@ import gptTokenizer from "gpt-tokenizer";
 import prettyMilliseconds from "pretty-ms";
 import {
   getCurrentSearchRunId,
+  mergeSearchImageResults,
   replaceChatConversation,
   saveLlmResponseForQuery,
   updateSearchResults,
@@ -362,6 +363,9 @@ export async function searchAndRespond() {
   updateLlmTextSearchResults([]);
 
   updateImageSearchResults([]);
+  // Image writes add to the stored list, so a retry on this run starts it
+  // over too; the old attempt's images stay off the screen and out of history.
+  updateSearchResults(searchRunId, { type: "image", items: [] });
 
   updateChatMessages([]);
 
@@ -869,15 +873,20 @@ async function startImageSearch(
     }
 
     if (isRunCurrent()) {
-      updateSearchResults(searchRunId, {
-        type: "image",
-        items: mergedResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
-          title,
-          url,
-          thumbnail: thumbnailUrl,
-          sourceUrl,
-        })),
-      });
+      // After what a follow-up already stored, as on screen.
+      mergeSearchImageResults(
+        searchRunId,
+        {
+          type: "image",
+          items: mergedResults.map(([title, url, thumbnailUrl, sourceUrl]) => ({
+            title,
+            url,
+            thumbnail: thumbnailUrl,
+            sourceUrl,
+          })),
+        },
+        { newFirst: false },
+      );
     }
   } catch {
     // Same distinction as the text path: an outage fails the search, an empty

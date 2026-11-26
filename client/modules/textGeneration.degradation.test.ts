@@ -97,6 +97,7 @@ vi.mock("./history", () => ({
   getCurrentSearchRunId: vi.fn(() => harness.state.searchRunId),
   saveLlmResponseForQuery: vi.fn(() => Promise.resolve()),
   updateSearchResults: vi.fn(() => Promise.resolve()),
+  mergeSearchImageResults: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("./logEntries", () => ({ addLogEntry: vi.fn() }));
@@ -153,7 +154,11 @@ vi.mock("./textGenerationWithWllama", () => ({
   generateChatWithWllama: vi.fn(() => Promise.resolve("")),
 }));
 
-import { saveLlmResponseForQuery, updateSearchResults } from "./history";
+import {
+  mergeSearchImageResults,
+  saveLlmResponseForQuery,
+  updateSearchResults,
+} from "./history";
 import { fetchPageContents } from "./pageContent";
 import {
   listenToSettingsChanges,
@@ -614,7 +619,9 @@ describe("search supersession ownership", () => {
     expect(
       vi
         .mocked(updateSearchResults)
-        .mock.calls.filter(([runId]) => runId === "run-b"),
+        .mock.calls.filter(
+          ([runId, payload]) => runId === "run-b" && payload.type === "text",
+        ),
     ).toHaveLength(1);
   });
 
@@ -674,6 +681,15 @@ describe("search supersession ownership", () => {
     };
   }
 
+  it("starts the run's stored image list over for a new attempt", async () => {
+    await searchAndRespond();
+
+    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-a", {
+      type: "image",
+      items: [],
+    });
+  });
+
   it("keeps the images a follow-up added while the first image search was still running", async () => {
     const { finishImages } = await searchWithFollowUpImagesFirst();
 
@@ -689,23 +705,27 @@ describe("search supersession ownership", () => {
       followUpImage,
       firstImage,
     ]);
-    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-a", {
-      type: "image",
-      items: [
-        {
-          title: "Follow-up",
-          url: "https://f.example/img.png",
-          thumbnail: "thumb-f",
-          sourceUrl: "https://f.example",
-        },
-        {
-          title: "First",
-          url: "https://a.example/img.png",
-          thumbnail: "thumb-a",
-          sourceUrl: "https://a.example",
-        },
-      ],
-    });
+    expect(vi.mocked(mergeSearchImageResults)).toHaveBeenCalledWith(
+      "run-a",
+      {
+        type: "image",
+        items: [
+          {
+            title: "Follow-up",
+            url: "https://f.example/img.png",
+            thumbnail: "thumb-f",
+            sourceUrl: "https://f.example",
+          },
+          {
+            title: "First",
+            url: "https://a.example/img.png",
+            thumbnail: "thumb-a",
+            sourceUrl: "https://a.example",
+          },
+        ],
+      },
+      { newFirst: false },
+    );
   });
 
   it("keeps a follow-up's images when the first image search finds none", async () => {
@@ -768,23 +788,26 @@ describe("search supersession ownership", () => {
         .mocked(updateImageSearchState)
         .mock.calls.filter(([state]) => state === "completed"),
     ).toHaveLength(1);
-    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-a", {
-      type: "image",
-      items: [
-        {
-          title: "Img A",
-          url: "https://a.example/img.png",
-          thumbnail: "thumb-a",
-          sourceUrl: "https://a.example",
-        },
-      ],
-    });
+    // Search A was left, so its images are added to its own stored list.
+    expect(vi.mocked(mergeSearchImageResults)).toHaveBeenCalledWith(
+      "run-a",
+      {
+        type: "image",
+        items: [
+          {
+            title: "Img A",
+            url: "https://a.example/img.png",
+            thumbnail: "thumb-a",
+            sourceUrl: "https://a.example",
+          },
+        ],
+      },
+      { newFirst: false },
+    );
     expect(
       vi
-        .mocked(updateSearchResults)
-        .mock.calls.filter(
-          ([runId, payload]) => runId === "run-b" && payload.type === "image",
-        ),
+        .mocked(mergeSearchImageResults)
+        .mock.calls.filter(([runId]) => runId === "run-b"),
     ).toHaveLength(1);
   });
 
@@ -889,7 +912,11 @@ describe("search supersession ownership", () => {
     expect(harness.state.textSearchResults).toEqual(retryResults);
     expect(harness.state.llmTextSearchResults).toEqual(retryResults);
     expect(harness.state.staleFlag).toBe(false);
-    expect(vi.mocked(updateSearchResults)).toHaveBeenCalledTimes(1);
+    expect(
+      vi
+        .mocked(updateSearchResults)
+        .mock.calls.filter(([, payload]) => payload.type === "text"),
+    ).toHaveLength(1);
     expect(vi.mocked(updateSearchResults)).toHaveBeenCalledWith("run-a", {
       type: "text",
       items: [
