@@ -7,6 +7,7 @@ import { resetHandledQuery } from "@/modules/autoSearch";
 import { settingsPubSub } from "@/modules/pubSub";
 import { getRandomQuerySuggestion } from "@/modules/querySuggestions";
 import { defaultSettings } from "@/modules/settings";
+import { getDictationEngine, startDictation } from "@/modules/speechToText";
 import { searchAndRespond } from "@/modules/textGeneration";
 
 vi.mock("create-pubsub/react", () => ({
@@ -55,20 +56,29 @@ vi.mock("../../../modules/querySuggestions", () => ({
   getRandomQuerySuggestion: vi.fn(async () => "Anything you need!"),
 }));
 
-/** Captures the props `SearchForm` hands the real dictation button. */
+vi.mock("@/modules/speechToText", async () =>
+  (await import("@/testMocks")).speechToTextMock(),
+);
+
+/** Captures the props while still exercising the real button lifecycle. */
 let dictationProps: {
   getValue: () => string;
   setValue: (value: string) => void;
   labelScope: string;
 } = { getValue: () => "", setValue: () => {}, labelScope: "" };
 
-vi.mock("@/components/DictationButton", () => ({
-  dictationButtonWidth: 34,
-  default: function DictationButtonProbe(props: typeof dictationProps) {
-    dictationProps = props;
-    return <button type="button" data-testid="dictation-probe" />;
-  },
-}));
+vi.mock("@/components/DictationButton", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/components/DictationButton")>();
+  const DictationButton = actual.default;
+  return {
+    ...actual,
+    default: function DictationButtonProbe(props: typeof dictationProps) {
+      dictationProps = props;
+      return <DictationButton {...props} />;
+    },
+  };
+});
 
 const renderSearchForm = (
   query: string,
@@ -91,9 +101,15 @@ const waitForPlaceholder = async () => {
 
 describe("SearchForm component", () => {
   beforeEach(() => {
+    vi.mocked(getDictationEngine).mockReturnValue("wasm");
+    vi.mocked(startDictation).mockReset();
     vi.mocked(searchAndRespond).mockClear();
     resetHandledQuery();
     window.history.replaceState({}, "", "/");
+  });
+
+  afterEach(() => {
+    settingsPubSub[0]({ ...defaultSettings });
   });
 
   it("renders textarea with placeholder when empty", async () => {
@@ -146,10 +162,6 @@ describe("SearchForm component", () => {
   });
 
   describe("Enter and Shift+Enter", () => {
-    afterEach(() => {
-      settingsPubSub[0]({ ...defaultSettings });
-    });
-
     it.each(ENTER_TO_SUBMIT_CASES)(
       "with enterToSubmit %s, pressing %s submits: %s",
       async (enterToSubmit, keys, submits) => {
@@ -178,11 +190,75 @@ describe("SearchForm component", () => {
 
     const textarea = await waitForPlaceholder();
     await user.type(textarea, "test query");
-    const button = screen.getByRole("button", { name: /search/i });
+    const button = screen.getByRole("button", { name: "Search" });
     await user.click(button);
 
     expect(mockUpdate).toHaveBeenCalledWith("test query");
   });
+
+  it.each([
+    { engine: "wasm", submitWith: "Search" },
+    { engine: "wasm", submitWith: "Enter" },
+    { engine: "web-speech", submitWith: "Search" },
+    { engine: "web-speech", submitWith: "Enter" },
+  ] as const)(
+    "cancels $engine dictation on $submitWith and allows a new session",
+    async ({ engine, submitWith }) => {
+      const preferLocalModel = engine === "wasm";
+      settingsPubSub[0]({
+        ...defaultSettings,
+        enableLocalDictationModel: preferLocalModel,
+      });
+      vi.mocked(getDictationEngine).mockReturnValue(engine);
+      const cancel = vi.fn();
+      const stop = vi.fn();
+      vi.mocked(startDictation)
+        .mockResolvedValueOnce({ cancel, stop })
+        .mockResolvedValueOnce({ cancel: vi.fn(), stop: vi.fn() });
+      const user = userEvent.setup();
+      const updateQuery = vi.fn();
+      renderSearchForm("existing query", updateQuery);
+      const textarea = screen.getByRole("textbox");
+
+      await user.click(
+        screen.getByRole("button", { name: "Dictate the search query" }),
+      );
+      await screen.findByRole("button", {
+        name: "Stop dictating the search query",
+      });
+      const [firstSession, firstPreference] =
+        vi.mocked(startDictation).mock.calls[0];
+      expect(firstPreference).toBe(preferLocalModel);
+
+      if (submitWith === "Enter") {
+        await user.type(textarea, "{Enter}");
+      } else {
+        await user.click(screen.getByRole("button", { name: "Search" }));
+      }
+
+      expect(updateQuery).toHaveBeenCalledWith("existing query");
+      act(() => {
+        if (cancel.mock.calls.length === 0) {
+          firstSession.onTranscript("late words");
+        }
+      });
+      expect(textarea).toHaveValue("existing query");
+      expect(cancel).toHaveBeenCalledTimes(1);
+      expect(stop).not.toHaveBeenCalled();
+      expect(screen.getByRole("textbox")).toBe(textarea);
+
+      await user.click(
+        screen.getByRole("button", { name: "Dictate the search query" }),
+      );
+      await screen.findByRole("button", {
+        name: "Stop dictating the search query",
+      });
+      expect(startDictation).toHaveBeenCalledTimes(2);
+      const [secondSession] = vi.mocked(startDictation).mock.calls[1];
+      act(() => secondSession.onTranscript("fresh words"));
+      expect(textarea).toHaveValue("existing query fresh words");
+    },
+  );
 
   it("does not re-trigger the search when the form remounts for the same query", async () => {
     window.history.replaceState({}, "", "/?q=remount-case");
@@ -209,18 +285,20 @@ describe("SearchForm component", () => {
   it("floats the dictation button inside the field, not in the button row", async () => {
     renderSearchForm("", vi.fn());
     const textarea = await waitForPlaceholder();
-    const probe = screen.getByTestId("dictation-probe");
+    const dictationButton = screen.getByRole("button", {
+      name: "Dictate the search query",
+    });
 
     // The button is anchored to the field, so it cannot drift when the row of
     // buttons below the field changes.
-    const fieldWrapper = probe.parentElement;
+    const fieldWrapper = dictationButton.parentElement;
     expect(fieldWrapper).toContainElement(textarea);
     expect(fieldWrapper).toHaveStyle({ position: "relative" });
 
     const buttonRow = screen
-      .getByRole("button", { name: /search/i })
+      .getByRole("button", { name: "Search" })
       .closest("div");
-    expect(buttonRow).not.toContainElement(probe);
+    expect(buttonRow).not.toContainElement(dictationButton);
   });
 
   it("names the search query in the dictation label", async () => {
