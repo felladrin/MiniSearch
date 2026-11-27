@@ -6,7 +6,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
-import { vi } from "vitest";
+import { expect, type Mock, vi } from "vitest";
 
 /** The middleware an endpoint hook mounted on `server.middlewares`. */
 export type HookHandler = (
@@ -104,4 +104,26 @@ export function postThroughSocket(
     );
     req.end(payload);
   });
+}
+
+/**
+ * Runs `handler` on a request whose `Host` header cannot be parsed, and checks
+ * it answered 400 without verifying a token or handing the request to Vite. A
+ * host that fails to parse must never reach the token check or the upstream.
+ */
+export async function expectBadHostRejected(
+  handler: HookHandler,
+  url: string,
+  handleTokenVerification: Mock,
+): Promise<void> {
+  const response = createResponse();
+  const next = vi.fn();
+
+  await expect(
+    handler(createRequestWithBadHost(url), response, next),
+  ).resolves.toBeUndefined();
+
+  expect(response.statusCode).toBe(400);
+  expect(handleTokenVerification).not.toHaveBeenCalled();
+  expect(next).not.toHaveBeenCalled();
 }

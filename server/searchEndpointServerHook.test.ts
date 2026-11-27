@@ -44,8 +44,10 @@ import {
   createRequest,
   createRequestWithBadHost,
   createResponse,
+  expectBadHostRejected,
   getRegisteredHookHandler,
 } from "./hookTestUtils";
+
 import { rankSearchResults } from "./rankSearchResults";
 import { getRerankerStatus } from "./rerankerService";
 import { searchEndpointServerHook } from "./searchEndpointServerHook";
@@ -928,19 +930,10 @@ describe("searchEndpointServerHook with a malformed Host header", () => {
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: true,
     });
-    const response = createResponse();
-    const next = vi.fn();
-
-    await expect(
-      getRegisteredHandler()(
-        createRequestWithBadHost("/search/text?q=cats&token=abc"),
-        response,
-        next,
-      ),
-    ).resolves.toBeUndefined();
-
-    expect(response.statusCode).toBe(400);
-    expect(handleTokenVerification).not.toHaveBeenCalled();
-    expect(next).not.toHaveBeenCalled();
+    await expectBadHostRejected(
+      getRegisteredHandler(),
+      "/search/text?q=cats&token=abc",
+      handleTokenVerification,
+    );
   });
 });

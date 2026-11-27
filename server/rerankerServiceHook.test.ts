@@ -25,9 +25,11 @@ function createServer(withHttpServer = true): ServerWithCloseHandler {
   return withHttpServer ? { httpServer: { on: vi.fn() } } : {};
 }
 
-/** Runs the hook with a reranker that fails, with the console noise silenced. */
-async function runHookWithFailedReranker(error: Error) {
-  vi.mocked(startRerankerService).mockRejectedValue(error);
+/**
+ * Runs the hook on a fresh server with the console noise silenced. The caller
+ * arranges the failure first.
+ */
+async function runHookOnFreshServer() {
   const consoleError = vi
     .spyOn(console, "error")
     .mockImplementation(() => undefined);
@@ -73,7 +75,8 @@ describe("rerankerServiceHook", () => {
 
   it("continues startup and logs when the reranker fails", async () => {
     const error = new Error("reranker unavailable");
-    const { consoleError } = await runHookWithFailedReranker(error);
+    vi.mocked(startRerankerService).mockRejectedValue(error);
+    const { consoleError, server } = await runHookOnFreshServer();
 
     expect(startWebSearchService).toHaveBeenCalledOnce();
     expect(consoleError).toHaveBeenCalledWith(
@@ -85,14 +88,7 @@ describe("rerankerServiceHook", () => {
   it("continues startup and logs when the web search service fails", async () => {
     const error = new Error("search service unavailable");
     vi.mocked(startWebSearchService).mockRejectedValue(error);
-    const consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
-    const server = createServer();
-
-    await rerankerServiceHook(
-      server as unknown as Parameters<typeof rerankerServiceHook>[0],
-    );
+    const { consoleError, server } = await runHookOnFreshServer();
 
     expect(startRerankerService).toHaveBeenCalledOnce();
     expect(consoleError).toHaveBeenCalledWith(
@@ -104,14 +100,7 @@ describe("rerankerServiceHook", () => {
   it("logs a shutdown failure without rejecting the close callback", async () => {
     const error = new Error("release failed");
     vi.mocked(stopRerankerService).mockRejectedValue(error);
-    const consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
-    const server = createServer();
-
-    await rerankerServiceHook(
-      server as unknown as Parameters<typeof rerankerServiceHook>[0],
-    );
+    const { consoleError, server } = await runHookOnFreshServer();
     const closeHandler = server.httpServer?.on.mock.calls[0][1] as () => void;
 
     expect(() => closeHandler()).not.toThrow();

@@ -39,8 +39,10 @@ import {
   createRequest,
   createRequestWithBadHost,
   createResponse,
+  expectBadHostRejected,
   getRegisteredHookHandler,
 } from "./hookTestUtils";
+
 import {
   recordThumbnailBlocked,
   recordThumbnailDropped,
@@ -545,21 +547,10 @@ describe("thumbnailEndpointServerHook", () => {
 describe("thumbnailEndpointServerHook with a malformed Host header", () => {
   it("answers 400 instead of 500", async () => {
     vi.mocked(handleTokenVerification).mockClear();
-    const response = createResponse();
-    const next = vi.fn();
-
-    await expect(
-      getRegisteredHandler()(
-        createRequestWithBadHost(
-          "/thumbnail?u=https%3A%2F%2Fexample.com%2Fa.png&token=abc",
-        ),
-        response,
-        next,
-      ),
-    ).resolves.toBeUndefined();
-
-    expect(response.statusCode).toBe(400);
-    expect(handleTokenVerification).not.toHaveBeenCalled();
-    expect(next).not.toHaveBeenCalled();
+    await expectBadHostRejected(
+      getRegisteredHandler(),
+      "/thumbnail?u=https%3A%2F%2Fexample.com%2Fa.png&token=abc",
+      handleTokenVerification,
+    );
   });
 });

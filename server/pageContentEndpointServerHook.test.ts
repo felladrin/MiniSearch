@@ -13,8 +13,10 @@ import {
   createRequest,
   createRequestWithBadHost,
   createResponse,
+  expectBadHostRejected,
   getRegisteredHookHandler,
 } from "./hookTestUtils";
+
 import { pageContentEndpointServerHook } from "./pageContentEndpointServerHook";
 import { fetchPageContents } from "./pageContentService";
 
@@ -224,21 +226,10 @@ describe("pageContentEndpointServerHook", () => {
 describe("pageContentEndpointServerHook with a malformed Host header", () => {
   it("answers 400 and keeps the handler promise from rejecting", async () => {
     vi.clearAllMocks();
-    const response = createResponse();
-    const next = vi.fn();
-
-    await expect(
-      getRegisteredHookHandler(pageContentEndpointServerHook)(
-        createRequestWithBadHost(
-          "/page-content?url=http://example.com&token=abc",
-        ),
-        response,
-        next,
-      ),
-    ).resolves.toBeUndefined();
-
-    expect(response.statusCode).toBe(400);
-    expect(handleTokenVerification).not.toHaveBeenCalled();
-    expect(next).not.toHaveBeenCalled();
+    await expectBadHostRejected(
+      getRegisteredHookHandler(pageContentEndpointServerHook),
+      "/page-content?url=http://example.com&token=abc",
+      handleTokenVerification,
+    );
   });
 });
