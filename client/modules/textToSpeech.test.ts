@@ -149,10 +149,7 @@ async function startLocalSpeech(text: string) {
 
 /** The local voice the engine asks for when reading `text`. */
 async function localVoiceFor(text: string): Promise<string> {
-  const worker = installFakeWorker();
-  void tts.speak(text);
-  await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-  return worker.sent[0].voiceId;
+  return (await startLocalSpeech(text)).worker.sent[0].voiceId;
 }
 
 /** Reads `text` locally; the worker sends one chunk, then fails. */
