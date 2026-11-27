@@ -616,50 +616,56 @@ describe("graceful degradation", () => {
     ]);
   });
 
-  it.each([5, 10])(
-    "fills a limit of %i with images that have a thumbnail, skipping those without",
-    async (limit) => {
-      const imagesWithoutThumbnail = Array.from({ length: 5 }, (_, index) => ({
-        title: `image ${index} without thumbnail`,
-        url: `https://example.com/picture-${index}`,
-        category: "images",
-        img_src: `https://example.com/picture-${index}.jpg`,
-        thumbnail_src: "",
-      }));
-      fetchMock.mockResolvedValue(
-        createMockResponse(
-          JSON.stringify({
-            results: [
-              ...imagesWithoutThumbnail,
-              {
-                title: "with thumbnail",
-                url: "https://example.com/picture",
-                category: "images",
-                img_src: "https://example.com/picture.jpg",
-                thumbnail_src: "https://example.com/thumbnail.jpg",
-              },
-            ],
-          }),
-        ),
-      );
+  it("fills the limit with images that have a thumbnail, skipping those without", async () => {
+    const withoutThumbnail = Array.from({ length: 5 }, (_, index) =>
+      index < 2
+        ? {
+            title: `video ${index} without thumbnail`,
+            url: `https://example.com/watch-${index}`,
+            category: "videos",
+            iframe_src: `https://example.com/embed-${index}`,
+          }
+        : {
+            title: `image ${index} without thumbnail`,
+            url: `https://example.com/blank-${index}`,
+            category: "images",
+            img_src: `https://example.com/blank-${index}.jpg`,
+            thumbnail_src: "",
+          },
+    );
+    const withThumbnail = Array.from({ length: 7 }, (_, index) => ({
+      title: `image ${index}`,
+      url: `https://example.com/picture-${index}`,
+      category: "images",
+      img_src: `https://example.com/picture-${index}.jpg`,
+      thumbnail_src: `https://example.com/thumbnail-${index}.jpg`,
+    }));
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({ results: [...withoutThumbnail, ...withThumbnail] }),
+      ),
+    );
 
-      const results = await fetchSearXNG(
-        "failure injection",
-        "images",
-        limit,
-        new CircuitBreaker(breakerOptions),
-      );
+    const results = await fetchSearXNG(
+      "failure injection",
+      "images",
+      5,
+      new CircuitBreaker(breakerOptions),
+    );
 
-      expect(results).toEqual([
-        [
-          "with thumbnail",
-          "https://example.com/picture",
-          "https://example.com/thumbnail.jpg",
-          "https://example.com/picture.jpg",
-        ],
-      ]);
-    },
-  );
+    // A limit applied before the filter would return nothing, and none at all
+    // would return all seven.
+    expect(results).toEqual(
+      withThumbnail
+        .slice(0, 5)
+        .map(({ title, url, thumbnail_src, img_src }) => [
+          title,
+          url,
+          thumbnail_src,
+          img_src,
+        ]),
+    );
+  });
 });
 
 describe("query privacy", () => {
