@@ -81,3 +81,32 @@ export function searchMock() {
     searchText: vi.fn(() => Promise.resolve([])),
   };
 }
+
+/**
+ * The pubsub surface `textGeneration` reads. `getSettings` is the one part
+ * tests rewrite per case, so it is passed in as a getter.
+ */
+export function pubSubMock(getSettings: () => unknown) {
+  return {
+    getConversationSummary: vi.fn(() => ({ conversationId: "", summary: "" })),
+    getQuery: vi.fn(() => ""),
+    getResponse: vi.fn(() => ""),
+    getSettings: vi.fn(getSettings),
+    getTextGenerationState: vi.fn(() => "idle"),
+    listenToSettingsChanges: vi.fn(() => vi.fn()),
+    updateChatMessages: vi.fn(),
+    updateConversationSummary: vi.fn(),
+    updateImageSearchResults: vi.fn(),
+    updateImageSearchState: vi.fn(),
+    updateLlmTextSearchResults: vi.fn(),
+    updatePageContents: vi.fn(),
+    updateResponse: vi.fn(),
+    updateResponseImmediately: vi.fn(),
+    updateSearchPromise: vi.fn(),
+    updateSuppressNextFollowUp: vi.fn(),
+    updateTextGenerationState: vi.fn(),
+    updateTextSearchResults: vi.fn(),
+    updateTextSearchStale: vi.fn(),
+    updateTextSearchState: vi.fn(),
+  };
+}

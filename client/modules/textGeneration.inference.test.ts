@@ -3,14 +3,12 @@ import {
   historyMock,
   logEntriesMock,
   notificationsMock,
+  pubSubMock,
   searchMock,
 } from "./textGenerationTestUtils";
 
-vi.mock("./pubSub", () => ({
-  getConversationSummary: vi.fn(() => ({ conversationId: "", summary: "" })),
-  getQuery: vi.fn(() => ""),
-  getResponse: vi.fn(() => ""),
-  getSettings: vi.fn(() => ({
+vi.mock("./pubSub", () =>
+  pubSubMock(() => ({
     inferenceType: "browser",
     enableAiResponse: true,
     enableTextSearch: true,
@@ -18,23 +16,7 @@ vi.mock("./pubSub", () => ({
     searchResultsLimit: 10,
     allowAiModelDownload: true,
   })),
-  getTextGenerationState: vi.fn(() => "idle"),
-  listenToSettingsChanges: vi.fn(() => vi.fn()),
-  updateChatMessages: vi.fn(),
-  updateConversationSummary: vi.fn(),
-  updateImageSearchResults: vi.fn(),
-  updateImageSearchState: vi.fn(),
-  updateLlmTextSearchResults: vi.fn(),
-  updateResponse: vi.fn(),
-  updateResponseImmediately: vi.fn(),
-  updateSearchPromise: vi.fn(),
-  updateTextGenerationState: vi.fn(),
-  updateTextSearchResults: vi.fn(),
-  updateTextSearchState: vi.fn(),
-  updateTextSearchStale: vi.fn(),
-  updateSuppressNextFollowUp: vi.fn(),
-  updatePageContents: vi.fn(),
-}));
+);
 vi.mock("./history", () => historyMock(() => "run-1"));
 vi.mock("./logEntries", () => logEntriesMock());
 vi.mock("./notifications", () => notificationsMock());

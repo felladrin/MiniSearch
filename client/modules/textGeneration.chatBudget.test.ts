@@ -3,6 +3,7 @@ import {
   historyMock,
   logEntriesMock,
   notificationsMock,
+  pubSubMock,
   searchMock,
 } from "./textGenerationTestUtils";
 
@@ -16,25 +17,7 @@ const state = vi.hoisted(() => ({
   systemPrompt: "",
 }));
 
-vi.mock("./pubSub", () => ({
-  getConversationSummary: vi.fn(() => ({ conversationId: "", summary: "" })),
-  getQuery: vi.fn(() => ""),
-  getResponse: vi.fn(() => ""),
-  getSettings: vi.fn(() => state.settings),
-  getTextGenerationState: vi.fn(() => "idle"),
-  listenToSettingsChanges: vi.fn(() => vi.fn()),
-  updateChatMessages: vi.fn(),
-  updateConversationSummary: vi.fn(),
-  updateImageSearchResults: vi.fn(),
-  updateImageSearchState: vi.fn(),
-  updateLlmTextSearchResults: vi.fn(),
-  updateResponse: vi.fn(),
-  updateResponseImmediately: vi.fn(),
-  updateSearchPromise: vi.fn(),
-  updateTextGenerationState: vi.fn(),
-  updateTextSearchResults: vi.fn(),
-  updateTextSearchState: vi.fn(),
-}));
+vi.mock("./pubSub", () => pubSubMock(() => state.settings));
 vi.mock("./history", () => historyMock(() => "run-1"));
 vi.mock("./logEntries", () => logEntriesMock());
 vi.mock("./notifications", () => notificationsMock());
@@ -85,6 +68,35 @@ function mockGenerateChat(generateChat: typeof generateChatWithWllama) {
       ? "folded summary"
       : "the answer",
   );
+}
+
+/** Answers the summarizer call with `summary`, every other call with the answer. */
+function mockSummarizerReturning(summary: string) {
+  vi.mocked(generateChatWithWllama).mockImplementation(async (messages) =>
+    messages[0].content.startsWith(summarizerInstruction)
+      ? summary
+      : "the answer",
+  );
+}
+
+/** Total characters in a chat, which is its token count under this tokenizer. */
+function contentLength(chat: ChatMessage[]) {
+  return chat.reduce((total, message) => total + message.content.length, 0);
+}
+
+/**
+ * A summary slot that survives between turns, as the pubsub store does. The
+ * mock reads and writes it, so a test can watch what the turns folded in.
+ */
+function stubPersistentSummarySlot() {
+  const slot: { current: ReturnType<typeof getConversationSummary> } = {
+    current: { conversationId: "", summary: "" },
+  };
+  vi.mocked(getConversationSummary).mockImplementation(() => slot.current);
+  vi.mocked(updateConversationSummary).mockImplementation((next) => {
+    slot.current = next;
+  });
+  return slot;
 }
 
 function callsTo(generateChat: typeof generateChatWithWllama) {
@@ -232,10 +244,7 @@ describe("generateChatResponse context budget", () => {
       await generateChatResponse(messages, () => {});
 
       const { answer, summarizer } = callsTo(generateChatWithWllama);
-      const sentTokens = answer[0].reduce(
-        (total, message) => total + message.content.length,
-        0,
-      );
+      const sentTokens = contentLength(answer[0]);
       expect(sentTokens).toBeLessThanOrEqual(3072);
       expect(answer[0].slice(2)).toEqual(messages.slice(4));
       for (const dropped of messages.slice(0, 4)) {
@@ -269,10 +278,7 @@ describe("generateChatResponse context budget", () => {
     await generateChatResponse(messages, () => {});
 
     const { answer } = callsTo(generateChatWithWllama);
-    const sentTokens = answer[0].reduce(
-      (total, message) => total + message.content.length,
-      0,
-    );
+    const sentTokens = contentLength(answer[0]);
     expect(sentTokens).toBeLessThanOrEqual(3072);
     expect(answer[0][0].content).toContain("z");
     expect(answer[0].slice(2)).toEqual(messages.slice(2));
@@ -286,14 +292,7 @@ describe("generateChatResponse context budget", () => {
 
   it("folds each dropped turn into the summary once across turns", async () => {
     // The summary slot persists between turns, as the pubsub store does.
-    let slot: ReturnType<typeof getConversationSummary> = {
-      conversationId: "",
-      summary: "",
-    };
-    vi.mocked(getConversationSummary).mockImplementation(() => slot);
-    vi.mocked(updateConversationSummary).mockImplementation((next) => {
-      slot = next;
-    });
+    const slot = stubPersistentSummarySlot();
     mockGenerateChat(generateChatWithWllama);
     state.systemPrompt = "s".repeat(2000);
     const firstExchange: ChatMessage[] = [
@@ -310,7 +309,7 @@ describe("generateChatResponse context budget", () => {
       [...firstExchange, { role: "user", content: "c".repeat(300) }],
       () => {},
     );
-    expect(slot.summarizedCount).toBe(2);
+    expect(slot.current.summarizedCount).toBe(2);
 
     const turnTwo = [...firstExchange, ...secondExchange, question];
     await generateChatResponse(turnTwo, () => {});
@@ -324,18 +323,11 @@ describe("generateChatResponse context budget", () => {
     expect(summarizer[1][0].content).toContain("d".repeat(300));
     expect(summarizer[1][0].content).not.toContain("a".repeat(500));
     expect(summarizer[1][0].content).not.toContain("b".repeat(500));
-    expect(slot.summarizedCount).toBe(4);
+    expect(slot.current.summarizedCount).toBe(4);
   });
 
   it("folds again from the start once an edit reaches into the summary", async () => {
-    let slot: ReturnType<typeof getConversationSummary> = {
-      conversationId: "",
-      summary: "",
-    };
-    vi.mocked(getConversationSummary).mockImplementation(() => slot);
-    vi.mocked(updateConversationSummary).mockImplementation((next) => {
-      slot = next;
-    });
+    const slot = stubPersistentSummarySlot();
     mockGenerateChat(generateChatWithWllama);
     state.systemPrompt = "s".repeat(2000);
     const question: ChatMessage = { role: "user", content: "c".repeat(300) };
@@ -362,69 +354,50 @@ describe("generateChatResponse context budget", () => {
     expect(summarizer[1][0].content).toContain("a".repeat(500));
     expect(summarizer[1][0].content).toContain("x".repeat(500));
     expect(summarizer[1][0].content).toContain("Previous summary:\n(none)");
-    expect(slot.summarizedCount).toBe(2);
+    expect(slot.current.summarizedCount).toBe(2);
   });
 
-  it("keeps the stored summary when the summarizer rejects and the fallback returns empty", async () => {
-    state.systemPrompt = "s".repeat(2000);
-    const messages: ChatMessage[] = [
-      { role: "user", content: "first question" },
-      { role: "assistant", content: "x".repeat(1500) },
-      { role: "user", content: "follow-up question" },
-    ];
-    vi.mocked(getConversationSummary).mockReturnValue({
-      conversationId: "first question",
-      summary: "S1",
-    });
-    vi.mocked(generateChatWithWllama).mockImplementation(async (chat) => {
-      if (chat[0].content.startsWith(summarizerInstruction)) {
+  it.each([
+    {
+      title: "rejects",
+      summarize: () => {
         throw new Error("summarizer unavailable");
-      }
-      return "the answer";
-    });
-
-    await generateChatResponse(messages, () => {});
-
-    expect(updateConversationSummary).toHaveBeenCalledWith(
-      expect.objectContaining({
+      },
+    },
+    { title: "resolves to an empty string", summarize: () => "" },
+  ])(
+    "keeps the stored summary when the summarizer $title",
+    async ({ summarize }) => {
+      state.systemPrompt = "s".repeat(2000);
+      const messages: ChatMessage[] = [
+        { role: "user", content: "first question" },
+        { role: "assistant", content: "x".repeat(1500) },
+        { role: "user", content: "follow-up question" },
+      ];
+      vi.mocked(getConversationSummary).mockReturnValue({
         conversationId: "first question",
         summary: "S1",
-        summarizedCount: 0,
-      }),
-    );
-    const { answer } = callsTo(generateChatWithWllama);
-    expect(answer).toHaveLength(1);
-    expect(answer[0][0].content).toContain("S1");
-  });
+      });
+      vi.mocked(generateChatWithWllama).mockImplementation(async (chat) =>
+        chat[0].content.startsWith(summarizerInstruction)
+          ? summarize()
+          : "the answer",
+      );
 
-  it("keeps the stored summary when the summarizer resolves to an empty string", async () => {
-    state.systemPrompt = "s".repeat(2000);
-    const messages: ChatMessage[] = [
-      { role: "user", content: "first question" },
-      { role: "assistant", content: "x".repeat(1500) },
-      { role: "user", content: "follow-up question" },
-    ];
-    vi.mocked(getConversationSummary).mockReturnValue({
-      conversationId: "first question",
-      summary: "S1",
-    });
-    vi.mocked(generateChatWithWllama).mockImplementation(async (chat) =>
-      chat[0].content.startsWith(summarizerInstruction) ? "" : "the answer",
-    );
+      await generateChatResponse(messages, () => {});
 
-    await generateChatResponse(messages, () => {});
-
-    expect(updateConversationSummary).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversationId: "first question",
-        summary: "S1",
-        summarizedCount: 0,
-      }),
-    );
-    const { answer } = callsTo(generateChatWithWllama);
-    expect(answer).toHaveLength(1);
-    expect(answer[0][0].content).toContain("S1");
-  });
+      expect(updateConversationSummary).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: "first question",
+          summary: "S1",
+          summarizedCount: 0,
+        }),
+      );
+      const { answer } = callsTo(generateChatWithWllama);
+      expect(answer).toHaveLength(1);
+      expect(answer[0][0].content).toContain("S1");
+    },
+  );
 });
 
 describe("reasoning in earlier assistant turns", () => {
