@@ -5,8 +5,8 @@
  * broken, and how the shared request budget is spent across the endpoints that
  * share it, none of which needs to know who asked.
  *
- * A rejected request does carry one thing worth publishing, its `User-Agent`,
- * and it goes out the same way an engine's free-form failure goes out as
+ * A rejected request does carry two things worth publishing, its `User-Agent`
+ * and its `Sec-Fetch-Site` header, and they go out the same way an engine's free-form failure goes out as
  * `blocked`, `timeout` or `other`: sorted into a fixed vocabulary first, so the
  * answer to "does this look like a stale browser tab or a script" is public and
  * the client's own string is not. What a client claims to be is all the label
@@ -58,6 +58,20 @@ export type RejectedClientKind =
   | "other";
 
 /**
+ * What `Sec-Fetch-Site` a rejected request carried. `missing` is an absent or
+ * empty header (what curl, python, node, and Safari below 16.4 send), and
+ * `other` keeps the counts closed when a caller sends something outside the
+ * Fetch Metadata vocabulary.
+ */
+export type RejectedFetchSite =
+  | "sameOrigin"
+  | "sameSite"
+  | "crossSite"
+  | "none"
+  | "missing"
+  | "other";
+
+/**
  * Checked in order, first match wins. A bot comes first because a crawler is
  * free to present a browser string, and catching the ones that announce
  * themselves is the useful half. `browser` is a loose fit on purpose: it says a
@@ -97,6 +111,15 @@ const rejectedByClient: Record<RejectedClientKind, number> = {
   other: 0,
 };
 
+const rejectedByFetchSite: Record<RejectedFetchSite, number> = {
+  sameOrigin: 0,
+  sameSite: 0,
+  crossSite: 0,
+  none: 0,
+  missing: 0,
+  other: 0,
+};
+
 const bySurface: Record<AuthorizationSurface, SurfaceCounts> = {
   search: { authorized: 0, rejected: 0 },
   pageContent: { authorized: 0, rejected: 0 },
@@ -122,10 +145,35 @@ export function classifyRejectedClient(
   return "other";
 }
 
+/** Sorts a request's `Sec-Fetch-Site` header into the published vocabulary. */
+export function classifyRejectedFetchSite(
+  secFetchSite: string | undefined,
+): RejectedFetchSite {
+  // No trimming or case folding: Node already strips the surrounding
+  // whitespace, and browsers send the lowercase token, so a variant only comes
+  // from a hand-written header and belongs in `other`.
+  switch (secFetchSite) {
+    case undefined:
+    case "":
+      return "missing";
+    case "same-origin":
+      return "sameOrigin";
+    case "same-site":
+      return "sameSite";
+    case "cross-site":
+      return "crossSite";
+    case "none":
+      return "none";
+    default:
+      return "other";
+  }
+}
+
 export function recordRejectedRequest(
   surface: AuthorizationSurface,
   reason: RejectionReason,
   userAgent?: string,
+  secFetchSite?: string,
 ): void {
   reasons[reason]++;
   bySurface[surface].rejected++;
@@ -136,6 +184,7 @@ export function recordRejectedRequest(
   // on a public page.
   if (reason !== "rateLimited") {
     rejectedByClient[classifyRejectedClient(userAgent)]++;
+    rejectedByFetchSite[classifyRejectedFetchSite(secFetchSite)]++;
   }
 }
 
@@ -165,6 +214,7 @@ export function getAuthorizationStats() {
     // Copy, for the same reason as `reasons`: a snapshot must not move later.
     // Sums to `missingToken` plus `invalidToken`, not to every rejection.
     rejectedByClient: { ...rejectedByClient },
+    rejectedByFetchSite: { ...rejectedByFetchSite },
     // Deep copy, so a caller holding a snapshot for comparison does not watch
     // it change under them as later requests arrive.
     bySurface: Object.fromEntries(

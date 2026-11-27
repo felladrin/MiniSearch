@@ -341,8 +341,8 @@ and the search returned results, and AI responses are off by default, so
 nobody asked for an answer, not that nothing could be read.
 
 `authorization` reports what happened to the requests that reached token
-verification, the funnel `/search/text`, `/search/images`, `/page-content` and
-`/inference` all pass through:
+verification, the funnel `/search/text`, `/search/images`, `/page-content`,
+`/thumbnail` and `/inference` all pass through:
 
 | Field                    | Type   | Says                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -356,23 +356,27 @@ verification, the funnel `/search/text`, `/search/images`, `/page-content` and
 | `rejectedTokenCacheHits` | number | Rejections served from the rejected-token cache without a second argon2 verification                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `distinctRejectedTokens` | number | Distinct tokens the rejected-token cache holds, at most 1024. Only well-formed tokens that failed argon2 verification enter it; a token without the expected hash prefix is refused before that and never counted. A high `reasons.invalidToken` with a value of 1 here is one client replaying one dead token. A value that keeps growing is either many stale links or one caller sending fresh junk hashes, which the limiter caps per IP. The set only empties on a restart and evicts its oldest entry when full, so a value of 1024 means 1024 or more                                                                                                                                                                                |
 | `rejectedByClient`       | object | Token rejections counted per client kind: `bot`, `curl`, `wget`, `python`, `node`, `java`, `go`, `browser`, `other`. The client's own `User-Agent` is matched against a fixed list and then dropped, so a flood of scripts shows up as `curl` or `python` and something that looks like a stale browser tab as `browser`, without the endpoint publishing what any visitor sends. A client is free to claim anything, so `browser` means a browser-shaped string, not a proven browser. The counts cover only what got past the limiter, because a request the limiter stopped may hold a valid token: a script that floods is counted at the rate the budget allows, not at the rate it sends. An absent or unrecognised string is `other` |
+| `rejectedByFetchSite`    | object | Token rejections counted per `Sec-Fetch-Site` value: `sameOrigin` (`same-origin`), `sameSite` (`same-site`), `crossSite` (`cross-site`), `none`, `missing` (absent or empty), `other`. Browsers attach `Sec-Fetch-Site` on their own and page scripts cannot set or strip it; `curl`, Python and Node omit it unless added by hand, and Safari below 16.4 sends no `Sec-Fetch-*` header at all. Like `rejectedByClient`, the raw header value is dropped after sorting, and only requests that got past the rate limiter are counted                                                                                                                                                                                                        |
 | `limiter`                | object | The shared limiter's `points` and `durationSeconds`, plus the separate `thumbnail` budget behind `/thumbnail`, without which a rejection count says nothing                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 `authorized` plus every entry of `reasons` sums to `requests`, and each half of
 `bySurface` sums to its side of that, on the same principle as `pageReads`.
 `rejectedTokenCacheHits` counts a subset of `reasons.invalidToken` rather
-than adding to that sum, and the entries of `rejectedByClient` sum to
-`reasons.missingToken` plus `reasons.invalidToken`.
+than adding to that sum, and the entries of `rejectedByClient` and
+`rejectedByFetchSite` each sum to `reasons.missingToken` plus
+`reasons.invalidToken`.
 
 The limiter keys on the client IP and none of that reaches these counters: no
 address, no token, no query, no per-request timestamp. The cut is by reason, by
-surface, and by what kind of software sent the request, and each of those is one
-fixed vocabulary rather than free text from the request. The client kind is the
-one of the three that says anything about who sent it, and it says only that
-much: the `User-Agent` is matched against the list in
-`server/authorizationSinceLastRestart.ts`, counted under the label it hits, and
-never stored or published as the client wrote it. What a client claims is not
-what it is, so `browser` covers anything that sends a browser-shaped string.
+surface, by what kind of software sent the request, and by its `Sec-Fetch-Site`
+header, and each of those is one fixed vocabulary rather than free text from the
+request. The client kind and fetch site are the ones that say anything about who
+sent it, and they say only that much: `User-Agent` and `Sec-Fetch-Site` are
+sorted against fixed vocabularies in `server/authorizationSinceLastRestart.ts`,
+counted under the label they hit, and never stored or published as the client
+wrote them. What a client claims is not what it is, so `browser` covers
+anything that sends a browser-shaped string and a script can forge
+`Sec-Fetch-Site` by hand.
 `bySurface` is the one worth watching: all five endpoints share one budget and
 a single user action fans out into a text search, an image search, the
 thumbnail loads behind the image grid and a page-content read, so its

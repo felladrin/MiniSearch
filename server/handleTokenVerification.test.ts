@@ -110,15 +110,21 @@ describe("handleTokenVerification", () => {
     );
   });
 
-  it("sorts a refused request's client into the published vocabulary", async () => {
-    const before = getAuthorizationStats().rejectedByClient;
+  it("sorts a refused request's client and fetch site into the published vocabularies", async () => {
+    const before = getAuthorizationStats();
 
     await verify("/search/text", REJECTIONS.invalidToken, {
-      headers: { "user-agent": "curl/8.5.0" },
+      headers: {
+        "user-agent": "curl/8.5.0",
+        "sec-fetch-site": "same-origin",
+      },
     });
 
-    const after = getAuthorizationStats().rejectedByClient;
-    expect(after.curl).toBe(before.curl + 1);
+    const after = getAuthorizationStats();
+    expect(after.rejectedByClient.curl).toBe(before.rejectedByClient.curl + 1);
+    expect(after.rejectedByFetchSite.sameOrigin).toBe(
+      before.rejectedByFetchSite.sameOrigin + 1,
+    );
   });
 
   it.each([
@@ -203,7 +209,9 @@ describe("handleTokenVerification", () => {
   });
 
   it("exposes nothing that could identify a client", async () => {
-    await verify("/search/text?q=borogoves+outgrabe", REJECTIONS.invalidToken);
+    await verify("/search/text?q=borogoves+outgrabe", REJECTIONS.invalidToken, {
+      headers: { "sec-fetch-site": "borogoves-fetch-site" },
+    });
 
     const stats = getAuthorizationStats();
 
@@ -214,6 +222,7 @@ describe("handleTokenVerification", () => {
       "limiter",
       "reasons",
       "rejectedByClient",
+      "rejectedByFetchSite",
       "rejectedRate",
       "rejectedTokenCacheHits",
       "requests",
@@ -230,6 +239,14 @@ describe("handleTokenVerification", () => {
       "other",
       "python",
       "wget",
+    ]);
+    expect(Object.keys(stats.rejectedByFetchSite).sort()).toEqual([
+      "crossSite",
+      "missing",
+      "none",
+      "other",
+      "sameOrigin",
+      "sameSite",
     ]);
     expect(Object.keys(stats.reasons).sort()).toEqual([
       "invalidToken",
