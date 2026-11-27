@@ -1,6 +1,6 @@
 import { type ComboboxItem, Select } from "@mantine/core";
-import { useEffect, useState } from "react";
-import { wllamaModels } from "@/modules/wllama";
+import { useCallback, useEffect, useState } from "react";
+import { getDownloadedWllamaModelIds, wllamaModels } from "@/modules/wllama";
 
 export default function WllamaModelSelect({
   value,
@@ -17,6 +17,17 @@ export default function WllamaModelSelect({
         value,
       })),
   );
+  const [downloadedModelIds, setDownloadedModelIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const refreshDownloadedModelIds = useCallback(() => {
+    getDownloadedWllamaModelIds().then(setDownloadedModelIds);
+  }, []);
+
+  useEffect(() => {
+    refreshDownloadedModelIds();
+  }, [refreshDownloadedModelIds]);
 
   useEffect(() => {
     const isCurrentModelValid = wllamaModelOptions.some(
@@ -28,15 +39,22 @@ export default function WllamaModelSelect({
     }
   }, [onChange, wllamaModelOptions, value]);
 
+  const modelOptions = wllamaModelOptions.map((option) =>
+    downloadedModelIds.has(option.value)
+      ? { ...option, label: `${option.label} • Downloaded` }
+      : option,
+  );
+
   return (
     <Select
       value={value}
       onChange={(value) => value && onChange(value)}
       label="AI Model"
       description="Select the model to use for AI responses."
-      data={wllamaModelOptions}
+      data={modelOptions}
       allowDeselect={false}
       searchable
+      onDropdownOpen={refreshDownloadedModelIds}
     />
   );
 }
