@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { addLogEntry } from "./logEntries";
 import { getQuery, updateResponse, updateTextGenerationState } from "./pubSub";
+import { textGenerationUtilitiesMock } from "./textGenerationTestUtils";
 import {
   ChatGenerationError,
   canStartResponding,
@@ -23,22 +24,14 @@ vi.mock("./systemPrompt", () => ({
   getSystemPrompt: vi.fn().mockReturnValue("system prompt"),
 }));
 
-// canStartResponding/getFormattedSearchResults depend on pubSub state we
-// don't want to drive here; ChatGenerationError has no such dependency, so
-// keep it real so `instanceof` checks against it still work.
-vi.mock("./textGenerationUtilities", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("./textGenerationUtilities")>();
-  return {
-    ...actual,
-    canStartResponding: vi.fn().mockResolvedValue(undefined),
-    getFormattedSearchResults: vi.fn().mockReturnValue("None."),
+vi.mock("./textGenerationUtilities", (importOriginal) =>
+  textGenerationUtilitiesMock({
     getDefaultChatCompletionCreateParamsStreaming: vi.fn().mockReturnValue({
       max_tokens: 1000,
       temperature: 0.35,
     }),
-  };
-});
+  })(importOriginal),
+);
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
