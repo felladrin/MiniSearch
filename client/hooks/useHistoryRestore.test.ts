@@ -9,6 +9,7 @@ import {
 import {
   chatGenerationStatePubSub,
   chatMessagesPubSub,
+  getChatSession,
   getLlmTextSearchResults,
   getPageContents,
   getSuppressNextFollowUp,
@@ -356,4 +357,25 @@ describe("useHistoryRestore", () => {
       expect(getChatMessages()).toEqual(savedTurns);
     });
   });
+
+  it.each([
+    { searchRunId: "run-2", startsNewChat: true },
+    { searchRunId: "run-1", startsNewChat: false },
+  ])(
+    "starts a new chat session only when another search is restored ($searchRunId)",
+    async ({ searchRunId, startsNewChat }) => {
+      setCurrentSearchRunId("run-1");
+      updateChatGenerationState({
+        isGeneratingResponse: true,
+        isGeneratingFollowUpQuestion: false,
+      });
+      const sessionBefore = getChatSession();
+
+      await restoreEntry({ searchRunId });
+
+      expect(getChatSession()).toBe(
+        startsNewChat ? sessionBefore + 1 : sessionBefore,
+      );
+    },
+  );
 });
