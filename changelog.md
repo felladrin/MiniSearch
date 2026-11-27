@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-27
+
+- Images found by a follow-up question are no longer lost when a second follow-up is sent before they arrive. The second follow-up's image search took over, so when the first one's images landed they were dropped, on screen and in history. They are now added to the list either way.
+
 ## 2026-11-26
 
 - Restoring the search already on screen while a follow-up is being answered keeps the live text results and page excerpts used by that answer.

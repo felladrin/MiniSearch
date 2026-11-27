@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -498,7 +498,17 @@ describe("follow-up supersession ownership", () => {
     mockGetCurrentSearchRunId.mockReturnValue("run-1");
   });
 
-  it("drops a stale image refresh that resolves after a newer image refresh on the same run", async () => {
+  it("keeps both follow-ups' images when their refreshes land in reverse order", async () => {
+    let shown: ImageSearchResults = [];
+    vi.mocked(getImageSearchResults).mockImplementation(() => shown);
+    mockUpdateImage.mockImplementation((results) => {
+      shown = results;
+    });
+    onTestFinished(() => {
+      vi.mocked(getImageSearchResults).mockImplementation(() => []);
+      mockUpdateImage.mockImplementation(() => {});
+    });
+
     let releaseFirst: (value: {
       results: ImageSearchResults;
       stale: boolean;
@@ -512,18 +522,17 @@ describe("follow-up supersession ownership", () => {
     const existingA: ImageSearchResults = [
       ["Initial", "https://initial.com", "thumb-0", "src-0"],
     ];
+    shown = existingA;
     const first = refreshImageSearchResults("first", 10, existingA);
     await vi.waitFor(() => expect(mockSearchImages).toHaveBeenCalledTimes(1));
 
-    const existingB: ImageSearchResults = [
-      ["B0", "https://b0.com", "thumb-b0", "src-b0"],
-      ...existingA,
-    ];
+    // The second follow-up is sent before the first one's images land, so
+    // the list it is handed does not have them.
     mockSearchImages.mockResolvedValueOnce({
       results: [["B1", "https://b1.com", "thumb-b1", "src-b1"]],
       stale: false,
     });
-    await refreshImageSearchResults("second", 10, existingB);
+    await refreshImageSearchResults("second", 10, existingA);
 
     releaseFirst({
       results: [["Late A", "https://a.com", "thumb-a", "src-a"]],
@@ -531,12 +540,46 @@ describe("follow-up supersession ownership", () => {
     });
     await first;
 
-    expect(mockUpdateImage).toHaveBeenCalledTimes(1);
-    expect(mockUpdateImage).toHaveBeenCalledWith([
+    const both: ImageSearchResults = [
+      ["Late A", "https://a.com", "thumb-a", "src-a"],
       ["B1", "https://b1.com", "thumb-b1", "src-b1"],
-      ...existingB,
-    ]);
-    expect(mergeSearchImageResults).toHaveBeenCalledTimes(1);
+      ...existingA,
+    ];
+    expect(mockUpdateImage).toHaveBeenLastCalledWith(both);
+    expect(mergeSearchImageResults).toHaveBeenCalledTimes(2);
+    expect(mergeSearchImageResults).toHaveBeenLastCalledWith("run-1", {
+      type: "image",
+      items: both.map(([title, url, thumbnail, sourceUrl]) => ({
+        title,
+        url,
+        thumbnail,
+        sourceUrl,
+      })),
+    });
+  });
+
+  it("drops an image refresh that lands after a retry on the same run", async () => {
+    let releaseImages: (value: {
+      results: ImageSearchResults;
+      stale: boolean;
+    }) => void = () => {};
+    mockSearchImages.mockReturnValueOnce(
+      new Promise((resolve) => {
+        releaseImages = resolve;
+      }),
+    );
+    const refresh = refreshImageSearchResults("query", 10, [], "run-1");
+    await vi.waitFor(() => expect(mockSearchImages).toHaveBeenCalledTimes(1));
+
+    recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
+    releaseImages({
+      results: [["Old", "https://old.com", "thumb-o", "src-o"]],
+      stale: false,
+    });
+    await refresh;
+
+    expect(mockUpdateImage).not.toHaveBeenCalled();
+    expect(mergeSearchImageResults).not.toHaveBeenCalled();
   });
 
   it("drops a stale text refresh that resolves after a newer text refresh on the same run", async () => {

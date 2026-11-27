@@ -43,10 +43,8 @@ function sameSearchAttempt(searchRunId: string): () => boolean {
   return () => getLatestSearchAttempt(searchRunId) === attempt;
 }
 let textRefreshInvocation = 0;
-let imageRefreshInvocation = 0;
 let pageContentsReadInvocation = 0;
 const latestTextRefreshByRunId = new Map<string, number>();
-const latestImageRefreshByRunId = new Map<string, number>();
 
 /**
  * Returns the fresh results the answer is grounded on (empty when nothing came
@@ -121,16 +119,12 @@ export async function refreshImageSearchResults(
   existingResults: ImageSearchResults,
   searchRunId = getCurrentSearchRunId(),
 ): Promise<void> {
-  const invocation = ++imageRefreshInvocation;
-  latestImageRefreshByRunId.set(searchRunId, invocation);
+  // No newest-refresh check, unlike text: image refreshes merge into the list
+  // on screen and into history, so an older one landing after a newer one
+  // adds its images instead of overwriting the newer ones.
   const isSameAttempt = sameSearchAttempt(searchRunId);
   const isCurrent = () =>
-    invocation === imageRefreshInvocation &&
-    searchRunId === getCurrentSearchRunId() &&
-    isSameAttempt();
-  const isRunCurrent = () =>
-    latestImageRefreshByRunId.get(searchRunId) === invocation &&
-    isSameAttempt();
+    searchRunId === getCurrentSearchRunId() && isSameAttempt();
 
   const { results: imageResults } = await searchImages(
     searchQuery,
@@ -162,7 +156,7 @@ export async function refreshImageSearchResults(
       updateImageSearchResults(updatedImageResults);
     }
 
-    if (isRunCurrent()) {
+    if (isSameAttempt()) {
       mergeSearchImageResults(searchRunId, {
         type: "image",
         items: updatedImageResults.map(
