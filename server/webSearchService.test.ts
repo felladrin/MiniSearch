@@ -899,10 +899,16 @@ describe("per-search-type circuits", () => {
     expect(breaker.getState("searxng:images")).toBe("CLOSED");
   });
 
-  it("reports each search type's circuit separately", () => {
-    expect(getSearchCircuitStats()).toEqual({
-      circuitState: { text: expect.any(String), images: expect.any(String) },
-      circuitOpens: { text: expect.any(Number), images: expect.any(Number) },
+  it("reports each search type's circuit, and the worse of the two overall", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 1 });
+    fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+    await expect(fetchSearXNG("test", "images", 30, breaker)).rejects.toThrow();
+
+    expect(getSearchCircuitStats(breaker)).toEqual({
+      circuitState: "OPEN",
+      circuitOpens: 1,
+      circuitStateByType: { text: "CLOSED", images: "OPEN" },
+      circuitOpensByType: { text: 0, images: 1 },
     });
   });
 });
@@ -1009,6 +1015,30 @@ describe("getWebSearchServiceStatus", () => {
       // A 503 is not an engine failure, so nothing flagged a search type here:
       // the verdict has to come from the circuit alone.
       expect(await getWebSearchServiceStatus(breaker)).toBe("degraded");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports degraded while only the image circuit is half-open", async () => {
+    vi.useFakeTimers();
+    try {
+      const breaker = new CircuitBreaker({
+        failureThreshold: 1,
+        resetTimeout: 1000,
+      });
+      await clearDegradation(breaker);
+
+      fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+      await expect(
+        fetchSearXNG("test", "images", 30, breaker),
+      ).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(breaker.getState("searxng:images")).toBe("HALF_OPEN");
+
+      healthzOk();
+      expect(await getWebSearchServiceStatus(breaker)).toBe("degraded");
+      expect(getSearchCircuitStats(breaker).circuitState).toBe("HALF_OPEN");
     } finally {
       vi.useRealTimers();
     }

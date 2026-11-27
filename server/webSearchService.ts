@@ -94,20 +94,29 @@ function circuitKey(searchType: SearchType) {
  * failure without calling SearXNG at all, which no other counter distinguishes
  * from SearXNG being down.
  */
-export function getSearchCircuitStats() {
-  const circuitState = (searchType: SearchType) =>
-    searxngCircuitBreaker.getState(circuitKey(searchType));
-  const circuitOpens = (searchType: SearchType) =>
-    searxngCircuitBreaker.getOpens(circuitKey(searchType));
+export function getSearchCircuitStats(
+  breaker: CircuitBreaker = searxngCircuitBreaker,
+) {
+  const circuitStateByType = {
+    text: breaker.getState(circuitKey("text")),
+    images: breaker.getState(circuitKey("images")),
+  };
+  const circuitOpensByType = {
+    text: breaker.getOpens(circuitKey("text")),
+    images: breaker.getOpens(circuitKey("images")),
+  };
+  const states = Object.values(circuitStateByType);
   return {
-    circuitState: {
-      text: circuitState("text"),
-      images: circuitState("images"),
-    },
-    circuitOpens: {
-      text: circuitOpens("text"),
-      images: circuitOpens("images"),
-    },
+    // The worse state and the sum, so a monitor written when both types shared
+    // one circuit still reads these two fields the way it did then.
+    circuitState: states.includes("OPEN")
+      ? "OPEN"
+      : states.includes("HALF_OPEN")
+        ? "HALF_OPEN"
+        : "CLOSED",
+    circuitOpens: circuitOpensByType.text + circuitOpensByType.images,
+    circuitStateByType,
+    circuitOpensByType,
   };
 }
 
