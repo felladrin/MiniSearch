@@ -479,6 +479,36 @@ describe("History Module - Dexie CRUD", () => {
       ]);
     });
 
+    it("keeps different images from the same page", async () => {
+      const {
+        addSearchToHistory,
+        mergeSearchImageResults,
+        getRecentSearches,
+        getCurrentSearchRunId,
+      } = await import("./history");
+      const galleryImage = (name: string) => ({
+        title: name,
+        url: "https://example.com/gallery",
+        thumbnail: `https://example.com/${name}-thumb.gif`,
+        sourceUrl: `https://example.com/${name}.gif`,
+      });
+      await addSearchToHistory("gallery", {
+        type: "image",
+        items: [galleryImage("first")],
+      });
+
+      await mergeSearchImageResults(getCurrentSearchRunId(), {
+        type: "image",
+        items: [galleryImage("second")],
+      });
+
+      const [entry] = await getRecentSearches();
+      expect(entry.imageResults?.items).toEqual([
+        galleryImage("second"),
+        galleryImage("first"),
+      ]);
+    });
+
     it("writes nothing when no search has the run id", async () => {
       const { mergeSearchImageResults, getRecentSearches } = await import(
         "./history"

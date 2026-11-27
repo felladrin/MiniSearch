@@ -376,7 +376,10 @@ async function processSearchResults(
   const results = await breaker.execute(circuitKey(searchType), () =>
     performSearch(query, searchType, signal),
   );
-  const openableResults = openableUniqueResults(results);
+  const openableResults = openableUniqueResults(
+    results,
+    searchType === "text" ? (result) => result.url : graphicalResultKey,
+  );
 
   if (searchType === "text") {
     const consideredResults = openableResults.slice(0, limit);
@@ -478,7 +481,9 @@ export async function fetchSupplementarySearXNG(
   const data = (await response.json()) as SearxngSearchResponse;
   const results = Array.isArray(data.results) ? data.results : [];
   const textualResults = await Promise.all(
-    openableUniqueResults(results).slice(0, limit).map(processTextualResult),
+    openableUniqueResults(results, (result) => result.url)
+      .slice(0, limit)
+      .map(processTextualResult),
   );
   return filterNullResults(textualResults);
 }
@@ -546,18 +551,32 @@ async function processTextualResult(result: SearxngSearchResult) {
 
 // Runs before the limit is applied, so a dropped link does not take the slot
 // of a result that would have made the cut.
+/**
+ * What makes an image or video result distinct: the full-size source, then the
+ * thumbnail. A gallery page returns many different images under one page URL,
+ * so keying on the page would keep only the first of them.
+ */
+function graphicalResultKey(result: SearxngSearchResult): string {
+  if (result.category === "videos") {
+    return result.iframe_src || result.url;
+  }
+  return result.img_src || result.thumbnail_src || result.url;
+}
+
 function openableUniqueResults(
   results: SearxngSearchResult[],
+  keyOf: (result: SearxngSearchResult) => string,
 ): SearxngSearchResult[] {
-  const urls = new Set<string>();
+  const keys = new Set<string>();
   const unopenableEngines: string[] = [];
   const kept = results.filter((result) => {
     if (!isOpenableUrl(result.url)) {
       unopenableEngines.push(result.engine ?? "unknown");
       return false;
     }
-    if (urls.has(result.url)) return false;
-    urls.add(result.url);
+    const key = keyOf(result);
+    if (keys.has(key)) return false;
+    keys.add(key);
     return true;
   });
   // Engine names only: the url is downstream of the query, which never reaches
