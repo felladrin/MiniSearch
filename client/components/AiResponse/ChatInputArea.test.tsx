@@ -1,7 +1,6 @@
 import { MantineProvider } from "@mantine/core";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useSyncExternalStore } from "react";
 import ChatInputArea from "@/components/AiResponse/ChatInputArea";
 import {
   chatGenerationStatePubSub,
@@ -12,33 +11,15 @@ import {
 import { defaultSettings } from "@/modules/settings";
 import { getDictationEngine, startDictation } from "@/modules/speechToText";
 
-vi.mock("@/modules/speechToText", async () => {
-  const { DictationError: RealDictationError } = await import(
-    "@/modules/speechToText"
-  );
-  return {
-    DictationError: RealDictationError,
-    getDictationEngine: vi.fn(() => "wasm" as const),
-    startDictation: vi.fn(),
-  };
-});
-
-vi.mock("@mantine/notifications", () => ({
-  notifications: { show: vi.fn() },
-}));
-
-/** Subscribes for real, so a channel written mid-test re-renders the area. */
-vi.mock("create-pubsub/react", () => ({
-  usePubSub: (pubSub: [unknown, unknown, unknown]) => {
-    const [publish, subscribe, get] = pubSub as [
-      unknown,
-      (listener: () => void) => () => void,
-      () => unknown,
-    ];
-    const value = useSyncExternalStore(subscribe, get, get);
-    return [value, publish];
-  },
-}));
+vi.mock("@/modules/speechToText", async () =>
+  (await import("@/testMocks")).speechToTextMock(),
+);
+vi.mock("@mantine/notifications", async () =>
+  (await import("@/testMocks")).notificationsStub(),
+);
+vi.mock("create-pubsub/react", async () =>
+  (await import("@/testMocks")).pubSubReactMock(),
+);
 
 const stopFn = vi.fn();
 const cancelFn = vi.fn();

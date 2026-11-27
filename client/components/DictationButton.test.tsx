@@ -2,7 +2,6 @@ import { MantineProvider } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useSyncExternalStore } from "react";
 import DictationButton from "@/components/DictationButton";
 import {
   DictationError,
@@ -10,36 +9,15 @@ import {
   startDictation,
 } from "@/modules/speechToText";
 
-vi.mock("@/modules/speechToText", async () => {
-  const { DictationError: RealDictationError } = await import(
-    "@/modules/speechToText"
-  );
-  return {
-    DictationError: RealDictationError,
-    getDictationEngine: vi.fn(() => "wasm" as const),
-    startDictation: vi.fn(),
-  };
-});
-
-vi.mock("@mantine/notifications", () => ({
-  notifications: { show: vi.fn() },
-}));
-
-/**
- * Subscribes for real rather than reading a snapshot, so a settings change
- * during a test re-renders the button the way it does in the app.
- */
-vi.mock("create-pubsub/react", () => ({
-  usePubSub: (pubSub: [unknown, unknown, unknown]) => {
-    const [publish, subscribe, get] = pubSub as [
-      unknown,
-      (listener: () => void) => () => void,
-      () => unknown,
-    ];
-    const value = useSyncExternalStore(subscribe, get, get);
-    return [value, publish];
-  },
-}));
+vi.mock("@/modules/speechToText", async () =>
+  (await import("@/testMocks")).speechToTextMock(),
+);
+vi.mock("@mantine/notifications", async () =>
+  (await import("@/testMocks")).notificationsStub(),
+);
+vi.mock("create-pubsub/react", async () =>
+  (await import("@/testMocks")).pubSubReactMock(),
+);
 
 function renderButton({
   getValue = () => "",
