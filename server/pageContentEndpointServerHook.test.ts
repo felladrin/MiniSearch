@@ -11,7 +11,6 @@ vi.mock("./pageContentService", () => ({
 import { handleTokenVerification } from "./handleTokenVerification";
 import {
   createRequest,
-  createRequestWithBadHost,
   createResponse,
   expectBadHostRejected,
   getRegisteredHookHandler,

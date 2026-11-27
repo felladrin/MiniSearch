@@ -25,21 +25,6 @@ vi.mock("./fallbackSearchService", () => ({
   isSearchFallbackEnabled: vi.fn(() => false),
   getFallbackProviderStats: vi.fn(() => ({})),
 }));
-// jscpd:ignore-start
-// vi.mock is hoisted above the imports, so each file registers its own mocks;
-// only the factory bodies could be shared, and the ones that differ do.
-vi.mock("./biEncoderService.ts", () => ({
-  getBiEncoderStatus: async () => true,
-}));
-vi.mock("./rerankerService.ts", () => ({
-  getRerankerStatus: async () => true,
-}));
-vi.mock("./webSearchService.ts", () => ({
-  getWebSearchServiceStatus: async () => "healthy",
-  getSearchCircuitStats: () => ({ circuitState: "closed", circuitOpens: 0 }),
-}));
-
-// jscpd:ignore-end
 
 import { cacheServerHook } from "./cacheServerHook";
 import { configEndpointServerHook } from "./configEndpointServerHook";

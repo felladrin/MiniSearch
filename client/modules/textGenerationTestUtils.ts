@@ -7,9 +7,10 @@ import { vi } from "vitest";
  * `defaultContextSize`) stays real, so `instanceof` checks still work.
  *
  * Returns the factory rather than the object so a `vi.mock` call can stay a
- * one-liner. The call is deferred to factory time, which is after this module
- * has been evaluated: the mocked module is only reached through the dynamic
- * `await import(...)` of the module under test.
+ * one-liner. Call it from inside a `vi.mock` factory that loads this module with
+ * `await import(...)`: vitest hoists the registration above the imports, so a
+ * static import here would only be initialised in time by accident of the import
+ * order.
  */
 export function textGenerationUtilitiesMock(
   overrides: Record<string, unknown> = {},
@@ -22,6 +23,14 @@ export function textGenerationUtilitiesMock(
     getFormattedSearchResults: vi.fn().mockReturnValue("None."),
     ...overrides,
   });
+}
+
+/** The `./textGenerationWithWllama` override: both generators answer nothing. */
+export function wllamaMock() {
+  return {
+    generateTextWithWllama: vi.fn(() => Promise.resolve()),
+    generateChatWithWllama: vi.fn(() => Promise.resolve("")),
+  };
 }
 
 /**

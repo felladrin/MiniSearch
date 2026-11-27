@@ -3,8 +3,9 @@ import debug from "debug";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // jscpd:ignore-start
-// vi.mock is hoisted above the imports, so each file registers its own mocks;
-// only the factory bodies could be shared, and the ones that differ do.
+// Each file writes its own vi.mock call, because vitest hoists them above the
+// imports. This one also needs the `vi.hoisted` handle above it, so there is no
+// shared body left to extract.
 const lookupMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:dns/promises", () => ({
@@ -41,7 +42,6 @@ vi.mock("./utils/pinnedFetch", async (importOriginal) => {
 import { handleTokenVerification } from "./handleTokenVerification";
 import {
   createRequest,
-  createRequestWithBadHost,
   createResponse,
   expectBadHostRejected,
   getRegisteredHookHandler,

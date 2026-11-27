@@ -35,10 +35,9 @@ vi.mock("gpt-tokenizer", () => ({
 vi.mock("pretty-ms", () => ({
   default: vi.fn(() => "100ms"),
 }));
-vi.mock("./textGenerationWithWllama", () => ({
-  generateTextWithWllama: vi.fn(() => Promise.resolve()),
-  generateChatWithWllama: vi.fn(() => Promise.resolve("")),
-}));
+vi.mock("./textGenerationWithWllama", async () =>
+  (await import("./textGenerationTestUtils")).wllamaMock(),
+);
 
 import gptTokenizer from "gpt-tokenizer";
 import {

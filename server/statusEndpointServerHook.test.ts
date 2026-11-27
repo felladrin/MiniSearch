@@ -12,11 +12,9 @@ import {
 } from "./searchesSinceLastRestart.ts";
 import { statusEndpointServerHook } from "./statusEndpointServerHook.ts";
 
-// The health getters probe live services; this test is about the payload,
-// so they answer healthy without a network.
-// jscpd:ignore-start
-// vi.mock is hoisted above the imports, so each file registers its own mocks;
-// only the factory bodies could be shared, and the ones that differ do.
+// The health getters probe live services; this test is about the payload, so
+// they answer without a network. The search backend reports "degraded", the
+// state the payload has to carry through.
 vi.mock("./biEncoderService.ts", () => ({
   getBiEncoderStatus: async () => true,
 }));
@@ -25,7 +23,6 @@ vi.mock("./rerankerService.ts", () => ({
 }));
 vi.mock("./webSearchService.ts", () => ({
   getWebSearchServiceStatus: async () => "degraded",
-  // jscpd:ignore-end
   getSearchCircuitStats: () => ({
     circuitState: "closed",
     circuitOpens: 0,

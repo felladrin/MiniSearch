@@ -15,14 +15,15 @@ export function startLogCapture() {
   };
   const originalLog = debug.log;
   debug.log = record;
-  for (const method of ["log", "info", "warn", "error", "debug"] as const) {
-    vi.spyOn(console, method).mockImplementation(record);
-  }
+  const spies = (["log", "info", "warn", "error", "debug"] as const).map(
+    (method) => vi.spyOn(console, method).mockImplementation(record),
+  );
 
   return {
     lines,
     stop() {
       debug.log = originalLog;
+      for (const spy of spies) spy.mockRestore();
     },
   };
 }

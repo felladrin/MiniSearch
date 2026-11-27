@@ -7,7 +7,6 @@ import {
 } from "./pubSub";
 import { defaultSettings } from "./settings";
 import { sleep } from "./sleep";
-import { textGenerationUtilitiesMock } from "./textGenerationTestUtils";
 import { canStartResponding } from "./textGenerationUtilities";
 import type { ChatMessage } from "./types";
 
@@ -25,8 +24,8 @@ vi.mock("./sleep", () => ({
   sleep: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("./textGenerationUtilities", (importOriginal) =>
-  textGenerationUtilitiesMock({
+vi.mock("./textGenerationUtilities", async (importOriginal) =>
+  (await import("./textGenerationTestUtils")).textGenerationUtilitiesMock({
     getDefaultChatMessages: vi
       .fn()
       .mockReturnValue([{ role: "user", content: "hi" }]),
@@ -51,7 +50,6 @@ function mockSettings(overrides: Partial<typeof defaultSettings> = {}) {
   vi.mocked(getSettings).mockReturnValue({ ...defaultSettings, ...overrides });
 }
 
-/** Loads the generator under test, after the fetch routes are in place. */
 /** Queues a submit, one in-progress poll, and a final empty reply. */
 function queueInterruptedPolling(id: string) {
   mockFetch
@@ -70,6 +68,7 @@ function abortWhenGenerating() {
   return controller;
 }
 
+/** Loads the generator under test, after the fetch routes are in place. */
 async function loadHordeGenerator() {
   return (await import("./textGenerationWithHorde")).generateTextWithHorde;
 }
@@ -614,7 +613,6 @@ describe("textGenerationWithHorde", () => {
       expect(generationRequestBodies()).toHaveLength(2);
     });
 
-    /** Answers each job's polls from its own script, by the job id in the URL. */
     /** One worker with ten monthly generations, the shape most tests need. */
     function routeSingleWorker(
       statusResponder: (pollIndex: number, url: string) => unknown,
@@ -626,6 +624,7 @@ describe("textGenerationWithHorde", () => {
       });
     }
 
+    /** Answers each job's polls from its own script, by the job id in the URL. */
     function perJobResponder(
       scripts: Record<string, (jobPollIndex: number) => unknown>,
     ) {

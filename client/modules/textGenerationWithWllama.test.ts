@@ -7,7 +7,6 @@ import {
   updateModelSizeInMegabytes,
   updateSettings,
 } from "./pubSub";
-import { textGenerationUtilitiesMock } from "./textGenerationTestUtils";
 import {
   composeStreamedText,
   generateChatWithWllama,
@@ -49,8 +48,10 @@ vi.mock("./systemPrompt", () => ({
   getSystemPrompt: vi.fn().mockReturnValue("system"),
 }));
 
-vi.mock("./textGenerationUtilities", (importOriginal) =>
-  textGenerationUtilitiesMock()(importOriginal),
+vi.mock("./textGenerationUtilities", async (importOriginal) =>
+  (await import("./textGenerationTestUtils")).textGenerationUtilitiesMock()(
+    importOriginal,
+  ),
 );
 
 vi.mock("./webGpu", () => ({ webGpuSupport: Promise.resolve(false) }));

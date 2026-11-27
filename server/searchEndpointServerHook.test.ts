@@ -42,7 +42,6 @@ import {
 import { handleTokenVerification } from "./handleTokenVerification";
 import {
   createRequest,
-  createRequestWithBadHost,
   createResponse,
   expectBadHostRejected,
   getRegisteredHookHandler,

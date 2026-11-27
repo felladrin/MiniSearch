@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { addLogEntry } from "./logEntries";
 import { getQuery, updateResponse, updateTextGenerationState } from "./pubSub";
-import { textGenerationUtilitiesMock } from "./textGenerationTestUtils";
 import {
   ChatGenerationError,
   canStartResponding,
@@ -24,8 +23,8 @@ vi.mock("./systemPrompt", () => ({
   getSystemPrompt: vi.fn().mockReturnValue("system prompt"),
 }));
 
-vi.mock("./textGenerationUtilities", (importOriginal) =>
-  textGenerationUtilitiesMock({
+vi.mock("./textGenerationUtilities", async (importOriginal) =>
+  (await import("./textGenerationTestUtils")).textGenerationUtilitiesMock({
     getDefaultChatCompletionCreateParamsStreaming: vi.fn().mockReturnValue({
       max_tokens: 1000,
       temperature: 0.35,
