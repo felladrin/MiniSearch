@@ -2,6 +2,7 @@ import { CodeHighlightAdapterProvider } from "@mantine/code-highlight";
 import { usePubSub } from "create-pubsub/react";
 import { useMemo } from "react";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
+import { getCurrentSearchRunId } from "@/modules/history";
 import {
   chatMessagesPubSub,
   isRestoringFromHistoryPubSub,
@@ -61,6 +62,10 @@ export default function AiResponseSection() {
 
           {textGenerationState === "completed" && (
             <ChatInterface
+              // Restoring another search sets a new run id before it flips
+              // isRestoringFromHistory, so this remounts the chat: its cleanup
+              // aborts a follow-up still being answered for the old search.
+              key={getCurrentSearchRunId()}
               initialQuery={query}
               initialResponse={response}
               initialMessages={

@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-27
+
+- Restoring another search from history while a follow-up is being answered now stops that follow-up. It kept running in the restored chat, blocked sending until it ended, was answered from the restored search's results instead of its own, and then suggested a question about the old search. The follow-up's question is saved under its own search with "The answer was interrupted.", and the restored chat accepts a message right away.
+
 ## 2026-11-26
 
 - Restoring the search already on screen while a follow-up is being answered keeps the live text results and page excerpts used by that answer.
