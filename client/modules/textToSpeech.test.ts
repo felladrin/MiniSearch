@@ -409,6 +409,57 @@ describe("speak", () => {
     expect(spoken).toEqual(["One. Two."]);
   });
 
+  it("falls back to the system voice when the worker errors before any audio starts", async () => {
+    const { worker, speaking } = await startLocalSpeech("One. Two.");
+
+    worker.onerror?.();
+
+    await speaking;
+    expect(spoken).toEqual(["One. Two."]);
+    expect(mockAddLogEntry).toHaveBeenCalledWith(
+      "Local text-to-speech unavailable, using the system voices: The local text-to-speech worker failed to start",
+    );
+  });
+
+  it("does not fall back when the worker errors after the first chunk started playing", async () => {
+    const { worker, speaking } = await startLocalSpeech("One. Two.");
+
+    sendAudioChunk(worker);
+    await vi.waitFor(() => expect(createdObjectUrls).toBe(1));
+    worker.onerror?.();
+
+    await speaking;
+    expect(spoken).toEqual([]);
+    expect(mockAddLogEntry).not.toHaveBeenCalledWith(
+      expect.stringContaining("Local text-to-speech unavailable"),
+    );
+  });
+
+  it("treats a chunk as audible once play() resolves, even without onended firing", async () => {
+    vi.stubGlobal(
+      "Audio",
+      class {
+        onended: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        src = "";
+        play = () => Promise.resolve();
+        pause = vi.fn();
+        removeAttribute = vi.fn();
+      },
+    );
+    const { worker, speaking } = await startLocalSpeech("One. Two.");
+
+    sendAudioChunk(worker);
+    await vi.waitFor(() => expect(createdObjectUrls).toBe(1));
+    sendError(worker, "synthesis died halfway");
+
+    await speaking;
+    expect(spoken).toEqual([]);
+    expect(mockAddLogEntry).toHaveBeenCalledWith(
+      "Local text-to-speech stopped early: synthesis died halfway",
+    );
+  });
+
   it("honours a stop pressed while the voice catalogue is still loading", async () => {
     let releaseCatalogue: (voices: unknown[]) => void = () => {};
     mockVoices.mockReturnValue(
