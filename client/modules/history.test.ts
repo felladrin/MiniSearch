@@ -427,6 +427,79 @@ describe("History Module - Dexie CRUD", () => {
       ]);
     });
 
+    it("merges images by image source, falling back to the thumbnail", async () => {
+      const {
+        addSearchToHistory,
+        mergeSearchImageResults,
+        getRecentSearches,
+        getCurrentSearchRunId,
+      } = await import("./history");
+      const gallery = "https://example.com/gallery";
+      const storedFirst = {
+        title: "Stored first",
+        url: gallery,
+        thumbnail: "https://cdn.example.com/first-thumb.gif",
+        sourceUrl: "https://cdn.example.com/first.gif",
+      };
+      const storedDuplicate = {
+        title: "Stored duplicate",
+        url: "https://example.com/other-page",
+        thumbnail: "https://cdn.example.com/duplicate-thumb.gif",
+        sourceUrl: "https://cdn.example.com/first.gif",
+      };
+      const storedFallback = {
+        title: "Stored fallback",
+        url: gallery,
+        thumbnail: "https://cdn.example.com/fallback-thumb.gif",
+      };
+      const storedKept = {
+        title: "Stored kept",
+        url: "https://example.com/kept",
+        thumbnail: "https://cdn.example.com/kept-thumb.gif",
+        sourceUrl: "https://cdn.example.com/kept.gif",
+      };
+      await addSearchToHistory("identity merge", {
+        type: "image",
+        items: [storedFirst, storedDuplicate, storedFallback, storedKept],
+      });
+
+      const freshSameSource = {
+        title: "Fresh first",
+        url: gallery,
+        thumbnail: "https://cdn.example.com/fresh-first-thumb.gif",
+        sourceUrl: storedFirst.sourceUrl,
+      };
+      const freshSecond = {
+        title: "Fresh second",
+        url: gallery,
+        thumbnail: "https://cdn.example.com/fresh-second-thumb.gif",
+        sourceUrl: "https://cdn.example.com/fresh-second.gif",
+      };
+      const freshFallback = {
+        title: "Fresh fallback",
+        url: gallery,
+        thumbnail: storedFallback.thumbnail,
+      };
+      const freshNewFallback = {
+        title: "Fresh new fallback",
+        url: gallery,
+        thumbnail: "https://cdn.example.com/fresh-new-fallback-thumb.gif",
+      };
+      await mergeSearchImageResults(getCurrentSearchRunId(), {
+        type: "image",
+        items: [freshSameSource, freshSecond, freshFallback, freshNewFallback],
+      });
+
+      const [entry] = await getRecentSearches();
+      expect(entry.imageResults?.items).toEqual([
+        freshSameSource,
+        freshSecond,
+        freshFallback,
+        freshNewFallback,
+        storedKept,
+      ]);
+    });
+
     it("keeps both sets whichever image search lands first, and a retry starts over", async () => {
       const {
         addSearchToHistory,

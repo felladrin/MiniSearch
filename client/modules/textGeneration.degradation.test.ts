@@ -699,6 +699,31 @@ describe("search supersession ownership", () => {
     );
   });
 
+  it("keeps a gallery image that shares its page URL with a follow-up image", async () => {
+    const { finishImages } = await searchWithFollowUpImagesFirst();
+
+    const gallery = "https://gallery.example/page";
+    const followUp: ImageSearchResults[number] = [
+      "Follow-up",
+      gallery,
+      "thumb-follow",
+      "https://cdn.example/follow-up.gif",
+    ];
+    harness.state.imageSearchResults = [followUp];
+    const first: ImageSearchResults[number] = [
+      "First",
+      gallery,
+      "thumb-first",
+      "https://cdn.example/first.gif",
+    ];
+    await finishImages([first]);
+
+    expect(vi.mocked(updateImageSearchResults)).toHaveBeenLastCalledWith([
+      followUp,
+      first,
+    ]);
+  });
+
   it("keeps a follow-up's images when the first image search finds none", async () => {
     const { finishImages } = await searchWithFollowUpImagesFirst();
     await finishImages([]);

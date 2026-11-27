@@ -1,3 +1,4 @@
+import { getImageIdentity } from "@shared/imageIdentity";
 import Dexie, { type Table, type Transaction } from "dexie";
 import { addLogEntry } from "./logEntries";
 import { getSettings } from "./pubSub";
@@ -358,7 +359,7 @@ export async function updateSearchResults(
  * Adds `results` to the images stored for the search instead of replacing them.
  * Every image write goes through here: the screen can lack images the stored
  * list has (a late first search merged after the user left and came back), so
- * replacing it with the screen's list would drop them. A URL is stored once.
+ * replacing it with the screen's list would drop them. An image is stored once.
  * With `newFirst`, the new images go ahead of the stored ones; otherwise after.
  */
 export async function mergeSearchImageResults(
@@ -381,8 +382,17 @@ export async function mergeSearchImageResults(
             latest.imageResults ??
             (latest.results?.type === "image" ? latest.results : undefined)
           )?.items ?? [];
-        const newUrls = new Set(results.items.map((item) => item.url));
-        const keptItems = storedItems.filter((item) => !newUrls.has(item.url));
+        const newIdentities = new Set(
+          results.items.map((item) =>
+            getImageIdentity(item.sourceUrl, item.thumbnail, item.url),
+          ),
+        );
+        const keptItems = storedItems.filter(
+          (item) =>
+            !newIdentities.has(
+              getImageIdentity(item.sourceUrl, item.thumbnail, item.url),
+            ),
+        );
         await historyDatabase.searches.update(latest.id, {
           imageResults: {
             type: "image",

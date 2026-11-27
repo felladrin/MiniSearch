@@ -1,5 +1,6 @@
 import type { PreviewServer, ViteDevServer } from "vite";
 import { z } from "zod";
+import { getImageIdentity } from "../shared/imageIdentity.ts";
 import {
   assertSearchFallbackConfiguration,
   fetchFallbackTextResults,
@@ -335,7 +336,12 @@ export function searchEndpointServerHook<
       } else {
         const results = searchResults as ImageResult[];
         const resultsText = results.map(
-          ([title, url]) => [title?.slice(0, 100) || "", "", url] as TextResult,
+          ([title, url, thumbnailSource, sourceUrl]) =>
+            [
+              title?.slice(0, 100) || "",
+              "",
+              getImageIdentity(sourceUrl, thumbnailSource, url),
+            ] as TextResult,
         );
         const rankedResults = await handleRanking(
           query,
@@ -344,9 +350,11 @@ export function searchEndpointServerHook<
         );
 
         const processedResults = rankedResults
-          .map(([title, , rankedResultUrl]) => {
+          .map(([title, , rankedResultIdentity]) => {
             const result = results.find(
-              ([, resultUrl]) => resultUrl === rankedResultUrl,
+              ([, url, thumbnailSource, sourceUrl]) =>
+                getImageIdentity(sourceUrl, thumbnailSource, url) ===
+                rankedResultIdentity,
             );
             if (!result) return null;
             const [, url, thumbnailSource, sourceUrl] = result;

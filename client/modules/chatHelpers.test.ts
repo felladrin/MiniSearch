@@ -151,11 +151,26 @@ describe("refreshTextSearchResults", () => {
 describe("refreshImageSearchResults", () => {
   it("deduplicates by URL and prepends fresh results", async () => {
     const existing: ImageSearchResults = [
-      ["Existing", "https://existing.com", "thumb", "source"],
+      [
+        "Existing",
+        "https://existing.com",
+        "https://existing.com/thumb.jpg",
+        "https://existing.com/full.jpg",
+      ],
     ];
     const fresh: ImageSearchResults = [
-      ["New", "https://new.com", "thumb", "source"],
-      ["Duplicate", "https://existing.com", "thumb", "source"],
+      [
+        "New",
+        "https://new.com",
+        "https://new.com/thumb.jpg",
+        "https://new.com/full.jpg",
+      ],
+      [
+        "Duplicate",
+        "https://existing.com",
+        "https://existing.com/thumb.jpg",
+        "https://existing.com/full.jpg",
+      ],
     ];
 
     mockSearchImages.mockResolvedValueOnce({ results: fresh, stale: false });
@@ -163,17 +178,81 @@ describe("refreshImageSearchResults", () => {
     await refreshImageSearchResults("query", 10, existing);
 
     expect(mockUpdateImage).toHaveBeenCalledWith([
-      ["New", "https://new.com", "thumb", "source"],
-      ["Existing", "https://existing.com", "thumb", "source"],
+      [
+        "New",
+        "https://new.com",
+        "https://new.com/thumb.jpg",
+        "https://new.com/full.jpg",
+      ],
+      [
+        "Existing",
+        "https://existing.com",
+        "https://existing.com/thumb.jpg",
+        "https://existing.com/full.jpg",
+      ],
     ]);
+  });
+
+  it("deduplicates by image identity rather than page URL", async () => {
+    const gallery = "https://example.com/gallery";
+    const existing: ImageSearchResults = [
+      [
+        "Existing",
+        gallery,
+        "https://cdn.example.com/existing-thumb.gif",
+        "https://cdn.example.com/existing.gif",
+      ],
+      [
+        "Existing fallback",
+        gallery,
+        "https://cdn.example.com/existing-fallback-thumb.gif",
+        "",
+      ],
+    ];
+    const fresh: ImageSearchResults = [
+      [
+        "Same gallery, new image",
+        gallery,
+        "https://cdn.example.com/fresh-thumb.gif",
+        "https://cdn.example.com/fresh.gif",
+      ],
+      [
+        "Same image",
+        "https://example.com/other-page",
+        "https://cdn.example.com/other-thumb.gif",
+        "https://cdn.example.com/existing.gif",
+      ],
+      [
+        "Same fallback thumbnail",
+        "https://example.com/other-page",
+        "https://cdn.example.com/existing-fallback-thumb.gif",
+        "",
+      ],
+    ];
+
+    mockSearchImages.mockResolvedValueOnce({ results: fresh, stale: false });
+
+    await refreshImageSearchResults("query", 10, existing);
+
+    expect(mockUpdateImage).toHaveBeenCalledWith([fresh[0], ...existing]);
   });
 
   it("keeps the first search's images that landed after the follow-up started", async () => {
     const firstImages: ImageSearchResults = [
-      ["First", "https://first.com", "thumb", "source"],
+      [
+        "First",
+        "https://first.com",
+        "https://first.com/thumb.jpg",
+        "https://first.com/full.jpg",
+      ],
     ];
     const fresh: ImageSearchResults = [
-      ["New", "https://new.com", "thumb", "source"],
+      [
+        "New",
+        "https://new.com",
+        "https://new.com/thumb.jpg",
+        "https://new.com/full.jpg",
+      ],
     ];
     mockSearchImages.mockResolvedValueOnce({ results: fresh, stale: false });
     // The follow-up was handed an empty list; the first images arrived since.
@@ -188,14 +267,14 @@ describe("refreshImageSearchResults", () => {
         {
           title: "New",
           url: "https://new.com",
-          thumbnail: "thumb",
-          sourceUrl: "source",
+          thumbnail: "https://new.com/thumb.jpg",
+          sourceUrl: "https://new.com/full.jpg",
         },
         {
           title: "First",
           url: "https://first.com",
-          thumbnail: "thumb",
-          sourceUrl: "source",
+          thumbnail: "https://first.com/thumb.jpg",
+          sourceUrl: "https://first.com/full.jpg",
         },
       ],
     });
@@ -203,12 +282,27 @@ describe("refreshImageSearchResults", () => {
 
   it("shows an image found by both searches once", async () => {
     const firstImages: ImageSearchResults = [
-      ["First", "https://first.com", "thumb", "source"],
+      [
+        "First",
+        "https://first.com",
+        "https://first.com/thumb.jpg",
+        "https://first.com/full.jpg",
+      ],
     ];
     mockSearchImages.mockResolvedValueOnce({
       results: [
-        ["New", "https://new.com", "thumb", "source"],
-        ["First again", "https://first.com", "thumb", "source"],
+        [
+          "New",
+          "https://new.com",
+          "https://new.com/thumb.jpg",
+          "https://new.com/full.jpg",
+        ],
+        [
+          "First again",
+          "https://first.com",
+          "https://first.com/thumb.jpg",
+          "https://first.com/full.jpg",
+        ],
       ],
       stale: false,
     });
@@ -217,7 +311,12 @@ describe("refreshImageSearchResults", () => {
     await refreshImageSearchResults("query", 10, []);
 
     expect(mockUpdateImage).toHaveBeenCalledWith([
-      ["New", "https://new.com", "thumb", "source"],
+      [
+        "New",
+        "https://new.com",
+        "https://new.com/thumb.jpg",
+        "https://new.com/full.jpg",
+      ],
       ...firstImages,
     ]);
   });

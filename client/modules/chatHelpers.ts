@@ -7,6 +7,7 @@ import {
   type TextResults,
   updateSearchResults,
 } from "./history";
+import { imagesNotIn } from "./imageResults";
 import { addLogEntry } from "./logEntries";
 import { fetchPageContents } from "./pageContent";
 import {
@@ -136,15 +137,11 @@ export async function refreshImageSearchResults(
   // The first search's images can land after this refresh started, so it adds
   // to the list on screen now as well as the one it was handed then.
   const shown = isCurrent() ? getImageSearchResults() : [];
-  const shownUrls = new Set(shown.map(([, url]) => url));
   const baseResults: ImageSearchResults = [
     ...shown,
-    ...existingResults.filter(([, url]) => !shownUrls.has(url)),
+    ...imagesNotIn(shown, existingResults),
   ];
-  const existingUrls = new Set(baseResults.map(([, url]) => url));
-  const uniqueFreshResults = imageResults.filter(
-    ([, url]) => !existingUrls.has(url),
-  );
+  const uniqueFreshResults = imagesNotIn(baseResults, imageResults);
 
   if (uniqueFreshResults.length > 0) {
     const updatedImageResults: ImageSearchResults = [

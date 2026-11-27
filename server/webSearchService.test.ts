@@ -675,6 +675,111 @@ describe("graceful degradation", () => {
         ]),
     );
   });
+
+  it("identifies image results by image source, falling back to the thumbnail", async () => {
+    const gallery = "https://example.com/gallery";
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [
+            {
+              title: "First image",
+              url: gallery,
+              category: "images",
+              img_src: "https://cdn.example.com/first.gif",
+              thumbnail_src: "https://cdn.example.com/first-thumb.gif",
+            },
+            {
+              title: "Second image",
+              url: gallery,
+              category: "images",
+              img_src: "https://cdn.example.com/second.gif",
+              thumbnail_src: "https://cdn.example.com/second-thumb.gif",
+            },
+            {
+              title: "Duplicate image",
+              url: "https://example.com/other-page",
+              category: "images",
+              img_src: "https://cdn.example.com/second.gif",
+              thumbnail_src: "https://cdn.example.com/duplicate-thumb.gif",
+            },
+            {
+              title: "Image without a source",
+              url: "https://example.com/no-source",
+              category: "images",
+              thumbnail_src: "https://cdn.example.com/fallback-thumb.gif",
+            },
+            {
+              title: "Same fallback thumbnail",
+              url: "https://example.com/another-page",
+              category: "images",
+              thumbnail_src: "https://cdn.example.com/fallback-thumb.gif",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const results = await fetchSearXNG(
+      "failure injection",
+      "images",
+      5,
+      new CircuitBreaker(breakerOptions),
+    );
+
+    expect(results).toEqual([
+      [
+        "First image",
+        gallery,
+        "https://cdn.example.com/first-thumb.gif",
+        "https://cdn.example.com/first.gif",
+      ],
+      [
+        "Second image",
+        gallery,
+        "https://cdn.example.com/second-thumb.gif",
+        "https://cdn.example.com/second.gif",
+      ],
+      [
+        "Image without a source",
+        "https://example.com/no-source",
+        "https://cdn.example.com/fallback-thumb.gif",
+        "",
+      ],
+    ]);
+  });
+
+  it("still deduplicates text results by page URL", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [
+            {
+              title: "First page",
+              url: "https://example.com/page",
+              content: "first snippet",
+            },
+            {
+              title: "Second page",
+              url: "https://example.com/page",
+              content: "second snippet",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const results = await fetchSearXNG(
+      "failure injection",
+      "text",
+      5,
+      new CircuitBreaker(breakerOptions),
+    );
+
+    expect(results).toEqual([
+      ["First page", "first snippet", "https://example.com/page"],
+    ]);
+  });
 });
 
 describe("query privacy", () => {

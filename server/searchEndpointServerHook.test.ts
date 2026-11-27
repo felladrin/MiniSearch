@@ -389,6 +389,49 @@ describe("searchEndpointServerHook", () => {
     fetchSpy.mockRestore();
   });
 
+  it("reranks image results by image identity when they share a page URL", async () => {
+    const gallery = "https://example.com/gallery";
+    const first: [string, string, string, string] = [
+      "First image",
+      gallery,
+      "https://cdn.example.com/first-thumb.gif",
+      "https://cdn.example.com/first.gif",
+    ];
+    const second: [string, string, string, string] = [
+      "Second image",
+      gallery,
+      "https://cdn.example.com/second-thumb.gif",
+      "https://cdn.example.com/second.gif",
+    ];
+    const fallback: [string, string, string, string] = [
+      "Image without a source",
+      gallery,
+      "https://cdn.example.com/fallback-thumb.gif",
+      "",
+    ];
+    vi.mocked(fetchSearXNG).mockResolvedValue([first, second, fallback]);
+    vi.mocked(getRerankerStatus).mockResolvedValue(true);
+    vi.mocked(rankSearchResults).mockResolvedValue([
+      [second[0], "", second[3], 0.9],
+      [fallback[0], "", fallback[2], 0.8],
+      [first[0], "", first[3], 0.7],
+    ]);
+
+    const response = await sendSearch("/search/images?q=cats&token=abc");
+
+    expect(rankSearchResults).toHaveBeenCalledWith(
+      "cats",
+      "images",
+      [
+        [first[0], "", first[3]],
+        [second[0], "", second[3]],
+        [fallback[0], "", fallback[2]],
+      ],
+      false,
+    );
+    expect(endBody(response)).toEqual([second, fallback, first]);
+  });
+
   describe("graceful degradation", () => {
     const searxngResults: [string, string, string][] = [
       ["A", "snippet a", "https://a.com"],

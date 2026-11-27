@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
+import { getImageIdentity } from "../shared/imageIdentity.ts";
 import {
   type EngineFailure,
   getDegradedSearchTypes,
@@ -376,7 +377,7 @@ async function processSearchResults(
   const results = await breaker.execute(circuitKey(searchType), () =>
     performSearch(query, searchType, signal),
   );
-  const openableResults = openableUniqueResults(results);
+  const openableResults = openableUniqueResults(results, searchType);
 
   if (searchType === "text") {
     const consideredResults = openableResults.slice(0, limit);
@@ -478,26 +479,36 @@ export async function fetchSupplementarySearXNG(
   const data = (await response.json()) as SearxngSearchResponse;
   const results = Array.isArray(data.results) ? data.results : [];
   const textualResults = await Promise.all(
-    openableUniqueResults(results).slice(0, limit).map(processTextualResult),
+    openableUniqueResults(results, "text")
+      .slice(0, limit)
+      .map(processTextualResult),
   );
   return filterNullResults(textualResults);
 }
 
+function graphicalThumbnailSource(result: SearxngSearchResult) {
+  return result.category === "videos" ? result.thumbnail : result.thumbnail_src;
+}
+
+function graphicalSourceUrl(result: SearxngSearchResult) {
+  // Empty string, not undefined: the client reads the tuple positionally and
+  // treats an empty source as "no link to the full image".
+  return (
+    (result.category === "videos"
+      ? result.iframe_src || result.url
+      : result.img_src) ?? ""
+  );
+}
+
 async function processGraphicalResult(result: SearxngSearchResult) {
-  const thumbnailSource =
-    result.category === "videos" ? result.thumbnail : result.thumbnail_src;
+  const thumbnailSource = graphicalThumbnailSource(result);
 
   // A grid tile is the thumbnail: without one there is nothing to show but the
   // host name, and SearXNG leaves the field out often enough (video engines
   // especially) that keeping these fills the carousel with text placeholders.
   if (!thumbnailSource) return null;
 
-  // Empty string, not undefined: the client reads the tuple positionally and
-  // treats an empty source as "no link to the full image".
-  const sourceUrl =
-    (result.category === "videos"
-      ? result.iframe_src || result.url
-      : result.img_src) ?? "";
+  const sourceUrl = graphicalSourceUrl(result);
 
   return [result.title, result.url, thumbnailSource, sourceUrl] as [
     title: string,
@@ -548,16 +559,27 @@ async function processTextualResult(result: SearxngSearchResult) {
 // of a result that would have made the cut.
 function openableUniqueResults(
   results: SearxngSearchResult[],
+  searchType: SearchType,
 ): SearxngSearchResult[] {
-  const urls = new Set<string>();
+  const identities = new Set<string>();
   const unopenableEngines: string[] = [];
   const kept = results.filter((result) => {
     if (!isOpenableUrl(result.url)) {
       unopenableEngines.push(result.engine ?? "unknown");
       return false;
     }
-    if (urls.has(result.url)) return false;
-    urls.add(result.url);
+    // Text results are pages, so their URL names them. Image results are
+    // identified by the image itself: one gallery page can hold many results.
+    const identity =
+      searchType === "images"
+        ? getImageIdentity(
+            graphicalSourceUrl(result),
+            graphicalThumbnailSource(result),
+            result.url,
+          )
+        : result.url;
+    if (identities.has(identity)) return false;
+    identities.add(identity);
     return true;
   });
   // Engine names only: the url is downstream of the query, which never reaches

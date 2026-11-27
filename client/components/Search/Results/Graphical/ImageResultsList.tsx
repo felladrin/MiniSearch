@@ -19,6 +19,7 @@ import Captions from "yet-another-react-lightbox/plugins/captions";
 import classes from "./ImageResultsList.module.css";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/captions.css";
+import { getImageIdentity } from "@shared/imageIdentity";
 import { addLogEntry } from "@/modules/logEntries";
 import { getHostname } from "@/modules/stringFormatters";
 import { getThumbnailSrc } from "@/modules/thumbnailUrls";
@@ -90,11 +91,12 @@ export default function ImageResultsList({
 
     void (async () => {
       const entries = await Promise.all(
-        imageResults.map(async ([, url, thumbnailUrl]) => {
+        imageResults.map(async ([, url, thumbnailUrl, sourceUrl]) => {
+          const identity = getImageIdentity(sourceUrl, thumbnailUrl, url);
           try {
-            return [url, await getThumbnailSrc(thumbnailUrl)] as const;
+            return [identity, await getThumbnailSrc(thumbnailUrl)] as const;
           } catch {
-            return [url, null] as const;
+            return [identity, null] as const;
           }
         }),
       );
@@ -118,12 +120,12 @@ export default function ImageResultsList({
     }));
   };
 
-  const markThumbnailFailed = (url: string) => {
-    setFailedThumbnails((prev) => ({ ...prev, [url]: true }));
+  const markThumbnailFailed = (identity: string) => {
+    setFailedThumbnails((prev) => ({ ...prev, [identity]: true }));
   };
 
-  const renderTile = (title: string, url: string) => {
-    const tileSrc = failedThumbnails[url] ? null : thumbnailSrcs[url];
+  const renderTile = (title: string, url: string, identity: string) => {
+    const tileSrc = failedThumbnails[identity] ? null : thumbnailSrcs[identity];
 
     if (tileSrc) {
       return (
@@ -132,7 +134,7 @@ export default function ImageResultsList({
           src={tileSrc}
           loading="lazy"
           style={imageStyle}
-          onError={() => markThumbnailFailed(url)}
+          onError={() => markThumbnailFailed(identity)}
         />
       );
     }
@@ -140,7 +142,7 @@ export default function ImageResultsList({
     // `null` means the result has no thumbnail, or the load failed: the host
     // name is the most that can be shown. `undefined` means the src is still
     // being resolved, so the tile keeps a skeleton in the meantime.
-    if (thumbnailSrcs[url] === undefined) {
+    if (thumbnailSrcs[identity] === undefined) {
       return (
         <Box style={tileBoxStyle}>
           <Skeleton style={{ height: "100%", width: "100%" }} />
@@ -176,89 +178,97 @@ export default function ImageResultsList({
           loop: true,
         }}
       >
-        {imageResults.map(([title, url], index) => (
-          <Transition
-            key={url}
-            mounted={state.canStartTransition}
-            transition="fade"
-            timingFunction="ease"
-            enterDelay={shouldReduceMotion ? 0 : Math.min(index, 5) * 40}
-            duration={shouldReduceMotion ? 0 : 250}
-          >
-            {(styles) => (
-              <Carousel.Slide style={styles}>
-                <UnstyledButton
-                  aria-label={`Open image preview: ${title || getHostname(url)}`}
-                  className={classes.thumbnailButton}
-                  onClick={() => handleImageClick(index)}
-                >
-                  {renderTile(title, url)}
-                </UnstyledButton>
-              </Carousel.Slide>
-            )}
-          </Transition>
-        ))}
+        {imageResults.map(([title, url, thumbnailUrl, sourceUrl], index) => {
+          const identity = getImageIdentity(sourceUrl, thumbnailUrl, url);
+          return (
+            <Transition
+              key={identity}
+              mounted={state.canStartTransition}
+              transition="fade"
+              timingFunction="ease"
+              enterDelay={shouldReduceMotion ? 0 : Math.min(index, 5) * 40}
+              duration={shouldReduceMotion ? 0 : 250}
+            >
+              {(styles) => (
+                <Carousel.Slide style={styles}>
+                  <UnstyledButton
+                    aria-label={`Open image preview: ${title || getHostname(url)}`}
+                    className={classes.thumbnailButton}
+                    onClick={() => handleImageClick(index)}
+                  >
+                    {renderTile(title, url, identity)}
+                  </UnstyledButton>
+                </Carousel.Slide>
+              )}
+            </Transition>
+          );
+        })}
       </Carousel>
       <Lightbox
         open={state.isLightboxOpen}
         close={() => setState((prev) => ({ ...prev, isLightboxOpen: false }))}
         plugins={[Captions]}
         index={state.lightboxIndex}
-        slides={imageResults.map(([title, url, , sourceUrl]) => ({
-          // The grid's thumbnail when it loaded; when it did not, the same
-          // host-name placeholder the tile shows.
-          src:
-            thumbnailSrcs[url] && !failedThumbnails[url]
-              ? thumbnailSrcs[url]
-              : hostNamePlaceholder(getHostname(url)),
-          alt: title,
-          description: (
-            <Stack align="center" gap="md">
-              {title && (
-                <Text component="cite" ta="center">
-                  {title}
-                </Text>
-              )}
-              {sourceUrl && (
-                <Text size="xs" c="dimmed">
-                  Source: {getHostname(sourceUrl)}
-                </Text>
-              )}
-              <Group align="center" justify="center" gap="xs">
+        slides={imageResults.map(([title, url, thumbnailUrl, sourceUrl]) => {
+          const identity = getImageIdentity(sourceUrl, thumbnailUrl, url);
+          return {
+            // The grid's thumbnail when it loaded; when it did not, the same
+            // host-name placeholder the tile shows.
+            src:
+              thumbnailSrcs[identity] && !failedThumbnails[identity]
+                ? thumbnailSrcs[identity]
+                : hostNamePlaceholder(getHostname(url)),
+            alt: title,
+            description: (
+              <Stack align="center" gap="md">
+                {title && (
+                  <Text component="cite" ta="center">
+                    {title}
+                  </Text>
+                )}
                 {sourceUrl && (
+                  <Text size="xs" c="dimmed">
+                    Source: {getHostname(sourceUrl)}
+                  </Text>
+                )}
+                <Group align="center" justify="center" gap="xs">
+                  {sourceUrl && (
+                    <Button
+                      variant="subtle"
+                      component="a"
+                      size="xs"
+                      href={sourceUrl}
+                      target="_blank"
+                      title="Click to see the image in full size"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        addLogEntry(
+                          "User visited an image result in full size",
+                        );
+                      }}
+                    >
+                      View in full resolution
+                    </Button>
+                  )}
                   <Button
                     variant="subtle"
                     component="a"
-                    size="xs"
-                    href={sourceUrl}
+                    href={url}
                     target="_blank"
-                    title="Click to see the image in full size"
+                    size="xs"
+                    title="Click to visit the page where the image was found"
                     rel="noopener noreferrer"
                     onClick={() => {
-                      addLogEntry("User visited an image result in full size");
+                      addLogEntry("User visited an image result source");
                     }}
                   >
-                    View in full resolution
+                    Visit {getHostname(url)}
                   </Button>
-                )}
-                <Button
-                  variant="subtle"
-                  component="a"
-                  href={url}
-                  target="_blank"
-                  size="xs"
-                  title="Click to visit the page where the image was found"
-                  rel="noopener noreferrer"
-                  onClick={() => {
-                    addLogEntry("User visited an image result source");
-                  }}
-                >
-                  Visit {getHostname(url)}
-                </Button>
-              </Group>
-            </Stack>
-          ),
-        }))}
+                </Group>
+              </Stack>
+            ),
+          };
+        })}
       />
     </>
   );

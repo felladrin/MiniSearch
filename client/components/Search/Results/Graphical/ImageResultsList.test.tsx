@@ -100,6 +100,49 @@ describe("ImageResultsList", () => {
     );
   });
 
+  it("keys tiles by image identity when images share a page URL", async () => {
+    const gallery = "https://example.com/gallery";
+    render(
+      <MantineProvider>
+        <ImageResultsList
+          imageResults={[
+            [
+              "First gallery image",
+              gallery,
+              "https://cdn.example.com/first-thumb.gif",
+              "https://cdn.example.com/first.gif",
+            ],
+            [
+              "Second gallery image",
+              gallery,
+              "https://cdn.example.com/second-thumb.gif",
+              "https://cdn.example.com/second.gif",
+            ],
+          ]}
+        />
+      </MantineProvider>,
+    );
+
+    const [first, second] = await waitFor(() => {
+      const images = screen.getAllByRole("img");
+      expect(images).toHaveLength(2);
+      return images;
+    });
+
+    expect(getThumbnailSrc).toHaveBeenCalledWith(
+      "https://cdn.example.com/first-thumb.gif",
+    );
+    expect(getThumbnailSrc).toHaveBeenCalledWith(
+      "https://cdn.example.com/second-thumb.gif",
+    );
+    expect(first.getAttribute("src")).toBe(
+      thumbnailSrcFor("https://cdn.example.com/first-thumb.gif"),
+    );
+    expect(second.getAttribute("src")).toBe(
+      thumbnailSrcFor("https://cdn.example.com/second-thumb.gif"),
+    );
+  });
+
   it("shows the host name for a result without a thumbnail", async () => {
     render(
       <MantineProvider>
