@@ -24,8 +24,10 @@ vi.mock("./rerankerService.ts", () => ({
 vi.mock("./webSearchService.ts", () => ({
   getWebSearchServiceStatus: async () => "degraded",
   getSearchCircuitStats: () => ({
-    circuitState: "closed",
+    circuitState: "CLOSED",
     circuitOpens: 0,
+    circuitStateByType: { text: "CLOSED", images: "CLOSED" },
+    circuitOpensByType: { text: 0, images: 0 },
   }),
 }));
 
