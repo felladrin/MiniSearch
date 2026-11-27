@@ -26,6 +26,18 @@ jobs:
           { echo '---'; cat .github/hf-space-config.yml; echo '---'; echo; cat README.md; } > README.space.md
           mv README.space.md README.md
 
+      # The file is generated here and must never be committed to the source
+      # repository: a committed copy would freeze the reported commit for every
+      # later build. It is not in .gitignore on purpose, because the upload has
+      # to carry it and whether `hf upload` honours .gitignore is not something
+      # this project should depend on.
+      - name: Refuse a source commit file committed to the repository
+        run: |
+          if [ -e .source-commit ]; then
+            echo "::error::.source-commit is written by this workflow; remove it from the repository."
+            exit 1
+          fi
+
       # The Space builds from this copy, so its own git history is the Space's,
       # not the source's. The build reads this file instead of its git history
       # to report which commit is running (shared/buildSourceCommit.ts).
