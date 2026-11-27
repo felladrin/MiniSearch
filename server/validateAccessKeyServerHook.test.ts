@@ -48,12 +48,7 @@ function makeMockResponse() {
   return { setHeader, end, statusCode };
 }
 
-/** Builds a well-formed argon2id hash string with the client's fixed parameters. */
-function makeValidAccessKeyHash(suffix: string): string {
-  const salt = Buffer.from(`${suffix}salt`).toString("base64url");
-  const digest = Buffer.from(`${suffix}digest`).toString("base64url");
-  return `$argon2id$v=19$m=512,t=16,p=1$${salt}$${digest}`;
-}
+import { argon2idHash as makeValidAccessKeyHash } from "./accessKeyTestUtils";
 
 /** Imports the hook, registers it, and returns its middleware. */
 async function getRegisteredHandler() {

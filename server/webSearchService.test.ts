@@ -56,6 +56,17 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
+/** Trips the breaker with a failing search and waits until it half-opens. */
+async function halfOpenBreaker(breaker: CircuitBreaker) {
+  fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+  await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+
+  // Half-open, not open: the circuit check would answer "degraded" here, so
+  // only a probe checked first can answer "unhealthy".
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(breaker.getState("searxng")).toBe("HALF_OPEN");
+}
+
 describe("WebSearchService", () => {
   it("should report service not available when fetch throws", async () => {
     (global.fetch as MockedFunction<typeof fetch>).mockImplementation(() => {
@@ -857,13 +868,7 @@ describe("getWebSearchServiceStatus", () => {
         failureThreshold: 1,
         resetTimeout: 1000,
       });
-      fetchMock.mockResolvedValue(createMockResponse("", false, 503));
-      await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
-
-      // Half-open, not open: the circuit check would answer "degraded" here, so
-      // only a probe checked first can answer "unhealthy".
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(breaker.getState("searxng")).toBe("HALF_OPEN");
+      await halfOpenBreaker(breaker);
 
       fetchMock.mockResolvedValue(createMockResponse("NOT_OK", false));
 

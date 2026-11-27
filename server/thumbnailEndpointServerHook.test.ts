@@ -2,12 +2,16 @@ import type { IncomingMessage } from "node:http";
 import debug from "debug";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// jscpd:ignore-start
+// vi.mock is hoisted above the imports, so each file registers its own mocks;
+// only the factory bodies could be shared, and the ones that differ do.
 const lookupMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:dns/promises", () => ({
   default: { lookup: lookupMock },
   lookup: lookupMock,
 }));
+// jscpd:ignore-end
 
 vi.mock("./handleTokenVerification", () => ({
   handleTokenVerification: vi.fn(),
