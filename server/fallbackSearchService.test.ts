@@ -11,6 +11,42 @@ import { startLogCapture } from "./logCapture";
 
 import { mockResponse as createMockResponse } from "./mockResponse";
 
+/** Queues an exchange whose search reply is a JSON-RPC error. */
+function mockJsonRpcError(error: { code: unknown; message: string }) {
+  fetchMock.mockResolvedValueOnce(
+    createMockResponse(INITIALIZE_REPLY, {
+      headers: { "mcp-session-id": SESSION_ID },
+    }),
+  );
+  fetchMock.mockResolvedValueOnce(
+    createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
+  );
+  fetchMock.mockResolvedValueOnce(
+    createMockResponse(JSON.stringify({ jsonrpc: "2.0", id: 2, error })),
+  );
+}
+
+/** Runs a full search and returns the error it rejected with. */
+async function rejectionOfSearch() {
+  return fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS).catch(
+    (error: unknown) => error,
+  );
+}
+
+/** Queues the three keyless providers' empty replies, in the default order. */
+function queueAllKeylessProviders() {
+  delete process.env.SEARCH_FALLBACK_PROVIDERS;
+  vi.spyOn(Math, "random").mockReturnValue(0.99);
+  mockExchange(documentWith([]));
+  mockExchange(youcomDocumentWith([]), { initializeSession: null });
+  mockExchange(keenableDocumentWith([]), { initializeSession: null });
+}
+
+/** The URLs every queued request went to, in call order. */
+function requestedUrls() {
+  return fetchMock.mock.calls.map(([requestUrl]) => String(requestUrl));
+}
+
 const SESSION_ID = "session-from-step-one";
 const QUERY = "borogoves outgrabe mimsy-42";
 // The module's own cap on the exchange; every test that is not about the
@@ -1037,29 +1073,9 @@ describe("failures", () => {
   });
 
   it("throws on a JSON-RPC error and keeps the endpoint's message out of it", async () => {
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(INITIALIZE_REPLY, {
-        headers: { "mcp-session-id": SESSION_ID },
-      }),
-    );
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
-    );
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id: 2,
-          error: { code: -32601, message: "SECRET UPSTREAM TEXT" },
-        }),
-      ),
-    );
+    mockJsonRpcError({ code: -32601, message: "SECRET UPSTREAM TEXT" });
 
-    const rejection = await fetchFallbackTextResults(
-      QUERY,
-      10,
-      FULL_BUDGET_MS,
-    ).catch((error: unknown) => error);
+    const rejection = await rejectionOfSearch();
     // The whole message is fixed text plus the code: an upstream message is
     // free-form text from a third party and must not travel any further.
     expect(rejection).toBeInstanceOf(Error);
@@ -1070,29 +1086,9 @@ describe("failures", () => {
   });
 
   it("keeps a non-numeric JSON-RPC code out of the message", async () => {
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(INITIALIZE_REPLY, {
-        headers: { "mcp-session-id": SESSION_ID },
-      }),
-    );
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
-    );
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id: 2,
-          error: { code: "SECRET", message: "SECRET UPSTREAM TEXT" },
-        }),
-      ),
-    );
+    mockJsonRpcError({ code: "SECRET", message: "SECRET UPSTREAM TEXT" });
 
-    const rejection = await fetchFallbackTextResults(
-      QUERY,
-      10,
-      FULL_BUDGET_MS,
-    ).catch((error: unknown) => error);
+    const rejection = await rejectionOfSearch();
     // A code is upstream data like the message is, so only a number may be
     // carried into the thrown error.
     expect(rejection).toBeInstanceOf(Error);
@@ -1136,11 +1132,7 @@ describe("failures", () => {
   it("throws a fixed message when the reply itself is not JSON", async () => {
     mockExchange("<html>gateway</html>");
 
-    const rejection = await fetchFallbackTextResults(
-      QUERY,
-      10,
-      FULL_BUDGET_MS,
-    ).catch((error: unknown) => error);
+    const rejection = await rejectionOfSearch();
     // A raw SyntaxError quotes the offending body, which would put the
     // upstream response into the thrown error and then into the log.
     expect((rejection as Error).message).toBe(
@@ -1890,31 +1882,23 @@ describe("Keenable", () => {
   };
 
   it("joins the default list on the keyless endpoint when it has no key", async () => {
-    delete process.env.SEARCH_FALLBACK_PROVIDERS;
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
-    mockExchange(documentWith([]));
-    mockExchange(youcomDocumentWith([]), { initializeSession: null });
-    mockExchange(keenableDocumentWith([]), { initializeSession: null });
+    queueAllKeylessProviders();
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
-    const urls = fetchMock.mock.calls.map(([requestUrl]) => String(requestUrl));
+    const urls = requestedUrls();
     expect(new Set(urls)).toEqual(
       new Set([PARALLEL_URL, YOUCOM_KEYLESS_URL, KEENABLE_KEYLESS_URL]),
     );
   });
 
   it("uses the authenticated endpoint when its key is set", async () => {
-    delete process.env.SEARCH_FALLBACK_PROVIDERS;
     process.env[KEENABLE_KEY_VARIABLE] = "keenable-test-value";
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
-    mockExchange(documentWith([]));
-    mockExchange(youcomDocumentWith([]), { initializeSession: null });
-    mockExchange(keenableDocumentWith([]), { initializeSession: null });
+    queueAllKeylessProviders();
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
-    const urls = fetchMock.mock.calls.map(([requestUrl]) => String(requestUrl));
+    const urls = requestedUrls();
     expect(new Set(urls)).toEqual(
       new Set([PARALLEL_URL, YOUCOM_KEYLESS_URL, KEENABLE_AUTHENTICATED_URL]),
     );
