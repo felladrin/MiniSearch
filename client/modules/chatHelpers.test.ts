@@ -498,6 +498,17 @@ describe("follow-up supersession ownership", () => {
     mockGetCurrentSearchRunId.mockReturnValue("run-1");
   });
 
+  /** Holds the next image search until the returned function releases it. */
+  function holdNextImageSearch() {
+    let release: (results: ImageSearchResults) => void = () => {};
+    mockSearchImages.mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = (results) => resolve({ results, stale: false });
+      }),
+    );
+    return (results: ImageSearchResults) => release(results);
+  }
+
   it("keeps both follow-ups' images when their refreshes land in reverse order", async () => {
     let shown: ImageSearchResults = [];
     vi.mocked(getImageSearchResults).mockImplementation(() => shown);
@@ -509,15 +520,7 @@ describe("follow-up supersession ownership", () => {
       mockUpdateImage.mockImplementation(() => {});
     });
 
-    let releaseFirst: (value: {
-      results: ImageSearchResults;
-      stale: boolean;
-    }) => void = () => {};
-    mockSearchImages.mockReturnValueOnce(
-      new Promise((resolve) => {
-        releaseFirst = resolve;
-      }),
-    );
+    const releaseFirst = holdNextImageSearch();
 
     const existingA: ImageSearchResults = [
       ["Initial", "https://initial.com", "thumb-0", "src-0"],
@@ -534,10 +537,7 @@ describe("follow-up supersession ownership", () => {
     });
     await refreshImageSearchResults("second", 10, existingA);
 
-    releaseFirst({
-      results: [["Late A", "https://a.com", "thumb-a", "src-a"]],
-      stale: false,
-    });
+    releaseFirst([["Late A", "https://a.com", "thumb-a", "src-a"]]);
     await first;
 
     const both: ImageSearchResults = [
@@ -559,23 +559,12 @@ describe("follow-up supersession ownership", () => {
   });
 
   it("drops an image refresh that lands after a retry on the same run", async () => {
-    let releaseImages: (value: {
-      results: ImageSearchResults;
-      stale: boolean;
-    }) => void = () => {};
-    mockSearchImages.mockReturnValueOnce(
-      new Promise((resolve) => {
-        releaseImages = resolve;
-      }),
-    );
+    const releaseImages = holdNextImageSearch();
     const refresh = refreshImageSearchResults("query", 10, [], "run-1");
     await vi.waitFor(() => expect(mockSearchImages).toHaveBeenCalledTimes(1));
 
     recordSearchAttempt("run-1", (getLatestSearchAttempt("run-1") ?? 0) + 1);
-    releaseImages({
-      results: [["Old", "https://old.com", "thumb-o", "src-o"]],
-      stale: false,
-    });
+    releaseImages([["Old", "https://old.com", "thumb-o", "src-o"]]);
     await refresh;
 
     expect(mockUpdateImage).not.toHaveBeenCalled();
@@ -616,15 +605,7 @@ describe("follow-up supersession ownership", () => {
   });
 
   it("adds a late image refresh to its own run's stored images after leaving the search", async () => {
-    let releaseImages: (value: {
-      results: ImageSearchResults;
-      stale: boolean;
-    }) => void = () => {};
-    mockSearchImages.mockReturnValueOnce(
-      new Promise((resolve) => {
-        releaseImages = resolve;
-      }),
-    );
+    const releaseImages = holdNextImageSearch();
     const handed: ImageSearchResults = [
       ["Shown", "https://shown.com", "thumb-s", "src-s"],
     ];
@@ -633,10 +614,7 @@ describe("follow-up supersession ownership", () => {
 
     // The user restored or started another search meanwhile.
     mockGetCurrentSearchRunId.mockReturnValue("run-2");
-    releaseImages({
-      results: [["Fresh", "https://fresh.com", "thumb-f", "src-f"]],
-      stale: false,
-    });
+    releaseImages([["Fresh", "https://fresh.com", "thumb-f", "src-f"]]);
     await refresh;
 
     expect(mockUpdateImage).not.toHaveBeenCalled();
