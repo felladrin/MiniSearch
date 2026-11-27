@@ -95,6 +95,15 @@ function stubPersistentSummarySlot() {
   return slot;
 }
 
+/** Answers the summarizer with a summary of exactly this many tokens. */
+function mockSummarizerReturningTokens(tokens: number) {
+  vi.mocked(generateChatWithWllama).mockImplementation(async (chat) =>
+    chat[0].content.startsWith(summarizerInstruction)
+      ? "z".repeat(tokens)
+      : "the answer",
+  );
+}
+
 function callsTo(generateChat: typeof generateChatWithWllama) {
   const calls = vi
     .mocked(generateChat)
@@ -231,11 +240,7 @@ describe("generateChatResponse context budget", () => {
         { role: "assistant", content: "d".repeat(400) },
         { role: "user", content: "q".repeat(300) },
       ];
-      vi.mocked(generateChatWithWllama).mockImplementation(async (chat) =>
-        chat[0].content.startsWith(summarizerInstruction)
-          ? "z".repeat(summaryTokens)
-          : "the answer",
-      );
+      mockSummarizerReturningTokens(summaryTokens);
 
       await generateChatResponse(messages, () => {});
 

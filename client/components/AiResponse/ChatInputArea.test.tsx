@@ -2,6 +2,7 @@ import { MantineProvider } from "@mantine/core";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ChatInputArea from "@/components/AiResponse/ChatInputArea";
+import { ENTER_TO_SUBMIT_CASES } from "@/enterToSubmitCases";
 import {
   chatGenerationStatePubSub,
   chatInputPubSub,
@@ -144,12 +145,7 @@ describe("sending the suggested follow-up question", () => {
     settingsPubSub[0]({ ...defaultSettings });
   });
 
-  it.each([
-    [true, "{Enter}", true],
-    [true, "{Shift>}{Enter}{/Shift}", false],
-    [false, "{Shift>}{Enter}{/Shift}", true],
-    [false, "{Enter}", false],
-  ])(
+  it.each(ENTER_TO_SUBMIT_CASES)(
     "with enterToSubmit %s, pressing %s sends it: %s",
     async (enterToSubmit, keys, sends) => {
       settingsPubSub[0]({ ...defaultSettings, enterToSubmit });

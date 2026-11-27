@@ -93,6 +93,19 @@ function endBody(response: Awaited<ReturnType<typeof sendSearch>>) {
   return JSON.parse(body);
 }
 
+/** Checks the outage was reported and nothing came from the fallback. */
+function expectOutageReportedWithoutFallback(response: { statusCode: number }) {
+  expectServiceUnavailable(response);
+  expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
+  expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
+  expect(recordSearchDuration).not.toHaveBeenCalled();
+}
+
+/** Everything the hook logged through `console.error`, as one string. */
+function loggedText() {
+  return vi.mocked(console.error).mock.calls.flat().join(" ");
+}
+
 describe("searchEndpointServerHook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -623,16 +636,12 @@ describe("searchEndpointServerHook", () => {
         // timeout, so it is never asked and the outage is reported the way it
         // would have been with the feature off.
         expect(fetchFallbackTextResults).not.toHaveBeenCalled();
-        expectServiceUnavailable(response);
-        expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
-        expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
-        expect(recordSearchDuration).not.toHaveBeenCalled();
+        expectOutageReportedWithoutFallback(response);
 
-        const logged = vi.mocked(console.error).mock.calls.flat().join(" ");
-        expect(logged).toContain(
+        expect(loggedText()).toContain(
           "the search deadline left the fallback too little time",
         );
-        expect(logged).not.toContain("cats");
+        expect(loggedText()).not.toContain("cats");
       });
 
       it("hands the fallback the time left, not its own full budget", async () => {
@@ -665,16 +674,12 @@ describe("searchEndpointServerHook", () => {
 
         const response = await sendSearch("/search/text?q=cats&token=abc");
 
-        expectServiceUnavailable(response);
-        expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
-        expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
-        expect(recordSearchDuration).not.toHaveBeenCalled();
+        expectOutageReportedWithoutFallback(response);
 
-        const logged = vi.mocked(console.error).mock.calls.flat().join(" ");
-        expect(logged).toContain(
+        expect(loggedText()).toContain(
           "The fallback search tool call failed with status 502",
         );
-        expect(logged).not.toContain("cats");
+        expect(loggedText()).not.toContain("cats");
       });
 
       it("answers 502 without consulting the fallback when it is switched off", async () => {

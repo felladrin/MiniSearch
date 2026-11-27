@@ -175,6 +175,16 @@ import type { ImageSearchResults, TextSearchResults } from "./types";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+/** Makes the search endpoint reject a blank query, as the real one does. */
+function stubEmptyQueryRejection() {
+  vi.mocked(searchText).mockImplementation(async (query) => {
+    if (!query.trim()) {
+      throw new Error("Query cannot be empty or whitespace only");
+    }
+    return { results: [], stale: false };
+  });
+}
+
 const LATE_IMAGE_RESULTS: ImageSearchResults = [
   ["Late", "https://late.example.com", "t", "https://late.example.com"],
 ];
@@ -294,12 +304,7 @@ describe("search degradation", () => {
 
   it("completes with no results when a stopword-only query leaves no keywords to retry with", async () => {
     harness.state.query = "how about that";
-    vi.mocked(searchText).mockImplementation(async (query) => {
-      if (!query.trim()) {
-        throw new Error("Query cannot be empty or whitespace only");
-      }
-      return { results: [], stale: false };
-    });
+    stubEmptyQueryRejection();
 
     await searchAndRespond();
     await harness.state.searchPromise;
@@ -311,12 +316,7 @@ describe("search degradation", () => {
 
   it("completes without searching when an over-long query has no keywords", async () => {
     harness.state.query = "that ".repeat(401);
-    vi.mocked(searchText).mockImplementation(async (query) => {
-      if (!query.trim()) {
-        throw new Error("Query cannot be empty or whitespace only");
-      }
-      return { results: [], stale: false };
-    });
+    stubEmptyQueryRejection();
 
     await searchAndRespond();
     await harness.state.searchPromise;

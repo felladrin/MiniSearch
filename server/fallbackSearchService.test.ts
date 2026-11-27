@@ -226,6 +226,22 @@ function expectWordBoundaryCut(source: string, snippet: string) {
   expect(source[kept.length]).toBe(" ");
 }
 
+/** Runs one parallel exchange with `budgetMs`; returns the timeout spy. */
+async function runParallelExchange(budgetMs: number) {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  listProviders("parallel,youcom");
+  orderParallelFirst();
+  const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+  mockExchange(
+    documentWith([
+      { url: "https://example.com/p", title: "P", excerpts: [EXCERPT] },
+    ]),
+  );
+
+  await fetchFallbackTextResults(QUERY, 10, budgetMs);
+  return timeoutSpy;
+}
+
 describe("isSearchFallbackEnabled", () => {
   it("is off when the variable is unset", () => {
     expect(isSearchFallbackEnabled()).toBe(false);
@@ -1562,17 +1578,7 @@ describe("the cascade", () => {
   });
 
   it("splits the module's own cap when the caller offers more", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    listProviders("parallel,youcom");
-    orderParallelFirst();
-    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
-    mockExchange(
-      documentWith([
-        { url: "https://example.com/p", title: "P", excerpts: [EXCERPT] },
-      ]),
-    );
-
-    await fetchFallbackTextResults(QUERY, 10, 60_000);
+    const timeoutSpy = await runParallelExchange(60_000);
 
     expect(timeoutSpy.mock.calls).toEqual([[7_500]]);
   });
@@ -1599,6 +1605,31 @@ describe("pausing a rate-limited provider", () => {
     // On a whole second, so an HTTP-date Retry-After lands on an exact delta.
     vi.setSystemTime(Date.UTC(2026, 0, 1, 12, 0, 0));
   });
+
+  /**
+   * Queues a 429 whose body is never read, on the tool call or on the
+   * initialized notification, and returns the spy on its stream cancel.
+   */
+  function queueUnreadRateLimit(
+    headers: Record<string, string>,
+    atNotification = false,
+  ) {
+    const cancel = vi.fn(async () => undefined);
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse(INITIALIZE_REPLY, {
+        headers: { "mcp-session-id": SESSION_ID },
+      }),
+    );
+    if (!atNotification) {
+      fetchMock.mockResolvedValueOnce(
+        createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
+      );
+    }
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse("", { status: 429, headers, unreadBody: { cancel } }),
+    );
+    return cancel;
+  }
 
   async function hitRateLimit(headers: Record<string, string> = {}) {
     fetchMock.mockResolvedValueOnce(rateLimited(headers));
@@ -1639,24 +1670,9 @@ describe("pausing a rate-limited provider", () => {
   });
 
   it("reads an HTTP-date Retry-After on the tool call", async () => {
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(INITIALIZE_REPLY, {
-        headers: { "mcp-session-id": SESSION_ID },
-      }),
-    );
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
-    );
-    const cancel = vi.fn(async () => undefined);
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse("", {
-        status: 429,
-        headers: {
-          "retry-after": new Date(Date.now() + 300_000).toUTCString(),
-        },
-        unreadBody: { cancel },
-      }),
-    );
+    const cancel = queueUnreadRateLimit({
+      "retry-after": new Date(Date.now() + 300_000).toUTCString(),
+    });
 
     await expect(
       fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
@@ -1695,19 +1711,7 @@ describe("pausing a rate-limited provider", () => {
   });
 
   it("pauses on a 429 to the initialized notification and discards its body", async () => {
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(INITIALIZE_REPLY, {
-        headers: { "mcp-session-id": SESSION_ID },
-      }),
-    );
-    const cancel = vi.fn(async () => undefined);
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse("", {
-        status: 429,
-        headers: { "retry-after": "45" },
-        unreadBody: { cancel },
-      }),
-    );
+    const cancel = queueUnreadRateLimit({ "retry-after": "45" }, true);
 
     await expect(
       fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
@@ -1773,14 +1777,7 @@ describe("pausing a rate-limited provider", () => {
 
     listProviders("parallel,youcom");
     orderParallelFirst();
-    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
-    mockExchange(
-      documentWith([
-        { url: "https://example.com/p", title: "P", excerpts: [EXCERPT] },
-      ]),
-    );
-
-    await fetchFallbackTextResults(QUERY, 10, 3_000);
+    const timeoutSpy = await runParallelExchange(3_000);
 
     expect(timeoutSpy.mock.calls).toEqual([[3_000]]);
   });

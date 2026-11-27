@@ -52,6 +52,15 @@ function mockSettings(overrides: Partial<typeof defaultSettings> = {}) {
 }
 
 /** Loads the generator under test, after the fetch routes are in place. */
+/** Aborts the generation the moment the engine enters "generating". */
+function abortWhenGenerating() {
+  const controller = new AbortController();
+  vi.mocked(updateTextGenerationState).mockImplementation((next) => {
+    if (next === "generating") controller.abort();
+  });
+  return controller;
+}
+
 async function loadHordeGenerator() {
   return (await import("./textGenerationWithHorde")).generateTextWithHorde;
 }
@@ -125,10 +134,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("stops polling and publishes nothing once the user interrupts generation", async () => {
-      const controller = new AbortController();
-      vi.mocked(updateTextGenerationState).mockImplementation((next) => {
-        if (next === "generating") controller.abort();
-      });
+      const controller = abortWhenGenerating();
       const generateTextWithHorde = await loadHordeGenerator();
 
       mockFetch
@@ -165,10 +171,7 @@ describe("textGenerationWithHorde", () => {
     it("can be interrupted once it is generating, and cancels the queued job", async () => {
       // The UI only offers Stop while the state is "generating", so the
       // interrupt can only happen after the engine has entered it.
-      const controller = new AbortController();
-      vi.mocked(updateTextGenerationState).mockImplementation((next) => {
-        if (next === "generating") controller.abort();
-      });
+      const controller = abortWhenGenerating();
       const generateTextWithHorde = await loadHordeGenerator();
 
       mockFetch
@@ -188,10 +191,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("cancels the job exactly once when the user interrupts", async () => {
-      const controller = new AbortController();
-      vi.mocked(updateTextGenerationState).mockImplementation((next) => {
-        if (next === "generating") controller.abort();
-      });
+      const controller = abortWhenGenerating();
       const generateTextWithHorde = await loadHordeGenerator();
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ id: "gen-stop" }))

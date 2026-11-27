@@ -887,11 +887,7 @@ describe("getWebSearchServiceStatus", () => {
       });
       await clearDegradation(breaker);
 
-      fetchMock.mockResolvedValue(createMockResponse("", false, 503));
-      await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
-
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(breaker.getState("searxng")).toBe("HALF_OPEN");
+      await halfOpenBreaker(breaker);
 
       healthzOk();
 

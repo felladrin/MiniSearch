@@ -2,6 +2,7 @@ import { MantineProvider } from "@mantine/core";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SearchForm from "@/components/Search/Form/SearchForm";
+import { ENTER_TO_SUBMIT_CASES } from "@/enterToSubmitCases";
 import { resetHandledQuery } from "@/modules/autoSearch";
 import { settingsPubSub } from "@/modules/pubSub";
 import { getRandomQuerySuggestion } from "@/modules/querySuggestions";
@@ -149,12 +150,7 @@ describe("SearchForm component", () => {
       settingsPubSub[0]({ ...defaultSettings });
     });
 
-    it.each([
-      [true, "{Enter}", true],
-      [true, "{Shift>}{Enter}{/Shift}", false],
-      [false, "{Shift>}{Enter}{/Shift}", true],
-      [false, "{Enter}", false],
-    ])(
+    it.each(ENTER_TO_SUBMIT_CASES)(
       "with enterToSubmit %s, pressing %s submits: %s",
       async (enterToSubmit, keys, submits) => {
         settingsPubSub[0]({ ...defaultSettings, enterToSubmit });
