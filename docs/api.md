@@ -238,7 +238,8 @@ URL for a video result, and an empty string when there is nothing to link to.
 
 The response never waits on a thumbnail host; the client loads each tile
 through `/thumbnail`. A result SearXNG returned without a thumbnail URL is
-dropped before the response, since the grid would have nothing to show for it.
+dropped before `limit` applies, since the grid would have nothing to show for
+it, so it never takes the place of one that has a thumbnail.
 
 ### `GET /page-content`
 
