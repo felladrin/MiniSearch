@@ -130,6 +130,76 @@ function createFakeWorker() {
   return worker;
 }
 
+type FakeWorker = ReturnType<typeof createFakeWorker>;
+
+/** Installs a fake worker as the local engine. */
+function installFakeWorker(): FakeWorker {
+  const worker = createFakeWorker();
+  tts.setWorkerFactory(() => worker as unknown as Worker);
+  return worker;
+}
+
+/** Starts reading `text` with the local engine and waits for its request. */
+async function startLocalSpeech(text: string) {
+  const worker = installFakeWorker();
+  const speaking = tts.speak(text);
+  await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+  return { worker, speaking };
+}
+
+/** The local voice the engine asks for when reading `text`. */
+async function localVoiceFor(text: string): Promise<string> {
+  const worker = installFakeWorker();
+  void tts.speak(text);
+  await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+  return worker.sent[0].voiceId;
+}
+
+/** Reads `text` locally; the worker sends one chunk, then fails. */
+async function speakUntilWorkerFailsAfterFirstChunk(text: string) {
+  const { worker, speaking } = await startLocalSpeech(text);
+  sendAudioChunk(worker);
+  await vi.waitFor(() => expect(createdObjectUrls).toBe(1));
+  sendError(worker, "synthesis died halfway");
+  await speaking;
+}
+
+function sendAudioChunk(worker: FakeWorker) {
+  worker.onmessage?.({
+    data: { type: "audio", index: 0, buffer: new ArrayBuffer(8) },
+  });
+}
+
+function sendDone(worker: FakeWorker) {
+  worker.onmessage?.({ data: { type: "done" } });
+}
+
+function sendError(worker: FakeWorker, message: string) {
+  worker.onmessage?.({ data: { type: "error", message } });
+}
+
+/** An Audio element whose playback is always refused. */
+function stubUnplayableAudio() {
+  vi.stubGlobal(
+    "Audio",
+    class {
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      pause = vi.fn();
+      removeAttribute = vi.fn();
+      src = "";
+      play() {
+        return Promise.reject(new Error("autoplay blocked"));
+      }
+    },
+  );
+}
+
+function removeSystemVoices() {
+  vi.stubGlobal("speechSynthesis", undefined);
+  self.speechSynthesis = undefined as unknown as SpeechSynthesis;
+}
+
 let spoken: string[] = [];
 let spokenLanguages: string[] = [];
 let createdObjectUrls = 0;
@@ -239,21 +309,15 @@ describe("splitIntoSentences", () => {
 
 describe("speak", () => {
   it("reads the answer with the local engine when it works", async () => {
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
-
-    const speaking = tts.speak("Hello there.");
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+    const { worker, speaking } = await startLocalSpeech("Hello there.");
 
     expect(worker.sent[0]).toEqual({
       sentences: ["Hello there."],
       voiceId: "en_US-lessac-high",
     });
 
-    worker.onmessage?.({
-      data: { type: "audio", index: 0, buffer: new ArrayBuffer(8) },
-    });
-    worker.onmessage?.({ data: { type: "done" } });
+    sendAudioChunk(worker);
+    sendDone(worker);
 
     await speaking;
     expect(createdObjectUrls).toBe(1);
@@ -265,15 +329,9 @@ describe("speak", () => {
   });
 
   it("falls back to the system voice when the local engine cannot load", async () => {
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
+    const { worker, speaking } = await startLocalSpeech("Hello there.");
 
-    const speaking = tts.speak("Hello there.");
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    worker.onmessage?.({
-      data: { type: "error", message: "model download failed" },
-    });
+    sendError(worker, "model download failed");
 
     await speaking;
     expect(spoken).toEqual(["Hello there."]);
@@ -300,8 +358,7 @@ describe("speak", () => {
 
   it("uses the system engine directly when it is selected", async () => {
     settings.textToSpeechEngine = "system";
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
+    const worker = installFakeWorker();
 
     await tts.speak("Hello there.");
 
@@ -310,8 +367,7 @@ describe("speak", () => {
   });
 
   it("creates no utterance and never enters the speaking state for an open reasoning block", async () => {
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
+    const worker = installFakeWorker();
 
     await tts.speak("<think>The user wants the capital. Maybe Paris?");
 
@@ -321,65 +377,27 @@ describe("speak", () => {
   });
 
   it("does not fall back after audio has started", async () => {
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
+    await speakUntilWorkerFailsAfterFirstChunk("One. Two.");
 
-    const speaking = tts.speak("One. Two.");
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    worker.onmessage?.({
-      data: { type: "audio", index: 0, buffer: new ArrayBuffer(8) },
-    });
-    await vi.waitFor(() => expect(createdObjectUrls).toBe(1));
-    worker.onmessage?.({
-      data: { type: "error", message: "synthesis died halfway" },
-    });
-
-    await speaking;
     expect(spoken).toEqual([]);
   });
 
   it("falls back when every synthesized chunk fails to play", async () => {
-    vi.stubGlobal(
-      "Audio",
-      class {
-        onended: (() => void) | null = null;
-        onerror: (() => void) | null = null;
-        pause = vi.fn();
-        removeAttribute = vi.fn();
-        src = "";
-        play() {
-          return Promise.reject(new Error("autoplay blocked"));
-        }
-      },
-    );
+    stubUnplayableAudio();
+    const { worker, speaking } = await startLocalSpeech("Hello there.");
 
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
-
-    const speaking = tts.speak("Hello there.");
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    worker.onmessage?.({
-      data: { type: "audio", index: 0, buffer: new ArrayBuffer(8) },
-    });
-    worker.onmessage?.({ data: { type: "done" } });
+    sendAudioChunk(worker);
+    sendDone(worker);
 
     await speaking;
     expect(spoken).toEqual(["Hello there."]);
   });
 
   it("detaches the audio handlers before clearing the source", async () => {
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
+    const { worker, speaking } = await startLocalSpeech("Hello there.");
 
-    const speaking = tts.speak("Hello there.");
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    worker.onmessage?.({
-      data: { type: "audio", index: 0, buffer: new ArrayBuffer(8) },
-    });
-    worker.onmessage?.({ data: { type: "done" } });
+    sendAudioChunk(worker);
+    sendDone(worker);
     await speaking;
 
     // A real element can still fire `error` during teardown; a still-attached
@@ -388,35 +406,9 @@ describe("speak", () => {
   });
 
   it("falls back when the worker fails and no chunk was ever audible", async () => {
-    vi.stubGlobal(
-      "Audio",
-      class {
-        onended: (() => void) | null = null;
-        onerror: (() => void) | null = null;
-        pause = vi.fn();
-        removeAttribute = vi.fn();
-        src = "";
-        play() {
-          return Promise.reject(new Error("autoplay blocked"));
-        }
-      },
-    );
+    stubUnplayableAudio();
+    await speakUntilWorkerFailsAfterFirstChunk("One. Two.");
 
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
-
-    const speaking = tts.speak("One. Two.");
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    worker.onmessage?.({
-      data: { type: "audio", index: 0, buffer: new ArrayBuffer(8) },
-    });
-    await vi.waitFor(() => expect(createdObjectUrls).toBe(1));
-    worker.onmessage?.({
-      data: { type: "error", message: "synthesis died halfway" },
-    });
-
-    await speaking;
     expect(spoken).toEqual(["One. Two."]);
   });
 
@@ -428,8 +420,7 @@ describe("speak", () => {
       }),
     );
 
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
+    const worker = installFakeWorker();
 
     const speaking = tts.speak("Hello there.");
     await vi.waitFor(() =>
@@ -447,58 +438,35 @@ describe("speak", () => {
 
   it("picks the local voice for the answer's language, not the browser's", async () => {
     mockVoices.mockResolvedValue([englishVoice, portugueseVoice]);
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
 
-    void tts.speak(portugueseAnswer);
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    expect(worker.sent[0].voiceId).toBe("pt_BR-faber-medium");
+    expect(await localVoiceFor(portugueseAnswer)).toBe("pt_BR-faber-medium");
   });
 
   it("prefers a medium voice over a low one of the same language", async () => {
     mockVoices.mockResolvedValue([englishLowVoice, englishMediumVoice]);
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
 
-    void tts.speak("Hello there.");
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    expect(worker.sent[0].voiceId).toBe("en_GB-alan-medium");
+    expect(await localVoiceFor("Hello there.")).toBe("en_GB-alan-medium");
   });
 
   it("prefers a medium voice over a high one, which is a bigger download", async () => {
     mockVoices.mockResolvedValue([englishVoice, englishMediumVoice]);
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
 
-    void tts.speak("Hello there.");
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    expect(worker.sent[0].voiceId).toBe("en_GB-alan-medium");
+    expect(await localVoiceFor("Hello there.")).toBe("en_GB-alan-medium");
   });
 
   it("prefers the browser's region among voices of the same quality", async () => {
     mockVoices.mockResolvedValue([englishMediumVoice, americanMediumVoice]);
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
 
-    void tts.speak("Hello there.");
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    expect(worker.sent[0].voiceId).toBe("en_US-amy-medium");
+    expect(await localVoiceFor("Hello there.")).toBe("en_US-amy-medium");
   });
 
   it("prefers a low voice over an x-low one of the same language", async () => {
     vi.stubGlobal("navigator", { language: "vi-VN" });
     mockVoices.mockResolvedValue([vietnameseXLowVoice, vietnameseLowVoice]);
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
 
-    void tts.speak(vietnameseAnswer);
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    expect(worker.sent[0].voiceId).toBe("vi_VN-25hours_single-low");
+    expect(await localVoiceFor(vietnameseAnswer)).toBe(
+      "vi_VN-25hours_single-low",
+    );
   });
 
   it("keeps the catalogue order when the answer's language has no region", async () => {
@@ -506,40 +474,27 @@ describe("speak", () => {
       portugueseFromPortugalVoice,
       portugueseVoice,
     ]);
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
 
-    void tts.speak(portugueseAnswer);
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    expect(worker.sent[0].voiceId).toBe("pt_PT-tugão-medium");
+    expect(await localVoiceFor(portugueseAnswer)).toBe("pt_PT-tugão-medium");
   });
 
   it("keeps a chosen voice whatever the answer's language", async () => {
     mockVoices.mockResolvedValue([englishVoice, portugueseVoice]);
     settings.selectedVoiceId = "piper:en_US-lessac-high";
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
 
-    void tts.speak(portugueseAnswer);
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    expect(worker.sent[0].voiceId).toBe("en_US-lessac-high");
+    expect(await localVoiceFor(portugueseAnswer)).toBe("en_US-lessac-high");
   });
 
   it("keeps the browser language when the detector cannot recognize it", async () => {
     // franc-min has no Danish and reads this sentence as Swedish.
     vi.stubGlobal("navigator", { language: "da-DK" });
     mockVoices.mockResolvedValue([swedishVoice, danishVoice]);
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
 
-    void tts.speak(
-      "Eiffeltårnet blev bygget i 1889 til verdensudstillingen i Paris og er omkring 330 meter højt.",
-    );
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-    expect(worker.sent[0].voiceId).toBe("da_DK-talesyntese-medium");
+    expect(
+      await localVoiceFor(
+        "Eiffeltårnet blev bygget i 1889 til verdensudstillingen i Paris og er omkring 330 meter højt.",
+      ),
+    ).toBe("da_DK-talesyntese-medium");
   });
 
   it("uses the browser language when the detector fails to load", async () => {
@@ -549,13 +504,8 @@ describe("speak", () => {
     try {
       tts = await import("./textToSpeech");
       mockVoices.mockResolvedValue([englishVoice, portugueseVoice]);
-      const worker = createFakeWorker();
-      tts.setWorkerFactory(() => worker as unknown as Worker);
 
-      void tts.speak(portugueseAnswer);
-      await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
-
-      expect(worker.sent[0].voiceId).toBe("en_US-lessac-high");
+      expect(await localVoiceFor(portugueseAnswer)).toBe("en_US-lessac-high");
       expect(mockAddLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("Could not detect the answer's language"),
       );
@@ -573,11 +523,7 @@ describe("speak", () => {
   });
 
   it("stops playback without falling back to the system voice", async () => {
-    const worker = createFakeWorker();
-    tts.setWorkerFactory(() => worker as unknown as Worker);
-
-    const speaking = tts.speak("Hello there.");
-    await vi.waitFor(() => expect(worker.sent).toHaveLength(1));
+    const { worker, speaking } = await startLocalSpeech("Hello there.");
 
     tts.stopSpeaking();
     await speaking;
@@ -590,8 +536,7 @@ describe("speak", () => {
 describe("no speech engine at all", () => {
   it("resolves and logs when the local engine failed and there are no OS voices", async () => {
     mockVoices.mockRejectedValue(new Error("offline"));
-    vi.stubGlobal("speechSynthesis", undefined);
-    self.speechSynthesis = undefined as unknown as SpeechSynthesis;
+    removeSystemVoices();
 
     await tts.speak("Hello there.");
 
@@ -607,8 +552,7 @@ describe("no speech engine at all", () => {
 
   it("lists no voices instead of throwing", async () => {
     mockVoices.mockRejectedValue(new Error("offline"));
-    vi.stubGlobal("speechSynthesis", undefined);
-    self.speechSynthesis = undefined as unknown as SpeechSynthesis;
+    removeSystemVoices();
 
     await expect(tts.listVoices("en-US", "system")).resolves.toEqual([]);
   });
