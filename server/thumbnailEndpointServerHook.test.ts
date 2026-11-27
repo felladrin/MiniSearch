@@ -1,4 +1,4 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
+import type { IncomingMessage } from "node:http";
 import debug from "debug";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,6 +36,12 @@ vi.mock("./utils/pinnedFetch", async (importOriginal) => {
 
 import { handleTokenVerification } from "./handleTokenVerification";
 import {
+  createRequest,
+  createRequestWithBadHost,
+  createResponse,
+  getRegisteredHookHandler,
+} from "./hookTestUtils";
+import {
   recordThumbnailBlocked,
   recordThumbnailDropped,
   recordThumbnailRequested,
@@ -46,34 +52,8 @@ import {
   thumbnailEndpointServerHook,
 } from "./thumbnailEndpointServerHook";
 
-function createRequest(url: string): IncomingMessage {
-  return {
-    url,
-    headers: { host: "localhost:3000" },
-  } as unknown as IncomingMessage;
-}
-
-function createResponse() {
-  return {
-    statusCode: 200,
-    setHeader: vi.fn(),
-    end: vi.fn(),
-  } as unknown as ServerResponse & {
-    setHeader: ReturnType<typeof vi.fn>;
-    end: ReturnType<typeof vi.fn>;
-  };
-}
-
 function getRegisteredHandler() {
-  const use = vi.fn();
-  thumbnailEndpointServerHook({
-    middlewares: { use },
-  } as unknown as Parameters<typeof thumbnailEndpointServerHook>[0]);
-  return use.mock.calls[0][0] as (
-    request: IncomingMessage,
-    response: ServerResponse,
-    next: () => void,
-  ) => Promise<void>;
+  return getRegisteredHookHandler(thumbnailEndpointServerHook);
 }
 
 // The in-process cache is module state, so each test aims at its own URL and
@@ -565,15 +545,17 @@ describe("thumbnailEndpointServerHook", () => {
 describe("thumbnailEndpointServerHook with a malformed Host header", () => {
   it("answers 400 instead of 500", async () => {
     vi.mocked(handleTokenVerification).mockClear();
-    const request = {
-      url: "/thumbnail?u=https%3A%2F%2Fexample.com%2Fa.png&token=abc",
-      headers: { host: "bad host" },
-    } as unknown as IncomingMessage;
     const response = createResponse();
     const next = vi.fn();
 
     await expect(
-      getRegisteredHandler()(request, response, next),
+      getRegisteredHandler()(
+        createRequestWithBadHost(
+          "/thumbnail?u=https%3A%2F%2Fexample.com%2Fa.png&token=abc",
+        ),
+        response,
+        next,
+      ),
     ).resolves.toBeUndefined();
 
     expect(response.statusCode).toBe(400);
