@@ -139,3 +139,65 @@ describe("rejectedByClient", () => {
     expect(Object.values(rejectedByClient).reduce((a, b) => a + b, 0)).toBe(0);
   });
 });
+
+describe("classifyRejectedFetchSite", () => {
+  it.each([
+    ["same-origin", "sameOrigin"],
+    ["Same-Origin", "sameOrigin"],
+    ["same-site", "sameSite"],
+    ["cross-site", "crossSite"],
+    ["none", "none"],
+    [undefined, "missing"],
+    ["", "missing"],
+    ["   ", "missing"],
+    ["unknown", "other"],
+    [["same-origin", "cross-site"], "other"],
+  ] as const)("sorts a %s header into %s", async (secFetchSite, label) => {
+    const { classifyRejectedFetchSite } = await freshCounters();
+    expect(classifyRejectedFetchSite(secFetchSite)).toBe(label);
+  });
+});
+
+describe("rejectedByFetchSite", () => {
+  it("counts token rejections per Sec-Fetch-Site label and excludes rate-limited and accepted requests", async () => {
+    const {
+      recordAuthorizedRequest,
+      recordRejectedRequest,
+      getAuthorizationStats,
+    } = await freshCounters();
+
+    recordAuthorizedRequest("search");
+    recordRejectedRequest("thumbnail", "rateLimited", undefined, "same-origin");
+    recordRejectedRequest(
+      "search",
+      "invalidToken",
+      "Mozilla/5.0",
+      "same-origin",
+    );
+    recordRejectedRequest("search", "missingToken", "curl/8.5.0");
+    recordRejectedRequest(
+      "pageContent",
+      "invalidToken",
+      undefined,
+      "cross-site",
+    );
+    recordRejectedRequest("inference", "invalidToken", undefined, "unexpected");
+
+    const stats = getAuthorizationStats();
+    expect(stats.rejectedByFetchSite).toEqual({
+      sameOrigin: 1,
+      sameSite: 0,
+      crossSite: 1,
+      none: 0,
+      missing: 1,
+      other: 1,
+    });
+    const byFetchSite = Object.values(stats.rejectedByFetchSite).reduce(
+      (total, count) => total + count,
+      0,
+    );
+    expect(byFetchSite).toBe(
+      stats.reasons.missingToken + stats.reasons.invalidToken,
+    );
+  });
+});

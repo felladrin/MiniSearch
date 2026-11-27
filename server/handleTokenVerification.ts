@@ -118,6 +118,7 @@ export async function handleTokenVerification(
       surface,
       result.reason,
       request?.headers["user-agent"],
+      request?.headers["sec-fetch-site"],
     );
     response.statusCode = result.statusCode;
 
