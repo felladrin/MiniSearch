@@ -9,6 +9,21 @@ async function loadResponseChannel() {
   return await import("./pubSub");
 }
 
+/** Subscribes to the response channel and records each published value. */
+function collectPublished(
+  responsePubSub: [
+    unknown,
+    (listener: (value: string) => void) => () => void,
+    unknown,
+  ],
+) {
+  const published: string[] = [];
+  const unsubscribe = responsePubSub[1]((value) => {
+    published.push(value);
+  });
+  return { published, unsubscribe };
+}
+
 describe("response publishing", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -20,11 +35,7 @@ describe("response publishing", () => {
 
   it("publishes one leading and one trailing value per throttle window", async () => {
     const { responsePubSub, updateResponse } = await loadResponseChannel();
-    const published: string[] = [];
-    const [, onResponseChange] = responsePubSub;
-    const unsubscribe = onResponseChange((value) => {
-      published.push(value);
-    });
+    const { published, unsubscribe } = collectPublished(responsePubSub);
 
     updateResponse("Hello");
     updateResponse("Hello world");
@@ -46,11 +57,7 @@ describe("response publishing", () => {
       updateResponse,
       updateResponseImmediately,
     } = await loadResponseChannel();
-    const published: string[] = [];
-    const [, onResponseChange] = responsePubSub;
-    const unsubscribe = onResponseChange((value) => {
-      published.push(value);
-    });
+    const { published, unsubscribe } = collectPublished(responsePubSub);
 
     updateResponse("Hello");
     updateResponse("Hello world, but truncated");

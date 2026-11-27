@@ -36,6 +36,13 @@ vi.mock("@mantine/notifications", () => ({
 
 const TIMEOUT_HOURS = 24;
 
+/** Checks that a stored key was dropped without a call to the server. */
+function expectStoredKeyDiscarded(result: unknown) {
+  expect(result).toBe(false);
+  expect(localStorage.getItem("accessKeyHash")).toBeNull();
+  expect(mockFetch).not.toHaveBeenCalled();
+}
+
 describe("Access Key Module", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -196,9 +203,7 @@ describe("Access Key Module", () => {
       );
 
       const result = await verifyStoredAccessKey(TIMEOUT_HOURS);
-      expect(result).toBe(false);
-      expect(localStorage.getItem("accessKeyHash")).toBeNull();
-      expect(mockFetch).not.toHaveBeenCalled();
+      expectStoredKeyDiscarded(result);
     });
 
     it("deletes a stored value that is not JSON without asking the server", async () => {
@@ -207,9 +212,7 @@ describe("Access Key Module", () => {
 
       const result = await verifyStoredAccessKey(TIMEOUT_HOURS);
 
-      expect(result).toBe(false);
-      expect(localStorage.getItem("accessKeyHash")).toBeNull();
-      expect(mockFetch).not.toHaveBeenCalled();
+      expectStoredKeyDiscarded(result);
     });
 
     it("keeps the stored hash on a 429 instead of deleting it", async () => {
