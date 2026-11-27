@@ -67,6 +67,15 @@ function renderImageResultsList() {
   );
 }
 
+/** Breaks the first thumbnail and waits for its tile to fall back. */
+async function breakFirstThumbnail() {
+  const [img] = await screen.findAllByRole("img");
+  img.dispatchEvent(new Event("error"));
+
+  // The second tile still loads, so exactly one img survives the failure.
+  await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(1));
+}
+
 describe("ImageResultsList", () => {
   it("renders thumbnails as named buttons", async () => {
     renderImageResultsList();
@@ -113,11 +122,7 @@ describe("ImageResultsList", () => {
   it("shows the host name when a thumbnail fails to load", async () => {
     renderImageResultsList();
 
-    const [img] = await screen.findAllByRole("img");
-    img.dispatchEvent(new Event("error"));
-
-    // The second tile still loads, so exactly one img survives the failure.
-    await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(1));
+    await breakFirstThumbnail();
     expect(
       screen.getByRole("button", { name: "Open image preview: First image" }),
     ).toHaveTextContent("example.com");
@@ -127,9 +132,7 @@ describe("ImageResultsList", () => {
     const user = userEvent.setup();
     renderImageResultsList();
 
-    const [img] = await screen.findAllByRole("img");
-    img.dispatchEvent(new Event("error"));
-    await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(1));
+    await breakFirstThumbnail();
 
     await user.click(
       screen.getByRole("button", { name: "Open image preview: First image" }),

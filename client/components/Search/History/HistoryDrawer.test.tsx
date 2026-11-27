@@ -78,6 +78,20 @@ const mockHistory = (overrides: SearchHistoryOverrides = {}) => {
   });
 };
 
+/**
+ * Renders the drawer with one stored search and returns the select spy, the
+ * entry, and the user for the click that follows.
+ */
+function drawerWithOneEntry() {
+  const onSearchSelect = vi.fn();
+  const entry = makeEntry(1, "quantum tunneling");
+  mockHistory({ filteredSearches: [entry] });
+
+  const user = userEvent.setup();
+  renderDrawer(onSearchSelect);
+  return { user, onSearchSelect, entry };
+}
+
 describe("HistoryDrawer component", () => {
   beforeEach(() => {
     mockSettings(true);
@@ -137,24 +151,14 @@ describe("HistoryDrawer component", () => {
   });
 
   it("selects an entry when its card is clicked", async () => {
-    const onSearchSelect = vi.fn();
-    const entry = makeEntry(1, "quantum tunneling");
-    mockHistory({ filteredSearches: [entry] });
-
-    const user = userEvent.setup();
-    renderDrawer(onSearchSelect);
+    const { user, onSearchSelect, entry } = drawerWithOneEntry();
     await user.click(await screen.findByText("quantum tunneling"));
 
     expect(onSearchSelect).toHaveBeenCalledWith(entry);
   });
 
   it("selects an entry once when its query is clicked", async () => {
-    const onSearchSelect = vi.fn();
-    const entry = makeEntry(1, "quantum tunneling");
-    mockHistory({ filteredSearches: [entry] });
-
-    const user = userEvent.setup();
-    renderDrawer(onSearchSelect);
+    const { user, onSearchSelect, entry } = drawerWithOneEntry();
     await user.click(
       await screen.findByRole("button", { name: /quantum tunneling/ }),
     );
@@ -164,12 +168,7 @@ describe("HistoryDrawer component", () => {
   });
 
   it("selects an entry from the keyboard", async () => {
-    const onSearchSelect = vi.fn();
-    const entry = makeEntry(1, "quantum tunneling");
-    mockHistory({ filteredSearches: [entry] });
-
-    const user = userEvent.setup();
-    renderDrawer(onSearchSelect);
+    const { user, onSearchSelect, entry } = drawerWithOneEntry();
     const queryButton = await screen.findByRole("button", {
       name: /quantum tunneling/,
     });

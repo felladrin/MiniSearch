@@ -54,6 +54,13 @@ function makeValidHash(suffix: string): string {
   return `$argon2id$v=19$m=512,t=16,p=1$${salt}$${digest}`;
 }
 
+/** Reloads the module under test and returns its verifier. */
+async function reloadVerifier() {
+  mockRateLimiterShouldFail = false;
+  vi.resetModules();
+  return (await import("./verifyTokenAndRateLimit")).verifyTokenAndRateLimit;
+}
+
 describe("verifyTokenAndRateLimit", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -344,11 +351,7 @@ describe("verifyTokenAndRateLimit", () => {
   });
 
   it("should key rate limiter on the socket address by default (untrusted proxy)", async () => {
-    mockRateLimiterShouldFail = false;
-    vi.resetModules();
-    const { verifyTokenAndRateLimit } = await import(
-      "./verifyTokenAndRateLimit"
-    );
+    const verifyTokenAndRateLimit = await reloadVerifier();
     // makeMockRequest sets a spoofable X-Forwarded-For, but with TRUST_PROXY
     // off the real TCP peer (socket.remoteAddress) must be used instead.
     const mockReq = makeMockRequest("192.168.1.100");
@@ -406,11 +409,7 @@ describe("verifyTokenAndRateLimit", () => {
   });
 
   it("should fall back to token as rate limit key when no request", async () => {
-    mockRateLimiterShouldFail = false;
-    vi.resetModules();
-    const { verifyTokenAndRateLimit } = await import(
-      "./verifyTokenAndRateLimit"
-    );
+    const verifyTokenAndRateLimit = await reloadVerifier();
     const result = await verifyTokenAndRateLimit(makeValidHash("fallback"));
     expect(result.isAuthorized).toBe(true);
     expect(mockConsume).toHaveBeenCalledWith(

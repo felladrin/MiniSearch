@@ -25,6 +25,20 @@ function createServer(withHttpServer = true): ServerWithCloseHandler {
   return withHttpServer ? { httpServer: { on: vi.fn() } } : {};
 }
 
+/** Runs the hook with a reranker that fails, with the console noise silenced. */
+async function runHookWithFailedReranker(error: Error) {
+  vi.mocked(startRerankerService).mockRejectedValue(error);
+  const consoleError = vi
+    .spyOn(console, "error")
+    .mockImplementation(() => undefined);
+  const server = createServer();
+
+  await rerankerServiceHook(
+    server as unknown as Parameters<typeof rerankerServiceHook>[0],
+  );
+  return { consoleError, server };
+}
+
 describe("rerankerServiceHook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -59,15 +73,7 @@ describe("rerankerServiceHook", () => {
 
   it("continues startup and logs when the reranker fails", async () => {
     const error = new Error("reranker unavailable");
-    vi.mocked(startRerankerService).mockRejectedValue(error);
-    const consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
-    const server = createServer();
-
-    await rerankerServiceHook(
-      server as unknown as Parameters<typeof rerankerServiceHook>[0],
-    );
+    const { consoleError } = await runHookWithFailedReranker(error);
 
     expect(startWebSearchService).toHaveBeenCalledOnce();
     expect(consoleError).toHaveBeenCalledWith(

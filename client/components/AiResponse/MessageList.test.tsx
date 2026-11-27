@@ -29,6 +29,20 @@ function renderMessageList(props: {
   );
 }
 
+// An empty answer is saved when the stream ends with no content.
+function chatWithEmptyAnswers(): ChatMessage[] {
+  return [
+    { role: "user", content: "system instructions" },
+    { role: "assistant", content: "Ok!" },
+    { role: "user", content: "Q1" },
+    { role: "assistant", content: "" },
+    { role: "user", content: "Q2" },
+    { role: "assistant", content: "" },
+    { role: "user", content: "Q3" },
+    { role: "assistant", content: "A3" },
+  ];
+}
+
 describe("MessageList", () => {
   it("renders nothing when there are no follow-up messages", () => {
     const messages: ChatMessage[] = [
@@ -57,17 +71,7 @@ describe("MessageList", () => {
   });
 
   describe("an empty answer earlier in the chat", () => {
-    // An empty answer is saved when the stream ends with no content.
-    const messages: ChatMessage[] = [
-      { role: "user", content: "system instructions" },
-      { role: "assistant", content: "Ok!" },
-      { role: "user", content: "Q1" },
-      { role: "assistant", content: "" },
-      { role: "user", content: "Q2" },
-      { role: "assistant", content: "" },
-      { role: "user", content: "Q3" },
-      { role: "assistant", content: "A3" },
-    ];
+    const messages: ChatMessage[] = chatWithEmptyAnswers();
 
     it("edits each question at its position in the chat", () => {
       const onEditMessage = vi.fn();
