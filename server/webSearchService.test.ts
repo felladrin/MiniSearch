@@ -56,6 +56,15 @@ afterEach(() => {
   global.fetch = originalFetch;
 });
 
+/** A breaker whose text circuit one failed text search has opened. */
+async function openTextCircuit() {
+  const breaker = new CircuitBreaker({ failureThreshold: 1 });
+  fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+  await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+  expect(breaker.getState("searxng:text")).toBe("OPEN");
+  return breaker;
+}
+
 /** Trips the breaker with a failing search and waits until it half-opens. */
 async function halfOpenBreaker(breaker: CircuitBreaker) {
   fetchMock.mockResolvedValue(createMockResponse("", false, 503));
@@ -64,7 +73,7 @@ async function halfOpenBreaker(breaker: CircuitBreaker) {
   // Half-open, not open: the circuit check would answer "degraded" here, so
   // only a probe checked first can answer "unhealthy".
   await vi.advanceTimersByTimeAsync(1000);
-  expect(breaker.getState("searxng")).toBe("HALF_OPEN");
+  expect(breaker.getState("searxng:text")).toBe("HALF_OPEN");
 }
 
 describe("WebSearchService", () => {
@@ -397,14 +406,14 @@ describe("graceful degradation", () => {
     expect(fetchMock).toHaveBeenCalledTimes(
       (breakerOptions.failureThreshold - 1) * ATTEMPTS_PER_CALL,
     );
-    expect(breaker.getState("searxng")).toBe("CLOSED");
+    expect(breaker.getState("searxng:text")).toBe("CLOSED");
 
     await searchThroughRetries(breaker);
 
     expect(fetchMock).toHaveBeenCalledTimes(
       breakerOptions.failureThreshold * ATTEMPTS_PER_CALL,
     );
-    expect(breaker.getState("searxng")).toBe("OPEN");
+    expect(breaker.getState("searxng:text")).toBe("OPEN");
 
     // Open now, so the next call is refused without reaching SearXNG.
     const callsWhileOpen = fetchMock.mock.calls.length;
@@ -427,7 +436,7 @@ describe("graceful degradation", () => {
       ).rejects.toThrow();
     }
 
-    expect(breaker.getState("searxng")).toBe("OPEN");
+    expect(breaker.getState("searxng:text")).toBe("OPEN");
 
     await vi.advanceTimersByTimeAsync(breakerOptions.resetTimeout + 1);
     fetchMock.mockResolvedValue(successResponse());
@@ -440,7 +449,7 @@ describe("graceful degradation", () => {
     );
 
     expect(results).toHaveLength(1);
-    expect(breaker.getState("searxng")).toBe("CLOSED");
+    expect(breaker.getState("searxng:text")).toBe("CLOSED");
   });
 
   it("throws when the provider is down and returns an empty array for zero results", async () => {
@@ -462,8 +471,8 @@ describe("graceful degradation", () => {
       emptyBreaker,
     );
 
-    expect(downBreaker.getState("searxng")).toBe("OPEN");
-    expect(emptyBreaker.getState("searxng")).toBe("CLOSED");
+    expect(downBreaker.getState("searxng:text")).toBe("OPEN");
+    expect(emptyBreaker.getState("searxng:text")).toBe("CLOSED");
     expect(noResults).toEqual([]);
   });
 
@@ -486,7 +495,7 @@ describe("graceful degradation", () => {
     await vi.advanceTimersByTimeAsync(RETRY_BACKOFF_TOTAL_MS);
     await outcome;
 
-    expect(breaker.getState("searxng")).toBe("OPEN");
+    expect(breaker.getState("searxng:text")).toBe("OPEN");
     // A transient reason (a timeout) can clear inside the backoff, so this
     // case keeps the full retry budget before the search fails, and the
     // counter lands when the attempts run out. A suspended set would fail
@@ -837,19 +846,64 @@ describe("circuit breaker", () => {
     for (let failure = 0; failure < 4; failure++) {
       await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
     }
-    expect(breaker.getState("searxng")).toBe("CLOSED");
+    expect(breaker.getState("searxng:text")).toBe("CLOSED");
 
     const callsAfterFour = fetchMock.mock.calls.length;
     await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
 
     expect(fetchMock.mock.calls.length).toBe(callsAfterFour + 1);
-    expect(breaker.getState("searxng")).toBe("OPEN");
+    expect(breaker.getState("searxng:text")).toBe("OPEN");
 
     // Open now, so the next call is refused without reaching SearXNG.
     const callsWhileOpen = fetchMock.mock.calls.length;
     await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
 
     expect(fetchMock.mock.calls.length).toBe(callsWhileOpen);
+  });
+});
+
+describe("per-search-type circuits", () => {
+  it("keeps serving text searches after image searches open their circuit", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
+    fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+
+    for (let failure = 0; failure < 5; failure++) {
+      await expect(
+        fetchSearXNG("test", "images", 30, breaker),
+      ).rejects.toThrow();
+    }
+    expect(breaker.getState("searxng:images")).toBe("OPEN");
+    expect(breaker.getState("searxng:text")).toBe("CLOSED");
+
+    // SearXNG still serves text; the image circuit must not refuse it.
+    fetchMock.mockResolvedValue(successResponse());
+    const callsBefore = fetchMock.mock.calls.length;
+    await expect(fetchSearXNG("test", "text", 30, breaker)).resolves.toEqual([
+      ["example", "example content", "https://example.com"],
+    ]);
+    expect(fetchMock.mock.calls.length).toBe(callsBefore + 1);
+
+    // And the image circuit is still open: a text success does not close it.
+    expect(breaker.getState("searxng:images")).toBe("OPEN");
+  });
+
+  it("keeps serving image searches after text searches open their circuit", async () => {
+    const breaker = await openTextCircuit();
+
+    fetchMock.mockResolvedValue(
+      createMockResponse(JSON.stringify({ results: [] })),
+    );
+    await expect(fetchSearXNG("test", "images", 30, breaker)).resolves.toEqual(
+      [],
+    );
+    expect(breaker.getState("searxng:images")).toBe("CLOSED");
+  });
+
+  it("reports each search type's circuit separately", () => {
+    expect(getSearchCircuitStats()).toEqual({
+      circuitState: { text: expect.any(String), images: expect.any(String) },
+      circuitOpens: { text: expect.any(Number), images: expect.any(Number) },
+    });
   });
 });
 
@@ -900,16 +954,26 @@ describe("getWebSearchServiceStatus", () => {
   }
 
   it("reports unhealthy while the circuit is open, though /healthz answers OK", async () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 1 });
-    fetchMock.mockResolvedValue(createMockResponse("", false, 503));
-    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
-    expect(breaker.getState("searxng")).toBe("OPEN");
+    const breaker = await openTextCircuit();
 
     // SearXNG is listening, so the probe passes; every search still fails,
     // because the breaker answers them without reaching SearXNG at all.
     healthzOk();
 
     expect(await getWebSearchServiceStatus(breaker)).toBe("unhealthy");
+  });
+
+  it("reports degraded, not unhealthy, while only the image circuit is open", async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 1 });
+    await clearDegradation(breaker);
+    fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+    await expect(fetchSearXNG("test", "images", 30, breaker)).rejects.toThrow();
+    expect(breaker.getState("searxng:images")).toBe("OPEN");
+
+    healthzOk();
+
+    // Text searches are still served, so the instance is not down.
+    expect(await getWebSearchServiceStatus(breaker)).toBe("degraded");
   });
 
   it("reports unhealthy when the probe fails, before it looks at the circuit", async () => {
@@ -952,7 +1016,7 @@ describe("getWebSearchServiceStatus", () => {
 
   it("reports degraded after a search lost to unresponsive engines", async () => {
     const breaker = await degradedBreaker("google (CAPTCHA)");
-    expect(breaker.getState("searxng")).toBe("CLOSED");
+    expect(breaker.getState("searxng:text")).toBe("CLOSED");
 
     healthzOk();
 
@@ -1194,7 +1258,7 @@ describe("search deadline", () => {
     deadline.abort(new DOMException("timed out", "TimeoutError"));
     await outcome;
 
-    expect(breaker.getState("searxng")).toBe("OPEN");
+    expect(breaker.getState("searxng:text")).toBe("OPEN");
   });
 
   it("stops retrying when the signal fires during the backoff", async () => {
