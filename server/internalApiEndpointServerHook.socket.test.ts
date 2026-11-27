@@ -1,6 +1,6 @@
-import { Agent, createServer, request, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import { Agent, request } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { postThroughSocket, startHookServer } from "./hookTestUtils.ts";
 
 vi.mock("./handleTokenVerification.ts", () => ({
   handleTokenVerification: async () => ({ shouldContinue: true }),
@@ -19,7 +19,7 @@ vi.mock("./handleTokenVerification.ts", () => ({
  * but `npm test` does not run that config.
  */
 describe("internalApiEndpointServerHook over a real socket", () => {
-  let server: Server;
+  let closeServer: () => Promise<void>;
   let port: number;
 
   beforeEach(async () => {
@@ -31,46 +31,19 @@ describe("internalApiEndpointServerHook over a real socket", () => {
     const { internalApiEndpointServerHook } = await import(
       "./internalApiEndpointServerHook.ts"
     );
-    server = createServer((req, res) => {
-      const middlewares = {
-        use: (
-          handler: (req: unknown, res: unknown, next: () => void) => void,
-        ) =>
-          handler(req, res, () => {
-            res.statusCode = 404;
-            res.end();
-          }),
-      };
-      internalApiEndpointServerHook({ middlewares } as never);
-    });
-    await new Promise<void>((resolve) => server.listen(0, resolve));
-    port = (server.address() as AddressInfo).port;
+    const started = await startHookServer(internalApiEndpointServerHook);
+    closeServer = started.close;
+    port = started.port;
   });
 
   afterEach(async () => {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closeServer();
     vi.unstubAllEnvs();
   });
 
   function post(agent: Agent, payload: string | Buffer) {
-    return new Promise<string>((resolve) => {
-      const req = request(
-        {
-          port,
-          method: "POST",
-          path: "/inference",
-          agent,
-          headers: { "Content-Type": "application/json" },
-        },
-        (res) => {
-          res.resume();
-          res.on("end", () => resolve(`status=${res.statusCode}`));
-        },
-      );
-      req.on("error", (error) =>
-        resolve(`error=${(error as NodeJS.ErrnoException).code}`),
-      );
-      req.end(payload);
+    return postThroughSocket(port, "/inference", agent, payload, {
+      "Content-Type": "application/json",
     });
   }
 

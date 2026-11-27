@@ -1,4 +1,11 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
+import {
+  type Agent,
+  createServer,
+  type IncomingMessage,
+  request,
+  type ServerResponse,
+} from "node:http";
+import type { AddressInfo } from "node:net";
 import { vi } from "vitest";
 
 /** The middleware an endpoint hook mounted on `server.middlewares`. */
@@ -44,4 +51,57 @@ export function getRegisteredHookHandler<S>(
   const use = vi.fn();
   hook({ middlewares: { use } } as unknown as S);
   return use.mock.calls[0][0] as HookHandler;
+}
+
+/**
+ * Runs `hook` on a real HTTP server on an ephemeral port, with a `next` that
+ * answers 404. Only a real connection shows what a mid-upload refusal costs a
+ * keep-alive caller, which is what the socket tests check.
+ */
+export async function startHookServer(
+  hook: (server: never) => void,
+): Promise<{ port: number; close: () => Promise<void> }> {
+  const server = createServer((req, res) => {
+    const middlewares = {
+      use: (handler: (req: unknown, res: unknown, next: () => void) => void) =>
+        handler(req, res, () => {
+          res.statusCode = 404;
+          res.end();
+        }),
+    };
+    hook({ middlewares } as never);
+  });
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const port = (server.address() as AddressInfo).port;
+  return {
+    port,
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}
+
+/**
+ * POSTs `payload` to `path` and resolves with `status=<code>`, or
+ * `error=<code>` when the socket itself failed, which is how a dropped
+ * keep-alive connection reaches the caller.
+ */
+export function postThroughSocket(
+  port: number,
+  path: string,
+  agent: Agent,
+  payload: string | Buffer,
+  headers: Record<string, string> = {},
+): Promise<string> {
+  return new Promise<string>((resolve) => {
+    const req = request(
+      { port, method: "POST", path, agent, headers },
+      (res) => {
+        res.resume();
+        res.on("end", () => resolve(`status=${res.statusCode}`));
+      },
+    );
+    req.on("error", (error) =>
+      resolve(`error=${(error as NodeJS.ErrnoException).code}`),
+    );
+    req.end(payload);
+  });
 }

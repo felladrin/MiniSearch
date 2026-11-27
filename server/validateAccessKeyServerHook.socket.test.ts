@@ -1,6 +1,6 @@
-import { Agent, createServer, request, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import { Agent } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { postThroughSocket, startHookServer } from "./hookTestUtils.ts";
 
 vi.mock("hash-wasm", () => ({ argon2Verify: async () => false }));
 vi.mock("./verifyTokenAndRateLimit.ts", () => ({
@@ -20,7 +20,7 @@ vi.mock("./verifyTokenAndRateLimit.ts", () => ({
  * but `npm test` does not run that config.
  */
 describe("validateAccessKeyServerHook over a real socket", () => {
-  let server: Server;
+  let closeServer: () => Promise<void>;
   let port: number;
   let originalAccessKeys: string | undefined;
 
@@ -30,42 +30,19 @@ describe("validateAccessKeyServerHook over a real socket", () => {
     const { validateAccessKeyServerHook } = await import(
       "./validateAccessKeyServerHook.ts"
     );
-    server = createServer((req, res) => {
-      const middlewares = {
-        use: (
-          handler: (req: unknown, res: unknown, next: () => void) => void,
-        ) =>
-          handler(req, res, () => {
-            res.statusCode = 404;
-            res.end();
-          }),
-      };
-      validateAccessKeyServerHook({ middlewares } as never);
-    });
-    await new Promise<void>((resolve) => server.listen(0, resolve));
-    port = (server.address() as AddressInfo).port;
+    const started = await startHookServer(validateAccessKeyServerHook);
+    closeServer = started.close;
+    port = started.port;
   });
 
   afterEach(async () => {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await closeServer();
     if (originalAccessKeys === undefined) delete process.env.ACCESS_KEYS;
     else process.env.ACCESS_KEYS = originalAccessKeys;
   });
 
   function post(agent: Agent, payload: string | Buffer) {
-    return new Promise<string>((resolve) => {
-      const req = request(
-        { port, method: "POST", path: "/api/validate-access-key", agent },
-        (res) => {
-          res.resume();
-          res.on("end", () => resolve(`status=${res.statusCode}`));
-        },
-      );
-      req.on("error", (error) =>
-        resolve(`error=${(error as NodeJS.ErrnoException).code}`),
-      );
-      req.end(payload);
-    });
+    return postThroughSocket(port, "/api/validate-access-key", agent, payload);
   }
 
   it("refuses an oversized body with 413 without breaking the next request", async () => {
