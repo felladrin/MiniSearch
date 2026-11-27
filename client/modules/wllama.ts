@@ -1,6 +1,8 @@
 import {
   type DownloadOptions,
   type LoadModelParams,
+  ModelManager,
+  ModelValidationStatus,
   type SamplingParams,
   Wllama,
   type WllamaConfig,
@@ -140,6 +142,51 @@ export async function clearWllamaCache(): Promise<void> {
         }`,
       );
     });
+  }
+}
+
+/**
+ * Ids of the catalog models whose files are all in wllama's cache.
+ *
+ * A model counts as downloaded only when wllama itself calls it valid: every
+ * shard present at the size recorded when it was downloaded. A download that
+ * stopped halfway is reported as invalid by `validate()` and gets no id.
+ *
+ * Returns no ids, and logs, when the cache cannot be read (a browser without
+ * OPFS, for example), so the caller still gets a usable list.
+ */
+export async function getDownloadedWllamaModelIds(): Promise<Set<string>> {
+  try {
+    // ModelManager reads the cache on its own: no Wllama instance and no worker.
+    const cachedModels = await new ModelManager().getModels({
+      includeInvalid: true,
+    });
+    const validUrls = new Set(
+      cachedModels
+        .filter((model) => model.validate() === ModelValidationStatus.VALID)
+        .map((model) => model.url),
+    );
+
+    return new Set(
+      Object.entries(wllamaModels)
+        .filter(([, model]) =>
+          // The cache keys files by the URL they were downloaded from, and
+          // `loadModelFromHF` builds that URL as
+          // `https://huggingface.co/${repo}/resolve/main/${file}` (wllama's
+          // `getHFModelSource`), so the catalog entry matches only that URL.
+          validUrls.has(
+            `https://huggingface.co/${model.hfRepoId}/resolve/main/${model.hfFilePath}`,
+          ),
+        )
+        .map(([id]) => id),
+    );
+  } catch (error) {
+    addLogEntry(
+      `Failed to read the Wllama model cache: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
+    );
+    return new Set();
   }
 }
 
