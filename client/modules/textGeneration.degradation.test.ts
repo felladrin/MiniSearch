@@ -150,10 +150,14 @@ vi.mock("gpt-tokenizer", () => ({
   default: { encode: vi.fn(() => [1, 2, 3]) },
 }));
 
+// jscpd:ignore-start
+// vi.mock is hoisted above the imports, so each file registers its own mocks.
 vi.mock("./textGenerationWithWllama", () => ({
   generateTextWithWllama: vi.fn(() => Promise.resolve()),
   generateChatWithWllama: vi.fn(() => Promise.resolve("")),
 }));
+
+// jscpd:ignore-end
 
 import {
   mergeSearchImageResults,
