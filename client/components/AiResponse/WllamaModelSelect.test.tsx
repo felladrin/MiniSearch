@@ -84,11 +84,18 @@ describe("WllamaModelSelect", () => {
   });
 
   it("leaves a model whose download stopped halfway unmarked", async () => {
-    cache.getModels.mockResolvedValue([cachedModel(gemmaUrl, "invalid")]);
+    cache.getModels.mockResolvedValue([
+      cachedModel(qwenUrl, "valid"),
+      cachedModel(gemmaUrl, "invalid"),
+    ]);
     renderSelect();
 
-    await openPickerAndWaitForOption(gemmaOption);
-    expect(screen.queryByText(/Downloaded/)).not.toBeInTheDocument();
+    // Waiting for the valid model's marker proves the cache read has landed,
+    // so the next assertion cannot pass just because it ran too early.
+    await openPickerAndWaitForOption(`${qwenOption} • Downloaded`);
+    expect(
+      screen.getByRole("option", { name: gemmaOption, hidden: true }),
+    ).toBeInTheDocument();
   });
 
   it("keeps the picker usable and logs when the cache cannot be read", async () => {
