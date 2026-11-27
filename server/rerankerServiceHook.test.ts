@@ -76,7 +76,7 @@ describe("rerankerServiceHook", () => {
   it("continues startup and logs when the reranker fails", async () => {
     const error = new Error("reranker unavailable");
     vi.mocked(startRerankerService).mockRejectedValue(error);
-    const { consoleError, server } = await runHookOnFreshServer();
+    const { consoleError } = await runHookOnFreshServer();
 
     expect(startWebSearchService).toHaveBeenCalledOnce();
     expect(consoleError).toHaveBeenCalledWith(
@@ -88,7 +88,7 @@ describe("rerankerServiceHook", () => {
   it("continues startup and logs when the web search service fails", async () => {
     const error = new Error("search service unavailable");
     vi.mocked(startWebSearchService).mockRejectedValue(error);
-    const { consoleError, server } = await runHookOnFreshServer();
+    const { consoleError } = await runHookOnFreshServer();
 
     expect(startRerankerService).toHaveBeenCalledOnce();
     expect(consoleError).toHaveBeenCalledWith(

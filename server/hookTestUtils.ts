@@ -6,7 +6,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
-import { expect, type Mock, vi } from "vitest";
+import { expect, vi } from "vitest";
 
 /** The middleware an endpoint hook mounted on `server.middlewares`. */
 export type HookHandler = (
@@ -24,7 +24,7 @@ export function createRequest(url: string): IncomingMessage {
 }
 
 /** A request whose `Host` header cannot be parsed. */
-export function createRequestWithBadHost(url: string): IncomingMessage {
+function createRequestWithBadHost(url: string): IncomingMessage {
   return { url, headers: { host: "bad host" } } as unknown as IncomingMessage;
 }
 
