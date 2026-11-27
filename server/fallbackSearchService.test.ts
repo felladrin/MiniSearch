@@ -1,4 +1,3 @@
-import debug from "debug";
 import {
   afterEach,
   beforeEach,
@@ -8,44 +7,9 @@ import {
   type MockedFunction,
   vi,
 } from "vitest";
+import { startLogCapture } from "./logCapture";
 
-function createMockResponse(
-  body: string,
-  {
-    status,
-    ok = status === undefined ? true : status >= 200 && status < 300,
-    headers = {},
-    contentType = "application/json",
-    unreadBody = null,
-  }: {
-    ok?: boolean;
-    status?: number;
-    headers?: Record<string, string>;
-    contentType?: string;
-    unreadBody?: { cancel: () => Promise<void> } | null;
-  } = {},
-): Response {
-  const resolvedStatus = status ?? (ok ? 200 : 503);
-  return {
-    ok,
-    status: resolvedStatus,
-    statusText: ok ? "OK" : "Error",
-    headers: new Headers({ "content-type": contentType, ...headers }),
-    redirected: false,
-    type: "basic" as ResponseType,
-    url: "http://test.com",
-    clone: function () {
-      return this;
-    },
-    body: unreadBody,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    json: () => Promise.resolve(JSON.parse(body)),
-    text: () => Promise.resolve(body),
-  } as unknown as Response;
-}
+import { mockResponse as createMockResponse } from "./mockResponse";
 
 const SESSION_ID = "session-from-step-one";
 const QUERY = "borogoves outgrabe mimsy-42";
@@ -1203,24 +1167,14 @@ describe("failures", () => {
 });
 
 describe("privacy", () => {
-  let logLines: string[];
-  let originalLog: typeof debug.log;
+  let capture: ReturnType<typeof startLogCapture>;
 
   beforeEach(() => {
-    logLines = [];
-    originalLog = debug.log;
-    debug.log = (...args: unknown[]) => {
-      logLines.push(args.map(String).join(" "));
-    };
-    for (const method of ["log", "info", "warn", "error", "debug"] as const) {
-      vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
-        logLines.push(args.map(String).join(" "));
-      });
-    }
+    capture = startLogCapture();
   });
 
   afterEach(() => {
-    debug.log = originalLog;
+    capture.stop();
   });
 
   it("never writes the query, the API key or the response text to the log", async () => {
@@ -1246,7 +1200,7 @@ describe("privacy", () => {
       fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
     ).rejects.toThrow();
 
-    const output = logLines.join("\n");
+    const output = capture.lines.join("\n");
     for (const form of [
       QUERY,
       encodeURIComponent(QUERY),
@@ -1257,7 +1211,7 @@ describe("privacy", () => {
     ]) {
       expect(output).not.toContain(form);
     }
-    expect(logLines.length).toBeGreaterThan(0);
+    expect(capture.lines.length).toBeGreaterThan(0);
   });
 
   it("never writes the You.com query, the API key or the response text to the log", async () => {
@@ -1279,7 +1233,7 @@ describe("privacy", () => {
     // The stream the endpoint answers with carries the query inside a
     // notification before the reply, so this also covers that path: none of
     // it may reach the log, only the counts do.
-    const output = logLines.join("\n");
+    const output = capture.lines.join("\n");
     for (const form of [
       QUERY,
       "PRIVATE RESPONSE TITLE",
@@ -1288,7 +1242,7 @@ describe("privacy", () => {
     ]) {
       expect(output).not.toContain(form);
     }
-    expect(logLines.length).toBeGreaterThan(0);
+    expect(capture.lines.length).toBeGreaterThan(0);
   });
 });
 

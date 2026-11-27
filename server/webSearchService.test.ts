@@ -1,4 +1,3 @@
-import debug from "debug";
 import {
   afterEach,
   beforeEach,
@@ -8,6 +7,8 @@ import {
   type MockedFunction,
   vi,
 } from "vitest";
+import { startLogCapture } from "./logCapture";
+import { mockResponse } from "./mockResponse";
 import {
   getDegradedSearchTypes,
   getSearchesWithAllResultsDiscardedSinceLastRestart,
@@ -26,33 +27,8 @@ import {
   parseUnresponsiveEngines,
 } from "./webSearchService";
 
-function createMockResponse(
-  text: string,
-  ok = true,
-  status?: number,
-): Response {
-  const resolvedStatus = status ?? (ok ? 200 : 503);
-  return {
-    ok,
-    status: resolvedStatus,
-    statusText: ok ? "OK" : "Error",
-    headers: new Headers(),
-    redirected: false,
-    type: "basic" as ResponseType,
-    url: "http://test.com",
-    clone: function () {
-      return this;
-    },
-    body: null,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    json: () => Promise.resolve(JSON.parse(text)),
-    text: () => Promise.resolve(text),
-  } as unknown as Response;
-}
-
+const createMockResponse = (text: string, ok = true, status?: number) =>
+  mockResponse(text, { ok, status });
 const successResponse = () =>
   createMockResponse(
     JSON.stringify({
@@ -635,34 +611,18 @@ describe("query privacy", () => {
   // `+`, from URLSearchParams), which a match on the raw string alone misses.
   const DISTINCTIVE_QUERY = "borogoves outgrabe mimsy-42";
 
-  let logLines: string[];
-  let originalLog: typeof debug.log;
+  let capture: ReturnType<typeof startLogCapture>;
 
-  /**
-   * `debug` resolves its writer at call time, so replacing it here captures
-   * everything the module logs through `debug`, which under jsdom never reaches
-   * `console` in a spy-able way. The console spies cover the calls the module
-   * makes directly, so a new logging line is caught whichever it uses.
-   */
   beforeEach(() => {
     // The unresponsive-engine path retries, so the backoff timers must be
     // fake or those calls wait seven seconds of real time each.
     vi.useFakeTimers();
-    logLines = [];
-    originalLog = debug.log;
-    debug.log = (...args: unknown[]) => {
-      logLines.push(args.map(String).join(" "));
-    };
-    for (const method of ["log", "info", "warn", "error", "debug"] as const) {
-      vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
-        logLines.push(args.map(String).join(" "));
-      });
-    }
+    capture = startLogCapture();
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    debug.log = originalLog;
+    capture.stop();
     vi.restoreAllMocks();
   });
 
@@ -732,8 +692,8 @@ describe("query privacy", () => {
       fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker()),
     ).rejects.toThrow();
 
-    const output = logLines.join("\n");
-    expect(logLines.length).toBeGreaterThan(0);
+    const output = capture.lines.join("\n");
+    expect(capture.lines.length).toBeGreaterThan(0);
 
     for (const form of [
       DISTINCTIVE_QUERY,
@@ -757,12 +717,12 @@ describe("query privacy", () => {
     await vi.runAllTimersAsync();
     await outcome;
 
-    expect(logLines.join("\n")).toContain(
+    expect(capture.lines.join("\n")).toContain(
       "Unresponsive engines: google (Timeout)",
     );
     // The retry line carries the cause, so a recovered retry stays readable
     // in the log: engine names, never the query.
-    expect(logLines.join("\n")).toContain(
+    expect(capture.lines.join("\n")).toContain(
       "returned no results (google (Timeout))",
     );
   });
@@ -781,7 +741,9 @@ describe("query privacy", () => {
     );
 
     expect(results).toEqual([]);
-    expect(logLines.join("\n")).toContain("No engine errors were reported");
+    expect(capture.lines.join("\n")).toContain(
+      "No engine errors were reported",
+    );
     expect(getSearchesWithoutResultsSinceLastRestart()).toBe(
       searchesWithoutResults + 1,
     );
@@ -793,7 +755,7 @@ describe("query privacy", () => {
 
     await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
 
-    expect(logLines.join("\n")).toContain(
+    expect(capture.lines.join("\n")).toContain(
       "All 1 text result(s) processed from the SearXNG response were discarded",
     );
     expect(getSearchesWithAllResultsDiscardedSinceLastRestart()).toBe(
