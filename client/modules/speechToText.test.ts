@@ -235,6 +235,16 @@ describe("stripLanguageTag", () => {
   });
 });
 
+/** Starts a wasm-engine session with a fresh transcript spy. */
+async function startWasmSession() {
+  const { stream } = makeMediaStream();
+  stubWasmSupport(vi.fn().mockResolvedValue(stream));
+  const onTranscript = vi.fn();
+
+  const session = await startDictation({ onTranscript }, true);
+  return { session, onTranscript };
+}
+
 describe("startDictation with the wasm engine", () => {
   /** Minimal `SpeechRecognition` stand-in; reports whether it was started. */
   function installLocalRecognitionFake() {
@@ -526,11 +536,7 @@ describe("startDictation with the wasm engine", () => {
   });
 
   it("gives a second stop the same transcript instead of resolving early", async () => {
-    const { stream } = makeMediaStream();
-    stubWasmSupport(vi.fn().mockResolvedValue(stream));
-    const onTranscript = vi.fn();
-
-    const session = await startDictation({ onTranscript }, true);
+    const { session, onTranscript } = await startWasmSession();
     capture(4800);
     const first = session.stop();
     const second = session.stop();
@@ -542,11 +548,7 @@ describe("startDictation with the wasm engine", () => {
   });
 
   it("skips the transcription when nothing was recorded", async () => {
-    const { stream } = makeMediaStream();
-    stubWasmSupport(vi.fn().mockResolvedValue(stream));
-    const onTranscript = vi.fn();
-
-    const session = await startDictation({ onTranscript }, true);
+    const { session, onTranscript } = await startWasmSession();
     await session.stop();
 
     expect(wllama.createTranscription).not.toHaveBeenCalled();
@@ -701,19 +703,21 @@ describe("startDictation with the web speech fallback", () => {
     await session.stop();
   });
 
-  it("ends the session quietly when the recognizer stops on its own", async () => {
+  /** Starts a web-speech session with fresh `onEnd` and `onError` spies. */
+  async function startRecognitionSession() {
     installRecognitionFake();
     const onError = vi.fn();
     const onEnd = vi.fn();
 
     const session = await startDictation(
-      {
-        onTranscript: vi.fn(),
-        onEnd,
-        onError,
-      },
+      { onTranscript: vi.fn(), onEnd, onError },
       true,
     );
+    return { session, onEnd, onError };
+  }
+
+  it("ends the session quietly when the recognizer stops on its own", async () => {
+    const { session, onEnd, onError } = await startRecognitionSession();
 
     // Chrome ends after silence even with `continuous`. The session is over,
     // but there is nothing the user needs told about.
@@ -725,18 +729,7 @@ describe("startDictation with the web speech fallback", () => {
   });
 
   it("says nothing when the recognizer ends because it was stopped", async () => {
-    installRecognitionFake();
-    const onError = vi.fn();
-    const onEnd = vi.fn();
-
-    const session = await startDictation(
-      {
-        onTranscript: vi.fn(),
-        onEnd,
-        onError,
-      },
-      true,
-    );
+    const { session, onEnd, onError } = await startRecognitionSession();
 
     await session.stop();
     instance?.onend?.();

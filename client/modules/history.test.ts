@@ -26,6 +26,27 @@ function oneTextResult() {
     items: [{ title: "T", url: "https://t.com", snippet: "S" }],
   };
 }
+/** Turns auto-cleanup on with a five-entry window and no retention. */
+async function enableAutoCleanup() {
+  const { getSettings } = await import("./pubSub");
+  const { defaultSettings } = await import("./settings");
+  vi.mocked(getSettings).mockReturnValue({
+    ...defaultSettings,
+    historyAutoCleanup: true,
+    historyRetentionDays: 0,
+    historyMaxEntries: 5,
+  });
+}
+
+/** Checks that every history store came back empty. */
+async function expectStoresEmpty(
+  db: typeof import("./history")["historyDatabase"],
+) {
+  expect(await db.searches.count()).toBe(0);
+  expect(await db.llmResponses.count()).toBe(0);
+  expect(await db.chatHistory.count()).toBe(0);
+}
+
 describe("History Module - Search Run ID Management", () => {
   beforeEach(async () => {
     vi.resetModules();
@@ -361,6 +382,14 @@ describe("History Module - Dexie CRUD", () => {
   });
 
   describe("mergeSearchImageResults", () => {
+    /** The two image results these tests merge, in the order the screen shows. */
+    function freshAndFirstImages() {
+      return [
+        image("Fresh", "https://fresh.com"),
+        image("First", "https://first.com"),
+      ];
+    }
+
     const image = (title: string, url: string) => ({
       title,
       url,
@@ -422,10 +451,7 @@ describe("History Module - Dexie CRUD", () => {
         type: "image",
         items: [image("Fresh", "https://fresh.com")],
       });
-      expect(await storedItems()).toEqual([
-        image("Fresh", "https://fresh.com"),
-        image("First", "https://first.com"),
-      ]);
+      expect(await storedItems()).toEqual(freshAndFirstImages());
 
       // The reverse order: a follow-up stored first, the first search lands
       // after it. Its images go after the follow-up's, as on screen.
@@ -439,10 +465,7 @@ describe("History Module - Dexie CRUD", () => {
         { type: "image", items: [image("First", "https://first.com")] },
         { newFirst: false },
       );
-      expect(await storedItems()).toEqual([
-        image("Fresh", "https://fresh.com"),
-        image("First", "https://first.com"),
-      ]);
+      expect(await storedItems()).toEqual(freshAndFirstImages());
 
       // A retry on the run clears the list before its own images arrive.
       await updateSearchResults(runId, { type: "image", items: [] });
@@ -612,14 +635,7 @@ describe("History Module - Dexie CRUD", () => {
 
   describe("cleanup after add", () => {
     it("should not throw TransactionInactiveError when auto-cleanup is enabled", async () => {
-      const { getSettings } = await import("./pubSub");
-      const { defaultSettings } = await import("./settings");
-      vi.mocked(getSettings).mockReturnValue({
-        ...defaultSettings,
-        historyAutoCleanup: true,
-        historyRetentionDays: 0,
-        historyMaxEntries: 5,
-      });
+      await enableAutoCleanup();
 
       const { addSearchToHistory, historyDatabase } = await import("./history");
       const results = oneTextResult();
@@ -745,9 +761,7 @@ describe("History Module - Dexie CRUD", () => {
 
       await clearAllHistory();
 
-      expect(await historyDatabase.searches.count()).toBe(0);
-      expect(await historyDatabase.llmResponses.count()).toBe(0);
-      expect(await historyDatabase.chatHistory.count()).toBe(0);
+      await expectStoresEmpty(historyDatabase);
     });
   });
 });
