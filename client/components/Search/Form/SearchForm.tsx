@@ -69,6 +69,7 @@ export default memo(function SearchForm({
     textAreaValue: query,
     suggestedQuery: DEFAULT_QUERY_SUGGESTION,
   });
+  const [dictationSessionKey, setDictationSessionKey] = useState(0);
 
   const [, navigate] = useLocation();
   const [pubSubSettings] = usePubSub(settingsPubSub);
@@ -183,6 +184,7 @@ export default memo(function SearchForm({
       markQueryAsHandled(normalizedQuery);
     }
 
+    setDictationSessionKey((key) => key + 1);
     setState((prev) => ({ ...prev, textAreaValue: queryToEncode }));
     updateQuery(queryToEncode);
 
@@ -249,6 +251,7 @@ export default memo(function SearchForm({
             }}
           />
           <DictationButton
+            key={dictationSessionKey}
             getValue={getDictationBase}
             setValue={setDictatedText}
             labelScope="the search query"
