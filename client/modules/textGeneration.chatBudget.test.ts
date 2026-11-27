@@ -70,15 +70,6 @@ function mockGenerateChat(generateChat: typeof generateChatWithWllama) {
   );
 }
 
-/** Answers the summarizer call with `summary`, every other call with the answer. */
-function mockSummarizerReturning(summary: string) {
-  vi.mocked(generateChatWithWllama).mockImplementation(async (messages) =>
-    messages[0].content.startsWith(summarizerInstruction)
-      ? summary
-      : "the answer",
-  );
-}
-
 /** Total characters in a chat, which is its token count under this tokenizer. */
 function contentLength(chat: ChatMessage[]) {
   return chat.reduce((total, message) => total + message.content.length, 0);
