@@ -114,7 +114,11 @@ export async function handleTokenVerification(
   const surface = resolveSurface(request);
 
   if (!result.isAuthorized) {
-    recordRejectedRequest(surface, result.reason);
+    recordRejectedRequest(
+      surface,
+      result.reason,
+      request?.headers["user-agent"],
+    );
     response.statusCode = result.statusCode;
 
     if (REASONS_WITH_A_PAGE.has(result.reason) && asksForHtml(request)) {

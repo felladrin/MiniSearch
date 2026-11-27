@@ -110,6 +110,17 @@ describe("handleTokenVerification", () => {
     );
   });
 
+  it("sorts a refused request's client into the published vocabulary", async () => {
+    const before = getAuthorizationStats().rejectedByClient;
+
+    await verify("/search/text", REJECTIONS.invalidToken, {
+      headers: { "user-agent": "curl/8.5.0" },
+    });
+
+    const after = getAuthorizationStats().rejectedByClient;
+    expect(after.curl).toBe(before.curl + 1);
+  });
+
   it.each([
     ["/search/text", "search"],
     ["/search/images", "search"],
@@ -202,9 +213,23 @@ describe("handleTokenVerification", () => {
       "distinctRejectedTokens",
       "limiter",
       "reasons",
+      "rejectedByClient",
       "rejectedRate",
       "rejectedTokenCacheHits",
       "requests",
+    ]);
+    // The client detail is a fixed set of labels, never the string a client
+    // sent: no address, no token, no query, and no user agent leaves here.
+    expect(Object.keys(stats.rejectedByClient).sort()).toEqual([
+      "bot",
+      "browser",
+      "curl",
+      "go",
+      "java",
+      "node",
+      "other",
+      "python",
+      "wget",
     ]);
     expect(Object.keys(stats.reasons).sort()).toEqual([
       "invalidToken",
