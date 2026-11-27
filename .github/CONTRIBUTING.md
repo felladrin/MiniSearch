@@ -4,7 +4,11 @@ First off, thank you for considering contributing to MiniSearch! It's people lik
 
 ## Your First Contribution
 
-Not sure where to start? [Browse issues labeled "good first issue"](https://github.com/felladrin/MiniSearch/issues?q=label%3A%22good+first+issue%22+state%3Aopen). They are curated for first-time contributors, and you are welcome to ask for help in the issue comments.
+Not sure where to start? [Browse issues labeled "good first issue"](https://github.com/felladrin/MiniSearch/issues?q=label%3A%22good+first+issue%22+state%3Aopen). They are curated for first-time contributors, and you are welcome to ask for help in the issue comments. Issues labeled ["help wanted"](https://github.com/felladrin/MiniSearch/issues?q=label%3A%22help+wanted%22+state%3Aopen) are open to anyone too, and usually take more work.
+
+An issue with either label has been triaged: the problem is confirmed, and it often describes a proposed solution. You don't need to ask before you work on it. Pick it, and open a pull request with `Closes #<number>` in the description. Before you start, check that no open pull request already links to the issue.
+
+An issue without either label may still need a decision. Ask in its comments before you work on it.
 
 ## Quick Start
 
