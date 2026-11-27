@@ -27,6 +27,9 @@ const SERVICE_BASE_URL = `http://${SERVICE_HOST}:${SERVICE_PORT}`;
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY = 1000;
 
+// Text and image searches go out to different engine pools, so each type gets
+// its own circuit: image engines failing must not block text searches that
+// SearXNG is still serving.
 const searxngCircuitBreaker = new CircuitBreaker({
   failureThreshold: 5,
   resetTimeout: 60_000,
@@ -81,15 +84,30 @@ export async function startWebSearchService() {
   }
 }
 
+function circuitKey(searchType: SearchType) {
+  return `searxng:${searchType}`;
+}
+
 /**
- * The state of the circuit in front of SearXNG, and how often it has opened. An
- * open circuit answers every search with a failure without calling SearXNG at
- * all, which no other counter distinguishes from SearXNG being down.
+ * The state of each search type's circuit in front of SearXNG, and how often
+ * it has opened. An open circuit answers every search of its type with a
+ * failure without calling SearXNG at all, which no other counter distinguishes
+ * from SearXNG being down.
  */
 export function getSearchCircuitStats() {
+  const circuitState = (searchType: SearchType) =>
+    searxngCircuitBreaker.getState(circuitKey(searchType));
+  const circuitOpens = (searchType: SearchType) =>
+    searxngCircuitBreaker.getOpens(circuitKey(searchType));
   return {
-    circuitState: searxngCircuitBreaker.getState("searxng"),
-    circuitOpens: searxngCircuitBreaker.getOpens("searxng"),
+    circuitState: {
+      text: circuitState("text"),
+      images: circuitState("images"),
+    },
+    circuitOpens: {
+      text: circuitOpens("text"),
+      images: circuitOpens("images"),
+    },
   };
 }
 
@@ -111,19 +129,27 @@ export async function getWebSearchStatus() {
  * so the probe keeps answering OK straight through a total outage, and engines
  * under suspension answer 200 with nothing usable. `degraded` means SearXNG is
  * up and reachable but search is not proven: the last search of either type was
- * lost to its engines, or the circuit is waiting for one to prove it recovered.
+ * lost to its engines, the image circuit is open, or a circuit is waiting for
+ * one to prove it recovered. An open text circuit is `unhealthy`, since text
+ * search is what every answer is built on; image search going down alone
+ * leaves it serving.
  */
 export async function getWebSearchServiceStatus(
   breaker: CircuitBreaker = searxngCircuitBreaker,
 ): Promise<"healthy" | "degraded" | "unhealthy"> {
   if (!(await getWebSearchStatus())) return "unhealthy";
 
-  const circuitState = breaker.getState("searxng");
-  if (circuitState === "OPEN") return "unhealthy";
+  const textCircuit = breaker.getState(circuitKey("text"));
+  if (textCircuit === "OPEN") return "unhealthy";
 
   // HALF_OPEN is reached on a timer, with no successful search behind it, so
   // reporting it as healthy would call the outage over because a minute passed.
-  if (circuitState === "HALF_OPEN") return "degraded";
+  if (
+    textCircuit === "HALF_OPEN" ||
+    breaker.getState(circuitKey("images")) !== "CLOSED"
+  ) {
+    return "degraded";
+  }
 
   return getDegradedSearchTypes().length > 0 ? "degraded" : "healthy";
 }
@@ -338,7 +364,7 @@ async function processSearchResults(
 ) {
   // An abort is thrown inside `execute`, so a stalled SearXNG counts as a
   // failure as soon as the deadline passes.
-  const results = await breaker.execute("searxng", () =>
+  const results = await breaker.execute(circuitKey(searchType), () =>
     performSearch(query, searchType, signal),
   );
   const openableResults = openableUniqueResults(results);
