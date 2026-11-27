@@ -175,6 +175,50 @@ import type { ImageSearchResults, TextSearchResults } from "./types";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
+const LATE_IMAGE_RESULTS: ImageSearchResults = [
+  ["Late", "https://late.example.com", "t", "https://late.example.com"],
+];
+
+/**
+ * Fails the text search and holds the image search open, with the AI response
+ * and the image search on. Returns the function that releases the held search.
+ */
+function failTextAndHoldImages() {
+  vi.mocked(searchText).mockRejectedValueOnce(
+    new Error("HTTP error! status: 502"),
+  );
+  let release:
+    | ((value: { results: ImageSearchResults; stale: boolean }) => void)
+    | undefined;
+  vi.mocked(searchImages).mockReturnValueOnce(
+    new Promise<{ results: ImageSearchResults; stale: boolean }>((resolve) => {
+      release = resolve;
+    }),
+  );
+  harness.state.settings.enableAiResponse = true;
+  harness.state.settings.enableImageSearch = true;
+  return () => release?.({ results: LATE_IMAGE_RESULTS, stale: false });
+}
+
+/** Lets an in-flight continuation drain before the next assertion. */
+async function drainContinuations() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** Queues run B: its own query, run id and text results. */
+function queueSecondSearch() {
+  const resultsB: TextSearchResults = [
+    ["B title", "B snippet", "https://b.example"],
+  ];
+  harness.state.query = "search b";
+  harness.state.searchRunId = "run-b";
+  vi.mocked(searchText).mockResolvedValueOnce({
+    results: resultsB,
+    stale: false,
+  });
+  return resultsB;
+}
+
 describe("search degradation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -368,22 +412,7 @@ describe("search degradation", () => {
 
   it("lets a newer search keep the grounding channel when an older image fallback resolves last", async () => {
     // Run 1: text fails, image in flight.
-    vi.mocked(searchText).mockRejectedValueOnce(
-      new Error("HTTP error! status: 502"),
-    );
-    let releaseImages: (value: {
-      results: ImageSearchResults;
-      stale: boolean;
-    }) => void = () => {};
-    vi.mocked(searchImages).mockReturnValueOnce(
-      new Promise<{ results: ImageSearchResults; stale: boolean }>(
-        (resolve) => {
-          releaseImages = resolve;
-        },
-      ),
-    );
-    harness.state.settings.enableAiResponse = true;
-    harness.state.settings.enableImageSearch = true;
+    const releaseLateImages = failTextAndHoldImages();
 
     const first = searchAndRespond();
     await vi.waitFor(() => expect(searchImages).toHaveBeenCalled());
@@ -399,17 +428,12 @@ describe("search degradation", () => {
     await harness.state.searchPromise;
 
     // Run 1's image search now lands, after run 2 already owns the channel.
-    releaseImages({
-      results: [
-        ["Late", "https://late.example.com", "t", "https://late.example.com"],
-      ],
-      stale: false,
-    });
+    releaseLateImages();
     // Let run 1's in-flight continuation fully drain: without the guard its
     // publish lands on later microtasks, after the test's own `await` has
     // resumed, so asserting without draining would race the very write the
     // guard blocks.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
     await first;
 
     expect(harness.state.llmTextSearchResults).toEqual([
@@ -418,21 +442,7 @@ describe("search degradation", () => {
   });
 
   it("keeps restored grounding when an older image fallback resolves after a restore", async () => {
-    vi.mocked(searchText).mockRejectedValueOnce(
-      new Error("HTTP error! status: 502"),
-    );
-    let releaseImages:
-      | ((value: { results: ImageSearchResults; stale: boolean }) => void)
-      | undefined;
-    vi.mocked(searchImages).mockReturnValueOnce(
-      new Promise<{ results: ImageSearchResults; stale: boolean }>(
-        (resolve) => {
-          releaseImages = resolve;
-        },
-      ),
-    );
-    harness.state.settings.enableAiResponse = true;
-    harness.state.settings.enableImageSearch = true;
+    const releaseLateImages = failTextAndHoldImages();
 
     const first = searchAndRespond();
     await vi.waitFor(() => expect(searchImages).toHaveBeenCalled());
@@ -444,15 +454,10 @@ describe("search degradation", () => {
       ["Restored", "snippet", "https://restored.example.com"],
     ];
 
-    releaseImages?.({
-      results: [
-        ["Late", "https://late.example.com", "t", "https://late.example.com"],
-      ],
-      stale: false,
-    });
+    releaseLateImages();
     // The publish sits behind the awaited image search; drain the
     // continuation before asserting, as in the cross-run test above.
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
     await first;
 
     expect(harness.state.llmTextSearchResults).toEqual([
@@ -556,15 +561,7 @@ describe("search supersession ownership", () => {
     const first = searchAndRespond();
     await vi.waitFor(() => expect(searchText).toHaveBeenCalledTimes(1));
 
-    const resultsB: TextSearchResults = [
-      ["B title", "B snippet", "https://b.example"],
-    ];
-    harness.state.query = "search b";
-    harness.state.searchRunId = "run-b";
-    vi.mocked(searchText).mockResolvedValueOnce({
-      results: resultsB,
-      stale: false,
-    });
+    const resultsB = queueSecondSearch();
     vi.mocked(fetchPageContents).mockResolvedValueOnce({
       "https://b.example": "B page excerpt",
     });
@@ -577,7 +574,7 @@ describe("search supersession ownership", () => {
       ["A title", "A snippet", "https://a.example"],
     ];
     deferredA.release({ results: resultsA, stale: true });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
     await first;
 
     expect(harness.state.textSearchResults).toEqual(resultsB);
@@ -615,22 +612,14 @@ describe("search supersession ownership", () => {
     const first = searchAndRespond();
     await vi.waitFor(() => expect(searchText).toHaveBeenCalledTimes(1));
 
-    const resultsB: TextSearchResults = [
-      ["B title", "B snippet", "https://b.example"],
-    ];
-    harness.state.query = "search b";
-    harness.state.searchRunId = "run-b";
-    vi.mocked(searchText).mockResolvedValueOnce({
-      results: resultsB,
-      stale: false,
-    });
+    const resultsB = queueSecondSearch();
 
     const second = searchAndRespond();
     await second;
     await harness.state.searchPromise;
 
     deferredA.fail(new Error("late failure"));
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
     await first;
 
     expect(harness.state.textSearchState).toBe("completed");
@@ -659,7 +648,7 @@ describe("search supersession ownership", () => {
     return {
       finishImages: async (results: ImageSearchResults) => {
         deferredImages.release({ results, stale: false });
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await drainContinuations();
         await running;
       },
     };
@@ -735,12 +724,7 @@ describe("search supersession ownership", () => {
     const imagesB: ImageSearchResults = [
       ["Img B", "https://b.example/img.png", "thumb-b", "https://b.example"],
     ];
-    harness.state.query = "search b";
-    harness.state.searchRunId = "run-b";
-    vi.mocked(searchText).mockResolvedValueOnce({
-      results: [["B title", "B snippet", "https://b.example"]],
-      stale: false,
-    });
+    queueSecondSearch();
     vi.mocked(searchImages).mockResolvedValueOnce({
       results: imagesB,
       stale: false,
@@ -749,13 +733,13 @@ describe("search supersession ownership", () => {
     const second = searchAndRespond();
     await second;
     await harness.state.searchPromise;
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
 
     const imagesA: ImageSearchResults = [
       ["Img A", "https://a.example/img.png", "thumb-a", "https://a.example"],
     ];
     deferredImagesA.release({ results: imagesA, stale: false });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
     await first;
 
     expect(vi.mocked(updateImageSearchResults)).toHaveBeenLastCalledWith(
@@ -804,12 +788,7 @@ describe("search supersession ownership", () => {
     const first = searchAndRespond();
     await vi.waitFor(() => expect(searchImages).toHaveBeenCalledTimes(1));
 
-    harness.state.query = "search b";
-    harness.state.searchRunId = "run-b";
-    vi.mocked(searchText).mockResolvedValueOnce({
-      results: [["B title", "B snippet", "https://b.example"]],
-      stale: false,
-    });
+    queueSecondSearch();
     vi.mocked(searchImages).mockResolvedValueOnce({
       results: [
         ["Img B", "https://b.example/img.png", "thumb-b", "https://b.example"],
@@ -820,10 +799,10 @@ describe("search supersession ownership", () => {
     const second = searchAndRespond();
     await second;
     await harness.state.searchPromise;
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
 
     deferredImagesA.fail(new Error("late image error"));
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
     await first;
 
     expect(vi.mocked(updateImageSearchState)).not.toHaveBeenCalledWith(
@@ -857,10 +836,10 @@ describe("search supersession ownership", () => {
     const fourth = searchAndRespond();
     await fourth;
     await harness.state.searchPromise;
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
 
     deferredImagesC.fail(new Error("late fire-and-forget image error"));
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
     await third;
 
     expect(vi.mocked(updateImageSearchState)).not.toHaveBeenCalledWith(
@@ -890,7 +869,7 @@ describe("search supersession ownership", () => {
       results: [["Old", "Old snippet", "https://old.example"]],
       stale: true,
     });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
     await first;
 
     expect(harness.state.textSearchResults).toEqual(retryResults);
@@ -932,7 +911,7 @@ describe("search supersession ownership", () => {
       results: [["Late A", "Late snippet", "https://late.example"]],
       stale: true,
     });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await drainContinuations();
     await first;
 
     expect(harness.state.textSearchResults).toEqual(restoredResults);
