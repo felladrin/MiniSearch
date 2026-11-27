@@ -5,6 +5,7 @@ import {
   notificationsMock,
   pubSubMock,
   searchMock,
+  wllamaMock,
 } from "./textGenerationTestUtils";
 
 vi.mock("./pubSub", () =>
@@ -35,9 +36,7 @@ vi.mock("gpt-tokenizer", () => ({
 vi.mock("pretty-ms", () => ({
   default: vi.fn(() => "100ms"),
 }));
-vi.mock("./textGenerationWithWllama", async () =>
-  (await import("./textGenerationTestUtils")).wllamaMock(),
-);
+vi.mock("./textGenerationWithWllama", () => wllamaMock());
 
 import gptTokenizer from "gpt-tokenizer";
 import {

@@ -183,10 +183,9 @@ async function settleNewestQuestion(
 }
 
 /**
- * Unmounts the first chat mid-generation and mounts a second one in its
- * place. The caller sends the second chat's own message right after, in its
- * own act: an extra await boundary here moves when the orphaned send's
- * continuation runs, and these tests are about that ordering.
+ * Unmounts the first chat inside `act`, then mounts the second one with no
+ * `act` around the render. The caller sends the second chat's own message
+ * right after, in its own `act`.
  */
 async function remountChatMidGeneration(first: { unmount: () => void }) {
   await act(async () => {

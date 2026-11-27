@@ -41,6 +41,7 @@ import {
   notificationsMock,
   pageContentMock,
   sseStream,
+  wllamaMock,
 } from "./textGenerationTestUtils";
 
 vi.mock("./pubSub", () => ({
@@ -150,9 +151,7 @@ vi.mock("gpt-tokenizer", () => ({
   default: { encode: vi.fn(() => [1, 2, 3]) },
 }));
 
-vi.mock("./textGenerationWithWllama", async () =>
-  (await import("./textGenerationTestUtils")).wllamaMock(),
-);
+vi.mock("./textGenerationWithWllama", () => wllamaMock());
 
 import {
   mergeSearchImageResults,
