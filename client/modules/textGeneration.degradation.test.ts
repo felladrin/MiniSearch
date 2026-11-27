@@ -34,6 +34,15 @@ const harness = vi.hoisted(() => {
   };
 });
 
+import {
+  contentFrame,
+  historyMock,
+  logEntriesMock,
+  notificationsMock,
+  pageContentMock,
+  sseStream,
+} from "./textGenerationTestUtils";
+
 vi.mock("./pubSub", () => ({
   getImageSearchResults: () => harness.state.imageSearchResults,
   getConversationSummary: () => ({ conversationId: "", summary: "" }),
@@ -92,21 +101,13 @@ vi.mock("./config", () => ({
   getConfig: vi.fn(() => Promise.resolve({})),
 }));
 
-vi.mock("./history", () => ({
-  replaceChatConversation: vi.fn(() => Promise.resolve()),
-  getCurrentSearchRunId: vi.fn(() => harness.state.searchRunId),
-  saveLlmResponseForQuery: vi.fn(() => Promise.resolve()),
-  updateSearchResults: vi.fn(() => Promise.resolve()),
-  mergeSearchImageResults: vi.fn(() => Promise.resolve()),
-}));
+vi.mock("./history", () => historyMock(() => harness.state.searchRunId));
 
-vi.mock("./logEntries", () => ({ addLogEntry: vi.fn() }));
+vi.mock("./logEntries", () => logEntriesMock());
 
-vi.mock("./notifications", () => ({ showAiCompleteNotification: vi.fn() }));
+vi.mock("./notifications", () => notificationsMock());
 
-vi.mock("./pageContent", () => ({
-  fetchPageContents: vi.fn(() => Promise.resolve({})),
-}));
+vi.mock("./pageContent", () => pageContentMock());
 
 vi.mock("./search", () => ({
   searchImages: vi.fn(() => Promise.resolve({ results: [], stale: false })),
@@ -173,23 +174,6 @@ import type { ImageSearchResults, TextSearchResults } from "./types";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
-
-function sseStream(frames: string[]) {
-  const encoder = new TextEncoder();
-  return new Response(
-    new ReadableStream({
-      start(controller) {
-        for (const frame of frames) controller.enqueue(encoder.encode(frame));
-        controller.close();
-      },
-    }),
-    { status: 200 },
-  );
-}
-
-function contentFrame(content: string) {
-  return `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n`;
-}
 
 describe("search degradation", () => {
   beforeEach(() => {

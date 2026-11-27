@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  historyMock,
+  logEntriesMock,
+  notificationsMock,
+  searchMock,
+} from "./textGenerationTestUtils";
 
 vi.mock("./pubSub", () => ({
   getConversationSummary: vi.fn(() => ({ conversationId: "", summary: "" })),
@@ -29,18 +35,10 @@ vi.mock("./pubSub", () => ({
   updateSuppressNextFollowUp: vi.fn(),
   updatePageContents: vi.fn(),
 }));
-vi.mock("./history", () => ({
-  replaceChatConversation: vi.fn(() => Promise.resolve()),
-  getCurrentSearchRunId: vi.fn(() => "run-1"),
-  saveLlmResponseForQuery: vi.fn(() => Promise.resolve()),
-  updateSearchResults: vi.fn(() => Promise.resolve()),
-}));
-vi.mock("./logEntries", () => ({ addLogEntry: vi.fn() }));
-vi.mock("./notifications", () => ({ showAiCompleteNotification: vi.fn() }));
-vi.mock("./search", () => ({
-  searchImages: vi.fn(() => Promise.resolve([])),
-  searchText: vi.fn(() => Promise.resolve([])),
-}));
+vi.mock("./history", () => historyMock(() => "run-1"));
+vi.mock("./logEntries", () => logEntriesMock());
+vi.mock("./notifications", () => notificationsMock());
+vi.mock("./search", () => searchMock());
 vi.mock("./systemPrompt", () => ({ getSystemPrompt: vi.fn(() => "") }));
 vi.mock("./textGenerationUtilities", () => ({
   ChatGenerationError: class ChatGenerationError extends Error {},

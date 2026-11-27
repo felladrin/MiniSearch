@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  historyMock,
+  logEntriesMock,
+  notificationsMock,
+  searchMock,
+} from "./textGenerationTestUtils";
 
 const state = vi.hoisted(() => ({
   settings: { inferenceType: "browser" } as {
@@ -29,18 +35,10 @@ vi.mock("./pubSub", () => ({
   updateTextSearchResults: vi.fn(),
   updateTextSearchState: vi.fn(),
 }));
-vi.mock("./history", () => ({
-  replaceChatConversation: vi.fn(() => Promise.resolve()),
-  getCurrentSearchRunId: vi.fn(() => "run-1"),
-  saveLlmResponseForQuery: vi.fn(() => Promise.resolve()),
-  updateSearchResults: vi.fn(() => Promise.resolve()),
-}));
-vi.mock("./logEntries", () => ({ addLogEntry: vi.fn() }));
-vi.mock("./notifications", () => ({ showAiCompleteNotification: vi.fn() }));
-vi.mock("./search", () => ({
-  searchImages: vi.fn(() => Promise.resolve([])),
-  searchText: vi.fn(() => Promise.resolve([])),
-}));
+vi.mock("./history", () => historyMock(() => "run-1"));
+vi.mock("./logEntries", () => logEntriesMock());
+vi.mock("./notifications", () => notificationsMock());
+vi.mock("./search", () => searchMock());
 // The system prompt stands in for everything that fills it (instructions,
 // search results, page excerpts), so its length sets how much of the window
 // is left for the conversation.
