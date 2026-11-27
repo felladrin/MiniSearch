@@ -127,6 +127,19 @@ beforeEach(() => {
   });
 });
 
+/** Points the formatter at a worker that fails, and expects the fallback. */
+async function expectMainThreadFallback(worker: { terminate: () => void }) {
+  setWorkerFactory(() => worker as unknown as Worker);
+  setPageContents({
+    "https://a.example/": "sentence about cats. ".repeat(500),
+  });
+
+  const formatted = await getFormattedSearchResults(true);
+
+  expect(formatted).toContain("…");
+  expect(worker.terminate).toHaveBeenCalled();
+}
+
 describe("getFormattedSearchResults", () => {
   beforeEach(() => {
     state.searchResults = results;
@@ -498,28 +511,12 @@ describe("worker handoff", () => {
         data: { type: "error", message: "tokenization failed" },
       } as MessageEvent<WorkerResponse>),
     );
-    setWorkerFactory(() => worker as unknown as Worker);
-    setPageContents({
-      "https://a.example/": "sentence about cats. ".repeat(500),
-    });
-
-    const formatted = await getFormattedSearchResults(true);
-
-    expect(formatted).toContain("…");
-    expect(worker.terminate).toHaveBeenCalled();
+    await expectMainThreadFallback(worker);
   });
 
   it("falls back when the worker dies before answering", async () => {
     const worker = createFailingWorker((deadWorker) => deadWorker.onerror?.());
-    setWorkerFactory(() => worker as unknown as Worker);
-    setPageContents({
-      "https://a.example/": "sentence about cats. ".repeat(500),
-    });
-
-    const formatted = await getFormattedSearchResults(true);
-
-    expect(formatted).toContain("…");
-    expect(worker.terminate).toHaveBeenCalled();
+    await expectMainThreadFallback(worker);
   });
 
   it("does not start a worker when no page content was read", async () => {

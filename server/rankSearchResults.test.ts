@@ -29,6 +29,15 @@ function mockRerankScores(...scores: number[]) {
     }[],
   );
 }
+/** The three roundup results that compete with the named site. */
+function roundupResults() {
+  return [
+    ["Disney+ schedule roundup", "Blog", "https://blog.example.com/one"],
+    ["Another roundup", "Blog", "https://blog.example.com/two"],
+    ["Third roundup", "Blog", "https://blog.example.com/three"],
+  ];
+}
+
 describe("rankSearchResults", () => {
   it.each([
     ["text", false],
@@ -299,9 +308,7 @@ describe("rankSearchResults", () => {
         "December releases",
         "https://www.disneyplus.com/welcome",
       ],
-      ["Disney+ schedule roundup", "Blog", "https://blog.example.com/one"],
-      ["Another roundup", "Blog", "https://blog.example.com/two"],
-      ["Third roundup", "Blog", "https://blog.example.com/three"],
+      ...roundupResults(),
     ]);
 
     expect(result[0][2]).toBe("https://www.disneyplus.com/welcome");
@@ -325,9 +332,7 @@ describe("rankSearchResults", () => {
         "December releases",
         "https://www.disneyplus.com/welcome",
       ],
-      ["Disney+ schedule roundup", "Blog", "https://blog.example.com/one"],
-      ["Another roundup", "Blog", "https://blog.example.com/two"],
-      ["Third roundup", "Blog", "https://blog.example.com/three"],
+      ...roundupResults(),
     ]);
 
     expect(result[0][2]).toBe("https://www.disneyplus.com/welcome");

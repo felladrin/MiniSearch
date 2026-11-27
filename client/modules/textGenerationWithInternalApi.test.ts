@@ -56,33 +56,37 @@ function streamResponse(chunks: Array<string | Uint8Array>, status = 200) {
 }
 
 /**
- * A response whose stream sends `chunks` and then stays open, as a stalled
- * upstream does, with a spy on the stream's cancel.
+ * A response whose stream sends `chunks`, with a spy on the stream's cancel.
+ * `close` ends the stream, as a completed upstream does; leaving it open
+ * stands in for a stalled one.
  */
-function openStreamResponse(chunks: string[]) {
+function streamBody(chunks: string[], close: boolean) {
   const cancel = vi.fn();
   const encoder = new TextEncoder();
   const body = new ReadableStream({
     start(controller) {
       for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      if (close) controller.close();
     },
     cancel,
   });
   return { response: new Response(body), cancel };
 }
 
+function openStreamResponse(chunks: string[]) {
+  return streamBody(chunks, false);
+}
+
 /** A closed stream, with a spy on its cancel. */
 function closedStreamResponse(chunks: string[]) {
-  const cancel = vi.fn();
-  const encoder = new TextEncoder();
-  const body = new ReadableStream({
-    start(controller) {
-      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
-      controller.close();
-    },
-    cancel,
-  });
-  return { response: new Response(body), cancel };
+  return streamBody(chunks, true);
+}
+
+/** Makes the first publish abort the generation, and returns its controller. */
+function abortOnFirstPublish() {
+  const controller = new AbortController();
+  vi.mocked(updateResponse).mockImplementationOnce(() => controller.abort());
+  return controller;
 }
 
 function fetchSignal(): AbortSignal {
@@ -219,10 +223,7 @@ describe("textGenerationWithInternalApi", () => {
           ]),
         ),
       );
-      const controller = new AbortController();
-      vi.mocked(updateResponse).mockImplementationOnce(() =>
-        controller.abort(),
-      );
+      const controller = abortOnFirstPublish();
 
       await expect(
         generateTextWithInternalApi(controller.signal),
@@ -337,10 +338,7 @@ describe("textGenerationWithInternalApi", () => {
         'data: {"choices":[{"delta":{"content":"partial"}}]}\n',
       ]);
       mockFetch.mockResolvedValueOnce(stream.response);
-      const controller = new AbortController();
-      vi.mocked(updateResponse).mockImplementationOnce(() =>
-        controller.abort(),
-      );
+      const controller = abortOnFirstPublish();
 
       await expect(
         generateTextWithInternalApi(controller.signal),
