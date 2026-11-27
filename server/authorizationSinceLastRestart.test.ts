@@ -143,15 +143,14 @@ describe("rejectedByClient", () => {
 describe("classifyRejectedFetchSite", () => {
   it.each([
     ["same-origin", "sameOrigin"],
-    ["Same-Origin", "sameOrigin"],
+    ["Same-Origin", "other"],
     ["same-site", "sameSite"],
     ["cross-site", "crossSite"],
     ["none", "none"],
     [undefined, "missing"],
     ["", "missing"],
-    ["   ", "missing"],
     ["unknown", "other"],
-    [["same-origin", "cross-site"], "other"],
+    ["same-origin, cross-site", "other"],
   ] as const)("sorts a %s header into %s", async (secFetchSite, label) => {
     const { classifyRejectedFetchSite } = await freshCounters();
     expect(classifyRejectedFetchSite(secFetchSite)).toBe(label);
@@ -159,7 +158,7 @@ describe("classifyRejectedFetchSite", () => {
 });
 
 describe("rejectedByFetchSite", () => {
-  it("counts token rejections per Sec-Fetch-Site label and excludes rate-limited and accepted requests", async () => {
+  it("counts token rejections per Sec-Fetch-Site label and excludes rate-limited requests", async () => {
     const {
       recordAuthorizedRequest,
       recordRejectedRequest,

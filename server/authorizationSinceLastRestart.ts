@@ -5,8 +5,8 @@
  * broken, and how the shared request budget is spent across the endpoints that
  * share it, none of which needs to know who asked.
  *
- * A rejected request does carry one thing worth publishing, its `User-Agent`,
- * and it goes out the same way an engine's free-form failure goes out as
+ * A rejected request does carry two things worth publishing, its `User-Agent`
+ * and its `Sec-Fetch-Site` header, and they go out the same way an engine's free-form failure goes out as
  * `blocked`, `timeout` or `other`: sorted into a fixed vocabulary first, so the
  * answer to "does this look like a stale browser tab or a script" is public and
  * the client's own string is not. What a client claims to be is all the label
@@ -147,15 +147,13 @@ export function classifyRejectedClient(
 
 /** Sorts a request's `Sec-Fetch-Site` header into the published vocabulary. */
 export function classifyRejectedFetchSite(
-  secFetchSite: string | readonly string[] | undefined,
+  secFetchSite: string | undefined,
 ): RejectedFetchSite {
-  if (typeof secFetchSite !== "string") {
-    return secFetchSite === undefined || secFetchSite.length === 0
-      ? "missing"
-      : "other";
-  }
-
-  switch (secFetchSite.trim().toLowerCase()) {
+  // No trimming or case folding: Node already strips the surrounding
+  // whitespace, and browsers send the lowercase token, so a variant only comes
+  // from a hand-written header and belongs in `other`.
+  switch (secFetchSite) {
+    case undefined:
     case "":
       return "missing";
     case "same-origin":
@@ -175,7 +173,7 @@ export function recordRejectedRequest(
   surface: AuthorizationSurface,
   reason: RejectionReason,
   userAgent?: string,
-  secFetchSite?: string | readonly string[],
+  secFetchSite?: string,
 ): void {
   reasons[reason]++;
   bySurface[surface].rejected++;
