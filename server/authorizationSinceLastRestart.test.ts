@@ -33,14 +33,20 @@ describe("classifyRejectedClient", () => {
       "bot",
     ],
     ["Googlebot/2.1 (+http://www.google.com/bot.html)", "bot"],
-    ["Scrapy/2.11 (+https://scrapy.org)", "other"],
+    ["Scrapy/2.11 (+https://scrapy.org)", "bot"],
+    [
+      "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+      "bot",
+    ],
+    ["Java-http-client/21.0.4", "java"],
     ["", "other"],
     [undefined, "other"],
   ] as const)(
     "sorts a %s client into the published %s label",
     async (userAgent, kind) => {
-      // This table is the published vocabulary. A new row is a new label on an
-      // endpoint that needs no token, so it should be a deliberate one.
+      // The labels themselves are the published vocabulary, pinned by
+      // `handleTokenVerification.test.ts`. A row here only checks that a client
+      // reaches the label it already has.
       const { classifyRejectedClient } = await freshCounters();
       expect(classifyRejectedClient(userAgent)).toBe(kind);
     },
@@ -80,16 +86,27 @@ describe("rejectedByClient", () => {
     expect(rejectedByClient.browser).toBe(0);
   });
 
+  it("names no client for a request the limiter stopped", async () => {
+    const { recordRejectedRequest, getAuthorizationStats } =
+      await freshCounters();
+
+    recordRejectedRequest("thumbnail", "rateLimited", "curl/8.5.0");
+
+    const { rejectedByClient } = getAuthorizationStats();
+    expect(rejectedByClient.curl).toBe(0);
+    expect(rejectedByClient.other).toBe(0);
+  });
+
   it("counts a request that sent no User-Agent as other", async () => {
     const { recordRejectedRequest, getAuthorizationStats } =
       await freshCounters();
 
-    recordRejectedRequest("thumbnail", "rateLimited");
+    recordRejectedRequest("thumbnail", "missingToken");
 
     expect(getAuthorizationStats().rejectedByClient.other).toBe(1);
   });
 
-  it("accounts for every rejection across the client kinds", async () => {
+  it("accounts for every token rejection across the client kinds", async () => {
     const { recordRejectedRequest, getAuthorizationStats } =
       await freshCounters();
 
@@ -108,9 +125,7 @@ describe("rejectedByClient", () => {
       0,
     );
     expect(byClient).toBe(
-      stats.reasons.rateLimited +
-        stats.reasons.missingToken +
-        stats.reasons.invalidToken,
+      stats.reasons.missingToken + stats.reasons.invalidToken,
     );
   });
 
