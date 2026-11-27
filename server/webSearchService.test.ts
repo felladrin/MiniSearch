@@ -615,6 +615,51 @@ describe("graceful degradation", () => {
       ],
     ]);
   });
+
+  it.each([5, 10])(
+    "fills a limit of %i with images that have a thumbnail, skipping those without",
+    async (limit) => {
+      const imagesWithoutThumbnail = Array.from({ length: 5 }, (_, index) => ({
+        title: `image ${index} without thumbnail`,
+        url: `https://example.com/picture-${index}`,
+        category: "images",
+        img_src: `https://example.com/picture-${index}.jpg`,
+        thumbnail_src: "",
+      }));
+      fetchMock.mockResolvedValue(
+        createMockResponse(
+          JSON.stringify({
+            results: [
+              ...imagesWithoutThumbnail,
+              {
+                title: "with thumbnail",
+                url: "https://example.com/picture",
+                category: "images",
+                img_src: "https://example.com/picture.jpg",
+                thumbnail_src: "https://example.com/thumbnail.jpg",
+              },
+            ],
+          }),
+        ),
+      );
+
+      const results = await fetchSearXNG(
+        "failure injection",
+        "images",
+        limit,
+        new CircuitBreaker(breakerOptions),
+      );
+
+      expect(results).toEqual([
+        [
+          "with thumbnail",
+          "https://example.com/picture",
+          "https://example.com/thumbnail.jpg",
+          "https://example.com/picture.jpg",
+        ],
+      ]);
+    },
+  );
 });
 
 describe("query privacy", () => {
