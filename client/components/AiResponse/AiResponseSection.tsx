@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import {
   chatMessagesPubSub,
+  chatSessionPubSub,
   isRestoringFromHistoryPubSub,
   modelLoadingProgressPubSub,
   modelSizeInMegabytesPubSub,
@@ -37,6 +38,7 @@ export default function AiResponseSection() {
   const [modelSizeInMegabytes] = usePubSub(modelSizeInMegabytesPubSub);
   const [chatMessages] = usePubSub(chatMessagesPubSub);
   const [isRestoringFromHistory] = usePubSub(isRestoringFromHistoryPubSub);
+  const [chatSession] = usePubSub(chatSessionPubSub);
 
   useScreenWakeLock(statesKeepingTheScreenAwake.includes(textGenerationState));
 
@@ -61,6 +63,7 @@ export default function AiResponseSection() {
 
           {textGenerationState === "completed" && (
             <ChatInterface
+              key={chatSession}
               initialQuery={query}
               initialResponse={response}
               initialMessages={
@@ -104,5 +107,6 @@ export default function AiResponseSection() {
     modelLoadingProgress,
     modelSizeInMegabytes,
     isRestoringFromHistory,
+    chatSession,
   ]);
 }

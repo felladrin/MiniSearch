@@ -14,8 +14,10 @@ import {
 import { postMessageToParentWindow } from "../modules/parentWindow";
 import {
   getChatGenerationState,
+  getChatSession,
   updateChatInput,
   updateChatMessages,
+  updateChatSession,
   updateFollowUpQuestion,
   updateImageSearchResults,
   updateImageSearchState,
@@ -63,6 +65,9 @@ export function useHistoryRestore(
       const keepsChat =
         searchRunId === getCurrentSearchRunId() &&
         getChatGenerationState().isGeneratingResponse;
+      if (searchRunId !== getCurrentSearchRunId()) {
+        updateChatSession(getChatSession() + 1);
+      }
       setCurrentSearchRunId(searchRunId);
 
       updateIsRestoringFromHistory(true);
