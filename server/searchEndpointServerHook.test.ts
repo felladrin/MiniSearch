@@ -1,4 +1,3 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./fallbackSearchService", () => ({
@@ -41,6 +40,13 @@ import {
   isSearchFallbackEnabled,
 } from "./fallbackSearchService";
 import { handleTokenVerification } from "./handleTokenVerification";
+import {
+  createRequest,
+  createResponse,
+  expectBadHostRejected,
+  getRegisteredHookHandler,
+} from "./hookTestUtils";
+
 import { rankSearchResults } from "./rankSearchResults";
 import { getRerankerStatus } from "./rerankerService";
 import { searchEndpointServerHook } from "./searchEndpointServerHook";
@@ -56,34 +62,49 @@ import {
 } from "./searchesSinceLastRestart";
 import { fetchSearXNG, fetchSupplementarySearXNG } from "./webSearchService";
 
-function createRequest(url: string): IncomingMessage {
-  return {
-    url,
-    headers: { host: "localhost:3000" },
-  } as unknown as IncomingMessage;
-}
-
-function createResponse() {
-  return {
-    statusCode: 200,
-    setHeader: vi.fn(),
-    end: vi.fn(),
-  } as unknown as ServerResponse & {
-    setHeader: ReturnType<typeof vi.fn>;
-    end: ReturnType<typeof vi.fn>;
-  };
-}
-
 function getRegisteredHandler() {
-  const use = vi.fn();
-  searchEndpointServerHook({
-    middlewares: { use },
-  } as unknown as Parameters<typeof searchEndpointServerHook>[0]);
-  return use.mock.calls[0][0] as (
-    request: IncomingMessage,
-    response: ServerResponse,
-    next: () => void,
-  ) => Promise<void>;
+  return getRegisteredHookHandler(searchEndpointServerHook);
+}
+
+/**
+ * Registers the hook and sends `url` through it; returns the response. The
+ * `next` is a fresh mock the test does not look at.
+ */
+async function sendSearch(url: string) {
+  const response = createResponse();
+  await getRegisteredHandler()(createRequest(url), response, vi.fn());
+  return response;
+}
+
+/** The outage answer: 502 with the unavailable body. */
+function expectServiceUnavailable(
+  response: Awaited<ReturnType<typeof sendSearch>>,
+) {
+  expect(response.statusCode).toBe(502);
+  expect(response.end).toHaveBeenCalledWith(
+    JSON.stringify({ error: "Search service unavailable" }),
+  );
+}
+
+/** The body the endpoint sent, parsed back from JSON. */
+function endBody(response: Awaited<ReturnType<typeof sendSearch>>) {
+  const [body] = response.end.mock.calls[0];
+  return JSON.parse(body);
+}
+
+/** Checks the outage was reported and nothing came from the fallback. */
+function expectOutageReportedWithoutFallback(
+  response: Awaited<ReturnType<typeof sendSearch>>,
+) {
+  expectServiceUnavailable(response);
+  expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
+  expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
+  expect(recordSearchDuration).not.toHaveBeenCalled();
+}
+
+/** Everything the hook logged through `console.error`, as one string. */
+function loggedText() {
+  return vi.mocked(console.error).mock.calls.flat().join(" ");
 }
 
 describe("searchEndpointServerHook", () => {
@@ -263,14 +284,7 @@ describe("searchEndpointServerHook", () => {
     vi.mocked(fetchSearXNG).mockResolvedValue([
       ["Title", "Snippet", "https://example.com"],
     ]);
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest("/search/text?q=cats&token=abc"),
-      response,
-      vi.fn(),
-    );
+    const response = await sendSearch("/search/text?q=cats&token=abc");
 
     expect(fetchSearXNG).toHaveBeenCalledWith(
       "cats",
@@ -319,14 +333,7 @@ describe("searchEndpointServerHook", () => {
       ["A", "snippet a", "https://a.com", 0.5],
     ]);
 
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest("/search/text?q=test&token=abc&limit=5"),
-      response,
-      vi.fn(),
-    );
+    const response = await sendSearch("/search/text?q=test&token=abc&limit=5");
 
     expect(fetchSearXNG).toHaveBeenCalledWith(
       "test",
@@ -365,14 +372,7 @@ describe("searchEndpointServerHook", () => {
       ],
     ]);
 
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest("/search/images?q=cats&token=abc"),
-      response,
-      vi.fn(),
-    );
+    const response = await sendSearch("/search/images?q=cats&token=abc");
 
     expect(incrementGraphicalSearchesSinceLastRestart).toHaveBeenCalled();
     expect(response.end).toHaveBeenCalledWith(
@@ -415,14 +415,7 @@ describe("searchEndpointServerHook", () => {
       vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
       vi.mocked(getRerankerStatus).mockResolvedValue(false);
 
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-
-      await handler(
-        createRequest("/search/text?q=cats&token=abc"),
-        response,
-        vi.fn(),
-      );
+      const response = await sendSearch("/search/text?q=cats&token=abc");
 
       expect(rankSearchResults).not.toHaveBeenCalled();
       expect(response.statusCode).toBe(200);
@@ -436,14 +429,7 @@ describe("searchEndpointServerHook", () => {
         new Error("Reranker model is not loaded"),
       );
 
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-
-      await handler(
-        createRequest("/search/text?q=cats&token=abc"),
-        response,
-        vi.fn(),
-      );
+      const response = await sendSearch("/search/text?q=cats&token=abc");
 
       expect(response.statusCode).toBe(200);
       expect(response.end).toHaveBeenCalledWith(JSON.stringify(searxngResults));
@@ -453,19 +439,11 @@ describe("searchEndpointServerHook", () => {
       vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
       vi.mocked(getRerankerStatus).mockResolvedValue(false);
 
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-
-      await handler(
-        createRequest("/search/images?q=cats&token=abc"),
-        response,
-        vi.fn(),
-      );
+      const response = await sendSearch("/search/images?q=cats&token=abc");
 
       expect(rankSearchResults).not.toHaveBeenCalled();
       expect(response.statusCode).toBe(200);
-      const [body] = response.end.mock.calls[0];
-      expect(JSON.parse(body)).toEqual([imageResult]);
+      expect(endBody(response)).toEqual([imageResult]);
     });
 
     it("still serves image results when reranking throws mid-request", async () => {
@@ -475,18 +453,10 @@ describe("searchEndpointServerHook", () => {
         new Error("Reranker model is not loaded"),
       );
 
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-
-      await handler(
-        createRequest("/search/images?q=cats&token=abc"),
-        response,
-        vi.fn(),
-      );
+      const response = await sendSearch("/search/images?q=cats&token=abc");
 
       expect(response.statusCode).toBe(200);
-      const [body] = response.end.mock.calls[0];
-      expect(JSON.parse(body)).toEqual([imageResult]);
+      expect(endBody(response)).toEqual([imageResult]);
     });
 
     it("drops an image the reranker returns under an unknown URL", async () => {
@@ -501,14 +471,7 @@ describe("searchEndpointServerHook", () => {
         ],
       ]);
 
-      const handler = getRegisteredHandler();
-      const response = createResponse();
-
-      await handler(
-        createRequest("/search/images?q=cats&token=abc"),
-        response,
-        vi.fn(),
-      );
+      const response = await sendSearch("/search/images?q=cats&token=abc");
 
       expect(response.statusCode).toBe(200);
       expect(response.end).toHaveBeenCalledWith("[]");
@@ -519,37 +482,17 @@ describe("searchEndpointServerHook", () => {
         new Error("SearXNG request failed with status 503"),
       );
 
-      const handler = getRegisteredHandler();
-      const response = createResponse();
+      const response = await sendSearch("/search/text?q=cats&token=abc");
 
-      await handler(
-        createRequest("/search/text?q=cats&token=abc"),
-        response,
-        vi.fn(),
-      );
-
-      expect(response.statusCode).toBe(502);
-      expect(response.end).toHaveBeenCalledWith(
-        JSON.stringify({ error: "Search service unavailable" }),
-      );
+      expectServiceUnavailable(response);
     });
 
     it("answers 502 on image searches when SearXNG is down", async () => {
       vi.mocked(fetchSearXNG).mockRejectedValue(new Error("network down"));
 
-      const handler = getRegisteredHandler();
-      const response = createResponse();
+      const response = await sendSearch("/search/images?q=cats&token=abc");
 
-      await handler(
-        createRequest("/search/images?q=cats&token=abc"),
-        response,
-        vi.fn(),
-      );
-
-      expect(response.statusCode).toBe(502);
-      expect(response.end).toHaveBeenCalledWith(
-        JSON.stringify({ error: "Search service unavailable" }),
-      );
+      expectServiceUnavailable(response);
     });
 
     describe("text search fallback", () => {
@@ -634,14 +577,7 @@ describe("searchEndpointServerHook", () => {
         // A search that has just started hands the fallback the whole budget.
         vi.spyOn(performance, "now").mockReturnValue(0);
 
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-
-        await handler(
-          createRequest("/search/text?q=cats&token=abc"),
-          response,
-          vi.fn(),
-        );
+        const response = await sendSearch("/search/text?q=cats&token=abc");
 
         expect(fetchFallbackTextResults).toHaveBeenCalledWith(
           "cats",
@@ -675,14 +611,7 @@ describe("searchEndpointServerHook", () => {
         failSearxng();
         vi.mocked(fetchFallbackTextResults).mockResolvedValue([]);
 
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-
-        await handler(
-          createRequest("/search/text?q=cats&token=abc"),
-          response,
-          vi.fn(),
-        );
+        const response = await sendSearch("/search/text?q=cats&token=abc");
 
         // The endpoint answered, so this is a search with no results rather
         // than an outage: the client shows the no-results alert, not the
@@ -702,32 +631,18 @@ describe("searchEndpointServerHook", () => {
           .mockReturnValueOnce(0)
           .mockReturnValue(25_001);
 
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-
-        await handler(
-          createRequest("/search/text?q=cats&token=abc"),
-          response,
-          vi.fn(),
-        );
+        const response = await sendSearch("/search/text?q=cats&token=abc");
 
         // A fallback started now would answer after the client's own 30 s
         // timeout, so it is never asked and the outage is reported the way it
         // would have been with the feature off.
         expect(fetchFallbackTextResults).not.toHaveBeenCalled();
-        expect(response.statusCode).toBe(502);
-        expect(response.end).toHaveBeenCalledWith(
-          JSON.stringify({ error: "Search service unavailable" }),
-        );
-        expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
-        expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
-        expect(recordSearchDuration).not.toHaveBeenCalled();
+        expectOutageReportedWithoutFallback(response);
 
-        const logged = vi.mocked(console.error).mock.calls.flat().join(" ");
-        expect(logged).toContain(
+        expect(loggedText()).toContain(
           "the search deadline left the fallback too little time",
         );
-        expect(logged).not.toContain("cats");
+        expect(loggedText()).not.toContain("cats");
       });
 
       it("hands the fallback the time left, not its own full budget", async () => {
@@ -739,14 +654,7 @@ describe("searchEndpointServerHook", () => {
           .mockReturnValueOnce(0)
           .mockReturnValue(12_000);
 
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-
-        await handler(
-          createRequest("/search/text?q=cats&token=abc"),
-          response,
-          vi.fn(),
-        );
+        const response = await sendSearch("/search/text?q=cats&token=abc");
 
         // 13 s are left of the 25 s deadline, which is under the fallback's
         // own 15 s cap, so the search cannot outlive the client's patience.
@@ -765,46 +673,22 @@ describe("searchEndpointServerHook", () => {
           new Error("The fallback search tool call failed with status 502"),
         );
 
-        const handler = getRegisteredHandler();
-        const response = createResponse();
+        const response = await sendSearch("/search/text?q=cats&token=abc");
 
-        await handler(
-          createRequest("/search/text?q=cats&token=abc"),
-          response,
-          vi.fn(),
-        );
+        expectOutageReportedWithoutFallback(response);
 
-        expect(response.statusCode).toBe(502);
-        expect(response.end).toHaveBeenCalledWith(
-          JSON.stringify({ error: "Search service unavailable" }),
-        );
-        expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
-        expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
-        expect(recordSearchDuration).not.toHaveBeenCalled();
-
-        const logged = vi.mocked(console.error).mock.calls.flat().join(" ");
-        expect(logged).toContain(
+        expect(loggedText()).toContain(
           "The fallback search tool call failed with status 502",
         );
-        expect(logged).not.toContain("cats");
+        expect(loggedText()).not.toContain("cats");
       });
 
       it("answers 502 without consulting the fallback when it is switched off", async () => {
         failSearxng();
 
-        const handler = getRegisteredHandler();
-        const response = createResponse();
+        const response = await sendSearch("/search/text?q=cats&token=abc");
 
-        await handler(
-          createRequest("/search/text?q=cats&token=abc"),
-          response,
-          vi.fn(),
-        );
-
-        expect(response.statusCode).toBe(502);
-        expect(response.end).toHaveBeenCalledWith(
-          JSON.stringify({ error: "Search service unavailable" }),
-        );
+        expectServiceUnavailable(response);
         expect(fetchFallbackTextResults).not.toHaveBeenCalled();
         expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
         expect(incrementSearchesFailedOnFallback).not.toHaveBeenCalled();
@@ -814,19 +698,9 @@ describe("searchEndpointServerHook", () => {
         vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
         failSearxng();
 
-        const handler = getRegisteredHandler();
-        const response = createResponse();
+        const response = await sendSearch("/search/images?q=cats&token=abc");
 
-        await handler(
-          createRequest("/search/images?q=cats&token=abc"),
-          response,
-          vi.fn(),
-        );
-
-        expect(response.statusCode).toBe(502);
-        expect(response.end).toHaveBeenCalledWith(
-          JSON.stringify({ error: "Search service unavailable" }),
-        );
+        expectServiceUnavailable(response);
         expect(fetchFallbackTextResults).not.toHaveBeenCalled();
         expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();
         expect(incrementSearchesFailedOnFallback).not.toHaveBeenCalled();
@@ -836,14 +710,7 @@ describe("searchEndpointServerHook", () => {
         vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
         vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
 
-        const handler = getRegisteredHandler();
-        const response = createResponse();
-
-        await handler(
-          createRequest("/search/text?q=cats&token=abc"),
-          response,
-          vi.fn(),
-        );
+        const response = await sendSearch("/search/text?q=cats&token=abc");
 
         expect(response.statusCode).toBe(200);
         expect(response.end).toHaveBeenCalledWith(
@@ -862,14 +729,7 @@ describe("searchEndpointServerHook", () => {
     ]);
     vi.mocked(getRerankerStatus).mockRejectedValue(new Error("reranker down"));
 
-    const handler = getRegisteredHandler();
-    const response = createResponse();
-
-    await handler(
-      createRequest("/search/text?q=cats&token=abc"),
-      response,
-      vi.fn(),
-    );
+    const response = await sendSearch("/search/text?q=cats&token=abc");
 
     expect(response.statusCode).toBe(500);
     expect(response.end).toHaveBeenCalledWith(
@@ -1076,19 +936,10 @@ describe("searchEndpointServerHook with a malformed Host header", () => {
     vi.mocked(handleTokenVerification).mockResolvedValue({
       shouldContinue: true,
     });
-    const request = {
-      url: "/search/text?q=cats&token=abc",
-      headers: { host: "bad host" },
-    } as unknown as IncomingMessage;
-    const response = createResponse();
-    const next = vi.fn();
-
-    await expect(
-      getRegisteredHandler()(request, response, next),
-    ).resolves.toBeUndefined();
-
-    expect(response.statusCode).toBe(400);
-    expect(handleTokenVerification).not.toHaveBeenCalled();
-    expect(next).not.toHaveBeenCalled();
+    await expectBadHostRejected(
+      getRegisteredHandler(),
+      "/search/text?q=cats&token=abc",
+      handleTokenVerification,
+    );
   });
 });

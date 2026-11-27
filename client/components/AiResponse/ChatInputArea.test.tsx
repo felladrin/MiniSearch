@@ -1,8 +1,8 @@
 import { MantineProvider } from "@mantine/core";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useSyncExternalStore } from "react";
 import ChatInputArea from "@/components/AiResponse/ChatInputArea";
+import { ENTER_TO_SUBMIT_CASES } from "@/enterToSubmitCases";
 import {
   chatGenerationStatePubSub,
   chatInputPubSub,
@@ -12,33 +12,20 @@ import {
 import { defaultSettings } from "@/modules/settings";
 import { getDictationEngine, startDictation } from "@/modules/speechToText";
 
-vi.mock("@/modules/speechToText", async () => {
-  const { DictationError: RealDictationError } = await import(
-    "@/modules/speechToText"
-  );
-  return {
-    DictationError: RealDictationError,
-    getDictationEngine: vi.fn(() => "wasm" as const),
-    startDictation: vi.fn(),
-  };
-});
-
-vi.mock("@mantine/notifications", () => ({
-  notifications: { show: vi.fn() },
-}));
-
-/** Subscribes for real, so a channel written mid-test re-renders the area. */
-vi.mock("create-pubsub/react", () => ({
-  usePubSub: (pubSub: [unknown, unknown, unknown]) => {
-    const [publish, subscribe, get] = pubSub as [
-      unknown,
-      (listener: () => void) => () => void,
-      () => unknown,
-    ];
-    const value = useSyncExternalStore(subscribe, get, get);
-    return [value, publish];
-  },
-}));
+// jscpd:ignore-start
+// Vitest hoists every vi.mock call above the imports, so the registration has
+// to be written out in each file; only the factory body can be shared, and it
+// is. The duplication is the framework's, not the tests'.
+vi.mock("@/modules/speechToText", async () =>
+  (await import("@/testMocks")).speechToTextMock(),
+);
+vi.mock("@mantine/notifications", async () =>
+  (await import("@/testMocks")).notificationsStub(),
+);
+vi.mock("create-pubsub/react", async () =>
+  (await import("@/testMocks")).pubSubReactMock(),
+);
+// jscpd:ignore-end
 
 const stopFn = vi.fn();
 const cancelFn = vi.fn();
@@ -158,12 +145,7 @@ describe("sending the suggested follow-up question", () => {
     settingsPubSub[0]({ ...defaultSettings });
   });
 
-  it.each([
-    [true, "{Enter}", true],
-    [true, "{Shift>}{Enter}{/Shift}", false],
-    [false, "{Shift>}{Enter}{/Shift}", true],
-    [false, "{Enter}", false],
-  ])(
+  it.each(ENTER_TO_SUBMIT_CASES)(
     "with enterToSubmit %s, pressing %s sends it: %s",
     async (enterToSubmit, keys, sends) => {
       settingsPubSub[0]({ ...defaultSettings, enterToSubmit });

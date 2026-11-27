@@ -104,6 +104,14 @@ async function renderMainPage(state: PageState) {
   return { ...utils, ...handlers };
 }
 
+/** Renders the page with the AI-response prompt showing. */
+function promptPageState() {
+  return createPageState({
+    query: "cats",
+    settings: { showEnableAiResponsePrompt: true },
+  });
+}
+
 describe("MainPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -183,12 +191,7 @@ describe("MainPage", () => {
 
   it("enables AI response and triggers a search when the prompt is accepted", async () => {
     const user = userEvent.setup();
-    const { setSettings } = await renderMainPage(
-      createPageState({
-        query: "cats",
-        settings: { showEnableAiResponsePrompt: true },
-      }),
-    );
+    const { setSettings } = await renderMainPage(promptPageState());
 
     await user.click(await screen.findByRole("button", { name: "Accept" }));
 
@@ -201,12 +204,7 @@ describe("MainPage", () => {
 
   it("disables AI response without triggering a search when the prompt is declined", async () => {
     const user = userEvent.setup();
-    const { setSettings } = await renderMainPage(
-      createPageState({
-        query: "cats",
-        settings: { showEnableAiResponsePrompt: true },
-      }),
-    );
+    const { setSettings } = await renderMainPage(promptPageState());
 
     await user.click(await screen.findByRole("button", { name: "Decline" }));
 

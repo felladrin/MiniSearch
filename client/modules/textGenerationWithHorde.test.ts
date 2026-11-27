@@ -24,21 +24,13 @@ vi.mock("./sleep", () => ({
   sleep: vi.fn().mockResolvedValue(undefined),
 }));
 
-// canStartResponding/getDefaultChatMessages/getFormattedSearchResults depend
-// on pubSub state we don't want to drive here; ChatGenerationError and
-// defaultContextSize have no such dependency, so keep them real.
-vi.mock("./textGenerationUtilities", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("./textGenerationUtilities")>();
-  return {
-    ...actual,
-    canStartResponding: vi.fn().mockResolvedValue(undefined),
+vi.mock("./textGenerationUtilities", async (importOriginal) =>
+  (await import("./textGenerationTestUtils")).textGenerationUtilitiesMock({
     getDefaultChatMessages: vi
       .fn()
       .mockReturnValue([{ role: "user", content: "hi" }]),
-    getFormattedSearchResults: vi.fn().mockReturnValue("None."),
-  };
-});
+  })(importOriginal),
+);
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -58,6 +50,29 @@ function mockSettings(overrides: Partial<typeof defaultSettings> = {}) {
   vi.mocked(getSettings).mockReturnValue({ ...defaultSettings, ...overrides });
 }
 
+/** Queues a submit, one in-progress poll, and a final empty reply. */
+function queueInterruptedPolling(id: string) {
+  mockFetch
+    .mockResolvedValueOnce(jsonResponse({ id }))
+    .mockResolvedValueOnce(
+      jsonResponse({ done: false, is_possible: true, generations: [] }),
+    )
+    .mockResolvedValueOnce(jsonResponse({}));
+}
+
+function abortWhenGenerating() {
+  const controller = new AbortController();
+  vi.mocked(updateTextGenerationState).mockImplementation((next) => {
+    if (next === "generating") controller.abort();
+  });
+  return controller;
+}
+
+/** Loads the generator under test, after the fetch routes are in place. */
+async function loadHordeGenerator() {
+  return (await import("./textGenerationWithHorde")).generateTextWithHorde;
+}
+
 describe("textGenerationWithHorde", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -68,9 +83,7 @@ describe("textGenerationWithHorde", () => {
 
   describe("generateTextWithHorde", () => {
     it("starts a generation, polls until done, and streams the response", async () => {
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
 
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ id: "gen-1" }))
@@ -103,9 +116,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("throws ChatGenerationError when the generation is faulted", async () => {
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
 
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ id: "gen-2" }))
@@ -117,9 +128,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("throws ChatGenerationError when the model reports generation is not possible", async () => {
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
 
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ id: "gen-3" }))
@@ -133,13 +142,8 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("stops polling and publishes nothing once the user interrupts generation", async () => {
-      const controller = new AbortController();
-      vi.mocked(updateTextGenerationState).mockImplementation((next) => {
-        if (next === "generating") controller.abort();
-      });
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const controller = abortWhenGenerating();
+      const generateTextWithHorde = await loadHordeGenerator();
 
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ id: "gen-4" }))
@@ -161,9 +165,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it('submits nothing and never enters "generating" once a newer search aborted it', async () => {
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       const controller = new AbortController();
       controller.abort();
 
@@ -177,20 +179,10 @@ describe("textGenerationWithHorde", () => {
     it("can be interrupted once it is generating, and cancels the queued job", async () => {
       // The UI only offers Stop while the state is "generating", so the
       // interrupt can only happen after the engine has entered it.
-      const controller = new AbortController();
-      vi.mocked(updateTextGenerationState).mockImplementation((next) => {
-        if (next === "generating") controller.abort();
-      });
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const controller = abortWhenGenerating();
+      const generateTextWithHorde = await loadHordeGenerator();
 
-      mockFetch
-        .mockResolvedValueOnce(jsonResponse({ id: "gen-queued" }))
-        .mockResolvedValueOnce(
-          jsonResponse({ done: false, is_possible: true, generations: [] }),
-        )
-        .mockResolvedValueOnce(jsonResponse({}));
+      queueInterruptedPolling("gen-queued");
 
       await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
         "Generation interrupted",
@@ -202,19 +194,9 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("cancels the job exactly once when the user interrupts", async () => {
-      const controller = new AbortController();
-      vi.mocked(updateTextGenerationState).mockImplementation((next) => {
-        if (next === "generating") controller.abort();
-      });
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
-      mockFetch
-        .mockResolvedValueOnce(jsonResponse({ id: "gen-stop" }))
-        .mockResolvedValueOnce(
-          jsonResponse({ done: false, is_possible: true, generations: [] }),
-        )
-        .mockResolvedValueOnce(jsonResponse({}));
+      const controller = abortWhenGenerating();
+      const generateTextWithHorde = await loadHordeGenerator();
+      queueInterruptedPolling("gen-stop");
 
       await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
         "Generation interrupted",
@@ -223,9 +205,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("cancels a pinned-model job that faults", async () => {
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ id: "gen-fault" }))
         .mockResolvedValueOnce(jsonResponse({ done: true, faulted: true }))
@@ -238,9 +218,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("cancels a pinned-model job that the model cannot take", async () => {
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ id: "gen-offline" }))
         .mockResolvedValueOnce(jsonResponse({ done: true, is_possible: false }))
@@ -253,9 +231,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("does not cancel a job whose answer was returned", async () => {
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ id: "gen-ok" }))
         .mockResolvedValueOnce(
@@ -271,9 +247,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("keeps the original error and logs once when the cancel fails", async () => {
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ id: "gen-x" }))
         .mockResolvedValueOnce(jsonResponse({ done: true, faulted: true }))
@@ -293,9 +267,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("sends the cancel with a timeout and keepalive", async () => {
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ id: "gen-k" }))
         .mockResolvedValueOnce(jsonResponse({ done: true, faulted: true }))
@@ -310,9 +282,7 @@ describe("textGenerationWithHorde", () => {
 
     it("includes the configured model in the generation request body", async () => {
       mockSettings({ hordeModel: "custom-model" });
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
 
       mockFetch
         .mockResolvedValueOnce(jsonResponse({ id: "gen-5" }))
@@ -345,9 +315,7 @@ describe("textGenerationWithHorde", () => {
         });
 
       it("keeps polling through a rate limit and finishes the generation", async () => {
-        const { generateTextWithHorde } = await import(
-          "./textGenerationWithHorde"
-        );
+        const generateTextWithHorde = await loadHordeGenerator();
         mockFetch
           .mockResolvedValueOnce(jsonResponse({ id: "gen-rate" }))
           .mockResolvedValueOnce(
@@ -361,9 +329,7 @@ describe("textGenerationWithHorde", () => {
       });
 
       it("recovers when a gateway answers a poll with an HTML error page", async () => {
-        const { generateTextWithHorde } = await import(
-          "./textGenerationWithHorde"
-        );
+        const generateTextWithHorde = await loadHordeGenerator();
         mockFetch
           .mockResolvedValueOnce(jsonResponse({ id: "gen-gateway" }))
           .mockResolvedValueOnce(
@@ -379,9 +345,7 @@ describe("textGenerationWithHorde", () => {
       });
 
       it("gives up on a status check that keeps failing without calling the model impossible", async () => {
-        const { generateTextWithHorde } = await import(
-          "./textGenerationWithHorde"
-        );
+        const generateTextWithHorde = await loadHordeGenerator();
         mockFetch
           .mockResolvedValueOnce(jsonResponse({ id: "gen-down" }))
           .mockImplementation(async () =>
@@ -404,9 +368,7 @@ describe("textGenerationWithHorde", () => {
       });
 
       it("stops at once when the job is gone, with the server's message", async () => {
-        const { generateTextWithHorde } = await import(
-          "./textGenerationWithHorde"
-        );
+        const generateTextWithHorde = await loadHordeGenerator();
         mockFetch
           .mockResolvedValueOnce(jsonResponse({ id: "gen-gone" }))
           .mockResolvedValueOnce(
@@ -422,9 +384,7 @@ describe("textGenerationWithHorde", () => {
       });
 
       it("rejects a finished generation that carries no text", async () => {
-        const { generateTextWithHorde } = await import(
-          "./textGenerationWithHorde"
-        );
+        const generateTextWithHorde = await loadHordeGenerator();
         mockFetch
           .mockResolvedValueOnce(jsonResponse({ id: "gen-empty" }))
           .mockResolvedValueOnce(
@@ -441,9 +401,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("reports the server's reason when the job is refused at submit", async () => {
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       mockFetch.mockResolvedValueOnce(
         jsonResponse({ message: "Invalid API key" }, 401),
       );
@@ -523,6 +481,23 @@ describe("textGenerationWithHorde", () => {
       );
     }
 
+    /** Routes a worker whose job faults and expects the generation to reject. */
+    async function expectFaultedGenerationRejects() {
+      routeSingleWorker(() => ({ done: true, faulted: true }));
+
+      const generateTextWithHorde = await loadHordeGenerator();
+      await expect(generateTextWithHorde()).rejects.toThrow(
+        "Generation failed",
+      );
+    }
+
+    /** Runs one generation to its end and returns the generation request bodies. */
+    async function generationBodiesAfterOneRun() {
+      const generateTextWithHorde = await loadHordeGenerator();
+      await generateTextWithHorde();
+      return generationRequestBodies();
+    }
+
     function generationRequestBodies() {
       return mockFetch.mock.calls
         .filter(([url]) => String(url).includes("/generate/text/async"))
@@ -553,12 +528,7 @@ describe("textGenerationWithHorde", () => {
         statusResponder: () => doneResponse,
       });
 
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
-      await generateTextWithHorde();
-
-      const bodies = generationRequestBodies();
+      const bodies = await generationBodiesAfterOneRun();
       expect(bodies).toHaveLength(2);
       for (const body of bodies) {
         expect(body.models).toEqual(["m-f", "m-e", "m-d", "m-c", "m-b"]);
@@ -577,9 +547,7 @@ describe("textGenerationWithHorde", () => {
         statusResponder: () => doneResponse,
       });
 
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       await generateTextWithHorde();
 
       for (const body of generationRequestBodies()) {
@@ -594,12 +562,7 @@ describe("textGenerationWithHorde", () => {
         statusResponder: () => doneResponse,
       });
 
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
-      await generateTextWithHorde();
-
-      const bodies = generationRequestBodies();
+      const bodies = await generationBodiesAfterOneRun();
       expect(bodies).toHaveLength(2);
       for (const body of bodies) {
         expect(body.models).toBeUndefined();
@@ -610,16 +573,11 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("retries with any available model when the top models cannot take the job", async () => {
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: (pollIndex) =>
-          pollIndex < 2 ? { done: true, is_possible: false } : doneResponse,
-      });
-
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
+      routeSingleWorker((pollIndex) =>
+        pollIndex < 2 ? { done: true, is_possible: false } : doneResponse,
       );
+
+      const generateTextWithHorde = await loadHordeGenerator();
       await generateTextWithHorde();
 
       expect(updateResponse).toHaveBeenCalledWith("Top model answer");
@@ -639,16 +597,11 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("does not submit a second round when the status checks keep failing", async () => {
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: () =>
-          jsonResponse({ message: "Too many requests" }, 429),
-      });
-
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
+      routeSingleWorker(() =>
+        jsonResponse({ message: "Too many requests" }, 429),
       );
+
+      const generateTextWithHorde = await loadHordeGenerator();
       await expect(generateTextWithHorde()).rejects.toThrow(
         "Too many requests",
       );
@@ -656,20 +609,20 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("does not retry when the generation faults", async () => {
+      await expectFaultedGenerationRejects();
+      expect(generationRequestBodies()).toHaveLength(2);
+    });
+
+    /** One worker with ten monthly generations, the shape most tests need. */
+    function routeSingleWorker(
+      statusResponder: (pollIndex: number, url: string) => unknown,
+    ) {
       routeHordeFetch({
         workers: [{ models: ["m-a"], max_length: 1024 }],
         monthStats: { "m-a": 10 },
-        statusResponder: () => ({ done: true, faulted: true }),
+        statusResponder,
       });
-
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
-      await expect(generateTextWithHorde()).rejects.toThrow(
-        "Generation failed",
-      );
-      expect(generationRequestBodies()).toHaveLength(2);
-    });
+    }
 
     /** Answers each job's polls from its own script, by the job id in the URL. */
     function perJobResponder(
@@ -687,18 +640,14 @@ describe("textGenerationWithHorde", () => {
     const pendingResponse = { done: false, is_possible: true, generations: [] };
 
     it("serves the healthy job when its sibling faults first", async () => {
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: perJobResponder({
+      routeSingleWorker(
+        perJobResponder({
           "gen-1": () => ({ done: true, faulted: true }),
           "gen-2": (poll) => (poll === 0 ? pendingResponse : doneResponse),
         }),
-      });
-
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
       );
+
+      const generateTextWithHorde = await loadHordeGenerator();
       await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
 
       expect(updateResponse).toHaveBeenCalledWith("Top model answer");
@@ -706,10 +655,8 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("still retries with any model when one job faults and the other cannot take the job", async () => {
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: perJobResponder({
+      routeSingleWorker(
+        perJobResponder({
           // The faulted job is first in submission order, so picking the
           // first error would hide the "not possible" that the retry needs.
           "gen-1": () => ({ done: true, faulted: true }),
@@ -717,11 +664,9 @@ describe("textGenerationWithHorde", () => {
           "gen-3": () => doneResponse,
           "gen-4": () => doneResponse,
         }),
-      });
-
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
       );
+
+      const generateTextWithHorde = await loadHordeGenerator();
       await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
 
       expect(generationRequestBodies()).toHaveLength(4);
@@ -729,10 +674,8 @@ describe("textGenerationWithHorde", () => {
 
     it("reports an interrupt during the race and submits no retry", async () => {
       const controller = new AbortController();
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: perJobResponder({
+      routeSingleWorker(
+        perJobResponder({
           "gen-1": () => ({ done: true, is_possible: false }),
           "gen-2": (poll) => {
             // The user presses Stop while this job is still queued, after its
@@ -741,11 +684,9 @@ describe("textGenerationWithHorde", () => {
             return pendingResponse;
           },
         }),
-      });
-
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
       );
+
+      const generateTextWithHorde = await loadHordeGenerator();
       await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
         "Generation interrupted",
       );
@@ -754,31 +695,25 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("cancels the losing job and not the winner", async () => {
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: perJobResponder({
+      routeSingleWorker(
+        perJobResponder({
           "gen-1": () => doneResponse,
           "gen-2": () => pendingResponse,
         }),
-      });
-
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
       );
+
+      const generateTextWithHorde = await loadHordeGenerator();
       await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
       expect(cancelledIds()).toEqual(["gen-2"]);
     });
 
     it("cancels the loser whose submit was still in flight when the race ended", async () => {
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: perJobResponder({
+      routeSingleWorker(
+        perJobResponder({
           "gen-1": () => doneResponse,
           "gen-2": () => pendingResponse,
         }),
-      });
+      );
       const routed = mockFetch.getMockImplementation();
       let submits = 0;
       let releaseSecondSubmit: () => void = () => {};
@@ -798,9 +733,7 @@ describe("textGenerationWithHorde", () => {
         },
       );
 
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
       expect(cancelledIds()).toEqual([]);
 
@@ -809,58 +742,39 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("returns the winner's answer without waiting for the loser's cancel", async () => {
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: perJobResponder({
+      routeSingleWorker(
+        perJobResponder({
           "gen-1": () => doneResponse,
           "gen-2": () => pendingResponse,
         }),
-      });
+      );
       const routed = mockFetch.getMockImplementation();
       // A Horde that never answers the DELETE.
       mockFetch.mockImplementation((url: string, init?: { method?: string }) =>
         init?.method === "DELETE" ? new Promise(() => {}) : routed?.(url, init),
       );
 
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
       expect(cancelledIds()).toEqual(["gen-2"]);
     });
 
     it("cancels both jobs when the race fails", async () => {
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: () => ({ done: true, faulted: true }),
-      });
-
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
-      await expect(generateTextWithHorde()).rejects.toThrow(
-        "Generation failed",
-      );
+      await expectFaultedGenerationRejects();
       expect(cancelledIds().sort()).toEqual(["gen-1", "gen-2"]);
     });
 
     it("cancels the first round before submitting the fallback round", async () => {
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: perJobResponder({
+      routeSingleWorker(
+        perJobResponder({
           "gen-1": () => ({ done: true, is_possible: false }),
           "gen-2": () => ({ done: true, is_possible: false }),
           "gen-3": () => doneResponse,
           "gen-4": () => pendingResponse,
         }),
-      });
-
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
       );
+
+      const generateTextWithHorde = await loadHordeGenerator();
       await expect(generateTextWithHorde()).resolves.toBe("Top model answer");
 
       const calls = mockFetch.mock.calls.map(([url, init]) =>
@@ -880,15 +794,9 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("reuses the cached ranking for the next generation", async () => {
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: () => doneResponse,
-      });
+      routeSingleWorker(() => doneResponse);
 
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       await generateTextWithHorde();
       await generateTextWithHorde();
 
@@ -907,16 +815,10 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("refetches the ranking after the cache expires", async () => {
-      routeHordeFetch({
-        workers: [{ models: ["m-a"], max_length: 1024 }],
-        monthStats: { "m-a": 10 },
-        statusResponder: () => doneResponse,
-      });
+      routeSingleWorker(() => doneResponse);
       const nowSpy = vi.spyOn(Date, "now").mockReturnValue(0);
 
-      const { generateTextWithHorde } = await import(
-        "./textGenerationWithHorde"
-      );
+      const generateTextWithHorde = await loadHordeGenerator();
       await generateTextWithHorde();
       nowSpy.mockReturnValue(5 * 60 * 1000 + 1);
       await generateTextWithHorde();

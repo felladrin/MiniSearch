@@ -122,6 +122,111 @@ function renderChatInterface({ suppressInitialFollowUp = true } = {}) {
   );
 }
 
+/**
+ * Mounts the chat with one follow-up question in flight. Returns the deferred
+ * that settles the question, plus the render's `unmount`.
+ */
+async function mountWithFollowUpInFlight() {
+  const question = deferred<string>();
+  vi.mocked(generateFollowUpQuestion).mockReturnValueOnce(question.promise);
+
+  const view = renderChatInterface({ suppressInitialFollowUp: false });
+
+  await act(async () => {});
+
+  expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+  return { question, unmount: view.unmount };
+}
+
+/**
+ * Mounts the chat with two follow-up questions in flight, oldest first, and
+ * returns both deferreds.
+ */
+async function mountWithTwoFollowUpsInFlight() {
+  const earlierQuestion = deferred<string>();
+  const newerQuestion = deferred<string>();
+  vi.mocked(generateFollowUpQuestion)
+    .mockReturnValueOnce(earlierQuestion.promise)
+    .mockReturnValueOnce(newerQuestion.promise);
+
+  renderChatInterface({ suppressInitialFollowUp: false });
+  await act(async () => {});
+
+  expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+  return { earlierQuestion, newerQuestion };
+}
+
+/**
+ * Mounts the chat with two follow-up questions in flight, then sends a message,
+ * which orphans the older call. Returns both deferreds and the send promise.
+ */
+async function sendDuringTwoFollowUpsInFlight() {
+  const { earlierQuestion, newerQuestion } =
+    await mountWithTwoFollowUpsInFlight();
+
+  let send: Promise<void> = Promise.resolve();
+  await act(async () => {
+    send = sendMessage("And how do I use it?");
+  });
+  return { earlierQuestion, newerQuestion, send };
+}
+
+/** Settles the newer question and waits for the send still running beside it. */
+async function settleNewestQuestion(
+  newerQuestion: ReturnType<typeof deferred<string>>,
+  send: Promise<void>,
+) {
+  await act(async () => {
+    newerQuestion.resolve("The newest question?");
+    await send;
+  });
+}
+
+/**
+ * Unmounts the first chat inside `act`, then mounts the second one with no
+ * `act` around the render. The caller sends the second chat's own message
+ * right after, in its own `act`.
+ */
+async function remountChatMidGeneration(first: { unmount: () => void }) {
+  await act(async () => {
+    first.unmount();
+  });
+
+  renderChatInterface();
+}
+
+/** Settles the live answer and expects the response flag to clear with it. */
+async function settleLiveAnswer(
+  secondResponse: ReturnType<typeof deferred<string>>,
+  secondSend: Promise<void>,
+) {
+  await act(async () => {
+    secondResponse.resolve("The live answer.");
+    await secondSend;
+  });
+
+  expect(getChatGenerationState().isGeneratingResponse).toBe(false);
+}
+
+/** Lets an earlier follow-up question land while the answer is still running. */
+async function settleEarlierQuestionMidResponse(
+  followUpQuestion: ReturnType<typeof deferred<string>>,
+) {
+  expect(getChatGenerationState().isGeneratingResponse).toBe(true);
+
+  await act(async () => {
+    followUpQuestion.resolve("An earlier question?");
+  });
+
+  expect(getChatGenerationState().isGeneratingResponse).toBe(true);
+}
+
+/** Checks the second mount's own generation started, and is not a stale flag. */
+function expectLiveGenerationStarted(calls: number) {
+  expect(getChatGenerationState().isGeneratingResponse).toBe(true);
+  expect(generateChatResponse).toHaveBeenCalledTimes(calls);
+}
+
 function stubWakeLockApi() {
   const release = vi.fn(() => Promise.resolve());
   const request = vi.fn(() =>
@@ -162,16 +267,7 @@ afterEach(() => {
 
 describe("ChatInterface generation state", () => {
   it("leaves the follow-up question flag off after sending during its generation", async () => {
-    const earlierQuestion = deferred<string>();
-    vi.mocked(generateFollowUpQuestion).mockReturnValueOnce(
-      earlierQuestion.promise,
-    );
-
-    renderChatInterface({ suppressInitialFollowUp: false });
-
-    await act(async () => {});
-
-    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+    const { question: earlierQuestion } = await mountWithFollowUpInFlight();
 
     await act(async () => {
       await sendMessage("And how do I use it?");
@@ -204,13 +300,7 @@ describe("ChatInterface generation state", () => {
       send = sendMessage("And how do I use it?");
     });
 
-    expect(getChatGenerationState().isGeneratingResponse).toBe(true);
-
-    await act(async () => {
-      followUpQuestion.resolve("An earlier question?");
-    });
-
-    expect(getChatGenerationState().isGeneratingResponse).toBe(true);
+    await settleEarlierQuestionMidResponse(followUpQuestion);
 
     await act(async () => {
       chatResponse.resolve("An answer.");
@@ -360,16 +450,8 @@ describe("ChatInterface generation state", () => {
   });
 
   it("keeps the follow-up question flag on until the newest call finishes", async () => {
-    const earlierQuestion = deferred<string>();
-    const newerQuestion = deferred<string>();
-    vi.mocked(generateFollowUpQuestion)
-      .mockReturnValueOnce(earlierQuestion.promise)
-      .mockReturnValueOnce(newerQuestion.promise);
-
-    renderChatInterface({ suppressInitialFollowUp: false });
-    await act(async () => {});
-
-    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+    const { earlierQuestion, newerQuestion } =
+      await mountWithTwoFollowUpsInFlight();
 
     let send: Promise<void> = Promise.resolve();
     await act(async () => {
@@ -384,25 +466,15 @@ describe("ChatInterface generation state", () => {
     expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
     expect(getFollowUpQuestion()).toBe("");
 
-    await act(async () => {
-      newerQuestion.resolve("The newest question?");
-      await send;
-    });
+    await settleNewestQuestion(newerQuestion, send);
 
     expect(getFollowUpQuestion()).toBe("The newest question?");
     expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(false);
   });
 
   it("leaves both generation flags off after unmounting mid-generation", async () => {
-    const heldQuestion = deferred<string>();
-    vi.mocked(generateFollowUpQuestion).mockReturnValueOnce(
-      heldQuestion.promise,
-    );
-
-    const { unmount } = renderChatInterface({ suppressInitialFollowUp: false });
-    await act(async () => {});
-
-    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+    const { question: heldQuestion, unmount } =
+      await mountWithFollowUpInFlight();
 
     await act(async () => {
       unmount();
@@ -457,19 +529,8 @@ describe("ChatInterface generation state", () => {
   });
 
   it("blanks nothing when an orphaned call rejects after a newer one started", async () => {
-    const earlierQuestion = deferred<string>();
-    const newerQuestion = deferred<string>();
-    vi.mocked(generateFollowUpQuestion)
-      .mockReturnValueOnce(earlierQuestion.promise)
-      .mockReturnValueOnce(newerQuestion.promise);
-
-    renderChatInterface({ suppressInitialFollowUp: false });
-    await act(async () => {});
-
-    let send: Promise<void> = Promise.resolve();
-    await act(async () => {
-      send = sendMessage("And how do I use it?");
-    });
+    const { earlierQuestion, newerQuestion, send } =
+      await sendDuringTwoFollowUpsInFlight();
 
     // The orphaned call fails. Its catch must not blank the newer one's work.
     await act(async () => {
@@ -478,10 +539,7 @@ describe("ChatInterface generation state", () => {
 
     expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
 
-    await act(async () => {
-      newerQuestion.resolve("The newest question?");
-      await send;
-    });
+    await settleNewestQuestion(newerQuestion, send);
 
     expect(getFollowUpQuestion()).toBe("The newest question?");
     expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(false);
@@ -564,20 +622,14 @@ describe("ChatInterface generation state", () => {
       firstSend = sendMessage("And how do I use it?");
     });
 
-    await act(async () => {
-      first.unmount();
-    });
-
-    renderChatInterface();
+    await remountChatMidGeneration(first);
 
     let secondSend: Promise<void> = Promise.resolve();
     await act(async () => {
       secondSend = sendMessage("Does it work offline?");
     });
 
-    expect(getChatGenerationState().isGeneratingResponse).toBe(true);
-    // The live generation really started, rather than the flag being stale.
-    expect(generateChatResponse).toHaveBeenCalledTimes(2);
+    expectLiveGenerationStarted(2);
 
     // The orphan's `finally` must not clear the live generation's flag, which
     // would drop the spinner and let a third send start alongside it.
@@ -588,12 +640,7 @@ describe("ChatInterface generation state", () => {
 
     expect(getChatGenerationState().isGeneratingResponse).toBe(true);
 
-    await act(async () => {
-      secondResponse.resolve("The live answer.");
-      await secondSend;
-    });
-
-    expect(getChatGenerationState().isGeneratingResponse).toBe(false);
+    await settleLiveAnswer(secondResponse, secondSend);
   });
 
   it("leaves the next mount's response flag alone when an orphaned regenerate settles", async () => {
@@ -615,20 +662,14 @@ describe("ChatInterface generation state", () => {
       firstRegenerate = regenerateResponse();
     });
 
-    await act(async () => {
-      first.unmount();
-    });
-
-    renderChatInterface();
+    await remountChatMidGeneration(first);
 
     let secondSend: Promise<void> = Promise.resolve();
     await act(async () => {
       secondSend = sendMessage("Does it work offline?");
     });
 
-    expect(getChatGenerationState().isGeneratingResponse).toBe(true);
-    // The live generation really started, rather than the flag being stale.
-    expect(generateChatResponse).toHaveBeenCalledTimes(3);
+    expectLiveGenerationStarted(3);
 
     await act(async () => {
       firstResponse.resolve("The orphaned regeneration.");
@@ -637,12 +678,7 @@ describe("ChatInterface generation state", () => {
 
     expect(getChatGenerationState().isGeneratingResponse).toBe(true);
 
-    await act(async () => {
-      secondResponse.resolve("The live answer.");
-      await secondSend;
-    });
-
-    expect(getChatGenerationState().isGeneratingResponse).toBe(false);
+    await settleLiveAnswer(secondResponse, secondSend);
   });
 
   it("starts one re-generation when two regenerates land in the same task", async () => {

@@ -25,16 +25,6 @@ vi.mock("./fallbackSearchService", () => ({
   isSearchFallbackEnabled: vi.fn(() => false),
   getFallbackProviderStats: vi.fn(() => ({})),
 }));
-vi.mock("./biEncoderService.ts", () => ({
-  getBiEncoderStatus: async () => true,
-}));
-vi.mock("./rerankerService.ts", () => ({
-  getRerankerStatus: async () => true,
-}));
-vi.mock("./webSearchService.ts", () => ({
-  getWebSearchServiceStatus: async () => "healthy",
-  getSearchCircuitStats: () => ({ circuitState: "closed", circuitOpens: 0 }),
-}));
 
 import { cacheServerHook } from "./cacheServerHook";
 import { configEndpointServerHook } from "./configEndpointServerHook";

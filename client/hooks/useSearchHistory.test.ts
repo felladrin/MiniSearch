@@ -121,17 +121,23 @@ async function addNewerSearches(count: number) {
   }
 }
 
+/** Renders the pinned-aware two-entry window and waits for the first load. */
+async function renderPinnedAwareHistory() {
+  const { result } = renderHook(() =>
+    useSearchHistory({ limit: 2, includeAllPinned: true }),
+  );
+  await settle();
+  await untilLoaded(result);
+  return result;
+}
+
 describe("useSearchHistory with includeAllPinned", () => {
   it("keeps a pinned search older than the whole recent window", async () => {
     await pinOldestEntry();
     // limit 2 reads the newest 4: the pinned entry is the 7th newest.
     await addNewerSearches(4);
 
-    const { result } = renderHook(() =>
-      useSearchHistory({ limit: 2, includeAllPinned: true }),
-    );
-    await settle();
-    await untilLoaded(result);
+    const result = await renderPinnedAwareHistory();
 
     expect(queriesOf(result.current.filteredSearches)).toEqual([
       "newer search 4",
@@ -143,11 +149,7 @@ describe("useSearchHistory with includeAllPinned", () => {
   it("keeps a pinned search inside the window but past the limit", async () => {
     await pinOldestEntry();
 
-    const { result } = renderHook(() =>
-      useSearchHistory({ limit: 2, includeAllPinned: true }),
-    );
-    await settle();
-    await untilLoaded(result);
+    const result = await renderPinnedAwareHistory();
 
     expect(queriesOf(result.current.filteredSearches)).toEqual([
       "rust async tutorial",
@@ -160,11 +162,7 @@ describe("useSearchHistory with includeAllPinned", () => {
     await pinOldestEntry();
     await addNewerSearches(4);
 
-    const { result } = renderHook(() =>
-      useSearchHistory({ limit: 2, includeAllPinned: true }),
-    );
-    await settle();
-    await untilLoaded(result);
+    const result = await renderPinnedAwareHistory();
     act(() => result.current.searchHistory("lisbon"));
     await settle();
 
@@ -177,11 +175,7 @@ describe("useSearchHistory with includeAllPinned", () => {
     await pinOldestEntry();
     const pinnedReadSpy = vi.spyOn(historyModule, "getPinnedSearches");
 
-    const { result } = renderHook(() =>
-      useSearchHistory({ limit: 2, includeAllPinned: true }),
-    );
-    await settle();
-    await untilLoaded(result);
+    const result = await renderPinnedAwareHistory();
     expect(pinnedReadSpy).toHaveBeenCalledTimes(1);
 
     for (const query of ["w", "we", "wea"]) {

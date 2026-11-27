@@ -1,4 +1,3 @@
-import debug from "debug";
 import {
   afterEach,
   beforeEach,
@@ -8,6 +7,8 @@ import {
   type MockedFunction,
   vi,
 } from "vitest";
+import { startLogCapture } from "./logCapture";
+import { mockResponse } from "./mockResponse";
 import {
   getDegradedSearchTypes,
   getSearchesWithAllResultsDiscardedSinceLastRestart,
@@ -26,33 +27,8 @@ import {
   parseUnresponsiveEngines,
 } from "./webSearchService";
 
-function createMockResponse(
-  text: string,
-  ok = true,
-  status?: number,
-): Response {
-  const resolvedStatus = status ?? (ok ? 200 : 503);
-  return {
-    ok,
-    status: resolvedStatus,
-    statusText: ok ? "OK" : "Error",
-    headers: new Headers(),
-    redirected: false,
-    type: "basic" as ResponseType,
-    url: "http://test.com",
-    clone: function () {
-      return this;
-    },
-    body: null,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    json: () => Promise.resolve(JSON.parse(text)),
-    text: () => Promise.resolve(text),
-  } as unknown as Response;
-}
-
+const createMockResponse = (text: string, ok = true, status?: number) =>
+  mockResponse(text, { ok, status });
 const successResponse = () =>
   createMockResponse(
     JSON.stringify({
@@ -79,6 +55,17 @@ beforeEach(() => {
 afterEach(() => {
   global.fetch = originalFetch;
 });
+
+/** Trips the breaker with a failing search and waits until it half-opens. */
+async function halfOpenBreaker(breaker: CircuitBreaker) {
+  fetchMock.mockResolvedValue(createMockResponse("", false, 503));
+  await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+
+  // Half-open, not open: the circuit check would answer "degraded" here, so
+  // only a probe checked first can answer "unhealthy".
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(breaker.getState("searxng")).toBe("HALF_OPEN");
+}
 
 describe("WebSearchService", () => {
   it("should report service not available when fetch throws", async () => {
@@ -635,34 +622,18 @@ describe("query privacy", () => {
   // `+`, from URLSearchParams), which a match on the raw string alone misses.
   const DISTINCTIVE_QUERY = "borogoves outgrabe mimsy-42";
 
-  let logLines: string[];
-  let originalLog: typeof debug.log;
+  let capture: ReturnType<typeof startLogCapture>;
 
-  /**
-   * `debug` resolves its writer at call time, so replacing it here captures
-   * everything the module logs through `debug`, which under jsdom never reaches
-   * `console` in a spy-able way. The console spies cover the calls the module
-   * makes directly, so a new logging line is caught whichever it uses.
-   */
   beforeEach(() => {
     // The unresponsive-engine path retries, so the backoff timers must be
     // fake or those calls wait seven seconds of real time each.
     vi.useFakeTimers();
-    logLines = [];
-    originalLog = debug.log;
-    debug.log = (...args: unknown[]) => {
-      logLines.push(args.map(String).join(" "));
-    };
-    for (const method of ["log", "info", "warn", "error", "debug"] as const) {
-      vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
-        logLines.push(args.map(String).join(" "));
-      });
-    }
+    capture = startLogCapture();
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    debug.log = originalLog;
+    capture.stop();
     vi.restoreAllMocks();
   });
 
@@ -732,8 +703,8 @@ describe("query privacy", () => {
       fetchSearXNG(DISTINCTIVE_QUERY, "images", 30, new CircuitBreaker()),
     ).rejects.toThrow();
 
-    const output = logLines.join("\n");
-    expect(logLines.length).toBeGreaterThan(0);
+    const output = capture.lines.join("\n");
+    expect(capture.lines.length).toBeGreaterThan(0);
 
     for (const form of [
       DISTINCTIVE_QUERY,
@@ -757,12 +728,12 @@ describe("query privacy", () => {
     await vi.runAllTimersAsync();
     await outcome;
 
-    expect(logLines.join("\n")).toContain(
+    expect(capture.lines.join("\n")).toContain(
       "Unresponsive engines: google (Timeout)",
     );
     // The retry line carries the cause, so a recovered retry stays readable
     // in the log: engine names, never the query.
-    expect(logLines.join("\n")).toContain(
+    expect(capture.lines.join("\n")).toContain(
       "returned no results (google (Timeout))",
     );
   });
@@ -781,7 +752,9 @@ describe("query privacy", () => {
     );
 
     expect(results).toEqual([]);
-    expect(logLines.join("\n")).toContain("No engine errors were reported");
+    expect(capture.lines.join("\n")).toContain(
+      "No engine errors were reported",
+    );
     expect(getSearchesWithoutResultsSinceLastRestart()).toBe(
       searchesWithoutResults + 1,
     );
@@ -793,7 +766,7 @@ describe("query privacy", () => {
 
     await fetchSearXNG(DISTINCTIVE_QUERY, "text", 30, new CircuitBreaker());
 
-    expect(logLines.join("\n")).toContain(
+    expect(capture.lines.join("\n")).toContain(
       "All 1 text result(s) processed from the SearXNG response were discarded",
     );
     expect(getSearchesWithAllResultsDiscardedSinceLastRestart()).toBe(
@@ -854,6 +827,27 @@ describe("getWebSearchServiceStatus", () => {
     expect(await getWebSearchServiceStatus(breaker)).toBe("healthy");
   }
 
+  /** A breaker that starts from a known, healthy state. */
+  async function freshBreaker() {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
+    await clearDegradation(breaker);
+    return breaker;
+  }
+
+  /**
+   * A fresh breaker with one text search already lost to unresponsive engines,
+   * which is what flags the search type. Pass `expectedMessage` when the test
+   * also checks what the rejection said.
+   */
+  async function degradedBreaker(expectedMessage?: string | RegExp) {
+    const breaker = await freshBreaker();
+    fetchMock.mockResolvedValue(suspendedResponse());
+    const rejection = expect(fetchSearXNG("test", "text", 30, breaker)).rejects;
+    if (expectedMessage === undefined) await rejection.toThrow();
+    else await rejection.toThrow(expectedMessage);
+    return breaker;
+  }
+
   it("reports unhealthy while the circuit is open, though /healthz answers OK", async () => {
     const breaker = new CircuitBreaker({ failureThreshold: 1 });
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
@@ -874,13 +868,7 @@ describe("getWebSearchServiceStatus", () => {
         failureThreshold: 1,
         resetTimeout: 1000,
       });
-      fetchMock.mockResolvedValue(createMockResponse("", false, 503));
-      await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
-
-      // Half-open, not open: the circuit check would answer "degraded" here, so
-      // only a probe checked first can answer "unhealthy".
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(breaker.getState("searxng")).toBe("HALF_OPEN");
+      await halfOpenBreaker(breaker);
 
       fetchMock.mockResolvedValue(createMockResponse("NOT_OK", false));
 
@@ -899,11 +887,7 @@ describe("getWebSearchServiceStatus", () => {
       });
       await clearDegradation(breaker);
 
-      fetchMock.mockResolvedValue(createMockResponse("", false, 503));
-      await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
-
-      await vi.advanceTimersByTimeAsync(1000);
-      expect(breaker.getState("searxng")).toBe("HALF_OPEN");
+      await halfOpenBreaker(breaker);
 
       healthzOk();
 
@@ -916,13 +900,7 @@ describe("getWebSearchServiceStatus", () => {
   });
 
   it("reports degraded after a search lost to unresponsive engines", async () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 5 });
-    await clearDegradation(breaker);
-
-    fetchMock.mockResolvedValue(suspendedResponse());
-    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow(
-      "google (CAPTCHA)",
-    );
+    const breaker = await degradedBreaker("google (CAPTCHA)");
     expect(breaker.getState("searxng")).toBe("CLOSED");
 
     healthzOk();
@@ -931,11 +909,7 @@ describe("getWebSearchServiceStatus", () => {
   });
 
   it("stays degraded when an image search answers after a failed text search", async () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 5 });
-    await clearDegradation(breaker);
-
-    fetchMock.mockResolvedValue(suspendedResponse());
-    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+    const breaker = await degradedBreaker();
 
     // What the client actually does after a failed text search: it fires an
     // image search, which goes out to a different engine pool. Answering there
@@ -950,11 +924,7 @@ describe("getWebSearchServiceStatus", () => {
   });
 
   it("reports healthy again once SearXNG answers the search type that failed", async () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 5 });
-    await clearDegradation(breaker);
-
-    fetchMock.mockResolvedValue(suspendedResponse());
-    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+    const breaker = await degradedBreaker();
     const tallyWhileDegraded = getUnresponsiveEngineStats();
 
     fetchMock.mockResolvedValue(successResponse());
@@ -969,11 +939,7 @@ describe("getWebSearchServiceStatus", () => {
   });
 
   it("clears the degradation on zero results with no engine errors", async () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 5 });
-    await clearDegradation(breaker);
-
-    fetchMock.mockResolvedValue(suspendedResponse());
-    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+    const breaker = await degradedBreaker();
 
     // The engines replied, they just matched nothing, which is not a failure.
     fetchMock.mockResolvedValue(respondingEmptyResponse());

@@ -11,6 +11,33 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+/** Three text results, in the order the reranker indexes them. */
+function textResults(): [string, string, string][] {
+  return [
+    ["A", "a", "https://a.com"],
+    ["B", "b", "https://b.com"],
+    ["C", "c", "https://c.com"],
+  ];
+}
+
+/** Makes the reranker return one relevance score per index, in order. */
+function mockRerankScores(...scores: number[]) {
+  mockRerank.mockResolvedValue(
+    scores.map((relevance_score, index) => ({ index, relevance_score })) as {
+      index: number;
+      relevance_score: number;
+    }[],
+  );
+}
+/** The three roundup results that compete with the named site. */
+function roundupResults(): [string, string, string][] {
+  return [
+    ["Disney+ schedule roundup", "Blog", "https://blog.example.com/one"],
+    ["Another roundup", "Blog", "https://blog.example.com/two"],
+    ["Third roundup", "Blog", "https://blog.example.com/three"],
+  ];
+}
+
 describe("rankSearchResults", () => {
   it.each([
     ["text", false],
@@ -69,32 +96,16 @@ describe("rankSearchResults", () => {
   });
 
   it("should sort results by score descending when preserveTopResults is false", async () => {
-    mockRerank.mockResolvedValue([
-      { index: 0, relevance_score: 0.8 },
-      { index: 1, relevance_score: 0.9 },
-      { index: 2, relevance_score: 0.5 },
-    ] as { index: number; relevance_score: number }[]);
+    mockRerankScores(0.8, 0.9, 0.5);
     const { rankSearchResults } = await import("./rankSearchResults");
-    const result = await rankSearchResults("query", "text", [
-      ["A", "a", "https://a.com"],
-      ["B", "b", "https://b.com"],
-      ["C", "c", "https://c.com"],
-    ]);
+    const result = await rankSearchResults("query", "text", textResults());
     expect(result[0][0]).toBe("B");
   });
 
   it("carries the reranker score through as a fourth tuple element", async () => {
-    mockRerank.mockResolvedValue([
-      { index: 0, relevance_score: 9 },
-      { index: 1, relevance_score: 8.9 },
-      { index: 2, relevance_score: 8.8 },
-    ] as { index: number; relevance_score: number }[]);
+    mockRerankScores(9, 8.9, 8.8);
     const { rankSearchResults } = await import("./rankSearchResults");
-    const result = await rankSearchResults("query", "text", [
-      ["A", "a", "https://a.com"],
-      ["B", "b", "https://b.com"],
-      ["C", "c", "https://c.com"],
-    ]);
+    const result = await rankSearchResults("query", "text", textResults());
     // C is dropped by the score filter; the survivors keep their scores.
     expect(result).toEqual([
       ["A", "a", "https://a.com", 9],
@@ -224,18 +235,10 @@ describe("rankSearchResults", () => {
   it("counts the results the score filter considered and kept", async () => {
     const { getRerankingStats } = await import("./rerankingSinceLastRestart");
     const { rankSearchResults } = await import("./rankSearchResults");
-    mockRerank.mockResolvedValue([
-      { index: 0, relevance_score: 9 },
-      { index: 1, relevance_score: 8.9 },
-      { index: 2, relevance_score: 8.8 },
-    ] as { index: number; relevance_score: number }[]);
+    mockRerankScores(9, 8.9, 8.8);
 
     const before = getRerankingStats();
-    const ranked = await rankSearchResults("test", "text", [
-      ["A", "a", "https://a.com"],
-      ["B", "b", "https://b.com"],
-      ["C", "c", "https://c.com"],
-    ]);
+    const ranked = await rankSearchResults("test", "text", textResults());
     const after = getRerankingStats();
 
     // Counts, not just the ratio: the ratio alone passes for any
@@ -247,18 +250,10 @@ describe("rankSearchResults", () => {
   it("reports how many results survived the score filter", async () => {
     const { getRerankingStats } = await import("./rerankingSinceLastRestart");
     const before = getRerankingStats();
-    mockRerank.mockResolvedValue([
-      { index: 0, relevance_score: 9 },
-      { index: 1, relevance_score: 8.5 },
-      { index: 2, relevance_score: 8.4 },
-    ] as { index: number; relevance_score: number }[]);
+    mockRerankScores(9, 8.5, 8.4);
     const { rankSearchResults } = await import("./rankSearchResults");
 
-    const ranked = await rankSearchResults("test", "text", [
-      ["A", "a", "https://a.com"],
-      ["B", "b", "https://b.com"],
-      ["C", "c", "https://c.com"],
-    ]);
+    const ranked = await rankSearchResults("test", "text", textResults());
 
     const after = getRerankingStats();
     expect(after.reranks).toBe(before.reranks + 1);
@@ -313,9 +308,7 @@ describe("rankSearchResults", () => {
         "December releases",
         "https://www.disneyplus.com/welcome",
       ],
-      ["Disney+ schedule roundup", "Blog", "https://blog.example.com/one"],
-      ["Another roundup", "Blog", "https://blog.example.com/two"],
-      ["Third roundup", "Blog", "https://blog.example.com/three"],
+      ...roundupResults(),
     ]);
 
     expect(result[0][2]).toBe("https://www.disneyplus.com/welcome");
@@ -339,9 +332,7 @@ describe("rankSearchResults", () => {
         "December releases",
         "https://www.disneyplus.com/welcome",
       ],
-      ["Disney+ schedule roundup", "Blog", "https://blog.example.com/one"],
-      ["Another roundup", "Blog", "https://blog.example.com/two"],
-      ["Third roundup", "Blog", "https://blog.example.com/three"],
+      ...roundupResults(),
     ]);
 
     expect(result[0][2]).toBe("https://www.disneyplus.com/welcome");

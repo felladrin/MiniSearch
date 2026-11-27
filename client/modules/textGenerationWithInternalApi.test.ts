@@ -23,22 +23,14 @@ vi.mock("./systemPrompt", () => ({
   getSystemPrompt: vi.fn().mockReturnValue("system prompt"),
 }));
 
-// canStartResponding/getFormattedSearchResults depend on pubSub state we
-// don't want to drive here; ChatGenerationError has no such dependency, so
-// keep it real so `instanceof` checks against it still work.
-vi.mock("./textGenerationUtilities", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("./textGenerationUtilities")>();
-  return {
-    ...actual,
-    canStartResponding: vi.fn().mockResolvedValue(undefined),
-    getFormattedSearchResults: vi.fn().mockReturnValue("None."),
+vi.mock("./textGenerationUtilities", async (importOriginal) =>
+  (await import("./textGenerationTestUtils")).textGenerationUtilitiesMock({
     getDefaultChatCompletionCreateParamsStreaming: vi.fn().mockReturnValue({
       max_tokens: 1000,
       temperature: 0.35,
     }),
-  };
-});
+  })(importOriginal),
+);
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -63,33 +55,37 @@ function streamResponse(chunks: Array<string | Uint8Array>, status = 200) {
 }
 
 /**
- * A response whose stream sends `chunks` and then stays open, as a stalled
- * upstream does, with a spy on the stream's cancel.
+ * A response whose stream sends `chunks`, with a spy on the stream's cancel.
+ * `close` ends the stream, as a completed upstream does; leaving it open
+ * stands in for a stalled one.
  */
-function openStreamResponse(chunks: string[]) {
+function streamBody(chunks: string[], close: boolean) {
   const cancel = vi.fn();
   const encoder = new TextEncoder();
   const body = new ReadableStream({
     start(controller) {
       for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      if (close) controller.close();
     },
     cancel,
   });
   return { response: new Response(body), cancel };
 }
 
+function openStreamResponse(chunks: string[]) {
+  return streamBody(chunks, false);
+}
+
 /** A closed stream, with a spy on its cancel. */
 function closedStreamResponse(chunks: string[]) {
-  const cancel = vi.fn();
-  const encoder = new TextEncoder();
-  const body = new ReadableStream({
-    start(controller) {
-      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
-      controller.close();
-    },
-    cancel,
-  });
-  return { response: new Response(body), cancel };
+  return streamBody(chunks, true);
+}
+
+/** Makes the first publish abort the generation, and returns its controller. */
+function abortOnFirstPublish() {
+  const controller = new AbortController();
+  vi.mocked(updateResponse).mockImplementationOnce(() => controller.abort());
+  return controller;
 }
 
 function fetchSignal(): AbortSignal {
@@ -226,10 +222,7 @@ describe("textGenerationWithInternalApi", () => {
           ]),
         ),
       );
-      const controller = new AbortController();
-      vi.mocked(updateResponse).mockImplementationOnce(() =>
-        controller.abort(),
-      );
+      const controller = abortOnFirstPublish();
 
       await expect(
         generateTextWithInternalApi(controller.signal),
@@ -344,10 +337,7 @@ describe("textGenerationWithInternalApi", () => {
         'data: {"choices":[{"delta":{"content":"partial"}}]}\n',
       ]);
       mockFetch.mockResolvedValueOnce(stream.response);
-      const controller = new AbortController();
-      vi.mocked(updateResponse).mockImplementationOnce(() =>
-        controller.abort(),
-      );
+      const controller = abortOnFirstPublish();
 
       await expect(
         generateTextWithInternalApi(controller.signal),

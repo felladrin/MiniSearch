@@ -2,7 +2,6 @@ import { MantineProvider } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useSyncExternalStore } from "react";
 import DictationButton from "@/components/DictationButton";
 import {
   DictationError,
@@ -10,36 +9,58 @@ import {
   startDictation,
 } from "@/modules/speechToText";
 
-vi.mock("@/modules/speechToText", async () => {
-  const { DictationError: RealDictationError } = await import(
-    "@/modules/speechToText"
+// jscpd:ignore-start
+// Vitest hoists every vi.mock call above the imports, so the registration has
+// to be written out in each file; only the factory body can be shared, and it
+// is. The duplication is the framework's, not the tests'.
+vi.mock("@/modules/speechToText", async () =>
+  (await import("@/testMocks")).speechToTextMock(),
+);
+vi.mock("@mantine/notifications", async () =>
+  (await import("@/testMocks")).notificationsStub(),
+);
+vi.mock("create-pubsub/react", async () =>
+  (await import("@/testMocks")).pubSubReactMock(),
+);
+// jscpd:ignore-end
+
+/** Turns dictation on or off in the settings the button subscribes to. */
+async function setDictationSetting(enableDictation: boolean) {
+  const { settingsPubSub } = await import("@/modules/pubSub");
+  settingsPubSub[0]({ ...(settingsPubSub[2]?.() ?? {}), enableDictation });
+}
+
+/** Presses the button and returns the callbacks it handed the engine. */
+async function pressAndWaitForEngine(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button"));
+  await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
+  return vi.mocked(startDictation).mock.calls[0][0];
+}
+
+/** Re-renders the button as a field that went read-only mid-transcription. */
+function renderDisabledButton(view: ReturnType<typeof render>) {
+  view.rerender(
+    <MantineProvider>
+      <DictationButton
+        getValue={() => ""}
+        setValue={() => {}}
+        labelScope="the search query"
+        disabled
+      />
+    </MantineProvider>,
   );
-  return {
-    DictationError: RealDictationError,
-    getDictationEngine: vi.fn(() => "wasm" as const),
-    startDictation: vi.fn(),
-  };
-});
+}
 
-vi.mock("@mantine/notifications", () => ({
-  notifications: { show: vi.fn() },
-}));
-
-/**
- * Subscribes for real rather than reading a snapshot, so a settings change
- * during a test re-renders the button the way it does in the app.
- */
-vi.mock("create-pubsub/react", () => ({
-  usePubSub: (pubSub: [unknown, unknown, unknown]) => {
-    const [publish, subscribe, get] = pubSub as [
-      unknown,
-      (listener: () => void) => () => void,
-      () => unknown,
-    ];
-    const value = useSyncExternalStore(subscribe, get, get);
-    return [value, publish];
-  },
-}));
+/** Waits for the engine to have been started with this local-model preference. */
+async function expectEngineStartedWith(localModel: boolean) {
+  await waitFor(() =>
+    expect(startDictation).toHaveBeenCalledWith(
+      expect.anything(),
+      localModel,
+      expect.any(AbortSignal),
+    ),
+  );
+}
 
 function renderButton({
   getValue = () => "",
@@ -92,11 +113,7 @@ it("hides when no dictation engine is available", () => {
 });
 
 it("hides when the setting is off", async () => {
-  const { settingsPubSub } = await import("@/modules/pubSub");
-  settingsPubSub[0]({
-    ...(settingsPubSub[2]?.() ?? {}),
-    enableDictation: false,
-  });
+  await setDictationSetting(false);
   try {
     renderButton();
     expect(
@@ -105,10 +122,7 @@ it("hides when the setting is off", async () => {
   } finally {
     // Restored even on a failure: this channel is module state, so leaking
     // `false` would hide the button in every later test in this file.
-    settingsPubSub[0]({
-      ...(settingsPubSub[2]?.() ?? {}),
-      enableDictation: true,
-    });
+    await setDictationSetting(true);
   }
 });
 
@@ -124,13 +138,7 @@ it("passes the local-model preference through to the engine", async () => {
     await user.click(
       screen.getByRole("button", { name: "Dictate the search query" }),
     );
-    await waitFor(() =>
-      expect(startDictation).toHaveBeenCalledWith(
-        expect.anything(),
-        false,
-        expect.any(AbortSignal),
-      ),
-    );
+    await expectEngineStartedWith(false);
     expect(getDictationEngine).toHaveBeenCalledWith(false);
   } finally {
     settingsPubSub[0]({
@@ -243,16 +251,7 @@ describe("the transcribing phase", () => {
       "transcribing",
     );
 
-    view.rerender(
-      <MantineProvider>
-        <DictationButton
-          getValue={() => ""}
-          setValue={() => {}}
-          labelScope="the search query"
-          disabled
-        />
-      </MantineProvider>,
-    );
+    renderDisabledButton(view);
 
     // The transcript would otherwise land in a field that went read-only.
     await waitFor(() => expect(cancelFn).toHaveBeenCalledTimes(1));
@@ -538,7 +537,6 @@ describe("teardown", () => {
 
   it("stays quiet when a load abandoned by the setting fails", async () => {
     const user = userEvent.setup();
-    const { settingsPubSub } = await import("@/modules/pubSub");
     let fail: ((error: Error) => void) | undefined;
     vi.mocked(startDictation).mockReturnValue(
       new Promise((_resolve, reject) => {
@@ -547,14 +545,10 @@ describe("teardown", () => {
     );
 
     renderButton();
-    await user.click(screen.getByRole("button"));
-    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
+    await pressAndWaitForEngine(user);
 
     try {
-      settingsPubSub[0]({
-        ...(settingsPubSub[2]?.() ?? {}),
-        enableDictation: false,
-      });
+      await setDictationSetting(false);
       await waitFor(() =>
         expect(vi.mocked(startDictation).mock.calls[0][2]?.aborted).toBe(true),
       );
@@ -565,10 +559,7 @@ describe("teardown", () => {
       // The button is gone, so there is nothing for the failure to explain.
       expect(notifications.show).not.toHaveBeenCalled();
     } finally {
-      settingsPubSub[0]({
-        ...(settingsPubSub[2]?.() ?? {}),
-        enableDictation: true,
-      });
+      await setDictationSetting(true);
     }
   });
 
@@ -589,7 +580,6 @@ describe("teardown", () => {
 
   it("discards a session that arrives after the setting was turned off", async () => {
     const user = userEvent.setup();
-    const { settingsPubSub } = await import("@/modules/pubSub");
     let release: ((value: typeof session) => void) | undefined;
     vi.mocked(startDictation).mockReturnValue(
       new Promise((resolve) => {
@@ -598,30 +588,22 @@ describe("teardown", () => {
     );
 
     renderButton();
-    await user.click(screen.getByRole("button"));
-    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
+    await pressAndWaitForEngine(user);
 
     try {
       // Mid-load, with the session not yet in the ref: the button disappears,
       // and the microphone would otherwise open with nothing to stop it.
-      settingsPubSub[0]({
-        ...(settingsPubSub[2]?.() ?? {}),
-        enableDictation: false,
-      });
+      await setDictationSetting(false);
       release?.(session);
 
       await waitFor(() => expect(cancelFn).toHaveBeenCalledTimes(1));
     } finally {
-      settingsPubSub[0]({
-        ...(settingsPubSub[2]?.() ?? {}),
-        enableDictation: true,
-      });
+      await setDictationSetting(true);
     }
   });
 
   it("does not adopt a load an earlier press abandoned", async () => {
     const user = userEvent.setup();
-    const { settingsPubSub } = await import("@/modules/pubSub");
     const first = { stop: vi.fn(), cancel: vi.fn() };
     const second = { stop: vi.fn(), cancel: vi.fn() };
     const releases: ((value: typeof session) => void)[] = [];
@@ -630,21 +612,14 @@ describe("teardown", () => {
     );
 
     renderButton();
-    await user.click(screen.getByRole("button"));
-    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
+    await pressAndWaitForEngine(user);
 
     try {
-      settingsPubSub[0]({
-        ...(settingsPubSub[2]?.() ?? {}),
-        enableDictation: false,
-      });
+      await setDictationSetting(false);
       await waitFor(() =>
         expect(screen.queryByRole("button")).not.toBeInTheDocument(),
       );
-      settingsPubSub[0]({
-        ...(settingsPubSub[2]?.() ?? {}),
-        enableDictation: true,
-      });
+      await setDictationSetting(true);
 
       await user.click(await screen.findByRole("button"));
       await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(2));
@@ -658,10 +633,7 @@ describe("teardown", () => {
       await waitFor(() => expect(first.cancel).toHaveBeenCalledTimes(1));
       expect(second.cancel).not.toHaveBeenCalled();
     } finally {
-      settingsPubSub[0]({
-        ...(settingsPubSub[2]?.() ?? {}),
-        enableDictation: true,
-      });
+      await setDictationSetting(true);
     }
   });
 
@@ -669,10 +641,7 @@ describe("teardown", () => {
     const user = userEvent.setup();
     renderButton();
 
-    await user.click(screen.getByRole("button"));
-    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
-
-    const { onEnd } = vi.mocked(startDictation).mock.calls[0][0];
+    const { onEnd } = await pressAndWaitForEngine(user);
     act(() => onEnd?.());
 
     // The engine ending by itself is not a failure, but the button has to
@@ -692,10 +661,7 @@ describe("teardown", () => {
     const user = userEvent.setup();
     renderButton();
 
-    await user.click(screen.getByRole("button"));
-    await waitFor(() => expect(startDictation).toHaveBeenCalledTimes(1));
-
-    const { onError } = vi.mocked(startDictation).mock.calls[0][0];
+    const { onError } = await pressAndWaitForEngine(user);
     act(() => onError?.(new DictationError("engine", "the transcriber died")));
 
     await waitFor(() => expect(cancelFn).toHaveBeenCalledTimes(1));

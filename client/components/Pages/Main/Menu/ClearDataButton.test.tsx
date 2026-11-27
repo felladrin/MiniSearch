@@ -30,6 +30,14 @@ function renderClearDataButton() {
 }
 
 describe("ClearDataButton", () => {
+  /** Presses the button and waits for the teardown to reload the page. */
+  async function pressClearAllData() {
+    const user = userEvent.setup();
+    renderClearDataButton();
+    await user.click(screen.getByRole("button", { name: "Clear all data" }));
+    await waitFor(() => expect(reloadMock).toHaveBeenCalledTimes(1));
+  }
+
   const originalLocation = self.location;
   const originalCachesDescriptor = Object.getOwnPropertyDescriptor(
     self,
@@ -71,14 +79,7 @@ describe("ClearDataButton", () => {
       value: undefined,
     });
 
-    const user = userEvent.setup();
-    renderClearDataButton();
-
-    await user.click(screen.getByRole("button", { name: "Clear all data" }));
-
-    await waitFor(() => {
-      expect(reloadMock).toHaveBeenCalledTimes(1);
-    });
+    await pressClearAllData();
 
     expect(localStorage.getItem("sample-key")).toBeNull();
     expect(Dexie.delete).toHaveBeenCalledWith("minisearch-db");
@@ -99,14 +100,7 @@ describe("ClearDataButton", () => {
       new Error("OPFS unavailable"),
     );
 
-    const user = userEvent.setup();
-    renderClearDataButton();
-
-    await user.click(screen.getByRole("button", { name: "Clear all data" }));
-
-    await waitFor(() => {
-      expect(reloadMock).toHaveBeenCalledTimes(1);
-    });
+    await pressClearAllData();
 
     expect(addLogEntry).toHaveBeenCalledWith(
       "Error clearing data: OPFS unavailable",
@@ -135,14 +129,7 @@ describe("ClearDataButton", () => {
       },
     });
 
-    const user = userEvent.setup();
-    renderClearDataButton();
-
-    await user.click(screen.getByRole("button", { name: "Clear all data" }));
-
-    await waitFor(() => {
-      expect(reloadMock).toHaveBeenCalledTimes(1);
-    });
+    await pressClearAllData();
 
     expect(keysMock).toHaveBeenCalledTimes(1);
     expect(deleteMock).toHaveBeenCalledWith("cache-a");

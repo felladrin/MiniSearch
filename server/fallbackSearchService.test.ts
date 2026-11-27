@@ -1,4 +1,3 @@
-import debug from "debug";
 import {
   afterEach,
   beforeEach,
@@ -8,43 +7,44 @@ import {
   type MockedFunction,
   vi,
 } from "vitest";
+import { startLogCapture } from "./logCapture";
 
-function createMockResponse(
-  body: string,
-  {
-    status,
-    ok = status === undefined ? true : status >= 200 && status < 300,
-    headers = {},
-    contentType = "application/json",
-    unreadBody = null,
-  }: {
-    ok?: boolean;
-    status?: number;
-    headers?: Record<string, string>;
-    contentType?: string;
-    unreadBody?: { cancel: () => Promise<void> } | null;
-  } = {},
-): Response {
-  const resolvedStatus = status ?? (ok ? 200 : 503);
-  return {
-    ok,
-    status: resolvedStatus,
-    statusText: ok ? "OK" : "Error",
-    headers: new Headers({ "content-type": contentType, ...headers }),
-    redirected: false,
-    type: "basic" as ResponseType,
-    url: "http://test.com",
-    clone: function () {
-      return this;
-    },
-    body: unreadBody,
-    bodyUsed: false,
-    arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-    blob: () => Promise.resolve(new Blob()),
-    formData: () => Promise.resolve(new FormData()),
-    json: () => Promise.resolve(JSON.parse(body)),
-    text: () => Promise.resolve(body),
-  } as unknown as Response;
+import { mockResponse as createMockResponse } from "./mockResponse";
+
+/** Queues an exchange whose search reply is a JSON-RPC error. */
+function mockJsonRpcError(error: { code: unknown; message: string }) {
+  fetchMock.mockResolvedValueOnce(
+    createMockResponse(INITIALIZE_REPLY, {
+      headers: { "mcp-session-id": SESSION_ID },
+    }),
+  );
+  fetchMock.mockResolvedValueOnce(
+    createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
+  );
+  fetchMock.mockResolvedValueOnce(
+    createMockResponse(JSON.stringify({ jsonrpc: "2.0", id: 2, error })),
+  );
+}
+
+/** Runs a full search and returns the error it rejected with. */
+async function rejectionOfSearch() {
+  return fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS).catch(
+    (error: unknown) => error,
+  );
+}
+
+/** Queues the three keyless providers' empty replies, in the default order. */
+function queueAllKeylessProviders() {
+  delete process.env.SEARCH_FALLBACK_PROVIDERS;
+  vi.spyOn(Math, "random").mockReturnValue(0.99);
+  mockExchange(documentWith([]));
+  mockExchange(youcomDocumentWith([]), { initializeSession: null });
+  mockExchange(keenableDocumentWith([]), { initializeSession: null });
+}
+
+/** The URLs every queued request went to, in call order. */
+function requestedUrls() {
+  return fetchMock.mock.calls.map(([requestUrl]) => String(requestUrl));
 }
 
 const SESSION_ID = "session-from-step-one";
@@ -210,6 +210,36 @@ function requestBody(index: number): {
 function requestHeaders(index: number): Record<string, string> {
   const [, init] = fetchMock.mock.calls[index];
   return init?.headers as Record<string, string>;
+}
+
+/**
+ * The snippet is the source cut at 400 characters on a word boundary, with
+ * the ellipsis marking the cut.
+ */
+function expectWordBoundaryCut(source: string, snippet: string) {
+  expect(snippet.endsWith("…")).toBe(true);
+  expect(snippet.length).toBeLessThanOrEqual(400);
+  const kept = snippet.slice(0, -1);
+  // The kept text is a prefix of the source, and the source continues with a
+  // space, so the cut landed between two words rather than inside one.
+  expect(source.startsWith(kept)).toBe(true);
+  expect(source[kept.length]).toBe(" ");
+}
+
+/** Runs one parallel exchange with `budgetMs`; returns the timeout spy. */
+async function runParallelExchange(budgetMs: number) {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  listProviders("parallel,youcom");
+  orderParallelFirst();
+  const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+  mockExchange(
+    documentWith([
+      { url: "https://example.com/p", title: "P", excerpts: [EXCERPT] },
+    ]),
+  );
+
+  await fetchFallbackTextResults(QUERY, 10, budgetMs);
+  return timeoutSpy;
 }
 
 describe("isSearchFallbackEnabled", () => {
@@ -536,15 +566,7 @@ describe("mapping You.com results", () => {
       },
     ]);
 
-    const snippet = results[0][1];
-    expect(snippet.endsWith("…")).toBe(true);
-    expect(snippet.length).toBeLessThanOrEqual(400);
-    const kept = snippet.slice(0, -1);
-    // The kept text is a prefix of the collapsed source, and the source
-    // continues with a space, so the cut landed between two words rather
-    // than inside one.
-    expect(description.startsWith(kept)).toBe(true);
-    expect(description[kept.length]).toBe(" ");
+    expectWordBoundaryCut(description, results[0][1]);
   });
 
   it("keeps a short description that the excerpt length filter would drop", async () => {
@@ -805,6 +827,15 @@ describe("reading the reply", () => {
 });
 
 describe("mapping a result", () => {
+  /** Three hits with the standard excerpt, for the ordering and limit tests. */
+  function threeDocuments() {
+    return [
+      { url: "https://example.com/1", title: "One", excerpts: [EXCERPT] },
+      { url: "https://example.com/2", title: "Two", excerpts: [EXCERPT] },
+      { url: "https://example.com/3", title: "Three", excerpts: [EXCERPT] },
+    ];
+  }
+
   const run = async (results: unknown[], limit = 10) => {
     mockExchange(documentWith(results));
     return fetchFallbackTextResults(QUERY, limit, FULL_BUDGET_MS);
@@ -877,14 +908,7 @@ describe("mapping a result", () => {
       },
     ]);
 
-    const snippet = results[0][1];
-    expect(snippet.endsWith("…")).toBe(true);
-    expect(snippet.length).toBeLessThanOrEqual(400);
-    const kept = snippet.slice(0, -1);
-    // The kept text is a prefix of the source, and the source continues with a
-    // space, so the cut landed between two words rather than inside one.
-    expect(LONG_EXCERPT.startsWith(kept)).toBe(true);
-    expect(LONG_EXCERPT[kept.length]).toBe(" ");
+    expectWordBoundaryCut(LONG_EXCERPT, results[0][1]);
   });
 
   // The page read for this result would go looking for the text the snippet
@@ -999,24 +1023,13 @@ describe("mapping a result", () => {
   });
 
   it("keeps the endpoint's relevance order", async () => {
-    const results = await run([
-      { url: "https://example.com/1", title: "One", excerpts: [EXCERPT] },
-      { url: "https://example.com/2", title: "Two", excerpts: [EXCERPT] },
-      { url: "https://example.com/3", title: "Three", excerpts: [EXCERPT] },
-    ]);
+    const results = await run(threeDocuments());
 
     expect(results.map(([title]) => title)).toEqual(["One", "Two", "Three"]);
   });
 
   it("applies the limit", async () => {
-    const results = await run(
-      [
-        { url: "https://example.com/1", title: "One", excerpts: [EXCERPT] },
-        { url: "https://example.com/2", title: "Two", excerpts: [EXCERPT] },
-        { url: "https://example.com/3", title: "Three", excerpts: [EXCERPT] },
-      ],
-      2,
-    );
+    const results = await run(threeDocuments(), 2);
 
     expect(results.map(([title]) => title)).toEqual(["One", "Two"]);
   });
@@ -1076,29 +1089,9 @@ describe("failures", () => {
   });
 
   it("throws on a JSON-RPC error and keeps the endpoint's message out of it", async () => {
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(INITIALIZE_REPLY, {
-        headers: { "mcp-session-id": SESSION_ID },
-      }),
-    );
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
-    );
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id: 2,
-          error: { code: -32601, message: "SECRET UPSTREAM TEXT" },
-        }),
-      ),
-    );
+    mockJsonRpcError({ code: -32601, message: "SECRET UPSTREAM TEXT" });
 
-    const rejection = await fetchFallbackTextResults(
-      QUERY,
-      10,
-      FULL_BUDGET_MS,
-    ).catch((error: unknown) => error);
+    const rejection = await rejectionOfSearch();
     // The whole message is fixed text plus the code: an upstream message is
     // free-form text from a third party and must not travel any further.
     expect(rejection).toBeInstanceOf(Error);
@@ -1109,29 +1102,9 @@ describe("failures", () => {
   });
 
   it("keeps a non-numeric JSON-RPC code out of the message", async () => {
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(INITIALIZE_REPLY, {
-        headers: { "mcp-session-id": SESSION_ID },
-      }),
-    );
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
-    );
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id: 2,
-          error: { code: "SECRET", message: "SECRET UPSTREAM TEXT" },
-        }),
-      ),
-    );
+    mockJsonRpcError({ code: "SECRET", message: "SECRET UPSTREAM TEXT" });
 
-    const rejection = await fetchFallbackTextResults(
-      QUERY,
-      10,
-      FULL_BUDGET_MS,
-    ).catch((error: unknown) => error);
+    const rejection = await rejectionOfSearch();
     // A code is upstream data like the message is, so only a number may be
     // carried into the thrown error.
     expect(rejection).toBeInstanceOf(Error);
@@ -1175,11 +1148,7 @@ describe("failures", () => {
   it("throws a fixed message when the reply itself is not JSON", async () => {
     mockExchange("<html>gateway</html>");
 
-    const rejection = await fetchFallbackTextResults(
-      QUERY,
-      10,
-      FULL_BUDGET_MS,
-    ).catch((error: unknown) => error);
+    const rejection = await rejectionOfSearch();
     // A raw SyntaxError quotes the offending body, which would put the
     // upstream response into the thrown error and then into the log.
     expect((rejection as Error).message).toBe(
@@ -1206,24 +1175,14 @@ describe("failures", () => {
 });
 
 describe("privacy", () => {
-  let logLines: string[];
-  let originalLog: typeof debug.log;
+  let capture: ReturnType<typeof startLogCapture>;
 
   beforeEach(() => {
-    logLines = [];
-    originalLog = debug.log;
-    debug.log = (...args: unknown[]) => {
-      logLines.push(args.map(String).join(" "));
-    };
-    for (const method of ["log", "info", "warn", "error", "debug"] as const) {
-      vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
-        logLines.push(args.map(String).join(" "));
-      });
-    }
+    capture = startLogCapture();
   });
 
   afterEach(() => {
-    debug.log = originalLog;
+    capture.stop();
   });
 
   it("never writes the query, the API key or the response text to the log", async () => {
@@ -1249,7 +1208,7 @@ describe("privacy", () => {
       fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
     ).rejects.toThrow();
 
-    const output = logLines.join("\n");
+    const output = capture.lines.join("\n");
     for (const form of [
       QUERY,
       encodeURIComponent(QUERY),
@@ -1260,7 +1219,7 @@ describe("privacy", () => {
     ]) {
       expect(output).not.toContain(form);
     }
-    expect(logLines.length).toBeGreaterThan(0);
+    expect(capture.lines.length).toBeGreaterThan(0);
   });
 
   it("never writes the You.com query, the API key or the response text to the log", async () => {
@@ -1282,7 +1241,7 @@ describe("privacy", () => {
     // The stream the endpoint answers with carries the query inside a
     // notification before the reply, so this also covers that path: none of
     // it may reach the log, only the counts do.
-    const output = logLines.join("\n");
+    const output = capture.lines.join("\n");
     for (const form of [
       QUERY,
       "PRIVATE RESPONSE TITLE",
@@ -1291,7 +1250,7 @@ describe("privacy", () => {
     ]) {
       expect(output).not.toContain(form);
     }
-    expect(logLines.length).toBeGreaterThan(0);
+    expect(capture.lines.length).toBeGreaterThan(0);
   });
 });
 
@@ -1619,17 +1578,7 @@ describe("the cascade", () => {
   });
 
   it("splits the module's own cap when the caller offers more", async () => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-    listProviders("parallel,youcom");
-    orderParallelFirst();
-    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
-    mockExchange(
-      documentWith([
-        { url: "https://example.com/p", title: "P", excerpts: [EXCERPT] },
-      ]),
-    );
-
-    await fetchFallbackTextResults(QUERY, 10, 60_000);
+    const timeoutSpy = await runParallelExchange(60_000);
 
     expect(timeoutSpy.mock.calls).toEqual([[7_500]]);
   });
@@ -1656,6 +1605,31 @@ describe("pausing a rate-limited provider", () => {
     // On a whole second, so an HTTP-date Retry-After lands on an exact delta.
     vi.setSystemTime(Date.UTC(2026, 0, 1, 12, 0, 0));
   });
+
+  /**
+   * Queues a 429 whose body is never read, on the tool call or on the
+   * initialized notification, and returns the spy on its stream cancel.
+   */
+  function queueUnreadRateLimit(
+    headers: Record<string, string>,
+    atNotification = false,
+  ) {
+    const cancel = vi.fn(async () => undefined);
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse(INITIALIZE_REPLY, {
+        headers: { "mcp-session-id": SESSION_ID },
+      }),
+    );
+    if (!atNotification) {
+      fetchMock.mockResolvedValueOnce(
+        createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
+      );
+    }
+    fetchMock.mockResolvedValueOnce(
+      createMockResponse("", { status: 429, headers, unreadBody: { cancel } }),
+    );
+    return cancel;
+  }
 
   async function hitRateLimit(headers: Record<string, string> = {}) {
     fetchMock.mockResolvedValueOnce(rateLimited(headers));
@@ -1696,24 +1670,9 @@ describe("pausing a rate-limited provider", () => {
   });
 
   it("reads an HTTP-date Retry-After on the tool call", async () => {
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(INITIALIZE_REPLY, {
-        headers: { "mcp-session-id": SESSION_ID },
-      }),
-    );
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(NOTIFICATION_ACCEPTED, { status: 202 }),
-    );
-    const cancel = vi.fn(async () => undefined);
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse("", {
-        status: 429,
-        headers: {
-          "retry-after": new Date(Date.now() + 300_000).toUTCString(),
-        },
-        unreadBody: { cancel },
-      }),
-    );
+    const cancel = queueUnreadRateLimit({
+      "retry-after": new Date(Date.now() + 300_000).toUTCString(),
+    });
 
     await expect(
       fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
@@ -1752,19 +1711,7 @@ describe("pausing a rate-limited provider", () => {
   });
 
   it("pauses on a 429 to the initialized notification and discards its body", async () => {
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse(INITIALIZE_REPLY, {
-        headers: { "mcp-session-id": SESSION_ID },
-      }),
-    );
-    const cancel = vi.fn(async () => undefined);
-    fetchMock.mockResolvedValueOnce(
-      createMockResponse("", {
-        status: 429,
-        headers: { "retry-after": "45" },
-        unreadBody: { cancel },
-      }),
-    );
+    const cancel = queueUnreadRateLimit({ "retry-after": "45" }, true);
 
     await expect(
       fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS),
@@ -1830,14 +1777,7 @@ describe("pausing a rate-limited provider", () => {
 
     listProviders("parallel,youcom");
     orderParallelFirst();
-    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
-    mockExchange(
-      documentWith([
-        { url: "https://example.com/p", title: "P", excerpts: [EXCERPT] },
-      ]),
-    );
-
-    await fetchFallbackTextResults(QUERY, 10, 3_000);
+    const timeoutSpy = await runParallelExchange(3_000);
 
     expect(timeoutSpy.mock.calls).toEqual([[3_000]]);
   });
@@ -1939,31 +1879,23 @@ describe("Keenable", () => {
   };
 
   it("joins the default list on the keyless endpoint when it has no key", async () => {
-    delete process.env.SEARCH_FALLBACK_PROVIDERS;
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
-    mockExchange(documentWith([]));
-    mockExchange(youcomDocumentWith([]), { initializeSession: null });
-    mockExchange(keenableDocumentWith([]), { initializeSession: null });
+    queueAllKeylessProviders();
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
-    const urls = fetchMock.mock.calls.map(([requestUrl]) => String(requestUrl));
+    const urls = requestedUrls();
     expect(new Set(urls)).toEqual(
       new Set([PARALLEL_URL, YOUCOM_KEYLESS_URL, KEENABLE_KEYLESS_URL]),
     );
   });
 
   it("uses the authenticated endpoint when its key is set", async () => {
-    delete process.env.SEARCH_FALLBACK_PROVIDERS;
     process.env[KEENABLE_KEY_VARIABLE] = "keenable-test-value";
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
-    mockExchange(documentWith([]));
-    mockExchange(youcomDocumentWith([]), { initializeSession: null });
-    mockExchange(keenableDocumentWith([]), { initializeSession: null });
+    queueAllKeylessProviders();
 
     await fetchFallbackTextResults(QUERY, 10, FULL_BUDGET_MS);
 
-    const urls = fetchMock.mock.calls.map(([requestUrl]) => String(requestUrl));
+    const urls = requestedUrls();
     expect(new Set(urls)).toEqual(
       new Set([PARALLEL_URL, YOUCOM_KEYLESS_URL, KEENABLE_AUTHENTICATED_URL]),
     );

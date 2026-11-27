@@ -94,14 +94,19 @@ beforeEach(() => {
   );
 });
 
+/** Renders the form, opens the voice select, and returns its options. */
+async function renderedVoiceOptions() {
+  renderForm();
+  await screen.findByText("Voice Selection");
+
+  return openSelect(voiceInput()).getAllByRole("option", {
+    hidden: true,
+  });
+}
+
 describe("VoiceSettingsForm", () => {
   it("lists only the local voices while the local engine is selected", async () => {
-    renderForm();
-    await screen.findByText("Voice Selection");
-
-    const options = openSelect(voiceInput()).getAllByRole("option", {
-      hidden: true,
-    });
+    const options = await renderedVoiceOptions();
 
     expect(options.map((option) => option.textContent)).toEqual([
       "🇺🇸 lessac • English (high)",
@@ -134,12 +139,7 @@ describe("VoiceSettingsForm", () => {
 
   it("lists only the system voices while the system engine is selected", async () => {
     settings.current.textToSpeechEngine = "system";
-    renderForm();
-    await screen.findByText("Voice Selection");
-
-    const options = openSelect(voiceInput()).getAllByRole("option", {
-      hidden: true,
-    });
+    const options = await renderedVoiceOptions();
 
     expect(options.map((option) => option.textContent)).toEqual([
       "🇺🇸 OS Voice • en-US",

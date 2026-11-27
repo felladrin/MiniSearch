@@ -1,4 +1,3 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./handleTokenVerification", () => ({
@@ -10,45 +9,32 @@ vi.mock("./pageContentService", () => ({
 }));
 
 import { handleTokenVerification } from "./handleTokenVerification";
+import {
+  createRequest,
+  createResponse,
+  expectBadHostRejected,
+  getRegisteredHookHandler,
+} from "./hookTestUtils";
+
 import { pageContentEndpointServerHook } from "./pageContentEndpointServerHook";
 import { fetchPageContents } from "./pageContentService";
 
-type Handler = (
-  request: IncomingMessage,
-  response: ServerResponse,
-  next: () => void,
-) => Promise<void>;
-
-type RecordedResponse = ServerResponse & {
-  setHeader: ReturnType<typeof vi.fn>;
-  end: ReturnType<typeof vi.fn>;
-};
-
 function callEndpoint(requestUrl: string) {
-  const use = vi.fn();
-  pageContentEndpointServerHook({
-    middlewares: { use },
-  } as unknown as Parameters<typeof pageContentEndpointServerHook>[0]);
-
-  const response = {
-    statusCode: 200,
-    setHeader: vi.fn(),
-    end: vi.fn(),
-  } as unknown as RecordedResponse;
+  const response = createResponse();
   const next = vi.fn();
-  const request = {
-    url: requestUrl,
-    headers: { host: "localhost:7860" },
-  } as unknown as IncomingMessage;
 
   return {
     response,
     next,
-    handled: (use.mock.calls[0][0] as Handler)(request, response, next),
+    handled: getRegisteredHookHandler(pageContentEndpointServerHook)(
+      createRequest(requestUrl),
+      response,
+      next,
+    ),
   };
 }
 
-function parseBody(response: RecordedResponse): unknown {
+function parseBody(response: ReturnType<typeof createResponse>): unknown {
   return JSON.parse(response.end.mock.calls[0][0]);
 }
 
@@ -239,27 +225,10 @@ describe("pageContentEndpointServerHook", () => {
 describe("pageContentEndpointServerHook with a malformed Host header", () => {
   it("answers 400 and keeps the handler promise from rejecting", async () => {
     vi.clearAllMocks();
-    const use = vi.fn();
-    pageContentEndpointServerHook({
-      middlewares: { use },
-    } as unknown as Parameters<typeof pageContentEndpointServerHook>[0]);
-    const response = {
-      statusCode: 200,
-      setHeader: vi.fn(),
-      end: vi.fn(),
-    } as unknown as RecordedResponse;
-    const next = vi.fn();
-    const request = {
-      url: "/page-content?url=http://example.com&token=abc",
-      headers: { host: "bad host" },
-    } as unknown as IncomingMessage;
-
-    await expect(
-      (use.mock.calls[0][0] as Handler)(request, response, next),
-    ).resolves.toBeUndefined();
-
-    expect(response.statusCode).toBe(400);
-    expect(handleTokenVerification).not.toHaveBeenCalled();
-    expect(next).not.toHaveBeenCalled();
+    await expectBadHostRejected(
+      getRegisteredHookHandler(pageContentEndpointServerHook),
+      "/page-content?url=http://example.com&token=abc",
+      handleTokenVerification,
+    );
   });
 });
