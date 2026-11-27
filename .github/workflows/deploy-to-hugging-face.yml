@@ -30,7 +30,7 @@ jobs:
       # not the source's. The build reads this file instead of its git history
       # to report which commit is running (shared/buildSourceCommit.ts).
       - name: Record the source commit for the Space build
-        run: echo "$GITHUB_SHA" > .source-commit
+        run: git rev-parse --short "$GITHUB_SHA" > .source-commit
 
       - name: Sync to the Space
         run: |

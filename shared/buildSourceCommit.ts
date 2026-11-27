@@ -11,29 +11,43 @@
 /** The file the deploy workflow writes the source commit into, named by the workflow step that creates it. */
 export const SOURCE_COMMIT_FILE = ".source-commit";
 
-/** How many characters a reported commit hash carries. */
-const SHORT_COMMIT_LENGTH = 7;
+/**
+ * A commit hash has to be at least this long to be believed. Git's own short
+ * hashes start at 7 and grow until they are unique in the repository.
+ */
+const MIN_COMMIT_LENGTH = 7;
 
 const HEX = /^[0-9a-f]+$/i;
 
 /**
- * The commit to report, shortened: the synced source commit when the build was
- * made from a synced copy, otherwise the build's own git hash, otherwise empty.
- * Anything that is not a hex commit is ignored, so a truncated or hand-edited
- * file falls back to the git hash rather than reporting a lie.
+ * The commit to report: the synced source commit when the build was made from a
+ * synced copy, otherwise the build's own git hash, otherwise empty. Neither is
+ * shortened, because git already picks a length that is unique in the
+ * repository and the deploy workflow writes the same length.
+ *
+ * A synced file that holds something other than a commit is an error rather
+ * than a fallback. On a Space the git hash is the copy's own commit, which is
+ * the wrong answer this module exists to avoid, so a build that could not read
+ * the file has to say so instead of quietly reporting it.
  */
 export function resolveSourceCommitHash(input: {
   syncedCommit?: string | null;
   gitHash?: string | null;
 }): string {
-  const synced = input.syncedCommit?.trim().toLowerCase();
-  if (synced && HEX.test(synced) && synced.length >= SHORT_COMMIT_LENGTH) {
-    return synced.slice(0, SHORT_COMMIT_LENGTH);
+  const synced = input.syncedCommit?.trim().toLowerCase() ?? "";
+  if (synced.length > 0) {
+    if (!HEX.test(synced) || synced.length < MIN_COMMIT_LENGTH) {
+      throw new Error(
+        `${SOURCE_COMMIT_FILE} holds "${synced}", which is not a commit hash`,
+      );
+    }
+
+    return synced;
   }
 
-  const git = input.gitHash?.trim().toLowerCase();
-  if (git && HEX.test(git) && git.length >= SHORT_COMMIT_LENGTH) {
-    return git.slice(0, SHORT_COMMIT_LENGTH);
+  const git = input.gitHash?.trim().toLowerCase() ?? "";
+  if (HEX.test(git) && git.length >= MIN_COMMIT_LENGTH) {
+    return git;
   }
 
   return "";

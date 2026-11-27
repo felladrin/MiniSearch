@@ -262,7 +262,7 @@ The `/status` endpoint returns a JSON object:
 | `reranker`                           | object | Reranking cost and effect, see below                                                                                                                                                                                                              |
 | `thumbnails`                         | object | `/thumbnail` request outcomes, see below                                                                                                                                                                                                          |
 | `build.timestamp`                    | string | ISO 8601 build time                                                                                                                                                                                                                               |
-| `build.gitCommit`                    | string | Short Git commit hash                                                                                                                                                                                                                             |
+| `build.gitCommit`                    | string | The commit the build reports: the source commit the Hugging Face deploy workflow recorded, or the build's own short git hash                                                                                                                      |
 
 `webSearchServiceStatus` answers whether searches can be served, which
 SearXNG's `/healthz` alone does not: an open circuit fails every search without

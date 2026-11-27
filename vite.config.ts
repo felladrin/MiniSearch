@@ -38,8 +38,12 @@ const __dirname = path.dirname(__filename);
 function syncedSourceCommit(): string | null {
   try {
     return readFileSync(path.resolve(__dirname, SOURCE_COMMIT_FILE), "utf8");
-  } catch {
-    return null;
+  } catch (error) {
+    // Only "it is not there" means a build made from the source repository.
+    // Anything else is a file the build was told to read and could not, and
+    // falling back would report the wrong commit as if it were the right one.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
   }
 }
 
