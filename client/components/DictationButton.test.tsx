@@ -113,7 +113,6 @@ it("hides when no dictation engine is available", () => {
 });
 
 it("hides when the setting is off", async () => {
-  const { settingsPubSub } = await import("@/modules/pubSub");
   await setDictationSetting(false);
   try {
     renderButton();
