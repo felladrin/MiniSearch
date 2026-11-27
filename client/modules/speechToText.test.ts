@@ -8,6 +8,7 @@ import {
   type SpeechRecognitionLike,
   startDictation,
   stripLanguageTag,
+  WEB_SPEECH_STOP_TIMEOUT_MS,
 } from "@/modules/speechToText";
 import { createWllamaInstance } from "@/modules/wllama";
 
@@ -130,6 +131,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
@@ -617,7 +619,16 @@ describe("startDictation with the web speech fallback", () => {
 
   let instance: RecognitionFake | undefined;
 
-  function installRecognitionFake(startImpl: () => void = () => {}) {
+  /**
+   * `stopImpl` runs after the fake marks itself stopped. By default it ends on
+   * a later task, as a browser does once it has delivered the last result.
+   */
+  function installRecognitionFake(
+    startImpl: () => void = () => {},
+    stopImpl: (fake: RecognitionFake) => void = (fake) => {
+      setTimeout(() => fake.onend?.(), 0);
+    },
+  ) {
     class FakeRecognition {
       continuous = false;
       interimResults = false;
@@ -629,6 +640,7 @@ describe("startDictation with the web speech fallback", () => {
       start: () => void;
       stop = () => {
         this.stopped = true;
+        stopImpl(this as unknown as RecognitionFake);
       };
       constructor() {
         this.start = startImpl;
@@ -735,6 +747,118 @@ describe("startDictation with the web speech fallback", () => {
     instance?.onend?.();
 
     expect(onError).not.toHaveBeenCalled();
+    expect(onEnd).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A recognizer whose `stop()` delivers "fresh basil" as a final result after
+   * 25 ms and fires `end` 25 ms later, as the spec allows.
+   */
+  async function startSessionWithLateFinalResult() {
+    vi.useFakeTimers();
+    installRecognitionFake(undefined, (fake) => {
+      setTimeout(() => {
+        fake.onresult?.({
+          resultIndex: 0,
+          results: [{ isFinal: true, 0: { transcript: "fresh basil" } }],
+        });
+        setTimeout(() => fake.onend?.(), 25);
+      }, 25);
+    });
+    const transcripts: string[] = [];
+    const onEnd = vi.fn();
+    const session = await startDictation(
+      { onTranscript: (text) => transcripts.push(text), onEnd },
+      true,
+    );
+    instance?.onresult?.({
+      resultIndex: 0,
+      results: [{ isFinal: false, 0: { transcript: "fresh" } }],
+    });
+    return { session, transcripts, onEnd };
+  }
+
+  it("keeps the final result the recognizer delivers after stop", async () => {
+    const { session, transcripts, onEnd } =
+      await startSessionWithLateFinalResult();
+
+    let stopped = false;
+    const stopping = session.stop().then(() => {
+      stopped = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(25);
+    expect(transcripts).toEqual(["fresh", "fresh basil"]);
+    // The recognizer has not ended yet, so the stop must still be waiting.
+    expect(stopped).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(25);
+    await stopping;
+    expect(stopped).toBe(true);
+    // The end belongs to the stop, not to a recognizer that gave up.
+    expect(onEnd).not.toHaveBeenCalled();
+  });
+
+  it("gives up waiting when the recognizer never ends after stop", async () => {
+    vi.useFakeTimers();
+    installRecognitionFake(undefined, () => {});
+    const session = await startDictation({ onTranscript: vi.fn() }, true);
+
+    let stopped = false;
+    void session.stop().then(() => {
+      stopped = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(WEB_SPEECH_STOP_TIMEOUT_MS - 1);
+    expect(stopped).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(stopped).toBe(true);
+  });
+
+  it("ends the stop quietly when the recognizer fails while it waits", async () => {
+    vi.useFakeTimers();
+    installRecognitionFake(undefined, () => {});
+    const onError = vi.fn();
+    const session = await startDictation(
+      { onTranscript: vi.fn(), onError },
+      true,
+    );
+
+    let stopped = false;
+    void session.stop().then(() => {
+      stopped = true;
+    });
+    instance?.onerror?.({ error: "no-speech" });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(stopped).toBe(true);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("drops the late result and ends the stop at once when cancelled", async () => {
+    const { session, transcripts } = await startSessionWithLateFinalResult();
+
+    let stopped = false;
+    void session.stop().then(() => {
+      stopped = true;
+    });
+    session.cancel();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(stopped).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(50);
+    expect(transcripts).toEqual(["fresh"]);
+  });
+
+  it("drops the late result of a session cancelled without a stop", async () => {
+    const { session, transcripts, onEnd } =
+      await startSessionWithLateFinalResult();
+
+    session.cancel();
+    await vi.advanceTimersByTimeAsync(50);
+
+    expect(instance?.stopped).toBe(true);
+    expect(transcripts).toEqual(["fresh"]);
     expect(onEnd).not.toHaveBeenCalled();
   });
 });
