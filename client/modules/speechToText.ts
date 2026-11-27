@@ -45,6 +45,13 @@ const MODEL_SAMPLE_RATE = 16000;
 export const MAX_RECORDING_SECONDS = 120;
 
 /**
+ * How long a stopped browser recognizer gets to deliver its last result and
+ * fire `end` before the stop resolves without it, so a recognizer that never
+ * ends cannot leave the button transcribing forever.
+ */
+export const WEB_SPEECH_STOP_TIMEOUT_MS = 3000;
+
+/**
  * Room for `MAX_RECORDING_SECONDS` of audio, the prompt and the transcript.
  * The audio encoder emits about 13 tokens per second of speech.
  */
@@ -457,9 +464,16 @@ function startWebSpeechDictation(
   let finalText = "";
   /** The returned promise has resolved, so rejecting it would be a no-op. */
   let resolved = false;
-  // `recognition.stop()` emits one last `result` by spec, and the caller has
-  // already forgotten what it appended by then.
+  /**
+   * Cancelled, or done stopping. What the recognizer sends from now on is
+   * for a caller that has already forgotten what it appended.
+   */
   let stopped = false;
+  /** The recognizer fired `end`, so a stop has nothing left to wait for. */
+  let ended = false;
+  /** Settles a pending `stop`; set only while one waits for `end`. */
+  let settleStop: (() => void) | null = null;
+  let stopping: Promise<void> | null = null;
 
   return new Promise<DictationSession>((resolve, reject) => {
     recognition.onresult = (event) => {
@@ -479,6 +493,12 @@ function startWebSpeechDictation(
 
     recognition.onerror = (event) => {
       if (stopped) return;
+      // The user already asked to stop, so a failure while the last result
+      // was on its way only means there is no more text to wait for.
+      if (settleStop) {
+        settleStop();
+        return;
+      }
       const denied =
         event.error === "not-allowed" || event.error === "service-not-allowed";
       const failure = denied
@@ -496,6 +516,11 @@ function startWebSpeechDictation(
 
     recognition.onend = () => {
       if (stopped) return;
+      ended = true;
+      if (settleStop) {
+        settleStop();
+        return;
+      }
       // The recognizer ends on its own after silence even with `continuous`.
       // That is not a failure worth a notification, but the session is over, so
       // the button has to come back from Listening.
@@ -509,13 +534,39 @@ function startWebSpeechDictation(
     try {
       recognition.start();
       resolved = true;
-      // The recognizer delivers its text as it goes, so stopping it and
-      // dropping its last result is all either one needs to do.
-      const end = () => {
-        stopped = true;
-        recognition.stop();
-      };
-      resolve({ stop: async () => end(), cancel: end });
+      resolve({
+        // `recognition.stop()` still tries to return a result for the audio
+        // already captured, and the browser delivers it on a later task, so
+        // the stop waits for `end` instead of dropping the last words.
+        stop: () => {
+          if (stopped || ended) return Promise.resolve();
+          stopping ??= new Promise<void>((settle) => {
+            const timeout = setTimeout(
+              () => settleStop?.(),
+              WEB_SPEECH_STOP_TIMEOUT_MS,
+            );
+            settleStop = () => {
+              clearTimeout(timeout);
+              stopped = true;
+              settleStop = null;
+              settle();
+            };
+            recognition.stop();
+          });
+          return stopping;
+        },
+        // The field cannot take more text, so the last result is dropped and
+        // a stop still waiting for it resolves now.
+        cancel: () => {
+          if (stopped) return;
+          if (settleStop) {
+            settleStop();
+            return;
+          }
+          stopped = true;
+          recognition.stop();
+        },
+      });
     } catch (error) {
       reject(
         new DictationError(

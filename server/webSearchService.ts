@@ -341,9 +341,10 @@ async function processSearchResults(
   const results = await breaker.execute("searxng", () =>
     performSearch(query, searchType, signal),
   );
-  const consideredResults = openableUniqueResults(results).slice(0, limit);
+  const openableResults = openableUniqueResults(results);
 
   if (searchType === "text") {
+    const consideredResults = openableResults.slice(0, limit);
     const textualResults = await Promise.all(
       consideredResults.map(processTextualResult),
     );
@@ -354,12 +355,14 @@ async function processSearchResults(
     );
   }
 
+  // Dropped before the limit applies, so images without a thumbnail at the top
+  // of the response cannot take the slots of usable ones further down.
   const graphicalResults = await Promise.all(
-    consideredResults.map(processGraphicalResult),
+    openableResults.map(processGraphicalResult),
   );
   return reportDiscardedResults(
-    filterNullResults(graphicalResults),
-    consideredResults.length,
+    filterNullResults(graphicalResults).slice(0, limit),
+    openableResults.length,
     searchType,
   );
 }
