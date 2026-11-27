@@ -345,6 +345,15 @@ export const isRestoringFromHistoryPubSub = createPubSub(false);
 
 export const [updateIsRestoringFromHistory] = isRestoringFromHistoryPubSub;
 
+/**
+ * Changes when a history restore switches to another search, so the chat is
+ * mounted again for it. The old chat's unmount aborts its follow-up and drops
+ * its pending suggestion, which would otherwise land in the restored chat.
+ */
+export const chatSessionPubSub = createPubSub(0);
+
+export const [updateChatSession, , getChatSession] = chatSessionPubSub;
+
 export const suppressNextFollowUpPubSub = createPubSub(false);
 
 export const [updateSuppressNextFollowUp, , getSuppressNextFollowUp] =
