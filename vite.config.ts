@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import viteBasicSSLPlugin from "@vitejs/plugin-basic-ssl";
@@ -19,11 +20,28 @@ import { searchEndpointServerHook } from "./server/searchEndpointServerHook.ts";
 import { statusEndpointServerHook } from "./server/statusEndpointServerHook.ts";
 import { thumbnailEndpointServerHook } from "./server/thumbnailEndpointServerHook.ts";
 import { validateAccessKeyServerHook } from "./server/validateAccessKeyServerHook.ts";
+import {
+  resolveSourceCommitHash,
+  SOURCE_COMMIT_FILE,
+} from "./shared/buildSourceCommit.ts";
 
 dotenv.config({ path: [".env", ".env.example"], quiet: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * The source commit the deploy workflow left beside this copy of the
+ * repository, or null in a build made straight from the source repository,
+ * where there is nothing to record because the git hash is already the answer.
+ */
+function syncedSourceCommit(): string | null {
+  try {
+    return readFileSync(path.resolve(__dirname, SOURCE_COMMIT_FILE), "utf8");
+  } catch {
+    return null;
+  }
+}
 
 export default defineConfig((): UserConfig => {
   return {
@@ -35,7 +53,12 @@ export default defineConfig((): UserConfig => {
     root: "./client",
     define: {
       VITE_BUILD_DATE_TIME: Date.now(),
-      VITE_COMMIT_SHORT_HASH: JSON.stringify(getGitCommitHash({ short: true })),
+      VITE_COMMIT_SHORT_HASH: JSON.stringify(
+        resolveSourceCommitHash({
+          syncedCommit: syncedSourceCommit(),
+          gitHash: getGitCommitHash({ short: true }),
+        }),
+      ),
     },
     resolve: {
       alias: {

@@ -497,7 +497,7 @@ Lightweight state persisted across sessions via `createLocalStoragePubSub` patte
 
 1. Loads environment variables via `dotenv.config`
 2. Regenerates the search token used for CSRF protection, on build only
-3. Injects build metadata as compile-time replacements (`VITE_BUILD_DATE_TIME`, `VITE_COMMIT_SHORT_HASH`)
+3. Injects build metadata as compile-time replacements (`VITE_BUILD_DATE_TIME`, `VITE_COMMIT_SHORT_HASH`, the last one taken from `.source-commit` when the deploy workflow wrote it)
 4. Registers all middleware hooks (see Server Hook System above)
 
 ### Client-Side Bootstrap (client/index.tsx)
