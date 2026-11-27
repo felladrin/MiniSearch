@@ -9,6 +9,10 @@ import {
   startDictation,
 } from "@/modules/speechToText";
 
+// jscpd:ignore-start
+// Vitest hoists every vi.mock call above the imports, so the registration has
+// to be written out in each file; only the factory body can be shared, and it
+// is. The duplication is the framework's, not the tests'.
 vi.mock("@/modules/speechToText", async () =>
   (await import("@/testMocks")).speechToTextMock(),
 );
@@ -18,6 +22,7 @@ vi.mock("@mantine/notifications", async () =>
 vi.mock("create-pubsub/react", async () =>
   (await import("@/testMocks")).pubSubReactMock(),
 );
+// jscpd:ignore-end
 
 function renderButton({
   getValue = () => "",

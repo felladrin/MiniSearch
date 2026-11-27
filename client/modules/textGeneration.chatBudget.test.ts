@@ -17,6 +17,10 @@ const state = vi.hoisted(() => ({
   systemPrompt: "",
 }));
 
+// jscpd:ignore-start
+// Vitest hoists every vi.mock call above the imports, so the registration has
+// to be written out in each file; only the factory body can be shared, and it
+// is. The duplication is the framework's, not the tests'.
 vi.mock("./pubSub", () => pubSubMock(() => state.settings));
 vi.mock("./history", () => historyMock(() => "run-1"));
 vi.mock("./logEntries", () => logEntriesMock());
@@ -28,6 +32,7 @@ vi.mock("./search", () => searchMock());
 vi.mock("./systemPrompt", () => ({
   getSystemPrompt: vi.fn(() => state.systemPrompt),
 }));
+// jscpd:ignore-end
 vi.mock("./textGenerationUtilities", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./textGenerationUtilities")>()),
   getFormattedSearchResults: vi.fn(() => Promise.resolve("")),
