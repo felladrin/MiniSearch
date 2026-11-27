@@ -17,6 +17,14 @@ vi.mock("./searchTokenHash", () => ({
 }));
 
 const mockFetch = vi.fn();
+
+/** Answers every following `/search` fetch with `results`. */
+function mockSearchResponse(results: string[][]) {
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: vi.fn().mockResolvedValue(results),
+  });
+}
 vi.stubGlobal("fetch", mockFetch);
 vi.stubGlobal("self", {
   location: new URL("http://localhost:3000"),
@@ -445,10 +453,7 @@ describe("Search Module", () => {
       const mockResults: string[][] = [
         ["Title", "Snippet", "https://example.com"],
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockResults),
-      });
+      mockSearchResponse(mockResults);
 
       const firstResults = await searchModule.searchText("cached query");
       expect(firstResults).toEqual({ results: mockResults, stale: false });
@@ -469,10 +474,7 @@ describe("Search Module", () => {
       const mockResults: string[][] = [
         ["Image", "Alt", "https://example.com/img.jpg"],
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockResults),
-      });
+      mockSearchResponse(mockResults);
 
       const firstResults = await searchModule.searchImages("cached images");
       expect(firstResults).toEqual({ results: mockResults, stale: false });
@@ -495,10 +497,7 @@ describe("Search Module", () => {
       const mockResults: string[][] = [
         ["Title", "Snippet", "https://example.com"],
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockResults),
-      });
+      mockSearchResponse(mockResults);
 
       await searchModule.searchText("query A");
       await searchModule.searchText("query B");
@@ -509,10 +508,7 @@ describe("Search Module", () => {
       const mockResults: string[][] = [
         ["Title", "Snippet", "https://example.com"],
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockResults),
-      });
+      mockSearchResponse(mockResults);
 
       await searchModule.searchText("same query", 5);
       await searchModule.searchText("same query", 10);
@@ -523,10 +519,7 @@ describe("Search Module", () => {
       const mockResults: string[][] = [
         ["Title", "Snippet", "https://example.com"],
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockResults),
-      });
+      mockSearchResponse(mockResults);
 
       await searchModule.searchText("ttl query");
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -542,10 +535,7 @@ describe("Search Module", () => {
       const mockResults: string[][] = [
         ["Title", "Snippet", "https://example.com"],
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockResults),
-      });
+      mockSearchResponse(mockResults);
 
       searchModule.searchServiceInstance.updateCacheConfig({ enabled: false });
 
@@ -558,10 +548,7 @@ describe("Search Module", () => {
       const mockResults: string[][] = [
         ["Title", "Snippet", "https://example.com"],
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockResults),
-      });
+      mockSearchResponse(mockResults);
 
       await searchModule.searchText("cross-store query");
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -579,10 +566,7 @@ describe("Search Module", () => {
       const mockResults: string[][] = [
         ["Title", "Snippet", "https://example.com"],
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockResults),
-      });
+      mockSearchResponse(mockResults);
 
       const first = await searchModule.searchText("stale query");
       expect(first).toEqual({ results: mockResults, stale: false });
@@ -613,10 +597,7 @@ describe("Search Module", () => {
       const mockResults: string[][] = [
         ["Title", "Snippet", "https://example.com"],
       ];
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockResults),
-      });
+      mockSearchResponse(mockResults);
 
       try {
         // Cache an entry, then move past the 24-hour stale retention.
