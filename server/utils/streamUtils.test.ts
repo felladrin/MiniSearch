@@ -22,47 +22,42 @@ function fakeResponse(chunks: Uint8Array[]) {
 }
 
 describe("readCappedBytes", () => {
-  it("reads an exact-fit body in a single chunk without truncation", async () => {
-    const { response, cancel } = fakeResponse([new Uint8Array([1, 2, 3, 4])]);
-    const { bytes, truncated } = await readCappedBytes(response, 4);
+  it.each([
+    {
+      title: "reads an exact-fit body in a single chunk",
+      chunks: [[1, 2, 3, 4]],
+      bytes: [1, 2, 3, 4],
+      truncated: false,
+    },
+    {
+      title: "reads an exact-fit body split across chunks",
+      chunks: [
+        [1, 2],
+        [3, 4],
+      ],
+      bytes: [1, 2, 3, 4],
+      truncated: false,
+    },
+    {
+      title: "truncates when a single chunk exceeds maxBytes",
+      chunks: [[1, 2, 3, 4, 5]],
+      bytes: [1, 2, 3, 4],
+      truncated: true,
+    },
+    {
+      title: "truncates when the boundary lands on a chunk boundary",
+      chunks: [[1, 2, 3, 4], [5]],
+      bytes: [1, 2, 3, 4],
+      truncated: true,
+    },
+  ])("$title", async ({ chunks, bytes, truncated }) => {
+    const { response, cancel } = fakeResponse(
+      chunks.map((chunk) => new Uint8Array(chunk)),
+    );
+    const result = await readCappedBytes(response, 4);
 
-    expect(Array.from(bytes)).toEqual([1, 2, 3, 4]);
-    expect(truncated).toBe(false);
-    expect(cancel).toHaveBeenCalled();
-  });
-
-  it("reads an exact-fit body split across chunks without truncation", async () => {
-    const { response, cancel } = fakeResponse([
-      new Uint8Array([1, 2]),
-      new Uint8Array([3, 4]),
-    ]);
-    const { bytes, truncated } = await readCappedBytes(response, 4);
-
-    expect(Array.from(bytes)).toEqual([1, 2, 3, 4]);
-    expect(truncated).toBe(false);
-    expect(cancel).toHaveBeenCalled();
-  });
-
-  it("truncates at the cap when a single chunk exceeds maxBytes", async () => {
-    const { response, cancel } = fakeResponse([
-      new Uint8Array([1, 2, 3, 4, 5]),
-    ]);
-    const { bytes, truncated } = await readCappedBytes(response, 4);
-
-    expect(Array.from(bytes)).toEqual([1, 2, 3, 4]);
-    expect(truncated).toBe(true);
-    expect(cancel).toHaveBeenCalled();
-  });
-
-  it("truncates at the cap when the boundary lands on a chunk boundary", async () => {
-    const { response, cancel } = fakeResponse([
-      new Uint8Array([1, 2, 3, 4]),
-      new Uint8Array([5]),
-    ]);
-    const { bytes, truncated } = await readCappedBytes(response, 4);
-
-    expect(Array.from(bytes)).toEqual([1, 2, 3, 4]);
-    expect(truncated).toBe(true);
+    expect(Array.from(result.bytes)).toEqual(bytes);
+    expect(result.truncated).toBe(truncated);
     expect(cancel).toHaveBeenCalled();
   });
 
