@@ -35,6 +35,12 @@ export default function ImageSearchResults() {
   }
 
   if (searchState === "failed") {
+    // A follow-up's image search can still add images after the first one
+    // failed, and it does not change this state.
+    if (results.length > 0) {
+      return <ImageResultsList imageResults={results} />;
+    }
+
     return (
       <Alert
         variant="light"
