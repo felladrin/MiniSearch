@@ -854,6 +854,27 @@ describe("getWebSearchServiceStatus", () => {
     expect(await getWebSearchServiceStatus(breaker)).toBe("healthy");
   }
 
+  /** A breaker that starts from a known, healthy state. */
+  async function freshBreaker() {
+    const breaker = new CircuitBreaker({ failureThreshold: 5 });
+    await clearDegradation(breaker);
+    return breaker;
+  }
+
+  /**
+   * A fresh breaker with one text search already lost to unresponsive engines,
+   * which is what flags the search type. Pass `expectedMessage` when the test
+   * also checks what the rejection said.
+   */
+  async function degradedBreaker(expectedMessage?: string | RegExp) {
+    const breaker = await freshBreaker();
+    fetchMock.mockResolvedValue(suspendedResponse());
+    const rejection = expect(fetchSearXNG("test", "text", 30, breaker)).rejects;
+    if (expectedMessage === undefined) await rejection.toThrow();
+    else await rejection.toThrow(expectedMessage);
+    return breaker;
+  }
+
   it("reports unhealthy while the circuit is open, though /healthz answers OK", async () => {
     const breaker = new CircuitBreaker({ failureThreshold: 1 });
     fetchMock.mockResolvedValue(createMockResponse("", false, 503));
@@ -916,13 +937,7 @@ describe("getWebSearchServiceStatus", () => {
   });
 
   it("reports degraded after a search lost to unresponsive engines", async () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 5 });
-    await clearDegradation(breaker);
-
-    fetchMock.mockResolvedValue(suspendedResponse());
-    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow(
-      "google (CAPTCHA)",
-    );
+    const breaker = await degradedBreaker("google (CAPTCHA)");
     expect(breaker.getState("searxng")).toBe("CLOSED");
 
     healthzOk();
@@ -931,11 +946,7 @@ describe("getWebSearchServiceStatus", () => {
   });
 
   it("stays degraded when an image search answers after a failed text search", async () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 5 });
-    await clearDegradation(breaker);
-
-    fetchMock.mockResolvedValue(suspendedResponse());
-    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+    const breaker = await degradedBreaker();
 
     // What the client actually does after a failed text search: it fires an
     // image search, which goes out to a different engine pool. Answering there
@@ -950,11 +961,7 @@ describe("getWebSearchServiceStatus", () => {
   });
 
   it("reports healthy again once SearXNG answers the search type that failed", async () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 5 });
-    await clearDegradation(breaker);
-
-    fetchMock.mockResolvedValue(suspendedResponse());
-    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+    const breaker = await degradedBreaker();
     const tallyWhileDegraded = getUnresponsiveEngineStats();
 
     fetchMock.mockResolvedValue(successResponse());
@@ -969,11 +976,7 @@ describe("getWebSearchServiceStatus", () => {
   });
 
   it("clears the degradation on zero results with no engine errors", async () => {
-    const breaker = new CircuitBreaker({ failureThreshold: 5 });
-    await clearDegradation(breaker);
-
-    fetchMock.mockResolvedValue(suspendedResponse());
-    await expect(fetchSearXNG("test", "text", 30, breaker)).rejects.toThrow();
+    const breaker = await degradedBreaker();
 
     // The engines replied, they just matched nothing, which is not a failure.
     fetchMock.mockResolvedValue(respondingEmptyResponse());

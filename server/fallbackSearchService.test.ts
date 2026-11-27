@@ -212,6 +212,20 @@ function requestHeaders(index: number): Record<string, string> {
   return init?.headers as Record<string, string>;
 }
 
+/**
+ * The snippet is the source cut at 400 characters on a word boundary, with
+ * the ellipsis marking the cut.
+ */
+function expectWordBoundaryCut(source: string, snippet: string) {
+  expect(snippet.endsWith("…")).toBe(true);
+  expect(snippet.length).toBeLessThanOrEqual(400);
+  const kept = snippet.slice(0, -1);
+  // The kept text is a prefix of the source, and the source continues with a
+  // space, so the cut landed between two words rather than inside one.
+  expect(source.startsWith(kept)).toBe(true);
+  expect(source[kept.length]).toBe(" ");
+}
+
 describe("isSearchFallbackEnabled", () => {
   it("is off when the variable is unset", () => {
     expect(isSearchFallbackEnabled()).toBe(false);
@@ -536,15 +550,7 @@ describe("mapping You.com results", () => {
       },
     ]);
 
-    const snippet = results[0][1];
-    expect(snippet.endsWith("…")).toBe(true);
-    expect(snippet.length).toBeLessThanOrEqual(400);
-    const kept = snippet.slice(0, -1);
-    // The kept text is a prefix of the collapsed source, and the source
-    // continues with a space, so the cut landed between two words rather
-    // than inside one.
-    expect(description.startsWith(kept)).toBe(true);
-    expect(description[kept.length]).toBe(" ");
+    expectWordBoundaryCut(description, results[0][1]);
   });
 
   it("keeps a short description that the excerpt length filter would drop", async () => {
@@ -805,6 +811,15 @@ describe("reading the reply", () => {
 });
 
 describe("mapping a result", () => {
+  /** Three hits with the standard excerpt, for the ordering and limit tests. */
+  function threeDocuments() {
+    return [
+      { url: "https://example.com/1", title: "One", excerpts: [EXCERPT] },
+      { url: "https://example.com/2", title: "Two", excerpts: [EXCERPT] },
+      { url: "https://example.com/3", title: "Three", excerpts: [EXCERPT] },
+    ];
+  }
+
   const run = async (results: unknown[], limit = 10) => {
     mockExchange(documentWith(results));
     return fetchFallbackTextResults(QUERY, limit, FULL_BUDGET_MS);
@@ -877,14 +892,7 @@ describe("mapping a result", () => {
       },
     ]);
 
-    const snippet = results[0][1];
-    expect(snippet.endsWith("…")).toBe(true);
-    expect(snippet.length).toBeLessThanOrEqual(400);
-    const kept = snippet.slice(0, -1);
-    // The kept text is a prefix of the source, and the source continues with a
-    // space, so the cut landed between two words rather than inside one.
-    expect(LONG_EXCERPT.startsWith(kept)).toBe(true);
-    expect(LONG_EXCERPT[kept.length]).toBe(" ");
+    expectWordBoundaryCut(LONG_EXCERPT, results[0][1]);
   });
 
   // The page read for this result would go looking for the text the snippet
@@ -999,24 +1007,13 @@ describe("mapping a result", () => {
   });
 
   it("keeps the endpoint's relevance order", async () => {
-    const results = await run([
-      { url: "https://example.com/1", title: "One", excerpts: [EXCERPT] },
-      { url: "https://example.com/2", title: "Two", excerpts: [EXCERPT] },
-      { url: "https://example.com/3", title: "Three", excerpts: [EXCERPT] },
-    ]);
+    const results = await run(threeDocuments());
 
     expect(results.map(([title]) => title)).toEqual(["One", "Two", "Three"]);
   });
 
   it("applies the limit", async () => {
-    const results = await run(
-      [
-        { url: "https://example.com/1", title: "One", excerpts: [EXCERPT] },
-        { url: "https://example.com/2", title: "Two", excerpts: [EXCERPT] },
-        { url: "https://example.com/3", title: "Three", excerpts: [EXCERPT] },
-      ],
-      2,
-    );
+    const results = await run(threeDocuments(), 2);
 
     expect(results.map(([title]) => title)).toEqual(["One", "Two"]);
   });
