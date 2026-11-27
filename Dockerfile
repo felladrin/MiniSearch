@@ -125,8 +125,8 @@ COPY --chown=${USERNAME}:${USERNAME} . .
 # at preview time stay because `npm start` runs `vite preview` and the server
 # hooks load with the config.
 RUN git config --global --add safe.directory ${APP_DIR} 2>/dev/null || true; \
-  git rev-parse --short HEAD >/dev/null 2>&1 || \
-  echo "WARNING: no usable git repository in the build context, so the app will report an empty commit hash."; \
+  { git rev-parse --short HEAD >/dev/null 2>&1 || [ -f .source-commit ]; } || \
+  echo "WARNING: no usable git repository and no .source-commit in the build context, so the app will report an empty commit hash."; \
   npm run build && \
   npm prune --omit=dev
 
