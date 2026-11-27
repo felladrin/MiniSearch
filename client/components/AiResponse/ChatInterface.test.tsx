@@ -122,6 +122,40 @@ function renderChatInterface({ suppressInitialFollowUp = true } = {}) {
   );
 }
 
+/**
+ * Mounts the chat with one follow-up question in flight. Returns the deferred
+ * that settles the question, plus the render's `unmount`.
+ */
+async function mountWithFollowUpInFlight() {
+  const question = deferred<string>();
+  vi.mocked(generateFollowUpQuestion).mockReturnValueOnce(question.promise);
+
+  const view = renderChatInterface({ suppressInitialFollowUp: false });
+
+  await act(async () => {});
+
+  expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+  return { question, unmount: view.unmount };
+}
+
+/**
+ * Mounts the chat with two follow-up questions in flight, oldest first, and
+ * returns both deferreds.
+ */
+async function mountWithTwoFollowUpsInFlight() {
+  const earlierQuestion = deferred<string>();
+  const newerQuestion = deferred<string>();
+  vi.mocked(generateFollowUpQuestion)
+    .mockReturnValueOnce(earlierQuestion.promise)
+    .mockReturnValueOnce(newerQuestion.promise);
+
+  renderChatInterface({ suppressInitialFollowUp: false });
+  await act(async () => {});
+
+  expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+  return { earlierQuestion, newerQuestion };
+}
+
 function stubWakeLockApi() {
   const release = vi.fn(() => Promise.resolve());
   const request = vi.fn(() =>
@@ -162,16 +196,7 @@ afterEach(() => {
 
 describe("ChatInterface generation state", () => {
   it("leaves the follow-up question flag off after sending during its generation", async () => {
-    const earlierQuestion = deferred<string>();
-    vi.mocked(generateFollowUpQuestion).mockReturnValueOnce(
-      earlierQuestion.promise,
-    );
-
-    renderChatInterface({ suppressInitialFollowUp: false });
-
-    await act(async () => {});
-
-    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+    const { question: earlierQuestion } = await mountWithFollowUpInFlight();
 
     await act(async () => {
       await sendMessage("And how do I use it?");
@@ -360,16 +385,8 @@ describe("ChatInterface generation state", () => {
   });
 
   it("keeps the follow-up question flag on until the newest call finishes", async () => {
-    const earlierQuestion = deferred<string>();
-    const newerQuestion = deferred<string>();
-    vi.mocked(generateFollowUpQuestion)
-      .mockReturnValueOnce(earlierQuestion.promise)
-      .mockReturnValueOnce(newerQuestion.promise);
-
-    renderChatInterface({ suppressInitialFollowUp: false });
-    await act(async () => {});
-
-    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+    const { earlierQuestion, newerQuestion } =
+      await mountWithTwoFollowUpsInFlight();
 
     let send: Promise<void> = Promise.resolve();
     await act(async () => {
@@ -394,15 +411,8 @@ describe("ChatInterface generation state", () => {
   });
 
   it("leaves both generation flags off after unmounting mid-generation", async () => {
-    const heldQuestion = deferred<string>();
-    vi.mocked(generateFollowUpQuestion).mockReturnValueOnce(
-      heldQuestion.promise,
-    );
-
-    const { unmount } = renderChatInterface({ suppressInitialFollowUp: false });
-    await act(async () => {});
-
-    expect(getChatGenerationState().isGeneratingFollowUpQuestion).toBe(true);
+    const { question: heldQuestion, unmount } =
+      await mountWithFollowUpInFlight();
 
     await act(async () => {
       unmount();
