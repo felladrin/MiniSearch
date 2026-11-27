@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-27
+
+- Images found by a follow-up question now show even when the first image search failed. The "Failed to search for images" alert stayed for the rest of the visit and hid them, although they were saved and showed after restoring the search. The alert now shows only while there are no images.
+
 ## 2026-11-26
 
 - Restoring the search already on screen while a follow-up is being answered keeps the live text results and page excerpts used by that answer.
