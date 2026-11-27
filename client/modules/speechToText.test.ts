@@ -815,6 +815,26 @@ describe("startDictation with the web speech fallback", () => {
     expect(stopped).toBe(true);
   });
 
+  it("ends the stop quietly when the recognizer fails while it waits", async () => {
+    vi.useFakeTimers();
+    installRecognitionFake(undefined, () => {});
+    const onError = vi.fn();
+    const session = await startDictation(
+      { onTranscript: vi.fn(), onError },
+      true,
+    );
+
+    let stopped = false;
+    void session.stop().then(() => {
+      stopped = true;
+    });
+    instance?.onerror?.({ error: "no-speech" });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(stopped).toBe(true);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it("drops the late result and ends the stop at once when cancelled", async () => {
     const { session, transcripts } = await startSessionWithLateFinalResult();
 
