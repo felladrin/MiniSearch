@@ -353,16 +353,23 @@ verification, the funnel `/search/text`, `/search/images`, `/page-content` and
 | `bySurface`              | object | `authorized` and `rejected` per endpoint family: `search`, `pageContent`, `thumbnail`, `inference`, `other`                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `rejectedTokenCacheHits` | number | Rejections served from the rejected-token cache without a second argon2 verification                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `distinctRejectedTokens` | number | Distinct tokens the rejected-token cache holds, at most 1024. Only well-formed tokens that failed argon2 verification enter it; a token without the expected hash prefix is refused before that and never counted. A high `reasons.invalidToken` with a value of 1 here is one client replaying one dead token. A value that keeps growing is either many stale links or one caller sending fresh junk hashes, which the limiter caps per IP. The set only empties on a restart and evicts its oldest entry when full, so a value of 1024 means 1024 or more |
+| `rejectedByClient`       | object | Rejections counted per client kind: `bot`, `curl`, `wget`, `python`, `node`, `java`, `go`, `browser`, `other`. The client's own `User-Agent` string is sorted into one of those labels and then dropped, so a flood of scripts shows up as `curl` or `python` and a stale browser tab as `browser`, without the endpoint publishing what any visitor sends. An absent or unrecognised string is `other`                                                                                                                                                      |
 | `limiter`                | object | The shared limiter's `points` and `durationSeconds`, plus the separate `thumbnail` budget behind `/thumbnail`, without which a rejection count says nothing                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 `authorized` plus every entry of `reasons` sums to `requests`, and each half of
 `bySurface` sums to its side of that, on the same principle as `pageReads`.
 `rejectedTokenCacheHits` counts a subset of `reasons.invalidToken` rather
-than adding to that sum.
+than adding to that sum, and the entries of `rejectedByClient` sum to the
+rejections themselves.
 
 The limiter keys on the client IP and none of that reaches these counters: no
-address, no token, no query, no per-request timestamp. The cut is by reason and
-by surface, both properties of the request rather than of whoever sent it.
+address, no token, no query, no per-request timestamp. The cut is by reason, by
+surface, and by what kind of software sent the request, and each of those is one
+fixed vocabulary rather than free text from the request. The client kind is the
+one of the three that says anything about who sent it, and it says only that
+much: the `User-Agent` is matched against the list in
+`server/authorizationSinceLastRestart.ts`, counted under the label it hits, and
+never stored or published as the client wrote it.
 `bySurface` is the one worth watching: all five endpoints share one budget and
 a single user action fans out into a text search, an image search, the
 thumbnail loads behind the image grid and a page-content read, so its

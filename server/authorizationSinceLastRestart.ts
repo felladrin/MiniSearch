@@ -4,6 +4,12 @@
  * is left says whether the instance is being abused, whether a client is
  * broken, and how the shared request budget is spent across the endpoints that
  * share it, none of which needs to know who asked.
+ *
+ * A rejected request does carry one thing worth publishing, its `User-Agent`,
+ * and it goes out the same way an engine's free-form failure goes out as
+ * `blocked`, `timeout` or `other`: sorted into a fixed vocabulary first, so the
+ * answer to "is this a stale browser tab or a script" is public and the client's
+ * own string is not.
  */
 
 import {
@@ -34,12 +40,56 @@ interface SurfaceCounts {
   rejected: number;
 }
 
+/**
+ * What a rejected request's client looks like. `other` is where a string that
+ * matches nothing lands, including no string at all, so the counts stay closed.
+ */
+export type RejectedClientKind =
+  | "bot"
+  | "curl"
+  | "wget"
+  | "python"
+  | "node"
+  | "java"
+  | "go"
+  | "browser"
+  | "other";
+
+/**
+ * Checked in order, first match wins. A bot comes first because a crawler is
+ * free to present a browser string, and telling it apart is the whole point.
+ * `browser` is a loose fit on purpose: it says a browser-shaped client asked,
+ * not which one.
+ */
+const CLIENT_PATTERNS: [RejectedClientKind, RegExp][] = [
+  ["bot", /bot|crawler|spider|crawl|headless|lighthouse/i],
+  ["curl", /curl\//i],
+  ["wget", /wget\//i],
+  ["python", /python/i],
+  ["node", /\bnode\b|node-fetch|undici|axios/i],
+  ["java", /\bjava\/|okhttp|apache-httpclient|jakarta\.commons/i],
+  ["go", /go-http-client/i],
+  ["browser", /mozilla\/[45]\.0/i],
+];
+
 let authorized = 0;
 
 const reasons: Record<RejectionReason, number> = {
   rateLimited: 0,
   missingToken: 0,
   invalidToken: 0,
+};
+
+const rejectedByClient: Record<RejectedClientKind, number> = {
+  bot: 0,
+  curl: 0,
+  wget: 0,
+  python: 0,
+  node: 0,
+  java: 0,
+  go: 0,
+  browser: 0,
+  other: 0,
 };
 
 const bySurface: Record<AuthorizationSurface, SurfaceCounts> = {
@@ -55,12 +105,26 @@ export function recordAuthorizedRequest(surface: AuthorizationSurface): void {
   bySurface[surface].authorized++;
 }
 
+/** Sorts a client's own string into the published vocabulary. */
+export function classifyRejectedClient(
+  userAgent: string | undefined,
+): RejectedClientKind {
+  const value = userAgent ?? "";
+  for (const [kind, pattern] of CLIENT_PATTERNS) {
+    if (pattern.test(value)) return kind;
+  }
+
+  return "other";
+}
+
 export function recordRejectedRequest(
   surface: AuthorizationSurface,
   reason: RejectionReason,
+  userAgent?: string,
 ): void {
   reasons[reason]++;
   bySurface[surface].rejected++;
+  rejectedByClient[classifyRejectedClient(userAgent)]++;
 }
 
 /**
@@ -86,6 +150,8 @@ export function getAuthorizationStats() {
     rejectedTokenCacheHits: getRejectedTokenCacheHits(),
     distinctRejectedTokens: getRejectedTokenCount(),
     reasons: { ...reasons },
+    // Copy, for the same reason as `reasons`: a snapshot must not move later.
+    rejectedByClient: { ...rejectedByClient },
     // Deep copy, so a caller holding a snapshot for comparison does not watch
     // it change under them as later requests arrive.
     bySurface: Object.fromEntries(

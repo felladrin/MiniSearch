@@ -61,6 +61,7 @@ Every HTTP request from client to backend carries a `token` query parameter for 
 
 - **Access Key Hashing**: Access keys hashed using argon2id before storage (via hash-wasm)
 - **Bounded Local Result Retention**: Results are kept at most 24 hours from cache write, of which the first 15 minutes count as fresh; past that they are served only as a clearly-flagged stale fallback when the live search fails,
+- **Rejected Clients Are Published As Kinds, Not As Strings**: `/status` counts rejections per client kind (`bot`, `curl`, `wget`, `python`, `node`, `java`, `go`, `browser`, `other`), which is how an operator tells a stale browser tab from a script without the endpoint publishing what any visitor sends. The `User-Agent` is matched against a fixed list, counted, and dropped; the client's own string is never stored, logged or published, and an unrecognised or absent string is `other`
 - **No PII Collection**: No personally identifiable information stored
 - **User Control**: Users can export and delete all their data
 

@@ -4,6 +4,8 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-27
 
+- `/status` now says what kind of software its rejections come from, under `authorization.rejectedByClient`: `bot`, `curl`, `wget`, `python`, `node`, `java`, `go`, `browser` or `other`. A high `rejectedRate` used to tell you something was hammering the instance and nothing more; now it tells you whether that something is a script or a browser tab. The client's own user-agent string is sorted into one of those labels and dropped, so the page still publishes no address, no token and no visitor string.
+
 - Images found by a follow-up question are no longer lost when a second follow-up is sent before they arrive. The second follow-up's image search took over, so when the first one's images landed they were dropped, on screen and in history. They are now added to the list either way.
 - Images found by a follow-up question now show even when the first image search failed. The "Failed to search for images" alert stayed for the rest of the visit and hid them, although they were saved and showed after restoring the search. The alert now shows only while there are no images.
 - Restoring another search from history while a follow-up is being answered now stops that follow-up. The old chat stayed on screen under the restored search, so sending was blocked until the old answer ended, and that answer was built from the restored search's results and then suggested a question about the old search. The follow-up is now cancelled when the restore switches searches: its question is saved under its own search with "The answer was interrupted.", and the restored chat can be used at once.
