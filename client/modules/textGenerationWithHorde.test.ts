@@ -52,7 +52,16 @@ function mockSettings(overrides: Partial<typeof defaultSettings> = {}) {
 }
 
 /** Loads the generator under test, after the fetch routes are in place. */
-/** Aborts the generation the moment the engine enters "generating". */
+/** Queues a submit, one in-progress poll, and a final empty reply. */
+function queueInterruptedPolling(id: string) {
+  mockFetch
+    .mockResolvedValueOnce(jsonResponse({ id }))
+    .mockResolvedValueOnce(
+      jsonResponse({ done: false, is_possible: true, generations: [] }),
+    )
+    .mockResolvedValueOnce(jsonResponse({}));
+}
+
 function abortWhenGenerating() {
   const controller = new AbortController();
   vi.mocked(updateTextGenerationState).mockImplementation((next) => {
@@ -174,12 +183,7 @@ describe("textGenerationWithHorde", () => {
       const controller = abortWhenGenerating();
       const generateTextWithHorde = await loadHordeGenerator();
 
-      mockFetch
-        .mockResolvedValueOnce(jsonResponse({ id: "gen-queued" }))
-        .mockResolvedValueOnce(
-          jsonResponse({ done: false, is_possible: true, generations: [] }),
-        )
-        .mockResolvedValueOnce(jsonResponse({}));
+      queueInterruptedPolling("gen-queued");
 
       await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
         "Generation interrupted",
@@ -193,12 +197,7 @@ describe("textGenerationWithHorde", () => {
     it("cancels the job exactly once when the user interrupts", async () => {
       const controller = abortWhenGenerating();
       const generateTextWithHorde = await loadHordeGenerator();
-      mockFetch
-        .mockResolvedValueOnce(jsonResponse({ id: "gen-stop" }))
-        .mockResolvedValueOnce(
-          jsonResponse({ done: false, is_possible: true, generations: [] }),
-        )
-        .mockResolvedValueOnce(jsonResponse({}));
+      queueInterruptedPolling("gen-stop");
 
       await expect(generateTextWithHorde(controller.signal)).rejects.toThrow(
         "Generation interrupted",
@@ -483,6 +482,23 @@ describe("textGenerationWithHorde", () => {
       );
     }
 
+    /** Routes a worker whose job faults and expects the generation to reject. */
+    async function expectFaultedGenerationRejects() {
+      routeSingleWorker(() => ({ done: true, faulted: true }));
+
+      const generateTextWithHorde = await loadHordeGenerator();
+      await expect(generateTextWithHorde()).rejects.toThrow(
+        "Generation failed",
+      );
+    }
+
+    /** Runs one generation to its end and returns the generation request bodies. */
+    async function generationBodiesAfterOneRun() {
+      const generateTextWithHorde = await loadHordeGenerator();
+      await generateTextWithHorde();
+      return generationRequestBodies();
+    }
+
     function generationRequestBodies() {
       return mockFetch.mock.calls
         .filter(([url]) => String(url).includes("/generate/text/async"))
@@ -513,10 +529,7 @@ describe("textGenerationWithHorde", () => {
         statusResponder: () => doneResponse,
       });
 
-      const generateTextWithHorde = await loadHordeGenerator();
-      await generateTextWithHorde();
-
-      const bodies = generationRequestBodies();
+      const bodies = await generationBodiesAfterOneRun();
       expect(bodies).toHaveLength(2);
       for (const body of bodies) {
         expect(body.models).toEqual(["m-f", "m-e", "m-d", "m-c", "m-b"]);
@@ -550,10 +563,7 @@ describe("textGenerationWithHorde", () => {
         statusResponder: () => doneResponse,
       });
 
-      const generateTextWithHorde = await loadHordeGenerator();
-      await generateTextWithHorde();
-
-      const bodies = generationRequestBodies();
+      const bodies = await generationBodiesAfterOneRun();
       expect(bodies).toHaveLength(2);
       for (const body of bodies) {
         expect(body.models).toBeUndefined();
@@ -600,12 +610,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("does not retry when the generation faults", async () => {
-      routeSingleWorker(() => ({ done: true, faulted: true }));
-
-      const generateTextWithHorde = await loadHordeGenerator();
-      await expect(generateTextWithHorde()).rejects.toThrow(
-        "Generation failed",
-      );
+      await expectFaultedGenerationRejects();
       expect(generationRequestBodies()).toHaveLength(2);
     });
 
@@ -756,12 +761,7 @@ describe("textGenerationWithHorde", () => {
     });
 
     it("cancels both jobs when the race fails", async () => {
-      routeSingleWorker(() => ({ done: true, faulted: true }));
-
-      const generateTextWithHorde = await loadHordeGenerator();
-      await expect(generateTextWithHorde()).rejects.toThrow(
-        "Generation failed",
-      );
+      await expectFaultedGenerationRejects();
       expect(cancelledIds().sort()).toEqual(["gen-1", "gen-2"]);
     });
 
