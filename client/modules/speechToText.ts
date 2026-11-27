@@ -51,7 +51,7 @@ export const MAX_RECORDING_SECONDS = 120;
 const DICTATION_CONTEXT_SIZE = 4096;
 
 /** The minimum the app needs from `window.SpeechRecognition`. */
-interface SpeechRecognitionLike {
+export interface SpeechRecognitionLike {
   continuous: boolean;
   interimResults: boolean;
   lang: string;

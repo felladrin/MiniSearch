@@ -5,6 +5,7 @@ import {
   getDictationEngine,
   MAX_RECORDING_SECONDS,
   resampleTo16k,
+  type SpeechRecognitionLike,
   startDictation,
   stripLanguageTag,
 } from "@/modules/speechToText";
@@ -610,22 +611,7 @@ describe("startDictation with the local model preference off", () => {
 });
 
 describe("startDictation with the web speech fallback", () => {
-  interface RecognitionFake {
-    continuous: boolean;
-    interimResults: boolean;
-    lang: string;
-    onresult:
-      | ((event: {
-          resultIndex: number;
-          results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>;
-        }) => void)
-      | null;
-    onerror: ((event: { error: string }) => void) | null;
-    onend: (() => void) | null;
-    start: () => void;
-    stop: () => void;
-    stopped: boolean;
-  }
+  type RecognitionFake = SpeechRecognitionLike & { stopped: boolean };
 
   let instance: RecognitionFake | undefined;
 

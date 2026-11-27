@@ -76,6 +76,10 @@ async function encodePerText(
   const embedding = last_hidden_state.data as Float32Array;
   const dim = last_hidden_state.dims[2];
   const pooled = new Float32Array(dim);
+  // jscpd:ignore-start
+  // Mean pooling and L2 normalization, written out again on purpose: this is
+  // the reference implementation the worker's own pooling is checked
+  // against. Sharing the code would make that comparison tautological.
   let count = 0;
 
   for (let t = 0; t < length; t++) {
@@ -103,6 +107,7 @@ async function encodePerText(
       pooled[d] /= norm;
     }
   }
+  // jscpd:ignore-end
 
   return pooled;
 }
