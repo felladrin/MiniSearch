@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 /** Three text results, in the order the reranker indexes them. */
-function textResults() {
+function textResults(): [string, string, string][] {
   return [
     ["A", "a", "https://a.com"],
     ["B", "b", "https://b.com"],
@@ -30,7 +30,7 @@ function mockRerankScores(...scores: number[]) {
   );
 }
 /** The three roundup results that compete with the named site. */
-function roundupResults() {
+function roundupResults(): [string, string, string][] {
   return [
     ["Disney+ schedule roundup", "Blog", "https://blog.example.com/one"],
     ["Another roundup", "Blog", "https://blog.example.com/two"],

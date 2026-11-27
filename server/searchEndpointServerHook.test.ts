@@ -94,7 +94,9 @@ function endBody(response: Awaited<ReturnType<typeof sendSearch>>) {
 }
 
 /** Checks the outage was reported and nothing came from the fallback. */
-function expectOutageReportedWithoutFallback(response: { statusCode: number }) {
+function expectOutageReportedWithoutFallback(
+  response: Awaited<ReturnType<typeof sendSearch>>,
+) {
   expectServiceUnavailable(response);
   expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
   expect(incrementSearchesServedByFallback).not.toHaveBeenCalled();

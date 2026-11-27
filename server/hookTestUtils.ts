@@ -114,7 +114,7 @@ export function postThroughSocket(
 export async function expectBadHostRejected(
   handler: HookHandler,
   url: string,
-  handleTokenVerification: Mock,
+  handleTokenVerification: (...args: never[]) => unknown,
 ): Promise<void> {
   const response = createResponse();
   const next = vi.fn();
