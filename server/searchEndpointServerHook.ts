@@ -9,7 +9,10 @@ import {
   type SearxngTimeRange,
   searxngTimeRanges,
 } from "../shared/searchTimeRange.ts";
-import { SEARCH_UNIT_CONVERSION_HEADER } from "../shared/unitConversion.ts";
+import {
+  encodeUnitConversion,
+  SEARCH_UNIT_CONVERSION_HEADER,
+} from "../shared/unitConversion.ts";
 import {
   assertSearchFallbackConfiguration,
   fetchFallbackTextResults,
@@ -383,7 +386,7 @@ export function searchEndpointServerHook<
         if (unitConversion) {
           response.setHeader(
             SEARCH_UNIT_CONVERSION_HEADER,
-            encodeURIComponent(unitConversion),
+            encodeUnitConversion(unitConversion),
           );
         }
 

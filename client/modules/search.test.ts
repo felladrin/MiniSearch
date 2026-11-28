@@ -975,6 +975,16 @@ describe("Search Module", () => {
       expect(cached.unitConversion).toBe("16.4041994751 ft");
     });
 
+    it("should drop a header that does not decode and keep the results", async () => {
+      // A lone percent sign is not a valid encoding.
+      mockSearchResponse(mockResults, { "X-Search-Unit-Conversion": "100%" });
+
+      const outcome = await searchModule.searchText("5 m to ft", 5);
+
+      expect(outcome.results).toEqual(mockResults);
+      expect(outcome.unitConversion).toBeUndefined();
+    });
+
     it("should report no conversion when the header is absent", async () => {
       mockSearchResponse(mockResults);
 

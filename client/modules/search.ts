@@ -7,7 +7,10 @@ import {
   SEARCH_TIME_RANGE_APPLIED_HEADER,
   type SearchTimeRange,
 } from "@shared/searchTimeRange";
-import { SEARCH_UNIT_CONVERSION_HEADER } from "@shared/unitConversion";
+import {
+  decodeUnitConversion,
+  SEARCH_UNIT_CONVERSION_HEADER,
+} from "@shared/unitConversion";
 import Dexie, { type Table } from "dexie";
 import { sha256 } from "hash-wasm";
 import { invalidateConfig } from "./config";
@@ -366,10 +369,11 @@ async function attemptSearch<T>(searchUrl: URL): Promise<SearchAttempt<T>> {
     const results = (await response.json()) as T;
 
     // Read after the body: a response that dies mid-body is the failure it
-    // died on, not a missing header. The server percent-encodes the answer, so
-    // this cannot fail on a header it sent; a mangled one fails the search
-    // outright rather than showing a conversion nobody asked for.
-    const unitConversion = response.headers.get(SEARCH_UNIT_CONVERSION_HEADER);
+    // died on, not a missing header. A header that does not decode only loses
+    // the card, never the results the search found.
+    const unitConversionHeader = response.headers.get(
+      SEARCH_UNIT_CONVERSION_HEADER,
+    );
 
     return {
       ok: true,
@@ -380,8 +384,8 @@ async function attemptSearch<T>(searchUrl: URL): Promise<SearchAttempt<T>> {
         response.headers.get(SEARCH_LANGUAGE_APPLIED_HEADER) === "false"
           ? true
           : undefined,
-      unitConversion: unitConversion
-        ? decodeURIComponent(unitConversion)
+      unitConversion: unitConversionHeader
+        ? decodeUnitConversion(unitConversionHeader)
         : undefined,
     };
   } catch (error) {

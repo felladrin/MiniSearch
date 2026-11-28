@@ -294,10 +294,11 @@ function allEnginesSuspended(engines: UnresponsiveEngine[]): boolean {
  * both end here, so a search costs one user-visible failure either way, and
  * `/status` learns which engines it cost it on.
  */
-function failWithUnresponsiveEngines(
+/** Counts a search that came back with no results and unresponsive engines. */
+function recordSearchWithUnresponsiveEngines(
   searchType: SearchType,
   engines: UnresponsiveEngine[],
-): never {
+): void {
   incrementSearchesWithUnresponsiveEnginesSinceLastRestart();
   recordUnresponsiveEngines(
     searchType,
@@ -306,6 +307,13 @@ function failWithUnresponsiveEngines(
       failure: classifyEngineFailure(reason),
     })),
   );
+}
+
+function failWithUnresponsiveEngines(
+  searchType: SearchType,
+  engines: UnresponsiveEngine[],
+): never {
+  recordSearchWithUnresponsiveEngines(searchType, engines);
   throw new Error(
     `No results returned from SearXNG. Unresponsive engines: ${formatUnresponsiveEngines(
       engines,
@@ -383,6 +391,9 @@ async function performSearch(
     const data = (await response.json()) as SearxngSearchResponse;
     const results = Array.isArray(data.results) ? data.results : [];
     const unitConversion = parseUnitConverterAnswer(data.answers);
+    // False when only the unit converter plugin answered: it needs no engine,
+    // so its answer says nothing about whether the engines are up.
+    let enginesResponded = true;
 
     if (results.length === 0) {
       const unresponsiveEngines = parseUnresponsiveEngines(
@@ -415,17 +426,28 @@ async function performSearch(
         failWithUnresponsiveEngines(searchType, unresponsiveEngines);
       }
 
-      incrementSearchesWithoutResultsSinceLastRestart();
-      printMessage(
-        unitConversion
-          ? "No results returned from SearXNG, but its unit converter plugin answered the query."
-          : "No results returned from SearXNG. No engine errors were reported; all engines returned zero results.",
-      );
+      if (unresponsiveEngines.length > 0) {
+        // Only the plugin answered, so the search is served, but its engines
+        // still failed: `/status` has to say so, and has to keep saying so.
+        recordSearchWithUnresponsiveEngines(searchType, unresponsiveEngines);
+        enginesResponded = false;
+        printMessage(
+          `No results returned from SearXNG, but its unit converter plugin answered the query. Unresponsive engines: ${formatUnresponsiveEngines(unresponsiveEngines)}.`,
+        );
+      } else {
+        incrementSearchesWithoutResultsSinceLastRestart();
+        printMessage(
+          unitConversion
+            ? "No results returned from SearXNG, but its unit converter plugin answered the query."
+            : "No results returned from SearXNG. No engine errors were reported; all engines returned zero results.",
+        );
+      }
     }
 
     // Reached only when SearXNG answered, retries included, so a degradation
-    // recorded on an earlier search stops being reported as current.
-    recordRespondingEngines(searchType);
+    // recorded on an earlier search stops being reported as current, unless
+    // only a plugin answered.
+    if (enginesResponded) recordRespondingEngines(searchType);
 
     return { results, unitConversion };
   }

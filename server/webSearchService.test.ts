@@ -631,7 +631,7 @@ describe("graceful degradation", () => {
       ),
     );
 
-    const results = await fetchSearXNG(
+    const { results } = await fetchSearXNG(
       "failure injection",
       "images",
       5,
@@ -764,6 +764,19 @@ describe("unit converter answers", () => {
   const searxngAnswerResponse = (body: Record<string, unknown>) =>
     createMockResponse(JSON.stringify(body));
 
+  // A search that came back with results proves the engines are up, which
+  // clears the flag a test here may have left set for the rest of the file.
+  afterEach(async () => {
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({
+        results: [
+          { title: "example", url: "https://example.com", content: "content" },
+        ],
+      }),
+    );
+    await fetchSearXNG("reset", "text", 30, new CircuitBreaker());
+  });
+
   it("keeps the plugin's answer and ignores an engine's", async () => {
     fetchMock.mockResolvedValue(
       searxngAnswerResponse({
@@ -825,16 +838,53 @@ describe("unit converter answers", () => {
       new CircuitBreaker(),
     );
 
-    // The plugin needs no engine, so the search is over as soon as SearXNG
-    // answers: no retry to wait out, and no failure to report.
+    // The plugin needs no engine, so the search is served as soon as SearXNG
+    // answers: no retry to wait out. The engines still failed, though, and the
+    // status counts that search among those that came back with unresponsive
+    // engines.
     expect(search).toEqual({
       results: [],
       unitConversion: "16.4041994751 ft",
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(getSearchesWithUnresponsiveEnginesSinceLastRestart()).toBe(
-      searchesWithUnresponsiveEngines,
+      searchesWithUnresponsiveEngines + 1,
     );
+  });
+
+  it("keeps saying the engines are down when only the plugin answered", async () => {
+    const suspended = {
+      results: [],
+      unresponsive_engines: [["brave", "Suspended: too many requests"]],
+    };
+    // A search lost to engines under a long suspension flags the pool.
+    fetchMock.mockResolvedValue(searxngAnswerResponse(suspended));
+    await expect(
+      fetchSearXNG("5 m to ft", "text", 30, new CircuitBreaker()),
+    ).rejects.toThrow("Unresponsive engines");
+    expect(getDegradedSearchTypes()).toContain("text");
+
+    // The plugin answers without any engine, which says nothing about them.
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({ ...suspended, answers: [unitConverterAnswer] }),
+    );
+    await fetchSearXNG("5 m to ft", "text", 30, new CircuitBreaker());
+
+    expect(getDegradedSearchTypes()).toContain("text");
+  });
+
+  it("flags the engines as down when the plugin answered a search no engine did", async () => {
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({
+        results: [],
+        unresponsive_engines: [["brave", "Suspended: too many requests"]],
+        answers: [unitConverterAnswer],
+      }),
+    );
+
+    await fetchSearXNG("5 m to ft", "text", 30, new CircuitBreaker());
+
+    expect(getDegradedSearchTypes()).toContain("text");
   });
 
   it("serves a conversion even when every engine is under a long suspension", async () => {
