@@ -617,6 +617,39 @@ describe("graceful degradation", () => {
     );
   });
 
+  it("shows an image once when two engines report it with different thumbnails", async () => {
+    const report = (host: string) => ({
+      title: "photo",
+      url: `https://${host}.example.com/post`,
+      category: "images",
+      img_src: "https://cdn.example.com/photo.jpg",
+      thumbnail_src: `https://${host}.example.com/thumbnail.jpg`,
+    });
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({ results: [report("one"), report("two")] }),
+      ),
+    );
+
+    const results = await fetchSearXNG(
+      "failure injection",
+      "images",
+      5,
+      new CircuitBreaker(breakerOptions),
+    );
+
+    // The full-size image is what identifies it, not the thumbnail each engine
+    // happened to bring.
+    expect(results).toEqual([
+      [
+        "photo",
+        "https://one.example.com/post",
+        "https://one.example.com/thumbnail.jpg",
+        "https://cdn.example.com/photo.jpg",
+      ],
+    ]);
+  });
+
   it("drops image results that carry no thumbnail URL", async () => {
     fetchMock.mockResolvedValue(
       createMockResponse(
