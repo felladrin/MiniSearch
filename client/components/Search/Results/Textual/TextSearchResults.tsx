@@ -10,11 +10,13 @@ import {
   textSearchStalePubSub,
   textSearchStatePubSub,
   textSearchTimeFilterPubSub,
+  textSearchUnitConversionPubSub,
 } from "@/modules/pubSub";
 import { searchAndRespond } from "@/modules/textGeneration";
 
 import SearchResultsList from "./SearchResultsList";
 import TextResultsLoadingState from "./TextResultsLoadingState";
+import UnitConversionCard from "./UnitConversionCard";
 
 export default function TextSearchResults() {
   const [searchState] = usePubSub(textSearchStatePubSub);
@@ -22,6 +24,7 @@ export default function TextSearchResults() {
   const [stale] = usePubSub(textSearchStalePubSub);
   const [timeFilterNotApplied] = usePubSub(textSearchTimeFilterPubSub);
   const [languageNotApplied] = usePubSub(textSearchLanguagePubSub);
+  const [unitConversion] = usePubSub(textSearchUnitConversionPubSub);
   const [imageState] = usePubSub(imageSearchStatePubSub);
   const [imageResults] = usePubSub(imageSearchResultsPubSub);
   const [settings] = usePubSub(settingsPubSub);
@@ -62,9 +65,17 @@ export default function TextSearchResults() {
               {unappliedNote} not applied to these results
             </Text>
           )}
+          {unitConversion && <UnitConversionCard value={unitConversion} />}
           <SearchResultsList searchResults={results} />
         </>
       );
+    }
+
+    // The unit converter needs no engine, so its answer can be all a search
+    // brought back. Saying "no results found" under it would take back what
+    // the card just said.
+    if (unitConversion) {
+      return <UnitConversionCard value={unitConversion} />;
     }
 
     return (

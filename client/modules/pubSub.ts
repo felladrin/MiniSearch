@@ -329,6 +329,15 @@ export const [
   getTextSearchLanguageNotApplied,
 ] = textSearchLanguagePubSub;
 
+/**
+ * The unit conversion SearXNG's own plugin worked out for the search on screen,
+ * as plain text, or null when it worked out none. It needs no search engine, so
+ * it can be the only thing a search brings back.
+ */
+export const textSearchUnitConversionPubSub = createPubSub<string | null>(null);
+
+export const [updateTextSearchUnitConversion] = textSearchUnitConversionPubSub;
+
 const pageContentsPubSub = createPubSub<PageContents>({});
 
 export const [updatePageContents, , getPageContents] = pageContentsPubSub;

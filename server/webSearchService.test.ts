@@ -191,7 +191,7 @@ describe("retry logic", () => {
 
     const promise = fetchSearXNG("test", "text");
     await vi.runAllTimersAsync();
-    const results = await promise;
+    const { results } = await promise;
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(results).toHaveLength(1);
@@ -231,7 +231,7 @@ describe("retry logic", () => {
       getSearchesWithUnresponsiveEnginesSinceLastRestart();
     const promise = fetchSearXNG("test", "text");
     await vi.runAllTimersAsync();
-    const results = await promise;
+    const { results } = await promise;
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(results).toHaveLength(1);
@@ -339,7 +339,7 @@ describe("retry logic", () => {
       getSearchesWithUnresponsiveEnginesSinceLastRestart();
     const promise = fetchSearXNG("test", "text");
     await vi.runAllTimersAsync();
-    const results = await promise;
+    const { results } = await promise;
 
     // The classification follows the response the search ends on, so a retry
     // that recovers to a clean zero is a no-results search, not a failure.
@@ -441,7 +441,7 @@ describe("graceful degradation", () => {
     await vi.advanceTimersByTimeAsync(breakerOptions.resetTimeout + 1);
     fetchMock.mockResolvedValue(successResponse());
 
-    const results = await fetchSearXNG(
+    const { results } = await fetchSearXNG(
       "failure injection",
       "text",
       30,
@@ -464,7 +464,7 @@ describe("graceful degradation", () => {
     fetchMock.mockResolvedValue(
       createMockResponse(JSON.stringify({ results: [] })),
     );
-    const noResults = await fetchSearXNG(
+    const { results: noResults } = await fetchSearXNG(
       "failure injection",
       "text",
       30,
@@ -534,7 +534,7 @@ describe("graceful degradation", () => {
       ),
     );
 
-    const results = await fetchSearXNG(
+    const { results } = await fetchSearXNG(
       "failure injection",
       "text",
       30,
@@ -567,7 +567,7 @@ describe("graceful degradation", () => {
       ),
     );
 
-    const results = await fetchSearXNG(
+    const { results } = await fetchSearXNG(
       "failure injection",
       "text",
       1,
@@ -600,7 +600,7 @@ describe("graceful degradation", () => {
       ),
     );
 
-    const results = await fetchSearXNG(
+    const { results } = await fetchSearXNG(
       "failure injection",
       "images",
       5,
@@ -631,7 +631,7 @@ describe("graceful degradation", () => {
       ),
     );
 
-    const results = await fetchSearXNG(
+    const { results } = await fetchSearXNG(
       "failure injection",
       "images",
       5,
@@ -679,7 +679,7 @@ describe("graceful degradation", () => {
       ),
     );
 
-    const results = await fetchSearXNG(
+    const { results } = await fetchSearXNG(
       "failure injection",
       "images",
       30,
@@ -726,7 +726,7 @@ describe("graceful degradation", () => {
       ),
     );
 
-    const results = await fetchSearXNG(
+    const { results } = await fetchSearXNG(
       "failure injection",
       "images",
       5,
@@ -745,6 +745,313 @@ describe("graceful degradation", () => {
           img_src,
         ]),
     );
+  });
+});
+
+describe("unit converter answers", () => {
+  const unitConverterAnswer = {
+    engine: "plugin: unit_converter",
+    answer: "16.4041994751 ft",
+    url: null,
+  };
+  // What the currency engine made of `5 m to ft` on a real SearXNG: a reading
+  // of the query no one asked for, and the reason only the plugin is trusted.
+  const currencyAnswer = {
+    engine: "currency",
+    answer: "5.0 LSL = 97.4461855875 HUF",
+    url: null,
+  };
+  const searxngAnswerResponse = (body: Record<string, unknown>) =>
+    createMockResponse(JSON.stringify(body));
+
+  // A search that came back with results proves the engines are up, which
+  // clears the flag a test here may have left set for the rest of the file.
+  afterEach(async () => {
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({
+        results: [
+          { title: "example", url: "https://example.com", content: "content" },
+        ],
+      }),
+    );
+    await fetchSearXNG("reset", "text", 30, new CircuitBreaker());
+  });
+
+  it("keeps the plugin's answer and ignores an engine's", async () => {
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({
+        results: [
+          {
+            title: "example",
+            url: "https://example.com",
+            content: "example content",
+          },
+        ],
+        answers: [currencyAnswer, unitConverterAnswer],
+      }),
+    );
+
+    const search = await fetchSearXNG(
+      "5 m to ft",
+      "text",
+      30,
+      new CircuitBreaker(),
+    );
+
+    expect(search.unitConversion).toBe("16.4041994751 ft");
+    expect(search.results).toHaveLength(1);
+  });
+
+  it("keeps no answer when only an engine answered", async () => {
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({
+        results: [],
+        answers: [currencyAnswer],
+      }),
+    );
+
+    const search = await fetchSearXNG(
+      "5 m to ft",
+      "text",
+      30,
+      new CircuitBreaker(),
+    );
+
+    expect(search).toEqual({ results: [] });
+  });
+
+  it("serves a conversion the search's engines could not answer", async () => {
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({
+        results: [],
+        unresponsive_engines: [["google", "Timeout"]],
+        answers: [unitConverterAnswer],
+      }),
+    );
+    const searchesWithUnresponsiveEngines =
+      getSearchesWithUnresponsiveEnginesSinceLastRestart();
+
+    const search = await fetchSearXNG(
+      "5 m to ft",
+      "text",
+      30,
+      new CircuitBreaker(),
+    );
+
+    // The plugin needs no engine, so the search is served as soon as SearXNG
+    // answers: no retry to wait out. The engines still failed, though, and the
+    // status counts that search among those that came back with unresponsive
+    // engines.
+    expect(search).toEqual({
+      results: [],
+      unitConversion: "16.4041994751 ft",
+      enginesFailed: true,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(getSearchesWithUnresponsiveEnginesSinceLastRestart()).toBe(
+      searchesWithUnresponsiveEngines + 1,
+    );
+  });
+
+  it("keeps saying the engines are down when only the plugin answered", async () => {
+    const suspended = {
+      results: [],
+      unresponsive_engines: [["brave", "Suspended: too many requests"]],
+    };
+    // A search lost to engines under a long suspension flags the pool.
+    fetchMock.mockResolvedValue(searxngAnswerResponse(suspended));
+    await expect(
+      fetchSearXNG("5 m to ft", "text", 30, new CircuitBreaker()),
+    ).rejects.toThrow("Unresponsive engines");
+    expect(getDegradedSearchTypes()).toContain("text");
+
+    // The plugin answers without any engine, which says nothing about them.
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({ ...suspended, answers: [unitConverterAnswer] }),
+    );
+    await fetchSearXNG("5 m to ft", "text", 30, new CircuitBreaker());
+
+    expect(getDegradedSearchTypes()).toContain("text");
+  });
+
+  describe("circuit breaker", () => {
+    const suspendedWithConversion = () =>
+      searxngAnswerResponse({
+        results: [],
+        unresponsive_engines: [["brave", "Suspended: too many requests"]],
+        answers: [unitConverterAnswer],
+      });
+    const suspendedWithoutConversion = () =>
+      searxngAnswerResponse({
+        results: [],
+        unresponsive_engines: [["brave", "Suspended: too many requests"]],
+      });
+    const failSearch = async (breaker: CircuitBreaker) => {
+      fetchMock.mockResolvedValue(suspendedWithoutConversion());
+      await expect(
+        fetchSearXNG("a plain query", "text", 30, breaker),
+      ).rejects.toThrow("Unresponsive engines");
+    };
+
+    /** A breaker the text search has opened and whose reset time has passed. */
+    const halfOpenBreaker = async () => {
+      const breaker = new CircuitBreaker({
+        failureThreshold: 1,
+        resetTimeout: 1000,
+        successThreshold: 1,
+      });
+      await failSearch(breaker);
+      await vi.advanceTimersByTimeAsync(1001);
+      return breaker;
+    };
+
+    it("does not count a conversion the engines could not back as a success", async () => {
+      const breaker = new CircuitBreaker({
+        failureThreshold: 3,
+        resetTimeout: 600_000,
+        successThreshold: 1,
+      });
+      await failSearch(breaker);
+      await failSearch(breaker);
+
+      // A success here would reset the two failures, and the next one would
+      // not open the circuit.
+      fetchMock.mockResolvedValue(suspendedWithConversion());
+      await fetchSearXNG("5 m to ft", "text", 30, breaker);
+      await failSearch(breaker);
+
+      expect(breaker.getState("searxng:text")).toBe("OPEN");
+    });
+
+    it("does not close a half-open circuit on a conversion alone", async () => {
+      vi.useFakeTimers();
+      try {
+        const breaker = await halfOpenBreaker();
+        expect(breaker.getState("searxng:text")).toBe("HALF_OPEN");
+
+        fetchMock.mockResolvedValue(suspendedWithConversion());
+        await fetchSearXNG("5 m to ft", "text", 30, breaker);
+
+        expect(breaker.getState("searxng:text")).toBe("HALF_OPEN");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("still counts a search with web results as a success", async () => {
+      vi.useFakeTimers();
+      try {
+        const breaker = await halfOpenBreaker();
+
+        fetchMock.mockResolvedValue(
+          searxngAnswerResponse({
+            results: [
+              {
+                title: "example",
+                url: "https://example.com",
+                content: "content",
+              },
+            ],
+            answers: [unitConverterAnswer],
+          }),
+        );
+        await fetchSearXNG("5 m to ft", "text", 30, breaker);
+
+        expect(breaker.getState("searxng:text")).toBe("CLOSED");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  it("leaves a conversion out of an image search, which still fails on its engines", async () => {
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({
+        results: [],
+        unresponsive_engines: [["brave", "Suspended: too many requests"]],
+        answers: [unitConverterAnswer],
+      }),
+    );
+
+    await expect(
+      fetchSearXNG("5 m to ft", "images", 30, new CircuitBreaker()),
+    ).rejects.toThrow("Unresponsive engines");
+  });
+
+  it("flags the engines as down when the plugin answered a search no engine did", async () => {
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({
+        results: [],
+        unresponsive_engines: [["brave", "Suspended: too many requests"]],
+        answers: [unitConverterAnswer],
+      }),
+    );
+
+    await fetchSearXNG("5 m to ft", "text", 30, new CircuitBreaker());
+
+    expect(getDegradedSearchTypes()).toContain("text");
+  });
+
+  it("serves a conversion even when every engine is under a long suspension", async () => {
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({
+        results: [],
+        unresponsive_engines: [["brave", "Suspended: too many requests"]],
+        answers: [unitConverterAnswer],
+      }),
+    );
+
+    await expect(
+      fetchSearXNG("5 m to ft", "text", 30, new CircuitBreaker()),
+    ).resolves.toEqual({
+      results: [],
+      unitConversion: "16.4041994751 ft",
+      enginesFailed: true,
+    });
+  });
+
+  it("still fails an empty search the plugin did not answer", async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockResolvedValue(
+        searxngAnswerResponse({
+          results: [],
+          unresponsive_engines: [["google", "Timeout"]],
+          answers: [currencyAnswer],
+        }),
+      );
+
+      const search = fetchSearXNG(
+        "5 m to ft",
+        "text",
+        30,
+        new CircuitBreaker(),
+      );
+      const outcome = expect(search).rejects.toThrow(
+        "Unresponsive engines: google (Timeout)",
+      );
+      await vi.runAllTimersAsync();
+      await outcome;
+
+      // Unchanged from before the plugin was read: the retries are spent and
+      // the search fails as an unresponsive-engine one.
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores an answer that carries no text", async () => {
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({
+        results: [],
+        answers: [{ engine: "plugin: unit_converter", answer: "  " }],
+      }),
+    );
+
+    await expect(
+      fetchSearXNG("5 m to ft", "text", 30, new CircuitBreaker()),
+    ).resolves.toEqual({ results: [] });
   });
 });
 
@@ -875,7 +1182,7 @@ describe("query privacy", () => {
     );
     const searchesWithoutResults = getSearchesWithoutResultsSinceLastRestart();
 
-    const results = await fetchSearXNG(
+    const { results } = await fetchSearXNG(
       DISTINCTIVE_QUERY,
       "text",
       30,
@@ -949,9 +1256,9 @@ describe("per-search-type circuits", () => {
     // SearXNG still serves text; the image circuit must not refuse it.
     fetchMock.mockResolvedValue(successResponse());
     const callsBefore = fetchMock.mock.calls.length;
-    await expect(fetchSearXNG("test", "text", 30, breaker)).resolves.toEqual([
-      ["example", "example content", "https://example.com"],
-    ]);
+    await expect(fetchSearXNG("test", "text", 30, breaker)).resolves.toEqual({
+      results: [["example", "example content", "https://example.com"]],
+    });
     expect(fetchMock.mock.calls.length).toBe(callsBefore + 1);
 
     // And the image circuit is still open: a text success does not close it.
@@ -964,9 +1271,9 @@ describe("per-search-type circuits", () => {
     fetchMock.mockResolvedValue(
       createMockResponse(JSON.stringify({ results: [] })),
     );
-    await expect(fetchSearXNG("test", "images", 30, breaker)).resolves.toEqual(
-      [],
-    );
+    await expect(fetchSearXNG("test", "images", 30, breaker)).resolves.toEqual({
+      results: [],
+    });
     expect(breaker.getState("searxng:images")).toBe("CLOSED");
   });
 
@@ -1250,9 +1557,9 @@ describe("getWebSearchServiceStatus", () => {
 
     // Nothing to report, so it takes the genuinely-empty path rather than
     // retrying and tallying under an empty engine name.
-    await expect(fetchSearXNG("test", "text", 30, breaker)).resolves.toEqual(
-      [],
-    );
+    await expect(fetchSearXNG("test", "text", 30, breaker)).resolves.toEqual({
+      results: [],
+    });
     expect(getSearchesWithoutResultsSinceLastRestart()).toBe(
       searchesWithoutResults + 1,
     );

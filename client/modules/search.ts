@@ -7,6 +7,10 @@ import {
   SEARCH_TIME_RANGE_APPLIED_HEADER,
   type SearchTimeRange,
 } from "@shared/searchTimeRange";
+import {
+  decodeUnitConversion,
+  SEARCH_UNIT_CONVERSION_HEADER,
+} from "@shared/unitConversion";
 import Dexie, { type Table } from "dexie";
 import { sha256 } from "hash-wasm";
 import { invalidateConfig } from "./config";
@@ -152,6 +156,12 @@ interface SearchFetch<T> {
    * did before the setting existed, in the cache and in the outcome alike.
    */
   languageNotApplied?: boolean;
+  /**
+   * The unit conversion SearXNG's own plugin computed for the query, kept out
+   * of the result array by the header it arrives in. Left out when it answered
+   * nothing, the same way the two notes above are.
+   */
+  unitConversion?: string;
 }
 
 interface CachedSearchOutcome<T> {
@@ -168,6 +178,8 @@ interface CachedSearchOutcome<T> {
    * when the language was applied.
    */
   languageNotApplied?: boolean;
+  /** The unit conversion that came with these results, if there was one. */
+  unitConversion?: string;
 }
 
 async function executeCachedSearch<T extends SearchResults>(
@@ -207,6 +219,7 @@ async function executeCachedSearch<T extends SearchResults>(
       stale: false,
       timeFilterNotApplied: cachedData.timeFilterNotApplied,
       languageNotApplied: cachedData.languageNotApplied,
+      unitConversion: cachedData.unitConversion,
     };
   }
 
@@ -214,14 +227,18 @@ async function executeCachedSearch<T extends SearchResults>(
   cacheMetrics.incrementTotalOperations();
 
   try {
-    const { results, timeFilterNotApplied, languageNotApplied } =
-      await operations.performSearch(
-        context.endpoint,
-        query,
-        limit,
-        timeRange,
-        requestLanguage,
-      );
+    const {
+      results,
+      timeFilterNotApplied,
+      languageNotApplied,
+      unitConversion,
+    } = await operations.performSearch(
+      context.endpoint,
+      query,
+      limit,
+      timeRange,
+      requestLanguage,
+    );
 
     await db.cacheResult(
       context.storeName,
@@ -229,6 +246,7 @@ async function executeCachedSearch<T extends SearchResults>(
       results,
       timeFilterNotApplied,
       languageNotApplied,
+      unitConversion,
     );
     logAndMaybeResetMetrics();
 
@@ -236,7 +254,13 @@ async function executeCachedSearch<T extends SearchResults>(
       `${context.logLabel}: Fetched ${results.length} results from the API`,
     );
 
-    return { results, stale: false, timeFilterNotApplied, languageNotApplied };
+    return {
+      results,
+      stale: false,
+      timeFilterNotApplied,
+      languageNotApplied,
+      unitConversion,
+    };
   } catch (error) {
     if (
       cachedData &&
@@ -254,6 +278,7 @@ async function executeCachedSearch<T extends SearchResults>(
         stale: true,
         timeFilterNotApplied: cachedData.timeFilterNotApplied,
         languageNotApplied: cachedData.languageNotApplied,
+        unitConversion: cachedData.unitConversion,
       };
     }
     throw error;
@@ -269,6 +294,7 @@ type SearchAttempt<T> =
       results: T;
       timeFilterNotApplied: boolean;
       languageNotApplied?: boolean;
+      unitConversion?: string;
     }
   | { ok: false; status: number };
 
@@ -340,15 +366,27 @@ async function attemptSearch<T>(searchUrl: URL): Promise<SearchAttempt<T>> {
       return { ok: false, status: response.status };
     }
 
+    const results = (await response.json()) as T;
+
+    // Read after the body: a response that dies mid-body is the failure it
+    // died on, not a missing header. A header that does not decode only loses
+    // the card, never the results the search found.
+    const unitConversionHeader = response.headers.get(
+      SEARCH_UNIT_CONVERSION_HEADER,
+    );
+
     return {
       ok: true,
-      results: (await response.json()) as T,
+      results,
       timeFilterNotApplied:
         response.headers.get(SEARCH_TIME_RANGE_APPLIED_HEADER) === "false",
       languageNotApplied:
         response.headers.get(SEARCH_LANGUAGE_APPLIED_HEADER) === "false"
           ? true
           : undefined,
+      unitConversion: unitConversionHeader
+        ? decodeUnitConversion(unitConversionHeader)
+        : undefined,
     };
   } catch (error) {
     throw labelSearchFailure(error, controller.signal);
@@ -367,6 +405,8 @@ interface SearchCacheEntry {
   timeFilterNotApplied?: boolean;
   /** The same, for a search that asked for a language. */
   languageNotApplied?: boolean;
+  /** The same, for the unit conversion that came with these results. */
+  unitConversion?: string;
 }
 
 interface TextSearchCache extends SearchCacheEntry {
@@ -480,6 +520,7 @@ class SearchCacheDatabase extends Dexie {
     timestamp: number;
     timeFilterNotApplied?: boolean;
     languageNotApplied?: boolean;
+    unitConversion?: string;
   } | null> {
     if (!cacheConfig.enabled) return null;
 
@@ -491,6 +532,7 @@ class SearchCacheDatabase extends Dexie {
           timestamp: number;
           timeFilterNotApplied?: boolean;
           languageNotApplied?: boolean;
+          unitConversion?: string;
         },
         string
       >;
@@ -505,6 +547,7 @@ class SearchCacheDatabase extends Dexie {
         timestamp: cachedItem.timestamp,
         timeFilterNotApplied: cachedItem.timeFilterNotApplied,
         languageNotApplied: cachedItem.languageNotApplied,
+        unitConversion: cachedItem.unitConversion,
       };
     } catch (error) {
       addLogEntry(
@@ -520,6 +563,7 @@ class SearchCacheDatabase extends Dexie {
     results: T,
     timeFilterNotApplied?: boolean,
     languageNotApplied?: boolean,
+    unitConversion?: string,
   ): Promise<void> {
     if (!cacheConfig.enabled) return;
 
@@ -531,6 +575,7 @@ class SearchCacheDatabase extends Dexie {
           timestamp: number;
           timeFilterNotApplied?: boolean;
           languageNotApplied?: boolean;
+          unitConversion?: string;
         },
         string
       >;
@@ -540,6 +585,7 @@ class SearchCacheDatabase extends Dexie {
         timestamp: Date.now(),
         timeFilterNotApplied,
         languageNotApplied,
+        unitConversion,
       });
 
       const cacheWrites = this._cacheWriteCount;
@@ -640,6 +686,7 @@ const searchService = {
       results: attempt.results,
       timeFilterNotApplied: attempt.timeFilterNotApplied,
       languageNotApplied: attempt.languageNotApplied,
+      unitConversion: attempt.unitConversion,
     };
   },
 

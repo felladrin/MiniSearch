@@ -194,11 +194,12 @@ cascade runs under one 15-second budget, or what is left of the search's own
 deadline when that is shorter, and each attempt gets the remaining budget
 divided by the number of providers still untried and not paused. A provider
 paused after a `429` is skipped without a request. The cascade runs only after SearXNG has
-failed: never while SearXNG answers, and never on an image search. It is
+failed, and never on an image search. The one case where SearXNG answered is a
+unit conversion that only the plugin could answer, described below. It is
 skipped when less than two seconds of the search's own 25-second deadline
 remain, since an answer that late cannot reach the client before its 30-second
-timeout, and that skip answers the `502` above and counts as a fallback that
-failed. So that a stalled SearXNG cannot use up that deadline, the SearXNG
+timeout, and that skip answers the `502` above (or, for that conversion, a
+`200` with no results) and counts as a fallback that failed. So that a stalled SearXNG cannot use up that deadline, the SearXNG
 request, its retries and their backoff are canceled after 15 seconds when the
 fallback could follow, which leaves it the last 10, and after the full 25
 seconds otherwise; a canceled request counts as a SearXNG failure toward the
@@ -206,7 +207,8 @@ circuit breaker. If at least one provider answers with nothing usable and none r
 results, this endpoint responds `200` with `[]`, so the client shows the
 "No results found" alert rather than the "Text search unavailable" one; only
 when every provider tried fails, or none could be tried at all, does the
-search fall through to the same `502`.
+search fall through to the same `502`, except for a unit conversion the plugin
+answered, which stays a `200` with `[]` and its header.
 
 Those providers take a query and a count, so none of them can apply a
 `time_range` or a `language`. When one answers a search that asked for either,
@@ -218,6 +220,34 @@ search that asked for no time range and no language, and the client names
 whichever was lost above the results it got that way: "Time filter not applied
 to these results", "Language not applied to these results", or "Time filter and
 language not applied to these results".
+
+A text search can also carry a unit conversion, in
+`X-Search-Unit-Conversion`. SearXNG runs a `unit_converter` plugin over the
+query itself, which answers a query shaped `<number> <unit> to|in|as <unit>`
+(`5 m to ft` gives `16.4041994751 ft`), and the plugin needs no search engine.
+Only its answers are sent, and only its own: the same `answers` field carries
+answers from search engines, and those misread such queries (the currency
+engine read `5 m to ft` as `5.0 LSL = 97.4461855875 HUF`). The body is an array
+of results and has no room for the value, so the header is the only place it
+goes, percent-encoded with `encodeURIComponent` because a header value cannot
+carry every character the answer can; read it back with `decodeURIComponent`. It
+is absent whenever the plugin answered nothing, which is every search that is
+not a conversion.
+
+Because the plugin answered, such a search is served rather than failed even
+when its engines returned nothing or reported themselves unresponsive: the
+`502` above is not the answer to a query that was answered, and the body is then
+`[]`. When the engines were the ones that failed and the fallback above is
+switched on, the fallback is asked for web results as it would be for any other
+failed search, and the header stays. If the fallback fails, the answer is still
+the `200` with `[]` and the header, not the `502`. The client shows the value above the
+results in a "Unit conversion" card, and keeps it with the cached results, so a
+search served from the cache shows it too.
+
+The conversion needs the request to reach SearXNG. While the text circuit
+breaker is open, which is most of the time on a Hugging Face Space where every
+web engine is blocked, the request never gets there and carries no conversion.
+An image search never carries one.
 
 ### `GET /search/images`
 

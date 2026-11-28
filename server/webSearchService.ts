@@ -56,6 +56,57 @@ interface SearxngSearchResponse {
   results?: SearxngSearchResult[];
   number_of_results?: number;
   unresponsive_engines?: unknown[];
+  answers?: unknown;
+}
+
+/**
+ * What one SearXNG search produced: the results, and the unit conversion its
+ * `unit_converter` plugin worked out for the query, if it worked one out.
+ */
+interface SearxngSearchOutcome<T> {
+  results: T;
+  /**
+   * The converted value as the plugin wrote it (for example
+   * `16.4041994751 ft`). Left out when the plugin answered nothing.
+   */
+  unitConversion?: string;
+  /**
+   * Set when only the unit converter plugin answered a search whose engines
+   * were unresponsive: the search is served on the conversion, but its web
+   * results are missing, and the caller may want them from another source.
+   */
+  enginesFailed?: true;
+}
+
+/** The `engine` SearXNG reports for an answer from its unit converter plugin. */
+const UNIT_CONVERTER_ENGINE = "plugin: unit_converter";
+
+/**
+ * Picks the conversion SearXNG's own unit converter plugin computed for the
+ * query out of the response's `answers`, which holds one entry per answerer.
+ *
+ * Only that plugin is read. The same response carries answers from search
+ * engines, and those misread a conversion query often enough to be unusable:
+ * `5 m to ft` came back with `5.0 LSL = 97.4461855875 HUF` from the currency
+ * engine, next to the right answer from the plugin.
+ */
+function parseUnitConverterAnswer(answers: unknown): string | undefined {
+  if (!Array.isArray(answers)) return undefined;
+
+  for (const answer of answers) {
+    if (typeof answer !== "object" || answer === null) continue;
+
+    const { engine, answer: text } = answer as {
+      engine?: unknown;
+      answer?: unknown;
+    };
+    if (engine !== UNIT_CONVERTER_ENGINE || typeof text !== "string") continue;
+
+    const conversion = text.trim();
+    if (conversion) return conversion;
+  }
+
+  return undefined;
 }
 
 // No `lang` here: SearXNG reads its locale from `language` (`parse_lang` in
@@ -243,6 +294,21 @@ function allEnginesSuspended(engines: UnresponsiveEngine[]): boolean {
   );
 }
 
+/** Counts a search that came back with no results and unresponsive engines. */
+function recordSearchWithUnresponsiveEngines(
+  searchType: SearchType,
+  engines: UnresponsiveEngine[],
+): void {
+  incrementSearchesWithUnresponsiveEnginesSinceLastRestart();
+  recordUnresponsiveEngines(
+    searchType,
+    engines.map(({ engine, reason }) => ({
+      engine,
+      failure: classifyEngineFailure(reason),
+    })),
+  );
+}
+
 /**
  * Counts the search as an unresponsive-engine failure and throws the error the
  * endpoint turns into a non-200. The fail-fast and the retry-exhausted paths
@@ -253,14 +319,7 @@ function failWithUnresponsiveEngines(
   searchType: SearchType,
   engines: UnresponsiveEngine[],
 ): never {
-  incrementSearchesWithUnresponsiveEnginesSinceLastRestart();
-  recordUnresponsiveEngines(
-    searchType,
-    engines.map(({ engine, reason }) => ({
-      engine,
-      failure: classifyEngineFailure(reason),
-    })),
-  );
+  recordSearchWithUnresponsiveEngines(searchType, engines);
   throw new Error(
     `No results returned from SearXNG. Unresponsive engines: ${formatUnresponsiveEngines(
       engines,
@@ -305,7 +364,7 @@ async function performSearch(
   signal?: AbortSignal,
   timeRange?: SearxngTimeRange,
   language?: string,
-): Promise<SearxngSearchResult[]> {
+): Promise<SearxngSearchOutcome<SearxngSearchResult[]>> {
   const searchUrl = buildSearchUrl(query, searchType, timeRange, language);
 
   let retryReason = "";
@@ -337,6 +396,15 @@ async function performSearch(
 
     const data = (await response.json()) as SearxngSearchResponse;
     const results = Array.isArray(data.results) ? data.results : [];
+    // Text searches only: an image search is about pictures, and a conversion
+    // would turn its failures into empty successes.
+    const unitConversion =
+      searchType === "text"
+        ? parseUnitConverterAnswer(data.answers)
+        : undefined;
+    // False when only the unit converter plugin answered: it needs no engine,
+    // so its answer says nothing about whether the engines are up.
+    let enginesResponded = true;
 
     if (results.length === 0) {
       const unresponsiveEngines = parseUnresponsiveEngines(
@@ -348,7 +416,13 @@ async function performSearch(
       // the search layer is down arrives in `unresponsive_engines`. Returned as
       // an empty array it is indistinguishable from a query that genuinely
       // matches nothing.
-      if (unresponsiveEngines.length > 0) {
+      //
+      // A conversion the plugin worked out is the one case where that empty
+      // set is not a failed search: the plugin reads the query itself and needs
+      // no engine, so it answers even where every engine is blocked. The search
+      // is served with its answer and no web results instead of being retried
+      // and thrown away on a 502.
+      if (unresponsiveEngines.length > 0 && !unitConversion) {
         if (allEnginesSuspended(unresponsiveEngines)) {
           failWithUnresponsiveEngines(searchType, unresponsiveEngines);
         }
@@ -363,23 +437,51 @@ async function performSearch(
         failWithUnresponsiveEngines(searchType, unresponsiveEngines);
       }
 
-      incrementSearchesWithoutResultsSinceLastRestart();
-      printMessage(
-        "No results returned from SearXNG. No engine errors were reported; all engines returned zero results.",
-      );
+      if (unresponsiveEngines.length > 0) {
+        // Only the plugin answered, so the search is served, but its engines
+        // still failed: `/status` has to say so, and has to keep saying so.
+        recordSearchWithUnresponsiveEngines(searchType, unresponsiveEngines);
+        enginesResponded = false;
+        printMessage(
+          `No results returned from SearXNG, but its unit converter plugin answered the query. Unresponsive engines: ${formatUnresponsiveEngines(unresponsiveEngines)}.`,
+        );
+      } else {
+        incrementSearchesWithoutResultsSinceLastRestart();
+        printMessage(
+          unitConversion
+            ? "No results returned from SearXNG, but its unit converter plugin answered the query."
+            : "No results returned from SearXNG. No engine errors were reported; all engines returned zero results.",
+        );
+      }
     }
 
     // Reached only when SearXNG answered, retries included, so a degradation
-    // recorded on an earlier search stops being reported as current.
-    recordRespondingEngines(searchType);
+    // recorded on an earlier search stops being reported as current, unless
+    // only a plugin answered.
+    if (enginesResponded) recordRespondingEngines(searchType);
 
-    return results;
+    return {
+      results,
+      unitConversion,
+      ...(enginesResponded ? {} : { enginesFailed: true as const }),
+    };
   }
 
   throw new Error(
     `SearXNG request failed with status 500 after ${MAX_RETRIES} retries`,
   );
 }
+
+/** A text result as the endpoint is handed it. */
+type ProcessedTextResult = [title: string, content: string, url: string];
+
+/** An image or video result as the endpoint is handed it. */
+type ProcessedGraphicalResult = [
+  title: string,
+  url: string,
+  thumbnailSource: string,
+  sourceUrl: string,
+];
 
 async function processSearchResults(
   query: string,
@@ -389,12 +491,35 @@ async function processSearchResults(
   signal?: AbortSignal,
   timeRange?: SearxngTimeRange,
   language?: string,
-) {
-  // An abort is thrown inside `execute`, so a stalled SearXNG counts as a
-  // failure as soon as the deadline passes.
-  const results = await breaker.execute(circuitKey(searchType), () =>
-    performSearch(query, searchType, signal, timeRange, language),
-  );
+): Promise<
+  SearxngSearchOutcome<ProcessedTextResult[] | ProcessedGraphicalResult[]>
+> {
+  const key = circuitKey(searchType);
+  if (!breaker.allows(key)) {
+    throw new Error(`Circuit breaker is open for ${key}`);
+  }
+
+  // `execute` taken apart: a search that only the unit converter plugin
+  // answered is neither a success nor a failure for the circuit. Counting it a
+  // success would close a half-open circuit, or reset the failures that are
+  // about to open one, while the engines are still down.
+  let outcome: Awaited<ReturnType<typeof performSearch>>;
+  try {
+    // An abort is thrown in here, so a stalled SearXNG counts as a failure as
+    // soon as the deadline passes.
+    outcome = await performSearch(
+      query,
+      searchType,
+      signal,
+      timeRange,
+      language,
+    );
+  } catch (error) {
+    breaker.recordFailure(key);
+    throw error;
+  }
+  if (!outcome.enginesFailed) breaker.recordSuccess(key);
+  const { results, unitConversion, enginesFailed } = outcome;
   const openableResults = openableUniqueResults(
     results,
     searchType === "text" ? (result) => result.url : graphicalResultKey,
@@ -405,11 +530,15 @@ async function processSearchResults(
     const textualResults = await Promise.all(
       consideredResults.map(processTextualResult),
     );
-    return reportDiscardedResults(
-      filterNullResults(textualResults),
-      consideredResults.length,
-      searchType,
-    );
+    return {
+      results: reportDiscardedResults(
+        filterNullResults(textualResults),
+        consideredResults.length,
+        searchType,
+      ),
+      unitConversion,
+      enginesFailed,
+    };
   }
 
   // Dropped before the limit applies, so images without a thumbnail at the top
@@ -417,11 +546,15 @@ async function processSearchResults(
   const graphicalResults = await Promise.all(
     openableResults.map(processGraphicalResult),
   );
-  return reportDiscardedResults(
-    filterNullResults(graphicalResults).slice(0, limit),
-    openableResults.length,
-    searchType,
-  );
+  return {
+    results: reportDiscardedResults(
+      filterNullResults(graphicalResults).slice(0, limit),
+      openableResults.length,
+      searchType,
+    ),
+    unitConversion,
+    enginesFailed,
+  };
 }
 
 /**

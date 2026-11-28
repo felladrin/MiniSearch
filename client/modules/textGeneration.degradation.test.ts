@@ -98,6 +98,7 @@ vi.mock("./pubSub", () => ({
   }),
   updateTextSearchTimeFilterNotApplied: vi.fn(),
   updateTextSearchLanguageNotApplied: vi.fn(),
+  updateTextSearchUnitConversion: vi.fn(),
   getTextSearchStale: () => harness.state.staleFlag,
 }));
 
@@ -168,6 +169,7 @@ import {
   updateImageSearchResults,
   updateImageSearchState,
   updateTextSearchStale,
+  updateTextSearchUnitConversion,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
 import { interruptSearch, searchAndRespond } from "./textGeneration";
@@ -268,6 +270,25 @@ describe("search degradation", () => {
       harness.state.query.split(" ").length,
     );
     expect(harness.state.textSearchResults).toEqual(fallbackResults);
+    expect(harness.state.textSearchState).toBe("completed");
+  });
+
+  it("keeps a unit conversion instead of retrying with keywords when no web results came back", async () => {
+    harness.state.query = "5 m to ft";
+    vi.mocked(searchText).mockResolvedValue({
+      results: [],
+      stale: false,
+      unitConversion: "16.4041994751 ft",
+    });
+
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    // The keyword query would drop "to" as a stopword and lose the conversion.
+    expect(searchText).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(updateTextSearchUnitConversion)).toHaveBeenLastCalledWith(
+      "16.4041994751 ft",
+    );
     expect(harness.state.textSearchState).toBe("completed");
   });
 

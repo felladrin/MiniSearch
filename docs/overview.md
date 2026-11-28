@@ -118,7 +118,7 @@ The `textGeneration` module orchestrates the entire search-to-response flow, man
 
 - **Circuit Breaker**: Opens after 5 consecutive failures, blocking requests for 60 seconds before attempting reset
 - **Retry Logic**: Exponential backoff for HTTP 500 errors, up to 3 retries
-- **Fail-Fast on Suspending Engines**: An empty response in which every unresponsive engine is under a long suspension (CAPTCHA, rate limit, access denied; SearXNG suspends them for an hour to a day) throws on the first attempt instead of spending the retry budget, which it could not possibly outlast. Transient engine errors (timeouts, server API errors) keep the full retry budget.
+- **Fail-Fast on Suspending Engines**: An empty response in which every unresponsive engine is under a long suspension (CAPTCHA, rate limit, access denied; SearXNG suspends them for an hour to a day) throws on the first attempt instead of spending the retry budget, which it could not possibly outlast. Transient engine errors (timeouts, server API errors) keep the full retry budget. A text search the unit converter plugin answered skips both, since the plugin needs no engine.
 - **Content Processing**: Converts HTML results to plain text, strips emojis for cleaner output
 - **Lazy Thumbnail Loading**: The search response returns thumbnail URLs as SearXNG sent them; the client then loads each tile from `/thumbnail`, which applies the SSRF guard and serves from an in-process LRU, so a dead thumbnail host delays one tile instead of the whole grid
 
@@ -214,7 +214,7 @@ MiniSearch implements all server-side logic as Vite plugin hooks. Each hook regi
 
 Key server-side modules:
 
-- **`server/webSearchService.ts`**: Integrates with SearXNG at `http://127.0.0.1:8888`. Implements a circuit breaker per search type, so failing image engines cannot block text searches (each opens after 5 failures, resets after 60s) and retry logic (up to 3 retries with exponential backoff, for 500s and for empty responses naming transiently unresponsive engines; an all-suspended set fails fast on the first attempt, since SearXNG suspensions last an hour to a day).
+- **`server/webSearchService.ts`**: Integrates with SearXNG at `http://127.0.0.1:8888`. Implements a circuit breaker per search type, so failing image engines cannot block text searches (each opens after 5 failures, resets after 60s) and retry logic (up to 3 retries with exponential backoff, for 500s and for empty responses naming transiently unresponsive engines; an all-suspended set fails fast on the first attempt, since SearXNG suspensions last an hour to a day; a text search the unit converter plugin answered is served without either).
 - **`server/pageContentService.ts`**: Reads result pages for answer grounding: SSRF-guarded fetches with a byte cap, readable-text extraction, and query-relevant passage selection. Reads run under a per-host circuit breaker (`server/pageReadHostBreaker.ts`) that skips a host for 5 minutes after 3 refusals in a row, then probes it with one read.
 - **`server/searchToken.ts`**: Manages a token at `{os.tempdir()}/minisearch-token` used for CSRF protection on search requests.
 - **`server/verifiedTokens.ts`**: In-memory `Map` of verified session token to last-seen time, evicted after 30 idle minutes, plus a cumulative count of the distinct sessions seen since the last restart.
@@ -248,7 +248,7 @@ The `/status` endpoint returns a JSON object:
 | `averageTextualSearchesPerSession`   | number | Text searches / sessions ratio                                                                                                                                                                                                                    |
 | `averageGraphicalSearchesPerSession` | number | Image searches / sessions ratio                                                                                                                                                                                                                   |
 | `searchesWithoutResults`             | number | Searches, text and image together, that SearXNG answered with zero results and no unresponsive engines                                                                                                                                            |
-| `searchesWithUnresponsiveEngines`    | number | Searches, text and image together, that came back with zero results and unresponsive engines, whether the retries were spent or an all-suspended set failed fast; one per search, not per attempt                                                 |
+| `searchesWithUnresponsiveEngines`    | number | Searches, text and image together, that came back with zero results and unresponsive engines, whether the retries were spent, an all-suspended set failed fast, or only the unit converter plugin answered it; one per search, not per attempt    |
 | `searchesWithAllResultsDiscarded`    | number | Searches, text and image together, whose results were all dropped during processing (for images, none had a thumbnail)                                                                                                                            |
 | `searchesServedByFallback`           | number | Text searches answered by the fallback source after SearXNG failed                                                                                                                                                                                |
 | `searchesFailedOnFallback`           | number | Fallback searches that failed, plus searches where SearXNG's own retries had left too little of the search deadline for the fallback to be asked at all. A rising count is therefore not by itself a sign that the fallback providers are failing |
@@ -279,7 +279,9 @@ per search type, because text and image searches go out to different engine
 pools and the client fires an image search straight after a failed text one;
 `searches.degradedSearchTypes` names the ones currently flagged. It clears as
 soon as SearXNG answers a search of that type, zero results included: the
-engines replied, so whatever was failing is not failing now.
+engines replied, so whatever was failing is not failing now. An answer that only
+the unit converter plugin gave does not count, because the plugin needs no
+engine.
 `rerankerServiceStatus` and `biEncoderServiceStatus` stay plain liveness probes,
 since neither sits behind a breaker and a failing one degrades a search instead
 of losing it.
@@ -290,7 +292,8 @@ behind an empty response and the size and type of a discarded batch; how often
 each happens is read from here instead. `searchesWithoutResults` counts only
 the searches that genuinely matched nothing, since an empty response naming
 unresponsive engines fails the search rather than returning zero results,
-after the retries are spent or immediately for an all-suspended set
+after the retries are spent or immediately for an all-suspended set, unless the
+unit converter plugin answered it, which is served with no retries
 (see `docs/failure-injection.md`);
 `searchesWithUnresponsiveEngines` counts those, which is the way to tell
 whether the case is being over-classified. It undercounts a sustained

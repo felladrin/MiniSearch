@@ -10,6 +10,10 @@ import {
   searxngTimeRanges,
 } from "../shared/searchTimeRange.ts";
 import {
+  encodeUnitConversion,
+  SEARCH_UNIT_CONVERSION_HEADER,
+} from "../shared/unitConversion.ts";
+import {
   assertSearchFallbackConfiguration,
   fetchFallbackTextResults,
   isSearchFallbackEnabled,
@@ -264,13 +268,66 @@ export function searchEndpointServerHook<
 
       let searchResults: TextResult[] | ImageResult[] | null;
       let servedBySearXNG = false;
+      let unitConversion: string | undefined;
       const searchStartedAt = performance.now();
       const fallbackPossible = isTextSearch && isSearchFallbackEnabled();
       const searxngTimeoutMs = fallbackPossible
         ? SEARCH_DEADLINE_MS - SEARXNG_FALLBACK_RESERVE_MS
         : SEARCH_DEADLINE_MS;
+      // Asks the operator's second text source for results. Returns null when
+      // it is not asked or fails, so the caller keeps what it already has.
+      const askFallback = async (): Promise<TextResult[] | null> => {
+        const remainingMs =
+          SEARCH_DEADLINE_MS - (performance.now() - searchStartedAt);
+
+        if (remainingMs < MIN_FALLBACK_BUDGET_MS) {
+          // The deadline leaves too little time for a second source, so it is
+          // not asked. Counted as a fallback that failed rather than one that
+          // served, since none of its results could have reached the client in
+          // time.
+          incrementSearchesFailedOnFallback();
+          console.error(
+            "SearXNG failed, and the search deadline left the fallback too little time",
+          );
+          return null;
+        }
+
+        try {
+          const fallbackResults = await fetchFallbackTextResults(
+            query,
+            limit,
+            remainingMs,
+          );
+          incrementSearchesServedByFallback();
+
+          // The fallback providers take a query and a count only, so the
+          // period the search asked for cannot be honored here. Saying so
+          // is the difference between a narrow search and a wide one that
+          // looks narrow. The language is lost the same way.
+          if (timeRange) {
+            response.setHeader(SEARCH_TIME_RANGE_APPLIED_HEADER, "false");
+          }
+          if (language) {
+            response.setHeader(SEARCH_LANGUAGE_APPLIED_HEADER, "false");
+          }
+          return fallbackResults;
+        } catch (fallbackError) {
+          incrementSearchesFailedOnFallback();
+          // Fixed text plus the error's message, which by construction
+          // carries an HTTP status or a JSON-RPC code, never the query.
+          console.error(
+            `SearXNG failed, and the fallback search failed: ${
+              fallbackError instanceof Error
+                ? fallbackError.message
+                : String(fallbackError)
+            }`,
+          );
+          return null;
+        }
+      };
+
       try {
-        searchResults = await fetchSearXNG(
+        const search = await fetchSearXNG(
           query,
           searchType,
           limit,
@@ -279,60 +336,28 @@ export function searchEndpointServerHook<
           timeRange,
           language,
         );
+        searchResults = search.results;
+        unitConversion = search.unitConversion;
         servedBySearXNG = true;
         recordSearchDuration(searchType, performance.now() - searchStartedAt);
-      } catch {
-        // SearXNG is unreachable. The operator may have switched on a second
-        // text source, which is consulted only here, after SearXNG has failed,
-        // and never for images: no fallback provider has image search.
-        searchResults = null;
 
-        if (fallbackPossible) {
-          const remainingMs =
-            SEARCH_DEADLINE_MS - (performance.now() - searchStartedAt);
-
-          if (remainingMs < MIN_FALLBACK_BUDGET_MS) {
-            // The deadline leaves too little time for a second source, so it is
-            // not asked and the 502 goes out now. Counted as a fallback that
-            // failed rather than one that served, since none of its results
-            // could have reached the client in time.
-            incrementSearchesFailedOnFallback();
-            console.error(
-              "SearXNG failed, and the search deadline left the fallback too little time",
-            );
-          } else {
-            try {
-              searchResults = await fetchFallbackTextResults(
-                query,
-                limit,
-                remainingMs,
-              );
-              incrementSearchesServedByFallback();
-
-              // The fallback providers take a query and a count only, so the
-              // period the search asked for cannot be honored here. Saying so
-              // is the difference between a narrow search and a wide one that
-              // looks narrow. The language is lost the same way.
-              if (timeRange) {
-                response.setHeader(SEARCH_TIME_RANGE_APPLIED_HEADER, "false");
-              }
-              if (language) {
-                response.setHeader(SEARCH_LANGUAGE_APPLIED_HEADER, "false");
-              }
-            } catch (fallbackError) {
-              incrementSearchesFailedOnFallback();
-              // Fixed text plus the error's message, which by construction
-              // carries an HTTP status or a JSON-RPC code, never the query.
-              console.error(
-                `SearXNG failed, and the fallback search failed: ${
-                  fallbackError instanceof Error
-                    ? fallbackError.message
-                    : String(fallbackError)
-                }`,
-              );
-            }
+        // Only the unit converter plugin answered: it needs no engine, so the
+        // engines are down and a search with no web results would otherwise go
+        // out as a conversion alone. The fallback is asked as it would be for
+        // any other failed search, and the conversion stays.
+        if (search.enginesFailed && fallbackPossible) {
+          const fallbackResults = await askFallback();
+          if (fallbackResults) {
+            searchResults = fallbackResults;
+            servedBySearXNG = false;
           }
         }
+      } catch {
+        // SearXNG is unreachable. The operator may have switched on a second
+        // text source, which is consulted here, after SearXNG has failed (and
+        // above, when only the unit converter plugin answered), and never for
+        // images: no fallback provider has image search.
+        searchResults = fallbackPossible ? await askFallback() : null;
       }
 
       if (searchResults === null) {
@@ -372,6 +397,16 @@ export function searchEndpointServerHook<
         );
 
         incrementTextualSearchesSinceLastRestart();
+
+        // The body is an array of results and has no room for the conversion the
+        // plugin worked out, so it travels in a header, percent-encoded because
+        // a header value cannot carry every character the answer can.
+        if (unitConversion) {
+          response.setHeader(
+            SEARCH_UNIT_CONVERSION_HEADER,
+            encodeUnitConversion(unitConversion),
+          );
+        }
 
         response.setHeader("Content-Type", "application/json");
         response.end(JSON.stringify(rankedResults));
