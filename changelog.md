@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-27
 
+- An answer that finishes after you delete its search from History is no longer saved. It used to be stored anyway, with no search to point to, so it stayed in the browser's storage where you could neither see nor remove it. It still shows in the open tab until you leave the search.
 - Image search now shows every image the search finds on a page, not just the first. Images were told apart by the page they were found on, so several different images from one gallery page came back as one result, and the carousel showed one photo where there were several. Images are now told apart by their full-size image, or their thumbnail when there is none, when results are deduplicated and reranked, when a follow-up's images are merged in, and when images are saved to history. The same image reported twice is still shown once.
 - The in-browser AI model list now marks the models that are already downloaded. A model whose files are all in the browser's cache shows "• Downloaded" after its name, so a model that starts answering at once no longer looks the same as one that first downloads hundreds of megabytes. A model whose download stopped halfway is not marked, and the list is checked again each time it opens, so a download that finishes during the visit shows up without a reload.
 - Starting a new search from the results page now ends dictation, releases the microphone and discards any pending transcript. You can start dictating again right away.

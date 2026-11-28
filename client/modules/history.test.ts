@@ -1136,7 +1136,6 @@ describe("History Module - a search takes its answers and chats with it", () => 
   });
 });
 
-
 describe("saveLlmResponseForQuery - deleted search", () => {
   beforeEach(async () => {
     const { historyDatabase, resetSearchRunId } = await import("./history");

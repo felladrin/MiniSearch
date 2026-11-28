@@ -523,16 +523,16 @@ export async function saveLlmResponseForQuery(
   if (!isHistoryEnabled()) return;
   try {
     await historyDatabase.transaction(
-        "rw",
+      "rw",
       historyDatabase.searches,
       historyDatabase.llmResponses,
       async () => {
-          const latest = await historyDatabase.searches
-                .where("searchRunId")
+        const latest = await historyDatabase.searches
+          .where("searchRunId")
           .equals(searchRunId)
           .first();
-    if (latest?.id === undefined) return;
-    
+        if (latest?.id === undefined) return;
+
         await historyDatabase.llmResponses.add({
           searchRunId,
           prompt: query,
@@ -541,8 +541,8 @@ export async function saveLlmResponseForQuery(
           timestamp: Date.now(),
           searchId: latest.id,
         });
-        },
-  );
+      },
+    );
   } catch (error) {
     addLogEntry(`Error saving LLM response: ${error}`);
   }
