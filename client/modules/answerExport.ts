@@ -7,13 +7,15 @@ interface AnswerExportParts {
   sources: TextSearchResults;
   /** What was typed in the search field. */
   query: string;
-  /** When the search ran. */
-  date: Date;
+  /** When the file is exported. */
+  exportedAt: Date;
 }
 
 const maxFileNameBaseLength = 60;
 const windowsReservedFileNames = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
-const unsupportedFileNameCharacters = /[^\p{L}\p{N} ._-]/gu;
+// Marks are allowed so scripts that write vowels as combining marks (Devanagari,
+// Thai) keep whole words instead of getting a dash inside each one.
+const unsupportedFileNameCharacters = /[^\p{L}\p{M}\p{N} ._-]/gu;
 
 /**
  * Renders an answer as a standalone Markdown document: the answer, then the
@@ -28,7 +30,7 @@ export function buildAnswerMarkdown({
   answer,
   sources,
   query,
-  date,
+  exportedAt,
 }: AnswerExportParts): string {
   const sections: string[] = [];
   const body = answer.trim();
@@ -47,9 +49,11 @@ export function buildAnswerMarkdown({
     sections.push(`## Sources\n\n${items.join("\n")}`);
   }
 
-  const searchedFor = singleLine(query);
+  // The export date, not the search date: an answer restored from history is
+  // exported long after its search ran.
+  const searchedFor = escapeInlineMarkdown(singleLine(query));
   sections.push(
-    `Searched${searchedFor ? ` for "${searchedFor}"` : ""} on ${formatDate(date)} with MiniSearch`,
+    `Searched${searchedFor ? ` for "${searchedFor}"` : ""} with MiniSearch, exported on ${formatDate(exportedAt)}`,
   );
 
   return `${sections.join("\n\n")}\n`;
@@ -57,12 +61,15 @@ export function buildAnswerMarkdown({
 
 /** A file name that survives every file system, bounded in length, ending in `.md`. */
 export function buildAnswerFileName(query: string): string {
-  const base = singleLine(query)
+  const cleaned = singleLine(query.normalize("NFC"))
     .replace(unsupportedFileNameCharacters, "-")
     .replace(/\s*-\s*/g, "-")
     .replace(/-{2,}/g, "-")
-    .replace(/^[-.]+|[-.]+$/g, "")
+    .replace(/^[-.]+|[-.]+$/g, "");
+  // Counted in code points, so the cut never splits a surrogate pair.
+  const base = Array.from(cleaned)
     .slice(0, maxFileNameBaseLength)
+    .join("")
     .replace(/[-. ]+$/g, "");
   // Windows reserves a device name whatever follows its first dot, so
   // `con.txt.md` fails as surely as `con.md`.
@@ -87,28 +94,39 @@ export function downloadAnswerMarkdown(
   document.body.append(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  // Released a moment later rather than at once: some browsers, Safari among
+  // them, have failed downloads whose URL was revoked right after the click.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function buildMarkdownLink(title: string, url: string): string {
   const destination = url.trim();
-  if (!destination) {
+  // Only web links: a source URL comes from a third-party page.
+  if (!/^https?:\/\//i.test(destination)) {
     return "";
   }
 
-  const text = escapeLinkText(title) || escapeLinkText(destination);
-  const wrappedDestination = /[\s()<>]/.test(destination)
-    ? `<${destination.replace(/[<>]/g, "")}>`
-    : destination;
+  const text =
+    escapeInlineMarkdown(singleLine(title)) ||
+    escapeInlineMarkdown(destination);
+  // Percent-encoded rather than wrapped in `<…>`, so the URL keeps every
+  // character and nothing in it can end the link early.
+  const encodedDestination = destination.replace(
+    /[\s()<>\\`]/g,
+    (character) =>
+      `%${character.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`,
+  );
 
-  return `[${text}](${wrappedDestination})`;
+  return `[${text}](${encodedDestination})`;
 }
 
-function escapeLinkText(text: string): string {
-  return singleLine(text)
-    .replace(/\\/g, "\\\\")
-    .replace(/\[/g, "\\[")
-    .replace(/\]/g, "\\]");
+/**
+ * Escapes what Markdown reads inside a line: emphasis, code spans, links,
+ * images, raw HTML, entities, strikethrough and table pipes. A source title
+ * comes from a third-party page, so a `<img onerror>` in it must stay text.
+ */
+function escapeInlineMarkdown(text: string): string {
+  return text.replace(/[\\`*_[\]<>!&~|]/g, "\\$&");
 }
 
 function singleLine(text: string): string {
