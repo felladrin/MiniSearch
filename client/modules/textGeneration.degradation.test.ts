@@ -700,6 +700,23 @@ describe("search supersession ownership", () => {
     );
   });
 
+  it("keeps the first search's image from the same page as a follow-up's", async () => {
+    const { finishImages } = await searchWithFollowUpImagesFirst();
+
+    const samePageImage: ImageSearchResults[number] = [
+      "Same page",
+      followUpImage[1],
+      "thumb-other",
+      "https://f.example/other",
+    ];
+    await finishImages([samePageImage]);
+
+    expect(vi.mocked(updateImageSearchResults)).toHaveBeenLastCalledWith([
+      followUpImage,
+      samePageImage,
+    ]);
+  });
+
   it("keeps a follow-up's images when the first image search finds none", async () => {
     const { finishImages } = await searchWithFollowUpImagesFirst();
     await finishImages([]);

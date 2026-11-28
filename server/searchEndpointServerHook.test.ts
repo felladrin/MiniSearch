@@ -538,6 +538,29 @@ describe("searchEndpointServerHook", () => {
       expect(endBody(response)).toEqual([imageResult]);
     });
 
+    it("keeps every reranked image from the same page", async () => {
+      const galleryImages = ["first", "second"].map(
+        (name) =>
+          [
+            `Gallery ${name}`,
+            "https://example.com/gallery",
+            `https://example.com/${name}-thumb.gif`,
+            `https://example.com/${name}.gif`,
+          ] as [string, string, string, string],
+      );
+      vi.mocked(fetchSearXNG).mockResolvedValue(galleryImages);
+      vi.mocked(getRerankerStatus).mockResolvedValue(true);
+      vi.mocked(rankSearchResults).mockResolvedValue([
+        ["Gallery second", "", "https://example.com/gallery", 0.9],
+        ["Gallery first", "", "https://example.com/gallery", 0.5],
+      ]);
+
+      const response = await sendSearch("/search/images?q=cats&token=abc");
+
+      expect(response.statusCode).toBe(200);
+      expect(endBody(response)).toEqual([galleryImages[1], galleryImages[0]]);
+    });
+
     it("drops an image the reranker returns under an unknown URL", async () => {
       vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
       vi.mocked(getRerankerStatus).mockResolvedValue(true);

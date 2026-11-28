@@ -150,13 +150,47 @@ describe("refreshTextSearchResults", () => {
 });
 
 describe("refreshImageSearchResults", () => {
-  it("deduplicates by URL and prepends fresh results", async () => {
+  it("keeps a fresh image from the same page as one on screen", async () => {
     const existing: ImageSearchResults = [
-      ["Existing", "https://existing.com", "thumb", "source"],
+      [
+        "First",
+        "https://gallery.com",
+        "https://gallery.com/first-thumb.jpg",
+        "https://gallery.com/first.jpg",
+      ],
     ];
     const fresh: ImageSearchResults = [
-      ["New", "https://new.com", "thumb", "source"],
-      ["Duplicate", "https://existing.com", "thumb", "source"],
+      [
+        "Second",
+        "https://gallery.com",
+        "https://gallery.com/second-thumb.jpg",
+        "https://gallery.com/second.jpg",
+      ],
+    ];
+    mockSearchImages.mockResolvedValueOnce({ results: fresh, stale: false });
+
+    await refreshImageSearchResults("query", 10, existing);
+
+    expect(mockUpdateImage).toHaveBeenCalledWith([...fresh, ...existing]);
+  });
+
+  it("drops a fresh copy of an image on screen and prepends the rest", async () => {
+    const existing: ImageSearchResults = [
+      [
+        "Existing",
+        "https://existing.com",
+        "thumb",
+        "https://existing.com/full.jpg",
+      ],
+    ];
+    const fresh: ImageSearchResults = [
+      ["New", "https://new.com", "thumb", "https://new.com/full.jpg"],
+      [
+        "Duplicate",
+        "https://existing.com",
+        "thumb",
+        "https://existing.com/full.jpg",
+      ],
     ];
 
     mockSearchImages.mockResolvedValueOnce({ results: fresh, stale: false });
@@ -164,17 +198,22 @@ describe("refreshImageSearchResults", () => {
     await refreshImageSearchResults("query", 10, existing);
 
     expect(mockUpdateImage).toHaveBeenCalledWith([
-      ["New", "https://new.com", "thumb", "source"],
-      ["Existing", "https://existing.com", "thumb", "source"],
+      ["New", "https://new.com", "thumb", "https://new.com/full.jpg"],
+      [
+        "Existing",
+        "https://existing.com",
+        "thumb",
+        "https://existing.com/full.jpg",
+      ],
     ]);
   });
 
   it("keeps the first search's images that landed after the follow-up started", async () => {
     const firstImages: ImageSearchResults = [
-      ["First", "https://first.com", "thumb", "source"],
+      ["First", "https://first.com", "thumb", "https://first.com/full.jpg"],
     ];
     const fresh: ImageSearchResults = [
-      ["New", "https://new.com", "thumb", "source"],
+      ["New", "https://new.com", "thumb", "https://new.com/full.jpg"],
     ];
     mockSearchImages.mockResolvedValueOnce({ results: fresh, stale: false });
     // The follow-up was handed an empty list; the first images arrived since.
@@ -190,13 +229,13 @@ describe("refreshImageSearchResults", () => {
           title: "New",
           url: "https://new.com",
           thumbnail: "thumb",
-          sourceUrl: "source",
+          sourceUrl: "https://new.com/full.jpg",
         },
         {
           title: "First",
           url: "https://first.com",
           thumbnail: "thumb",
-          sourceUrl: "source",
+          sourceUrl: "https://first.com/full.jpg",
         },
       ],
     });
@@ -204,12 +243,17 @@ describe("refreshImageSearchResults", () => {
 
   it("shows an image found by both searches once", async () => {
     const firstImages: ImageSearchResults = [
-      ["First", "https://first.com", "thumb", "source"],
+      ["First", "https://first.com", "thumb", "https://first.com/full.jpg"],
     ];
     mockSearchImages.mockResolvedValueOnce({
       results: [
-        ["New", "https://new.com", "thumb", "source"],
-        ["First again", "https://first.com", "thumb", "source"],
+        ["New", "https://new.com", "thumb", "https://new.com/full.jpg"],
+        [
+          "First again",
+          "https://first.com",
+          "thumb",
+          "https://first.com/full.jpg",
+        ],
       ],
       stale: false,
     });
@@ -218,7 +262,7 @@ describe("refreshImageSearchResults", () => {
     await refreshImageSearchResults("query", 10, []);
 
     expect(mockUpdateImage).toHaveBeenCalledWith([
-      ["New", "https://new.com", "thumb", "source"],
+      ["New", "https://new.com", "thumb", "https://new.com/full.jpg"],
       ...firstImages,
     ]);
   });

@@ -362,14 +362,29 @@ export function searchEndpointServerHook<
           resultsText,
         );
 
+        // Several images can come from one page, so a ranked row is matched
+        // back to an image it has not been matched to yet, preferring one with
+        // the same title. The reranker keeps the page URL for its authority
+        // boost.
+        const unmatched = new Set(results);
         const processedResults = rankedResults
-          .map(([title, , rankedResultUrl]) => {
-            const result = results.find(
+          .map(([rankedTitle, , rankedResultUrl]) => {
+            const sameUrl = [...unmatched].filter(
               ([, resultUrl]) => resultUrl === rankedResultUrl,
             );
+            const result =
+              sameUrl.find(
+                ([title]) => (title?.slice(0, 100) || "") === rankedTitle,
+              ) ?? sameUrl[0];
             if (!result) return null;
+            unmatched.delete(result);
             const [, url, thumbnailSource, sourceUrl] = result;
-            return [title, url, thumbnailSource, sourceUrl] as ImageResult;
+            return [
+              rankedTitle,
+              url,
+              thumbnailSource,
+              sourceUrl,
+            ] as ImageResult;
           })
           .filter((result): result is ImageResult => result !== null);
 

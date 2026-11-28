@@ -206,6 +206,32 @@ describe("useHistoryRestore", () => {
     expect(imageSearchStatePubSub[2]()).toBe("completed");
   });
 
+  it("restores one picture saved twice from two pages as one image", async () => {
+    const picture = {
+      title: "Same picture",
+      thumbnail: "https://cdn.example.com/thumbnail.png",
+      sourceUrl: "https://cdn.example.com/picture.png",
+    };
+    await restoreEntry({
+      imageResults: {
+        type: "image",
+        items: [
+          { ...picture, url: "https://first.example.com/gallery" },
+          { ...picture, url: "https://second.example.com/gallery" },
+        ],
+      },
+    });
+
+    expect(imageSearchResultsPubSub[2]()).toEqual([
+      [
+        "Same picture",
+        "https://first.example.com/gallery",
+        "https://cdn.example.com/thumbnail.png",
+        "https://cdn.example.com/picture.png",
+      ],
+    ]);
+  });
+
   it("leaves suppressNextFollowUp false when the restored entry has no saved response", async () => {
     await restoreEntry({ textResults });
 

@@ -159,7 +159,7 @@ The search endpoint coordinates reranking in `searchEndpointServerHook.ts`:
 4. Return structured JSON response
 ```
 
-Reranking is applied to both text and image search results. For image results, titles and URLs are reformatted into the same text-tuple shape used for text search before being sent through the reranker, then the original image data (including thumbnails) is re-matched to the reranked order by URL. Text search passes `preserveTopResults: true` to keep the original top SearXNG result pinned, while image search does not.
+Reranking is applied to both text and image search results. For image results, titles and URLs are reformatted into the same text-tuple shape used for text search before being sent through the reranker, then the original image data (including thumbnails) is re-matched to the reranked order. The reranker still gets the page URL, because the authority boost reads its host, so each ranked row takes an image from that page that has not been placed yet, preferring one with the same title; several images from one page all keep their own place. Text search passes `preserveTopResults: true` to keep the original top SearXNG result pinned, while image search does not.
 
 ## Model Details
 
