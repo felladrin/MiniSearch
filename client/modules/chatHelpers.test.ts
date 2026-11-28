@@ -149,7 +149,31 @@ describe("refreshTextSearchResults", () => {
 });
 
 describe("refreshImageSearchResults", () => {
-  it("deduplicates by URL and prepends fresh results", async () => {
+  it("keeps a fresh image from the same page as one on screen", async () => {
+    const existing: ImageSearchResults = [
+      [
+        "First",
+        "https://gallery.com",
+        "https://gallery.com/first-thumb.jpg",
+        "https://gallery.com/first.jpg",
+      ],
+    ];
+    const fresh: ImageSearchResults = [
+      [
+        "Second",
+        "https://gallery.com",
+        "https://gallery.com/second-thumb.jpg",
+        "https://gallery.com/second.jpg",
+      ],
+    ];
+    mockSearchImages.mockResolvedValueOnce({ results: fresh, stale: false });
+
+    await refreshImageSearchResults("query", 10, existing);
+
+    expect(mockUpdateImage).toHaveBeenCalledWith([...fresh, ...existing]);
+  });
+
+  it("drops a fresh copy of an image on screen and prepends the rest", async () => {
     const existing: ImageSearchResults = [
       [
         "Existing",

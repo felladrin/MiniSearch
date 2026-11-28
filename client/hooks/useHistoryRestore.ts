@@ -11,6 +11,7 @@ import {
   hasTextResults,
   setCurrentSearchRunId,
 } from "../modules/history";
+import { imageResultKey } from "../modules/imageResultKey";
 import { postMessageToParentWindow } from "../modules/parentWindow";
 import {
   getChatGenerationState,
@@ -111,7 +112,18 @@ export function useHistoryRestore(
             it.thumbnail,
             it.sourceUrl || "",
           ]);
-          updateImageSearchResults(imageTuples);
+          // History saved before images were told apart by their own source
+          // was deduplicated by page, so it can hold one picture twice (found
+          // on two pages). The list keys tiles by image, so keep the first.
+          const seen = new Set<string>();
+          updateImageSearchResults(
+            imageTuples.filter((tuple) => {
+              const key = imageResultKey(tuple);
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            }),
+          );
           updateImageSearchState("completed");
         } else {
           updateImageSearchResults([]);

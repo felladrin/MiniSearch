@@ -549,8 +549,6 @@ async function processTextualResult(result: SearxngSearchResult) {
   }
 }
 
-// Runs before the limit is applied, so a dropped link does not take the slot
-// of a result that would have made the cut.
 /**
  * What makes an image or video result distinct: the full-size source, then the
  * thumbnail. A gallery page returns many different images under one page URL,
@@ -563,6 +561,8 @@ function graphicalResultKey(result: SearxngSearchResult): string {
   return result.img_src || result.thumbnail_src || result.url;
 }
 
+// Runs before the limit is applied, so a dropped link does not take the slot
+// of a result that would have made the cut.
 function openableUniqueResults(
   results: SearxngSearchResult[],
   keyOf: (result: SearxngSearchResult) => string,
