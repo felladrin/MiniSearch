@@ -70,6 +70,12 @@ interface SearxngSearchOutcome<T> {
    * `16.4041994751 ft`). Left out when the plugin answered nothing.
    */
   unitConversion?: string;
+  /**
+   * Set when only the unit converter plugin answered a search whose engines
+   * were unresponsive: the search is served on the conversion, but its web
+   * results are missing, and the caller may want them from another source.
+   */
+  enginesFailed?: true;
 }
 
 /** The `engine` SearXNG reports for an answer from its unit converter plugin. */
@@ -288,12 +294,6 @@ function allEnginesSuspended(engines: UnresponsiveEngine[]): boolean {
   );
 }
 
-/**
- * Counts the search as an unresponsive-engine failure and throws the error the
- * endpoint turns into a non-200. The fail-fast and the retry-exhausted paths
- * both end here, so a search costs one user-visible failure either way, and
- * `/status` learns which engines it cost it on.
- */
 /** Counts a search that came back with no results and unresponsive engines. */
 function recordSearchWithUnresponsiveEngines(
   searchType: SearchType,
@@ -309,6 +309,12 @@ function recordSearchWithUnresponsiveEngines(
   );
 }
 
+/**
+ * Counts the search as an unresponsive-engine failure and throws the error the
+ * endpoint turns into a non-200. The fail-fast and the retry-exhausted paths
+ * both end here, so a search costs one user-visible failure either way, and
+ * `/status` learns which engines it cost it on.
+ */
 function failWithUnresponsiveEngines(
   searchType: SearchType,
   engines: UnresponsiveEngine[],
@@ -390,7 +396,12 @@ async function performSearch(
 
     const data = (await response.json()) as SearxngSearchResponse;
     const results = Array.isArray(data.results) ? data.results : [];
-    const unitConversion = parseUnitConverterAnswer(data.answers);
+    // Text searches only: an image search is about pictures, and a conversion
+    // would turn its failures into empty successes.
+    const unitConversion =
+      searchType === "text"
+        ? parseUnitConverterAnswer(data.answers)
+        : undefined;
     // False when only the unit converter plugin answered: it needs no engine,
     // so its answer says nothing about whether the engines are up.
     let enginesResponded = true;
@@ -449,7 +460,11 @@ async function performSearch(
     // only a plugin answered.
     if (enginesResponded) recordRespondingEngines(searchType);
 
-    return { results, unitConversion };
+    return {
+      results,
+      unitConversion,
+      ...(enginesResponded ? {} : { enginesFailed: true as const }),
+    };
   }
 
   throw new Error(
@@ -479,12 +494,32 @@ async function processSearchResults(
 ): Promise<
   SearxngSearchOutcome<ProcessedTextResult[] | ProcessedGraphicalResult[]>
 > {
-  // An abort is thrown inside `execute`, so a stalled SearXNG counts as a
-  // failure as soon as the deadline passes.
-  const { results, unitConversion } = await breaker.execute(
-    circuitKey(searchType),
-    () => performSearch(query, searchType, signal, timeRange, language),
-  );
+  const key = circuitKey(searchType);
+  if (!breaker.allows(key)) {
+    throw new Error(`Circuit breaker is open for ${key}`);
+  }
+
+  // `execute` taken apart: a search that only the unit converter plugin
+  // answered is neither a success nor a failure for the circuit. Counting it a
+  // success would close a half-open circuit, or reset the failures that are
+  // about to open one, while the engines are still down.
+  let outcome: Awaited<ReturnType<typeof performSearch>>;
+  try {
+    // An abort is thrown in here, so a stalled SearXNG counts as a failure as
+    // soon as the deadline passes.
+    outcome = await performSearch(
+      query,
+      searchType,
+      signal,
+      timeRange,
+      language,
+    );
+  } catch (error) {
+    breaker.recordFailure(key);
+    throw error;
+  }
+  if (!outcome.enginesFailed) breaker.recordSuccess(key);
+  const { results, unitConversion, enginesFailed } = outcome;
   const openableResults = openableUniqueResults(
     results,
     searchType === "text" ? (result) => result.url : graphicalResultKey,
@@ -502,6 +537,7 @@ async function processSearchResults(
         searchType,
       ),
       unitConversion,
+      enginesFailed,
     };
   }
 
@@ -517,6 +553,7 @@ async function processSearchResults(
       searchType,
     ),
     unitConversion,
+    enginesFailed,
   };
 }
 

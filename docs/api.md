@@ -235,10 +235,16 @@ not a conversion.
 Because the plugin answered, such a search is served rather than failed even
 when its engines returned nothing or reported themselves unresponsive: the
 `502` above is not the answer to a query that was answered, and the body is then
-`[]`. On a Hugging Face Space, where every web engine is blocked, that is the
-only thing a conversion query needs. The client shows the value above the
+`[]`. When the engines were the ones that failed and the fallback above is
+switched on, the fallback is asked for web results as it would be for any other
+failed search, and the header stays. The client shows the value above the
 results in a "Unit conversion" card, and keeps it with the cached results, so a
 search served from the cache shows it too.
+
+The conversion needs the request to reach SearXNG. While the text circuit
+breaker is open, which is most of the time on a Hugging Face Space where every
+web engine is blocked, the request never gets there and carries no conversion.
+An image search never carries one.
 
 ### `GET /search/images`
 

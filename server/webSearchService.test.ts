@@ -845,6 +845,7 @@ describe("unit converter answers", () => {
     expect(search).toEqual({
       results: [],
       unitConversion: "16.4041994751 ft",
+      enginesFailed: true,
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(getSearchesWithUnresponsiveEnginesSinceLastRestart()).toBe(
@@ -871,6 +872,110 @@ describe("unit converter answers", () => {
     await fetchSearXNG("5 m to ft", "text", 30, new CircuitBreaker());
 
     expect(getDegradedSearchTypes()).toContain("text");
+  });
+
+  describe("circuit breaker", () => {
+    const suspendedWithConversion = () =>
+      searxngAnswerResponse({
+        results: [],
+        unresponsive_engines: [["brave", "Suspended: too many requests"]],
+        answers: [unitConverterAnswer],
+      });
+    const suspendedWithoutConversion = () =>
+      searxngAnswerResponse({
+        results: [],
+        unresponsive_engines: [["brave", "Suspended: too many requests"]],
+      });
+    const failSearch = async (breaker: CircuitBreaker) => {
+      fetchMock.mockResolvedValue(suspendedWithoutConversion());
+      await expect(
+        fetchSearXNG("a plain query", "text", 30, breaker),
+      ).rejects.toThrow("Unresponsive engines");
+    };
+
+    it("does not count a conversion the engines could not back as a success", async () => {
+      const breaker = new CircuitBreaker({
+        failureThreshold: 3,
+        resetTimeout: 600_000,
+        successThreshold: 1,
+      });
+      await failSearch(breaker);
+      await failSearch(breaker);
+
+      // A success here would reset the two failures, and the next one would
+      // not open the circuit.
+      fetchMock.mockResolvedValue(suspendedWithConversion());
+      await fetchSearXNG("5 m to ft", "text", 30, breaker);
+      await failSearch(breaker);
+
+      expect(breaker.getState("searxng:text")).toBe("OPEN");
+    });
+
+    it("does not close a half-open circuit on a conversion alone", async () => {
+      vi.useFakeTimers();
+      try {
+        const breaker = new CircuitBreaker({
+          failureThreshold: 1,
+          resetTimeout: 1000,
+          successThreshold: 1,
+        });
+        await failSearch(breaker);
+        await vi.advanceTimersByTimeAsync(1001);
+        expect(breaker.getState("searxng:text")).toBe("HALF_OPEN");
+
+        fetchMock.mockResolvedValue(suspendedWithConversion());
+        await fetchSearXNG("5 m to ft", "text", 30, breaker);
+
+        expect(breaker.getState("searxng:text")).toBe("HALF_OPEN");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("still counts a search with web results as a success", async () => {
+      vi.useFakeTimers();
+      try {
+        const breaker = new CircuitBreaker({
+          failureThreshold: 1,
+          resetTimeout: 1000,
+          successThreshold: 1,
+        });
+        await failSearch(breaker);
+        await vi.advanceTimersByTimeAsync(1001);
+
+        fetchMock.mockResolvedValue(
+          searxngAnswerResponse({
+            results: [
+              {
+                title: "example",
+                url: "https://example.com",
+                content: "content",
+              },
+            ],
+            answers: [unitConverterAnswer],
+          }),
+        );
+        await fetchSearXNG("5 m to ft", "text", 30, breaker);
+
+        expect(breaker.getState("searxng:text")).toBe("CLOSED");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  it("leaves a conversion out of an image search, which still fails on its engines", async () => {
+    fetchMock.mockResolvedValue(
+      searxngAnswerResponse({
+        results: [],
+        unresponsive_engines: [["brave", "Suspended: too many requests"]],
+        answers: [unitConverterAnswer],
+      }),
+    );
+
+    await expect(
+      fetchSearXNG("5 m to ft", "images", 30, new CircuitBreaker()),
+    ).rejects.toThrow("Unresponsive engines");
   });
 
   it("flags the engines as down when the plugin answered a search no engine did", async () => {
@@ -901,6 +1006,7 @@ describe("unit converter answers", () => {
     ).resolves.toEqual({
       results: [],
       unitConversion: "16.4041994751 ft",
+      enginesFailed: true,
     });
   });
 

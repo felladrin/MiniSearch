@@ -1075,6 +1075,110 @@ describe("searchEndpointServerHook", () => {
       );
     });
 
+    describe("when only the plugin answered and the engines are down", () => {
+      const fallbackResults: [string, string, string][] = [
+        ["Fallback title", "Fallback snippet", "https://example.com/fallback"],
+      ];
+
+      function pluginOnlyAnswer() {
+        vi.mocked(fetchSearXNG).mockResolvedValue({
+          results: [],
+          unitConversion: conversion,
+          enginesFailed: true,
+        });
+      }
+
+      it("asks the fallback for web results and keeps the conversion", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        pluginOnlyAnswer();
+        vi.mocked(fetchFallbackTextResults).mockResolvedValue(fallbackResults);
+
+        const response = await sendSearch("/search/text?q=5+m+to+ft&token=abc");
+
+        expect(fetchFallbackTextResults).toHaveBeenCalledWith(
+          "5 m to ft",
+          30,
+          expect.any(Number),
+        );
+        expect(incrementSearchesServedByFallback).toHaveBeenCalledTimes(1);
+        expect(response.statusCode).toBe(200);
+        expect(response.end).toHaveBeenCalledWith(
+          JSON.stringify(fallbackResults),
+        );
+        expect(response.setHeader).toHaveBeenCalledWith(
+          "X-Search-Unit-Conversion",
+          encodeURIComponent(conversion),
+        );
+      });
+
+      it("does not ask SearXNG's official lane again after the fallback answered", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        vi.stubEnv("SEARCH_OFFICIAL_LANE_ENABLED", "true");
+        pluginOnlyAnswer();
+        // The same query and results the official lane tests use to start the
+        // lane, so it would start here if SearXNG were still counted as
+        // having served.
+        vi.mocked(fetchFallbackTextResults).mockResolvedValue([
+          [
+            "Disney showtimes roundup",
+            "Blog",
+            "https://blog.example.com/disney",
+          ],
+          ["Disney", "Official site", "https://www.disney.com/"],
+        ]);
+        vi.mocked(fetchSupplementarySearXNG).mockResolvedValue([]);
+
+        try {
+          await sendSearch("/search/text?q=disney+showtimes&token=abc");
+        } finally {
+          vi.unstubAllEnvs();
+        }
+
+        // SearXNG's engines have just failed, so a second request to it would
+        // only add latency.
+        expect(fetchSupplementarySearXNG).not.toHaveBeenCalled();
+      });
+
+      it("still answers 200 with the conversion when the fallback fails too", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        pluginOnlyAnswer();
+        vi.mocked(fetchFallbackTextResults).mockRejectedValue(
+          new Error("HTTP error! status: 503"),
+        );
+
+        const response = await sendSearch("/search/text?q=5+m+to+ft&token=abc");
+
+        expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
+        expect(response.statusCode).toBe(200);
+        expect(response.end).toHaveBeenCalledWith(JSON.stringify([]));
+        expect(response.setHeader).toHaveBeenCalledWith(
+          "X-Search-Unit-Conversion",
+          encodeURIComponent(conversion),
+        );
+      });
+
+      it("does not ask a fallback that is switched off", async () => {
+        pluginOnlyAnswer();
+
+        const response = await sendSearch("/search/text?q=5+m+to+ft&token=abc");
+
+        expect(fetchFallbackTextResults).not.toHaveBeenCalled();
+        expect(response.statusCode).toBe(200);
+      });
+
+      it("does not ask the fallback when the engines answered too", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        vi.mocked(fetchSearXNG).mockResolvedValue({
+          results: [],
+          unitConversion: conversion,
+        });
+
+        await sendSearch("/search/text?q=5+m+to+ft&token=abc");
+
+        expect(fetchFallbackTextResults).not.toHaveBeenCalled();
+      });
+    });
+
     it("sends no conversion header for a search the plugin did not answer", async () => {
       vi.mocked(fetchSearXNG).mockResolvedValue({
         results: [["Title", "Snippet", "https://example.com"]],

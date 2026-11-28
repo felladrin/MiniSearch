@@ -775,7 +775,11 @@ async function startTextSearch(query: string, invocation: number) {
             unitConversion: undefined,
           };
 
-      if (textResults.length === 0) {
+      // A conversion-only answer has no web results by design. The keyword
+      // query drops "to" and "in" as stopwords, so it would lose the
+      // conversion and could fail the search on an instance with blocked
+      // engines.
+      if (textResults.length === 0 && !unitConversion) {
         const keywordQuery = normalizeRelativeDates(
           (await getKeywords(query, 10)).join(" "),
           asOf,
