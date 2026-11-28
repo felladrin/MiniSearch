@@ -293,13 +293,16 @@ function SearchResultsSection() {
 
 Once an answer finishes, `AiResponseContent` shows a muted line with how fast it
 streamed in, for example `42 tokens/s`, read from `generationRatePubSub`.
-`client/modules/generationRate.ts` measures it from the first generated token to
-the last one, so model load, warmup and network time stay out of it. The line
-only appears when the token count is known exactly: the browser model streams one
-token per chunk, an OpenAI-compatible API and the Internal API report a completion
-count only when their backend sends one, and AI Horde delivers the whole answer on
-one poll and so never publishes a rate. A new search and a history restore clear
-it, so an answer never wears the previous one's speed.
+`client/modules/generationRate.ts` publishes a rate only when it is exact. The
+browser model's last chunk carries llama.cpp's own measured decode speed
+(`timings.predicted_per_second`), with model load and the prompt left out. An
+OpenAI-compatible API shows one only when its backend reports the token count
+(the request asks for it with `stream_options.include_usage`); the clock then
+runs from the first streamed text to the last, and when the server streamed no
+reasoning only its text tokens count. The Internal API and AI Horde show none:
+the `/inference` proxy forwards no token count, and AI Horde delivers the whole
+answer on one poll. A new search and a history restore clear it, so an answer
+never wears the previous one's speed.
 
 **Reasoning Content Extraction:**
 

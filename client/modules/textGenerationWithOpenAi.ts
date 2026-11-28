@@ -144,7 +144,14 @@ async function createOpenAiStream({
           rateMeter?.onDelta();
           onUpdate(text, reasoning);
         } else if (part.type === "finish") {
-          outputTokens = part.totalUsage.outputTokens;
+          // The completion count includes reasoning tokens. When the server
+          // kept its reasoning to itself, their time never reached the clock,
+          // so only the text tokens are counted against it.
+          outputTokens =
+            reasoning.length > 0
+              ? part.totalUsage.outputTokens
+              : (part.totalUsage.outputTokenDetails?.textTokens ??
+                part.totalUsage.outputTokens);
         } else if (part.type === "error") {
           streamError = part.error;
         }

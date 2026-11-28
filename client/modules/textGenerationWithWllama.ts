@@ -197,11 +197,13 @@ async function runWllamaGeneration({
       const reasoningDelta =
         (chunk.choices[0]?.delta as { reasoning_content?: string } | undefined)
           ?.reasoning_content ?? "";
+      // The last chunk carries llama.cpp's own decode speed, with no text, so
+      // it is read before the skip below. A chunk is not always one token, so
+      // nothing is counted here.
+      rateMeter?.setMeasuredRate(
+        chunk.timings?.predicted_per_second ?? undefined,
+      );
       if (!delta && !reasoningDelta) continue;
-
-      // One chunk is one generated token here, on either channel: the chain of
-      // thought is generated work too, so it counts toward the rate.
-      rateMeter?.onToken();
 
       if (shouldCheckCanRespond && !generating) {
         generating = true;

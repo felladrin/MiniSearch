@@ -128,7 +128,7 @@ describe("textGenerationWithOpenAi", () => {
      */
     async function streamTimedDeltas(lastChunk: unknown) {
       let now = 0;
-      const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+      const nowSpy = vi.spyOn(performance, "now").mockImplementation(() => now);
       const streams: ReturnType<typeof heldOpenSseResponse>[] = [];
       mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
         const stream = heldOpenSseResponse(init);
@@ -168,9 +168,26 @@ describe("textGenerationWithOpenAi", () => {
         usage: { prompt_tokens: 10, completion_tokens: 42, total_tokens: 52 },
       });
 
-      // 42 completion tokens across the 5 seconds between the first delta and
-      // the last, not across the whole request.
-      expect(updateGenerationRate).toHaveBeenCalledWith("8.4 tokens/s");
+      // 41 of the 42 completion tokens (the first came before the clock)
+      // across the 5 seconds between the first delta and the last, not across
+      // the whole request.
+      expect(updateGenerationRate).toHaveBeenCalledWith("8.2 tokens/s");
+    });
+
+    it("counts only the text tokens when the server kept its reasoning to itself", async () => {
+      await streamTimedDeltas({
+        choices: [{ delta: {}, finish_reason: "stop" }],
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 2042,
+          total_tokens: 2052,
+          completion_tokens_details: { reasoning_tokens: 2000 },
+        },
+      });
+
+      // 2,000 reasoning tokens never streamed, so their time never reached
+      // the clock: only the 42 text tokens count.
+      expect(updateGenerationRate).toHaveBeenCalledWith("8.2 tokens/s");
     });
 
     it("asks the server for the token usage of the stream", async () => {

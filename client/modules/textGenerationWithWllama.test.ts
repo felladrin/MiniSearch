@@ -340,7 +340,11 @@ describe("generation speed", () => {
    * owns, and answers with the speed the run published.
    */
   async function streamOnClock(
-    chunks: { delta: Record<string, string>; at: number }[],
+    chunks: {
+      delta: Record<string, string>;
+      at: number;
+      timings?: { predicted_per_second: number };
+    }[],
     signal?: AbortSignal,
     onChunk?: () => void,
   ) {
@@ -351,9 +355,9 @@ describe("generation speed", () => {
         ({
           createChatCompletion: vi.fn().mockResolvedValue(
             (async function* () {
-              for (const { delta, at } of chunks) {
+              for (const { delta, at, timings } of chunks) {
                 now = at;
-                yield { choices: [{ delta }] };
+                yield { choices: [{ delta }], timings };
                 onChunk?.();
               }
             })(),
@@ -371,17 +375,26 @@ describe("generation speed", () => {
     }
   }
 
-  it("counts one token per chunk that carries text, on either channel", async () => {
+  it("publishes llama.cpp's own decode speed from the last chunk", async () => {
     const rate = await streamOnClock([
       { delta: { content: "The" }, at: 0 },
       { delta: { reasoning_content: "hmm" }, at: 1000 },
       { delta: { content: "answer" }, at: 2000 },
-      // A chunk carrying no text is no token, and it does not move the clock.
-      { delta: {}, at: 4000 },
+      // The last chunk carries no text, only the timings.
+      { delta: {}, at: 4000, timings: { predicted_per_second: 23.77 } },
     ]);
 
-    // Three tokens from the first to the last, so two seconds.
-    expect(rate).toBe("1.5 tokens/s");
+    expect(rate).toBe("23.8 tokens/s");
+  });
+
+  it("publishes nothing when the engine reports no timings", async () => {
+    const rate = await streamOnClock([
+      { delta: { content: "The" }, at: 0 },
+      { delta: { content: "answer" }, at: 2000 },
+    ]);
+
+    // A chunk is not always one token, so counting chunks would be a guess.
+    expect(rate).toBeUndefined();
   });
 
   it("publishes nothing when the answer is interrupted", async () => {

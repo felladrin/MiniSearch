@@ -1,11 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { addLogEntry } from "./logEntries";
-import {
-  getQuery,
-  updateGenerationRate,
-  updateResponse,
-  updateTextGenerationState,
-} from "./pubSub";
+import { getQuery, updateResponse, updateTextGenerationState } from "./pubSub";
 import {
   ChatGenerationError,
   canStartResponding,
@@ -14,7 +9,6 @@ import type { ChatMessage } from "./types";
 
 vi.mock("./pubSub", () => ({
   getQuery: vi.fn().mockReturnValue("test query"),
-  updateGenerationRate: vi.fn(),
   updateResponse: vi.fn(),
   updateTextGenerationState: vi.fn(),
 }));
@@ -189,69 +183,6 @@ describe("textGenerationWithInternalApi", () => {
       expect(addLogEntry).not.toHaveBeenCalledWith(
         expect.stringContaining("cut short"),
       );
-    });
-
-    /**
-     * Moves the clock one second forward on every published chunk, so the
-     * answer spans a known stretch of time however the stream is buffered.
-     */
-    function clockPerChunk() {
-      let now = 0;
-      const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
-      vi.mocked(updateResponse).mockImplementation(() => {
-        now += 1000;
-      });
-
-      return () => {
-        nowSpy.mockRestore();
-        vi.mocked(updateResponse).mockReset();
-      };
-    }
-
-    it("publishes the speed from the usage the stream reports", async () => {
-      const { generateTextWithInternalApi } = await import(
-        "./textGenerationWithInternalApi"
-      );
-      const restoreClock = clockPerChunk();
-      mockFetch.mockResolvedValueOnce(
-        streamResponse(
-          sseChunks([
-            '{"choices":[{"delta":{"content":"Hel"}}]}',
-            '{"choices":[{"delta":{"content":"lo"}}]}',
-            '{"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":20,"total_tokens":30}}',
-          ]),
-        ),
-      );
-
-      try {
-        await expect(generateTextWithInternalApi()).resolves.toBe("Hello");
-        // 20 completion tokens between the first delta and the last one.
-        expect(updateGenerationRate).toHaveBeenCalledWith("20 tokens/s");
-      } finally {
-        restoreClock();
-      }
-    });
-
-    it("publishes no speed when the stream carries no usage", async () => {
-      const { generateTextWithInternalApi } = await import(
-        "./textGenerationWithInternalApi"
-      );
-      const restoreClock = clockPerChunk();
-      mockFetch.mockResolvedValueOnce(
-        streamResponse(
-          sseChunks([
-            '{"choices":[{"delta":{"content":"Hel"}}]}',
-            '{"choices":[{"delta":{"content":"lo"}}]}',
-          ]),
-        ),
-      );
-
-      try {
-        await expect(generateTextWithInternalApi()).resolves.toBe("Hello");
-        expect(updateGenerationRate).toHaveBeenCalledWith(undefined);
-      } finally {
-        restoreClock();
-      }
     });
 
     it("throws an HTTP error on a non-OK response", async () => {
