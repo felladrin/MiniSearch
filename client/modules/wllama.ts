@@ -49,8 +49,8 @@ export async function initializeWllama(
   try {
     wllama = await createWllamaInstance(config?.wllama);
 
-    await wllama.loadModelFromHF(
-      { repo: hfRepoId, file: hfFilePath },
+    await wllama.loadModelFromUrl(
+      { url: huggingFaceModelFileUrl(hfRepoId, hfFilePath) },
       {
         ...config?.model,
         n_threads: 1,
@@ -88,8 +88,8 @@ export async function initializeWllama(
 
     await wllama.exit();
 
-    await wllama.loadModelFromHF(
-      { repo: hfRepoId, file: hfFilePath },
+    await wllama.loadModelFromUrl(
+      { url: huggingFaceModelFileUrl(hfRepoId, hfFilePath) },
       config?.model,
     );
 
@@ -146,6 +146,17 @@ export async function clearWllamaCache(): Promise<void> {
 }
 
 /**
+ * The URL wllama downloads a Hugging Face model file from. Loading by this
+ * URL instead of by repo id skips the Hugging Face API entirely (wllama's
+ * `getHFModelSource` queries the tree API first), so a fully cached model
+ * loads even when the API is unreachable, and the file cache keeps matching
+ * because this is the same URL the cache keys files by.
+ */
+function huggingFaceModelFileUrl(hfRepoId: string, hfFilePath: string): string {
+  return `https://huggingface.co/${hfRepoId}/resolve/main/${hfFilePath}`;
+}
+
+/**
  * Ids of the catalog models whose files are all in wllama's cache.
  *
  * A model counts as downloaded only when wllama itself calls it valid: every
@@ -170,12 +181,8 @@ export async function getDownloadedWllamaModelIds(): Promise<Set<string>> {
     return new Set(
       Object.entries(wllamaModels)
         .filter(([, model]) =>
-          // The cache keys files by the URL they were downloaded from, and
-          // `loadModelFromHF` builds that URL as
-          // `https://huggingface.co/${repo}/resolve/main/${file}` (wllama's
-          // `getHFModelSource`), so the catalog entry matches only that URL.
           validUrls.has(
-            `https://huggingface.co/${model.hfRepoId}/resolve/main/${model.hfFilePath}`,
+            huggingFaceModelFileUrl(model.hfRepoId, model.hfFilePath),
           ),
         )
         .map(([id]) => id),
