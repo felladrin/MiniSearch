@@ -46,7 +46,7 @@ export default function SearchSettingsForm() {
         {...form.getInputProps("searchLanguage")}
         label="Search Language"
         // The answer is not what this changes: it keeps following the question.
-        description="Which language the results come back in. Browser language sends your browser's own locale, and Any language asks for no preference. The answer still follows the language of the question."
+        description="Which language the results come back in. Browser language sends your browser's own locale, Detect from the query lets the search engine guess, and Any language asks for no preference. The answer still follows the language of the question."
         data={searchLanguageOptions}
         searchable
         allowDeselect={false}
