@@ -7,6 +7,7 @@ import {
   type TextResults,
   updateSearchResults,
 } from "./history";
+import { imageResultKey } from "./imageResultKey";
 import { addLogEntry } from "./logEntries";
 import { fetchPageContents } from "./pageContent";
 import {
@@ -136,14 +137,16 @@ export async function refreshImageSearchResults(
   // The first search's images can land after this refresh started, so it adds
   // to the list on screen now as well as the one it was handed then.
   const shown = isCurrent() ? getImageSearchResults() : [];
-  const shownUrls = new Set(shown.map(([, url]) => url));
+  const shownKeys = new Set(shown.map(imageResultKey));
   const baseResults: ImageSearchResults = [
     ...shown,
-    ...existingResults.filter(([, url]) => !shownUrls.has(url)),
+    ...existingResults.filter(
+      (result) => !shownKeys.has(imageResultKey(result)),
+    ),
   ];
-  const existingUrls = new Set(baseResults.map(([, url]) => url));
+  const existingKeys = new Set(baseResults.map(imageResultKey));
   const uniqueFreshResults = imageResults.filter(
-    ([, url]) => !existingUrls.has(url),
+    (result) => !existingKeys.has(imageResultKey(result)),
   );
 
   if (uniqueFreshResults.length > 0) {

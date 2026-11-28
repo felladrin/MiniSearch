@@ -8,6 +8,7 @@ import {
   saveLlmResponseForQuery,
   updateSearchResults,
 } from "./history";
+import { imageResultKey } from "./imageResultKey";
 import { addLogEntry } from "./logEntries";
 import { showAiCompleteNotification } from "./notifications";
 import { fetchPageContents } from "./pageContent";
@@ -861,10 +862,12 @@ async function startImageSearch(
     // A follow-up can add images while this search is still running; they
     // stay, ahead of this search's own.
     const shown = isCurrent() ? getImageSearchResults() : [];
-    const shownUrls = new Set(shown.map(([, url]) => url));
+    const shownKeys = new Set(shown.map(imageResultKey));
     const mergedResults: ImageSearchResults = [
       ...shown,
-      ...imageResults.filter(([, url]) => !shownUrls.has(url)),
+      ...imageResults.filter(
+        (result) => !shownKeys.has(imageResultKey(result)),
+      ),
     ];
 
     if (isCurrent()) {

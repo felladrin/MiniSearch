@@ -579,6 +579,44 @@ describe("graceful degradation", () => {
     ]);
   });
 
+  it("keeps different images found on the same page", async () => {
+    const galleryImage = (name: string) => ({
+      title: name,
+      url: "https://example.com/gallery",
+      category: "images",
+      img_src: `https://example.com/${name}.gif`,
+      thumbnail_src: `https://example.com/${name}-thumb.gif`,
+    });
+    fetchMock.mockResolvedValue(
+      createMockResponse(
+        JSON.stringify({
+          results: [
+            galleryImage("first"),
+            galleryImage("second"),
+            // The same image reported by a second engine is still one result.
+            galleryImage("first"),
+          ],
+        }),
+      ),
+    );
+
+    const results = await fetchSearXNG(
+      "failure injection",
+      "images",
+      5,
+      new CircuitBreaker(breakerOptions),
+    );
+
+    expect(results).toEqual(
+      ["first", "second"].map((name) => [
+        name,
+        "https://example.com/gallery",
+        `https://example.com/${name}-thumb.gif`,
+        `https://example.com/${name}.gif`,
+      ]),
+    );
+  });
+
   it("drops image results that carry no thumbnail URL", async () => {
     fetchMock.mockResolvedValue(
       createMockResponse(

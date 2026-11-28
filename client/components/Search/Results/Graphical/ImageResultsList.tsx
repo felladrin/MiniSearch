@@ -19,6 +19,7 @@ import Captions from "yet-another-react-lightbox/plugins/captions";
 import classes from "./ImageResultsList.module.css";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/captions.css";
+import { imageResultKey } from "@/modules/imageResultKey";
 import { addLogEntry } from "@/modules/logEntries";
 import { getHostname } from "@/modules/stringFormatters";
 import { getThumbnailSrc } from "@/modules/thumbnailUrls";
@@ -76,6 +77,8 @@ export default function ImageResultsList({
   const [failedThumbnails, setFailedThumbnails] = useState<
     Record<string, boolean>
   >({});
+  // Thumbnails are tracked per image, not per page: one page can hold several.
+  const imageKeys = imageResults.map(imageResultKey);
 
   useEffect(() => {
     setState((prev) => ({ ...prev, canStartTransition: true }));
@@ -90,11 +93,12 @@ export default function ImageResultsList({
 
     void (async () => {
       const entries = await Promise.all(
-        imageResults.map(async ([, url, thumbnailUrl]) => {
+        imageResults.map(async (result) => {
+          const key = imageResultKey(result);
           try {
-            return [url, await getThumbnailSrc(thumbnailUrl)] as const;
+            return [key, await getThumbnailSrc(result[2])] as const;
           } catch {
-            return [url, null] as const;
+            return [key, null] as const;
           }
         }),
       );
@@ -118,12 +122,12 @@ export default function ImageResultsList({
     }));
   };
 
-  const markThumbnailFailed = (url: string) => {
-    setFailedThumbnails((prev) => ({ ...prev, [url]: true }));
+  const markThumbnailFailed = (key: string) => {
+    setFailedThumbnails((prev) => ({ ...prev, [key]: true }));
   };
 
-  const renderTile = (title: string, url: string) => {
-    const tileSrc = failedThumbnails[url] ? null : thumbnailSrcs[url];
+  const renderTile = (title: string, url: string, key: string) => {
+    const tileSrc = failedThumbnails[key] ? null : thumbnailSrcs[key];
 
     if (tileSrc) {
       return (
@@ -132,7 +136,7 @@ export default function ImageResultsList({
           src={tileSrc}
           loading="lazy"
           style={imageStyle}
-          onError={() => markThumbnailFailed(url)}
+          onError={() => markThumbnailFailed(key)}
         />
       );
     }
@@ -140,7 +144,7 @@ export default function ImageResultsList({
     // `null` means the result has no thumbnail, or the load failed: the host
     // name is the most that can be shown. `undefined` means the src is still
     // being resolved, so the tile keeps a skeleton in the meantime.
-    if (thumbnailSrcs[url] === undefined) {
+    if (thumbnailSrcs[key] === undefined) {
       return (
         <Box style={tileBoxStyle}>
           <Skeleton style={{ height: "100%", width: "100%" }} />
@@ -178,7 +182,7 @@ export default function ImageResultsList({
       >
         {imageResults.map(([title, url], index) => (
           <Transition
-            key={url}
+            key={imageKeys[index]}
             mounted={state.canStartTransition}
             transition="fade"
             timingFunction="ease"
@@ -192,7 +196,7 @@ export default function ImageResultsList({
                   className={classes.thumbnailButton}
                   onClick={() => handleImageClick(index)}
                 >
-                  {renderTile(title, url)}
+                  {renderTile(title, url, imageKeys[index])}
                 </UnstyledButton>
               </Carousel.Slide>
             )}
@@ -204,13 +208,13 @@ export default function ImageResultsList({
         close={() => setState((prev) => ({ ...prev, isLightboxOpen: false }))}
         plugins={[Captions]}
         index={state.lightboxIndex}
-        slides={imageResults.map(([title, url, , sourceUrl]) => ({
+        slides={imageResults.map(([title, url, , sourceUrl], index) => ({
           // The grid's thumbnail when it loaded; when it did not, the same
           // host-name placeholder the tile shows.
           src:
-            thumbnailSrcs[url] && !failedThumbnails[url]
-              ? thumbnailSrcs[url]
-              : hostNamePlaceholder(getHostname(url)),
+            (!failedThumbnails[imageKeys[index]] &&
+              thumbnailSrcs[imageKeys[index]]) ||
+            hostNamePlaceholder(getHostname(url)),
           alt: title,
           description: (
             <Stack align="center" gap="md">

@@ -100,6 +100,32 @@ describe("ImageResultsList", () => {
     );
   });
 
+  it("shows every image from the same page with its own thumbnail", async () => {
+    const galleryImages: ImageSearchResult[] = ["first", "second"].map(
+      (name) => [
+        `Gallery ${name}`,
+        "https://example.com/gallery",
+        `https://example.com/${name}-thumb.gif`,
+        `https://example.com/${name}.gif`,
+      ],
+    );
+    render(
+      <MantineProvider>
+        <ImageResultsList imageResults={galleryImages} />
+      </MantineProvider>,
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("img").map((img) => img.getAttribute("src")),
+      ).toEqual(
+        ["first", "second"].map((name) =>
+          thumbnailSrcFor(`https://example.com/${name}-thumb.gif`),
+        ),
+      ),
+    );
+  });
+
   it("shows the host name for a result without a thumbnail", async () => {
     render(
       <MantineProvider>
