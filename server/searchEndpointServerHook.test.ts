@@ -1159,6 +1159,21 @@ describe("searchEndpointServerHook", () => {
         expectConversionOnly(response);
       });
 
+      it("keeps the conversion and answers 200 when the deadline leaves the fallback too little time", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        pluginOnlyAnswer();
+        // 0 for the search's start, then past the 25 s deadline.
+        vi.spyOn(performance, "now")
+          .mockReturnValueOnce(0)
+          .mockReturnValue(25_001);
+
+        const response = await sendSearch("/search/text?q=5+m+to+ft&token=abc");
+
+        expect(fetchFallbackTextResults).not.toHaveBeenCalled();
+        expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
+        expectConversionOnly(response);
+      });
+
       it("does not ask a fallback that is switched off", async () => {
         pluginOnlyAnswer();
 

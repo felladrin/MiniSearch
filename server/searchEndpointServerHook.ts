@@ -354,8 +354,9 @@ export function searchEndpointServerHook<
         }
       } catch {
         // SearXNG is unreachable. The operator may have switched on a second
-        // text source, which is consulted only here, after SearXNG has failed,
-        // and never for images: no fallback provider has image search.
+        // text source, which is consulted here, after SearXNG has failed (and
+        // above, when only the unit converter plugin answered), and never for
+        // images: no fallback provider has image search.
         searchResults = fallbackPossible ? await askFallback() : null;
       }
 

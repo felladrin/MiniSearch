@@ -194,11 +194,12 @@ cascade runs under one 15-second budget, or what is left of the search's own
 deadline when that is shorter, and each attempt gets the remaining budget
 divided by the number of providers still untried and not paused. A provider
 paused after a `429` is skipped without a request. The cascade runs only after SearXNG has
-failed: never while SearXNG answers, and never on an image search. It is
+failed, and never on an image search. The one case where SearXNG answered is a
+unit conversion that only the plugin could answer, described below. It is
 skipped when less than two seconds of the search's own 25-second deadline
 remain, since an answer that late cannot reach the client before its 30-second
-timeout, and that skip answers the `502` above and counts as a fallback that
-failed. So that a stalled SearXNG cannot use up that deadline, the SearXNG
+timeout, and that skip answers the `502` above (or, for that conversion, a
+`200` with no results) and counts as a fallback that failed. So that a stalled SearXNG cannot use up that deadline, the SearXNG
 request, its retries and their backoff are canceled after 15 seconds when the
 fallback could follow, which leaves it the last 10, and after the full 25
 seconds otherwise; a canceled request counts as a SearXNG failure toward the
