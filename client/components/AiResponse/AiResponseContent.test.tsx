@@ -1,11 +1,34 @@
 import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { usePubSub } from "create-pubsub/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  buildAnswerFileName,
+  buildAnswerMarkdown,
+  downloadAnswerMarkdown,
+} from "@/modules/answerExport";
 import AiResponseContent from "./AiResponseContent";
 
 vi.mock("create-pubsub/react", () => ({
   usePubSub: vi.fn(),
+}));
+
+vi.mock("@/modules/answerExport", () => ({
+  buildAnswerMarkdown: vi.fn(() => "exported markdown"),
+  buildAnswerFileName: vi.fn(() => "mercury.md"),
+  downloadAnswerMarkdown: vi.fn(),
+}));
+
+// Show the text each copy button would put on the clipboard.
+vi.mock("./CopyIconButton", () => ({
+  default: ({
+    value,
+    tooltipLabel,
+  }: {
+    value: string;
+    tooltipLabel?: string;
+  }) => <button type="button" aria-label={tooltipLabel} data-value={value} />,
 }));
 
 vi.mock("@/modules/textGeneration", () => ({
@@ -118,5 +141,31 @@ describe("AiResponseContent", () => {
     expect(
       screen.getByRole("button", { name: "Regenerate response" }),
     ).toBeInTheDocument();
+  });
+
+  it("keeps copying the raw response and adds the export next to it", () => {
+    renderContent("completed");
+
+    expect(buildAnswerMarkdown).toHaveBeenCalledWith(
+      expect.objectContaining({ answer: "Hello world" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Copy response" }),
+    ).toHaveAttribute("data-value", "Hello world");
+    expect(
+      screen.getByRole("button", { name: "Copy as Markdown" }),
+    ).toHaveAttribute("data-value", "exported markdown");
+  });
+
+  it("downloads the built markdown under a name from the query", async () => {
+    renderContent("completed");
+
+    await userEvent.click(screen.getByRole("button", { name: "Download .md" }));
+
+    expect(downloadAnswerMarkdown).toHaveBeenCalledWith(
+      "exported markdown",
+      "mercury.md",
+    );
+    expect(buildAnswerFileName).toHaveBeenCalledWith("");
   });
 });

@@ -12,6 +12,7 @@ import {
 import {
   IconArrowsMaximize,
   IconArrowsMinimize,
+  IconDownload,
   IconHandStop,
   IconInfoCircle,
   IconRefresh,
@@ -19,7 +20,17 @@ import {
 } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import { type ReactNode, useMemo } from "react";
-import { settingsPubSub, textToSpeechStatePubSub } from "@/modules/pubSub";
+import {
+  buildAnswerFileName,
+  buildAnswerMarkdown,
+  downloadAnswerMarkdown,
+} from "@/modules/answerExport";
+import {
+  getLlmTextSearchResults,
+  getQuery,
+  settingsPubSub,
+  textToSpeechStatePubSub,
+} from "@/modules/pubSub";
 import { interruptSearch, searchAndRespond } from "@/modules/textGeneration";
 import { speak } from "@/modules/textToSpeech";
 import CopyIconButton from "./CopyIconButton";
@@ -36,6 +47,13 @@ export default function AiResponseContent({
   const [textToSpeechState] = usePubSub(textToSpeechStatePubSub);
   const isSpeaking = textToSpeechState === "speaking";
   const isGenerating = textGenerationState === "generating";
+  const query = getQuery();
+  const exportMarkdown = buildAnswerMarkdown({
+    answer: response,
+    sources: getLlmTextSearchResults(),
+    query,
+    date: new Date(),
+  });
 
   const ConditionalScrollArea = useMemo(
     () =>
@@ -142,6 +160,25 @@ export default function AiResponseContent({
               </Tooltip>
             )}
             <CopyIconButton value={response} tooltipLabel="Copy response" />
+            <CopyIconButton
+              value={exportMarkdown}
+              tooltipLabel="Copy as Markdown"
+            />
+            <Tooltip label="Download .md">
+              <ActionIcon
+                aria-label="Download .md"
+                onClick={() =>
+                  downloadAnswerMarkdown(
+                    exportMarkdown,
+                    buildAnswerFileName(query),
+                  )
+                }
+                variant="subtle"
+                color="gray"
+              >
+                <IconDownload size={16} />
+              </ActionIcon>
+            </Tooltip>
           </Group>
         </Group>
       </Card.Section>

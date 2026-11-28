@@ -143,6 +143,7 @@ Need to:
 - `client/modules/pageExcerptWorker.ts` - Tokenizes page bodies off the main thread at the search-to-generation handoff
 - `client/modules/pageExcerptWorkerProtocol.ts` - Message types shared by both sides of the excerpt worker
 - `client/modules/systemPrompt.ts` - System prompt templates
+- `client/modules/answerExport.ts` - Builds the Markdown export of an answer, with a file name taken from the query
 - `client/modules/logEntries.ts` - Application logging with unique IDs
 - `client/modules/appInfo.ts` - Application metadata and version info
 - `client/modules/textToSpeech.ts` - Reads answers aloud: engine selection, fallback, and the playback queue
