@@ -27,6 +27,7 @@ import {
   downloadAnswerMarkdown,
 } from "@/modules/answerExport";
 import {
+  generationRatePubSub,
   getLlmTextSearchResults,
   getQuery,
   settingsPubSub,
@@ -49,6 +50,7 @@ export default function AiResponseContent({
 }) {
   const [settings, setSettings] = usePubSub(settingsPubSub);
   const [textToSpeechState] = usePubSub(textToSpeechStatePubSub);
+  const [generationRate] = usePubSub(generationRatePubSub);
   const isSpeaking = textToSpeechState === "speaking";
   const isGenerating = textGenerationState === "generating";
   const isCompleted = textGenerationState === "completed";
@@ -239,6 +241,11 @@ export default function AiResponseContent({
             </FormattedMarkdown>
           </Box>
         </ConditionalScrollArea>
+        {generationRate && textGenerationState !== "generating" && (
+          <Text size="xs" c="dimmed" px="lg" pb="sm">
+            {generationRate}
+          </Text>
+        )}
         {textGenerationState === "failed" && (
           <Alert
             variant="light"

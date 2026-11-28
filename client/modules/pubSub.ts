@@ -204,6 +204,16 @@ export const updateResponseImmediately = updateResponse.publishNow;
 
 export const [, , getResponse] = responsePubSub;
 
+/**
+ * The generation speed of the answer on screen, already worded for the card
+ * (for example `42 tokens/s`). Nothing is published while an answer is still
+ * generating, and a backend that reports no exact token count publishes
+ * nothing, so a rate only ever appears once it is known for that answer.
+ */
+export const generationRatePubSub = createPubSub<string | undefined>(undefined);
+
+export const [updateGenerationRate] = generationRatePubSub;
+
 export const [updateSearchPromise, , getSearchPromise] = createPubSub<
   Promise<SearchResults>
 >(Promise.resolve({ textResults: [], imageResults: [] }));

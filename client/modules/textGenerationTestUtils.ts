@@ -105,6 +105,7 @@ export function pubSubMock(getSettings: () => unknown) {
     listenToSettingsChanges: vi.fn(() => vi.fn()),
     updateChatMessages: vi.fn(),
     updateConversationSummary: vi.fn(),
+    updateGenerationRate: vi.fn(),
     updateImageSearchResults: vi.fn(),
     updateImageSearchState: vi.fn(),
     updateLlmTextSearchResults: vi.fn(),

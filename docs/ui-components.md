@@ -72,6 +72,7 @@ All state channels are defined in `client/modules/pubSub.ts`:
 | ------------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
 | `queryPubSub`                  | `string`                                               | Current search query                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | SearchForm, SearchButton                |
 | `responsePubSub`               | `string`                                               | AI response content (throttled: 12/sec)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | AiResponseSection                       |
+| `generationRatePubSub`         | `string \| undefined`                                  | Generation speed of the finished answer, for example `42 tokens/s`; nothing arrives while it is generating, and none at all when the token count is not known exactly                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | AiResponseContent                       |
 | `textToSpeechStatePubSub`      | `TextToSpeechState`                                    | Whether an answer is being read aloud: `"idle" \| "speaking"`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | AiResponseContent                       |
 | `reasoningContentPubSub`       | `string`                                               | AI reasoning/thinking content (throttled: 12/sec)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | AiResponseSection                       |
 | `settingsPubSub`               | `Settings`                                             | Application settings                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | SettingsForm, various components        |
@@ -272,7 +273,7 @@ function SearchResultsSection() {
 
 **PubSub:**
 
-- **Subscribes:** `responsePubSub`, `textGenerationStatePubSub`, `chatMessagesPubSub`
+- **Subscribes:** `responsePubSub`, `textGenerationStatePubSub`, `chatMessagesPubSub`, `generationRatePubSub`
 
 **State Machine (`textGenerationStatePubSub`):**
 
@@ -287,6 +288,21 @@ function SearchResultsSection() {
 | `interrupted`                    | Generation manually stopped by user        | Response retained, with a yellow "Interrupted" badge  |
 | `completed`                      | Full response received                     | Complete response with chat interface                 |
 | `failed`                         | Error occurred                             | Error message with retry option                       |
+
+**Generation speed line:**
+
+Once an answer finishes, `AiResponseContent` shows a muted line with how fast it
+streamed in, for example `42 tokens/s`, read from `generationRatePubSub`.
+`client/modules/generationRate.ts` publishes a rate only when it is exact. The
+browser model's last chunk carries llama.cpp's own measured decode speed
+(`timings.predicted_per_second`), with model load and the prompt left out. An
+OpenAI-compatible API shows one only when its backend reports the token count
+(the request asks for it with `stream_options.include_usage`); the clock then
+runs from the first streamed text to the last, and when the server streamed no
+reasoning only its text tokens count. The Internal API and AI Horde show none:
+the `/inference` proxy forwards no token count, and AI Horde delivers the whole
+answer on one poll. A new search and a history restore clear it, so an answer
+never wears the previous one's speed.
 
 **Reasoning Content Extraction:**
 

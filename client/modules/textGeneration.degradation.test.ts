@@ -34,6 +34,7 @@ const harness = vi.hoisted(() => {
   };
 });
 
+import { updateGenerationRate } from "./pubSub";
 import {
   contentFrame,
   historyMock,
@@ -57,6 +58,7 @@ vi.mock("./pubSub", () => ({
   listenToTextGenerationStateChanges: vi.fn(() => vi.fn()),
   updateChatMessages: vi.fn(),
   updateConversationSummary: vi.fn(),
+  updateGenerationRate: vi.fn(),
   updateImageSearchResults: vi.fn((results: unknown[]) => {
     harness.state.imageSearchResults = results;
   }),
@@ -517,6 +519,13 @@ describe("search degradation", () => {
     await harness.state.searchPromise;
 
     expect(harness.state.suppressNextFollowUp).toBe(false);
+  });
+
+  it("clears the speed line so a new search never shows the old answer's", async () => {
+    await searchAndRespond();
+    await harness.state.searchPromise;
+
+    expect(updateGenerationRate).toHaveBeenCalledWith(undefined);
   });
 });
 

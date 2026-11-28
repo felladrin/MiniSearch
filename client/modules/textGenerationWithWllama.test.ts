@@ -3,6 +3,7 @@ import { getConfig } from "./config";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
+  updateGenerationRate,
   updateModelLoadingProgress,
   updateModelSizeInMegabytes,
   updateSettings,
@@ -26,6 +27,7 @@ vi.mock("./pubSub", () => ({
     reasoningEndMarker: "</think>",
   }),
   getTextGenerationState: vi.fn().mockReturnValue("generating"),
+  updateGenerationRate: vi.fn(),
   updateModelLoadingProgress: vi.fn(),
   updateModelSizeInMegabytes: vi.fn(),
   updateResponse: vi.fn(),
@@ -325,6 +327,91 @@ describe("stop strings", () => {
     const { result } = await streamWithStopModel(["no stop ", "here"]);
 
     expect(result).toBe("no stop here");
+  });
+});
+
+describe("generation speed", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * Streams `chunks`, each one arriving at its own moment on a clock the test
+   * owns, and answers with the speed the run published.
+   */
+  async function streamOnClock(
+    chunks: {
+      delta: Record<string, string>;
+      at: number;
+      timings?: { predicted_per_second: number };
+    }[],
+    signal?: AbortSignal,
+    onChunk?: () => void,
+  ) {
+    let now = 0;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+    vi.mocked(initializeWllama).mockImplementation(
+      async () =>
+        ({
+          createChatCompletion: vi.fn().mockResolvedValue(
+            (async function* () {
+              for (const { delta, at, timings } of chunks) {
+                now = at;
+                yield { choices: [{ delta }], timings };
+                onChunk?.();
+              }
+            })(),
+          ),
+          exit: vi.fn().mockResolvedValue(undefined),
+          // biome-ignore lint/suspicious/noExplicitAny: minimal Wllama stub
+        }) as any,
+    );
+
+    try {
+      await generateTextWithWllama(signal);
+      return vi.mocked(updateGenerationRate).mock.calls.at(-1)?.[0];
+    } finally {
+      nowSpy.mockRestore();
+    }
+  }
+
+  it("publishes llama.cpp's own decode speed from the last chunk", async () => {
+    const rate = await streamOnClock([
+      { delta: { content: "The" }, at: 0 },
+      { delta: { reasoning_content: "hmm" }, at: 1000 },
+      { delta: { content: "answer" }, at: 2000 },
+      // The last chunk carries no text, only the timings.
+      { delta: {}, at: 4000, timings: { predicted_per_second: 23.77 } },
+    ]);
+
+    expect(rate).toBe("23.8 tokens/s");
+  });
+
+  it("publishes nothing when the engine reports no timings", async () => {
+    const rate = await streamOnClock([
+      { delta: { content: "The" }, at: 0 },
+      { delta: { content: "answer" }, at: 2000 },
+    ]);
+
+    // A chunk is not always one token, so counting chunks would be a guess.
+    expect(rate).toBeUndefined();
+  });
+
+  it("publishes nothing when the answer is interrupted", async () => {
+    const controller = new AbortController();
+
+    await expect(
+      streamOnClock(
+        [
+          { delta: { content: "an" }, at: 0 },
+          { delta: { content: "swer" }, at: 1000 },
+        ],
+        controller.signal,
+        () => controller.abort(),
+      ),
+    ).rejects.toThrow("Chat generation interrupted");
+
+    expect(updateGenerationRate).not.toHaveBeenCalled();
   });
 });
 
