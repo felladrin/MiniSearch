@@ -893,6 +893,18 @@ describe("unit converter answers", () => {
       ).rejects.toThrow("Unresponsive engines");
     };
 
+    /** A breaker the text search has opened and whose reset time has passed. */
+    const halfOpenBreaker = async () => {
+      const breaker = new CircuitBreaker({
+        failureThreshold: 1,
+        resetTimeout: 1000,
+        successThreshold: 1,
+      });
+      await failSearch(breaker);
+      await vi.advanceTimersByTimeAsync(1001);
+      return breaker;
+    };
+
     it("does not count a conversion the engines could not back as a success", async () => {
       const breaker = new CircuitBreaker({
         failureThreshold: 3,
@@ -914,13 +926,7 @@ describe("unit converter answers", () => {
     it("does not close a half-open circuit on a conversion alone", async () => {
       vi.useFakeTimers();
       try {
-        const breaker = new CircuitBreaker({
-          failureThreshold: 1,
-          resetTimeout: 1000,
-          successThreshold: 1,
-        });
-        await failSearch(breaker);
-        await vi.advanceTimersByTimeAsync(1001);
+        const breaker = await halfOpenBreaker();
         expect(breaker.getState("searxng:text")).toBe("HALF_OPEN");
 
         fetchMock.mockResolvedValue(suspendedWithConversion());
@@ -935,13 +941,7 @@ describe("unit converter answers", () => {
     it("still counts a search with web results as a success", async () => {
       vi.useFakeTimers();
       try {
-        const breaker = new CircuitBreaker({
-          failureThreshold: 1,
-          resetTimeout: 1000,
-          successThreshold: 1,
-        });
-        await failSearch(breaker);
-        await vi.advanceTimersByTimeAsync(1001);
+        const breaker = await halfOpenBreaker();
 
         fetchMock.mockResolvedValue(
           searxngAnswerResponse({

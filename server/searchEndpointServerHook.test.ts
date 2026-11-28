@@ -1025,6 +1025,18 @@ describe("searchEndpointServerHook", () => {
   describe("unit conversion header", () => {
     const conversion = "16.4041994751 ft";
 
+    /** A 200 with no results and the conversion in its header. */
+    function expectConversionOnly(
+      response: Awaited<ReturnType<typeof sendSearch>>,
+    ) {
+      expect(response.statusCode).toBe(200);
+      expect(response.end).toHaveBeenCalledWith(JSON.stringify([]));
+      expect(response.setHeader).toHaveBeenCalledWith(
+        "X-Search-Unit-Conversion",
+        encodeURIComponent(conversion),
+      );
+    }
+
     it("carries the conversion the plugin worked out, beside unchanged results", async () => {
       vi.mocked(fetchSearXNG).mockResolvedValue({
         results: [["Title", "Snippet", "https://example.com"]],
@@ -1067,12 +1079,7 @@ describe("searchEndpointServerHook", () => {
 
       const response = await sendSearch("/search/text?q=5+m+to+ft&token=abc");
 
-      expect(response.statusCode).toBe(200);
-      expect(response.end).toHaveBeenCalledWith(JSON.stringify([]));
-      expect(response.setHeader).toHaveBeenCalledWith(
-        "X-Search-Unit-Conversion",
-        encodeURIComponent(conversion),
-      );
+      expectConversionOnly(response);
     });
 
     describe("when only the plugin answered and the engines are down", () => {
@@ -1149,12 +1156,7 @@ describe("searchEndpointServerHook", () => {
         const response = await sendSearch("/search/text?q=5+m+to+ft&token=abc");
 
         expect(incrementSearchesFailedOnFallback).toHaveBeenCalledTimes(1);
-        expect(response.statusCode).toBe(200);
-        expect(response.end).toHaveBeenCalledWith(JSON.stringify([]));
-        expect(response.setHeader).toHaveBeenCalledWith(
-          "X-Search-Unit-Conversion",
-          encodeURIComponent(conversion),
-        );
+        expectConversionOnly(response);
       });
 
       it("does not ask a fallback that is switched off", async () => {
