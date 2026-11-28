@@ -1,4 +1,9 @@
 import {
+  resolveSearchLanguage,
+  SEARCH_LANGUAGE_APPLIED_HEADER,
+  type SearchLanguage,
+} from "@shared/searchLanguage";
+import {
   SEARCH_TIME_RANGE_APPLIED_HEADER,
   type SearchTimeRange,
 } from "@shared/searchTimeRange";
@@ -125,12 +130,14 @@ interface SearchOperations<T extends SearchResults> {
     query: string,
     limit?: number,
     timeRange?: SearchTimeRange,
+    language?: string,
   ) => Promise<string>;
   performSearch: (
     endpoint: "text" | "images",
     query: string,
     limit?: number,
     timeRange?: SearchTimeRange,
+    language?: string,
   ) => Promise<SearchFetch<T>>;
 }
 
@@ -139,6 +146,12 @@ interface SearchFetch<T> {
   results: T;
   /** The server answered from a source that could not apply the time range. */
   timeFilterNotApplied: boolean;
+  /**
+   * The server answered from a source that could not apply the language. Left
+   * out rather than set false, so a search that applied one reads back as it
+   * did before the setting existed, in the cache and in the outcome alike.
+   */
+  languageNotApplied?: boolean;
 }
 
 interface CachedSearchOutcome<T> {
@@ -150,18 +163,34 @@ interface CachedSearchOutcome<T> {
    * existed reads back as "applied" instead of failing to say anything.
    */
   timeFilterNotApplied?: boolean;
+  /**
+   * The same, for a search that asked for a language, and left out the same way
+   * when the language was applied.
+   */
+  languageNotApplied?: boolean;
 }
 
 async function executeCachedSearch<T extends SearchResults>(
   query: string,
   limit: number | undefined,
   timeRange: SearchTimeRange | undefined,
+  language: SearchLanguage | undefined,
   context: SearchExecutionConfig,
   operations: SearchOperations<T>,
 ): Promise<CachedSearchOutcome<T>> {
   await db.cleanExpiredCache(context.storeName);
 
-  const key = await operations.hashQuery(query, limit, timeRange);
+  // Resolved here, at search time, so the cache key and the request agree on
+  // the locale actually asked for, and "Browser language" keeps following the
+  // browser when its locale changes.
+  const requestLanguage = resolveSearchLanguage(language, navigator.language);
+
+  const key = await operations.hashQuery(
+    query,
+    limit,
+    timeRange,
+    requestLanguage,
+  );
   const cachedData = await db.getCachedResult<T>(context.storeName, key);
 
   if (cachedData?.fresh) {
@@ -177,6 +206,7 @@ async function executeCachedSearch<T extends SearchResults>(
       results: cachedData.results,
       stale: false,
       timeFilterNotApplied: cachedData.timeFilterNotApplied,
+      languageNotApplied: cachedData.languageNotApplied,
     };
   }
 
@@ -184,21 +214,29 @@ async function executeCachedSearch<T extends SearchResults>(
   cacheMetrics.incrementTotalOperations();
 
   try {
-    const { results, timeFilterNotApplied } = await operations.performSearch(
-      context.endpoint,
-      query,
-      limit,
-      timeRange,
-    );
+    const { results, timeFilterNotApplied, languageNotApplied } =
+      await operations.performSearch(
+        context.endpoint,
+        query,
+        limit,
+        timeRange,
+        requestLanguage,
+      );
 
-    await db.cacheResult(context.storeName, key, results, timeFilterNotApplied);
+    await db.cacheResult(
+      context.storeName,
+      key,
+      results,
+      timeFilterNotApplied,
+      languageNotApplied,
+    );
     logAndMaybeResetMetrics();
 
     addLogEntry(
       `${context.logLabel}: Fetched ${results.length} results from the API`,
     );
 
-    return { results, stale: false, timeFilterNotApplied };
+    return { results, stale: false, timeFilterNotApplied, languageNotApplied };
   } catch (error) {
     if (
       cachedData &&
@@ -215,6 +253,7 @@ async function executeCachedSearch<T extends SearchResults>(
         results: cachedData.results,
         stale: true,
         timeFilterNotApplied: cachedData.timeFilterNotApplied,
+        languageNotApplied: cachedData.languageNotApplied,
       };
     }
     throw error;
@@ -225,7 +264,12 @@ async function executeCachedSearch<T extends SearchResults>(
 const UNAUTHORIZED_STATUS = 401;
 
 type SearchAttempt<T> =
-  | { ok: true; results: T; timeFilterNotApplied: boolean }
+  | {
+      ok: true;
+      results: T;
+      timeFilterNotApplied: boolean;
+      languageNotApplied?: boolean;
+    }
   | { ok: false; status: number };
 
 async function buildSearchUrl(
@@ -233,16 +277,19 @@ async function buildSearchUrl(
   query: string,
   limit: number | undefined,
   timeRange: SearchTimeRange | undefined,
+  language: string | undefined,
 ): Promise<URL> {
   const searchUrl = new URL(`/search/${endpoint}`, self.location.origin);
   searchUrl.searchParams.set("q", query);
   searchUrl.searchParams.set("token", await getSearchTokenHash());
   if (limit) searchUrl.searchParams.set("limit", limit.toString());
   // Anytime sends no parameter at all, so an unfiltered search asks the server
-  // for exactly what it asked before the filter existed.
+  // for exactly what it asked before the filter existed. A search with no
+  // language does the same, which keeps SearXNG on its own default.
   if (timeRange && timeRange !== "any") {
     searchUrl.searchParams.set("time_range", timeRange);
   }
+  if (language) searchUrl.searchParams.set("language", language);
   return searchUrl;
 }
 
@@ -298,6 +345,10 @@ async function attemptSearch<T>(searchUrl: URL): Promise<SearchAttempt<T>> {
       results: (await response.json()) as T,
       timeFilterNotApplied:
         response.headers.get(SEARCH_TIME_RANGE_APPLIED_HEADER) === "false",
+      languageNotApplied:
+        response.headers.get(SEARCH_LANGUAGE_APPLIED_HEADER) === "false"
+          ? true
+          : undefined,
     };
   } catch (error) {
     throw labelSearchFailure(error, controller.signal);
@@ -314,6 +365,8 @@ interface SearchCacheEntry {
    * time filter was not applied. Absent on every entry written before it.
    */
   timeFilterNotApplied?: boolean;
+  /** The same, for a search that asked for a language. */
+  languageNotApplied?: boolean;
 }
 
 interface TextSearchCache extends SearchCacheEntry {
@@ -426,6 +479,7 @@ class SearchCacheDatabase extends Dexie {
     fresh: boolean;
     timestamp: number;
     timeFilterNotApplied?: boolean;
+    languageNotApplied?: boolean;
   } | null> {
     if (!cacheConfig.enabled) return null;
 
@@ -436,6 +490,7 @@ class SearchCacheDatabase extends Dexie {
           results: T;
           timestamp: number;
           timeFilterNotApplied?: boolean;
+          languageNotApplied?: boolean;
         },
         string
       >;
@@ -449,6 +504,7 @@ class SearchCacheDatabase extends Dexie {
         fresh,
         timestamp: cachedItem.timestamp,
         timeFilterNotApplied: cachedItem.timeFilterNotApplied,
+        languageNotApplied: cachedItem.languageNotApplied,
       };
     } catch (error) {
       addLogEntry(
@@ -463,6 +519,7 @@ class SearchCacheDatabase extends Dexie {
     key: string,
     results: T,
     timeFilterNotApplied?: boolean,
+    languageNotApplied?: boolean,
   ): Promise<void> {
     if (!cacheConfig.enabled) return;
 
@@ -473,6 +530,7 @@ class SearchCacheDatabase extends Dexie {
           results: T;
           timestamp: number;
           timeFilterNotApplied?: boolean;
+          languageNotApplied?: boolean;
         },
         string
       >;
@@ -481,6 +539,7 @@ class SearchCacheDatabase extends Dexie {
         results,
         timestamp: Date.now(),
         timeFilterNotApplied,
+        languageNotApplied,
       });
 
       const cacheWrites = this._cacheWriteCount;
@@ -511,18 +570,21 @@ db.ensureIntegrity().catch((error) => {
 
 const searchService = {
   /**
-   * The limit and the time range are part of the key, so neither a different
-   * limit nor a different period can read another one's results. Anytime adds
-   * nothing, so an unfiltered search keeps reading the entries cached before
-   * the filter existed.
+   * The limit, the time range and the language are part of the key, so neither
+   * a different limit nor a different period nor a different language can read
+   * another one's results. A search with no language and an Anytime search add
+   * nothing, so they keep reading the entries cached before those settings
+   * existed.
    */
   async hashQuery(
     query: string,
     limit?: number,
     timeRange?: SearchTimeRange,
+    language?: string,
   ): Promise<string> {
     let input = limit !== undefined ? `${query}::limit=${limit}` : query;
     if (timeRange && timeRange !== "any") input += `::time_range=${timeRange}`;
+    if (language) input += `::language=${language}`;
     const hash = await sha256(input);
     // 16 hex chars are enough for a cache key.
     return hash.slice(0, 16);
@@ -533,6 +595,7 @@ const searchService = {
     query: string,
     limit?: number,
     timeRange?: SearchTimeRange,
+    language?: string,
   ): Promise<SearchFetch<T>> {
     if (!["text", "images"].includes(endpoint)) {
       throw new Error(
@@ -551,7 +614,7 @@ const searchService = {
     }
 
     let attempt = await attemptSearch<T>(
-      await buildSearchUrl(endpoint, query, limit, timeRange),
+      await buildSearchUrl(endpoint, query, limit, timeRange, language),
     );
 
     // Every server process mints its own search token, so a restart leaves
@@ -565,7 +628,7 @@ const searchService = {
       );
       invalidateConfig();
       attempt = await attemptSearch<T>(
-        await buildSearchUrl(endpoint, query, limit, timeRange),
+        await buildSearchUrl(endpoint, query, limit, timeRange, language),
       );
     }
 
@@ -576,6 +639,7 @@ const searchService = {
     return {
       results: attempt.results,
       timeFilterNotApplied: attempt.timeFilterNotApplied,
+      languageNotApplied: attempt.languageNotApplied,
     };
   },
 
@@ -583,12 +647,14 @@ const searchService = {
     query: string,
     limit?: number,
     timeRange?: SearchTimeRange,
+    language?: SearchLanguage,
   ): Promise<CachedSearchOutcome<TextSearchResults>> {
     try {
       return await executeCachedSearch<TextSearchResults>(
         query,
         limit,
         timeRange,
+        language,
         {
           storeName: "textSearchHistory",
           endpoint: "text",
@@ -615,12 +681,14 @@ const searchService = {
     query: string,
     limit?: number,
     timeRange?: SearchTimeRange,
+    language?: SearchLanguage,
   ): Promise<CachedSearchOutcome<ImageSearchResults>> {
     try {
       return await executeCachedSearch<ImageSearchResults>(
         query,
         limit,
         timeRange,
+        language,
         {
           storeName: "imageSearchHistory",
           endpoint: "images",

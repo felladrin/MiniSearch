@@ -2,6 +2,7 @@ import { MantineProvider } from "@mantine/core";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  textSearchLanguagePubSub,
   textSearchResultsPubSub,
   textSearchStalePubSub,
   textSearchStatePubSub,
@@ -24,12 +25,15 @@ const [setTextSearchState] = textSearchStatePubSub;
 const [setTextSearchResults] = textSearchResultsPubSub;
 const [setTextSearchStale] = textSearchStalePubSub;
 const [setTextSearchTimeFilterNotApplied] = textSearchTimeFilterPubSub;
+const [setTextSearchLanguageNotApplied] = textSearchLanguagePubSub;
 
 const results: TextSearchResultList = [
   ["A result", "Its snippet", "https://example.com"],
 ];
 
 const NOTE = "Time filter not applied to these results";
+const LANGUAGE_NOTE = "Language not applied to these results";
+const BOTH_NOTE = "Time filter and language not applied to these results";
 
 function renderTextSearchResults() {
   return render(
@@ -52,6 +56,7 @@ afterEach(() => {
     setTextSearchResults([]);
     setTextSearchStale(false);
     setTextSearchTimeFilterNotApplied(false);
+    setTextSearchLanguageNotApplied(false);
   });
 });
 
@@ -78,5 +83,26 @@ describe("TextSearchResults", () => {
     renderTextSearchResults();
 
     expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+
+  it("says when the results carry no language although one was asked for", () => {
+    act(() => setTextSearchLanguageNotApplied(true));
+    renderTextSearchResults();
+
+    expect(screen.getByText(LANGUAGE_NOTE)).toBeInTheDocument();
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+  });
+
+  it("names both filters when neither was applied", () => {
+    act(() => {
+      setTextSearchTimeFilterNotApplied(true);
+      setTextSearchLanguageNotApplied(true);
+    });
+    renderTextSearchResults();
+
+    expect(screen.getByText(BOTH_NOTE)).toBeInTheDocument();
+    // One note for both, not two notes for the same outage.
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    expect(screen.queryByText(LANGUAGE_NOTE)).not.toBeInTheDocument();
   });
 });

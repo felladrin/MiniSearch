@@ -15,10 +15,12 @@ vi.mock("./history", () => ({
 vi.mock("./pubSub", () => ({
   getImageSearchResults: vi.fn(() => []),
   getPageContents: vi.fn(() => ({})),
+  getTextSearchLanguageNotApplied: vi.fn(() => false),
   getTextSearchTimeFilterNotApplied: vi.fn(() => false),
   updateImageSearchResults: vi.fn(),
   updateLlmTextSearchResults: vi.fn(),
   updatePageContents: vi.fn(),
+  updateTextSearchLanguageNotApplied: vi.fn(),
   updateTextSearchResults: vi.fn(),
   updateTextSearchStale: vi.fn(),
   updateTextSearchTimeFilterNotApplied: vi.fn(),
@@ -52,11 +54,13 @@ import { fetchPageContents } from "./pageContent";
 import {
   getImageSearchResults,
   getPageContents,
+  getTextSearchLanguageNotApplied,
   getTextSearchTimeFilterNotApplied,
   updateImageSearchResults,
   updateLlmTextSearchResults,
   updatePageContents,
   updateTextSearchResults,
+  updateTextSearchLanguageNotApplied,
   updateTextSearchStale,
   updateTextSearchTimeFilterNotApplied,
 } from "./pubSub";
@@ -99,6 +103,19 @@ describe("refreshTextSearchResults", () => {
       expect(updateTextSearchTimeFilterNotApplied).toHaveBeenCalledWith(note);
     },
   );
+
+  it("keeps the language note on when a follow-up applied the language", async () => {
+    vi.mocked(getTextSearchLanguageNotApplied).mockReturnValueOnce(true);
+    mockSearchText.mockResolvedValueOnce({
+      results: [["New", "snippet", "https://new.com"]],
+      stale: false,
+      languageNotApplied: false,
+    });
+
+    await refreshTextSearchResults("query", 10, [], undefined, "any", "pt-BR");
+
+    expect(updateTextSearchLanguageNotApplied).toHaveBeenCalledWith(true);
+  });
 
   it("deduplicates by URL and appends fresh results", async () => {
     const existing: TextSearchResults = [
@@ -408,7 +425,7 @@ describe("runFollowUpSearch", () => {
       await runFollowUpSearch(
         [{ role: "user", content: "what about next month" }],
         "what about next month",
-        makeSettings(),
+        makeSettings({ searchLanguage: "pt-BR" }),
         [],
         [],
       );
@@ -417,8 +434,18 @@ describe("runFollowUpSearch", () => {
     }
 
     const anchoredQuery = "new series on disney plus next month December 2026";
-    expect(mockSearchText).toHaveBeenCalledWith(anchoredQuery, 10, "any");
-    expect(mockSearchImages).toHaveBeenCalledWith(anchoredQuery, 10, "any");
+    expect(mockSearchText).toHaveBeenCalledWith(
+      anchoredQuery,
+      10,
+      "any",
+      "pt-BR",
+    );
+    expect(mockSearchImages).toHaveBeenCalledWith(
+      anchoredQuery,
+      10,
+      "any",
+      "pt-BR",
+    );
   });
 
   it("replaces the year the model wrote with the one the question means", async () => {
@@ -440,7 +467,7 @@ describe("runFollowUpSearch", () => {
           { role: "user", content: "who won it last year" },
         ],
         "who won it last year",
-        makeSettings(),
+        makeSettings({ searchLanguage: "pt-BR" }),
         [],
         [],
       );
@@ -452,6 +479,7 @@ describe("runFollowUpSearch", () => {
       "who won world series 2025",
       10,
       "any",
+      "pt-BR",
     );
   });
 

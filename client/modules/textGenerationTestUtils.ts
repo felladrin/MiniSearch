@@ -114,6 +114,7 @@ export function pubSubMock(getSettings: () => unknown) {
     updateSearchPromise: vi.fn(),
     updateSuppressNextFollowUp: vi.fn(),
     updateTextGenerationState: vi.fn(),
+    updateTextSearchLanguageNotApplied: vi.fn(),
     updateTextSearchResults: vi.fn(),
     updateTextSearchStale: vi.fn(),
     updateTextSearchState: vi.fn(),

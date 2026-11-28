@@ -143,6 +143,16 @@ describe("numeric settings never hold an empty string", () => {
     expect(getSettings().historyRetentionDays).toBeGreaterThan(0);
   });
 
+  it("turns an unknown stored search language into the browser's", async () => {
+    const { defaultSettings } = await import("./settings");
+    localStorage.setItem(
+      "settings",
+      JSON.stringify({ ...defaultSettings, searchLanguage: "klingon" }),
+    );
+    const { getSettings } = await import("./pubSub");
+    expect(getSettings().searchLanguage).toBe("browser");
+  });
+
   it("turns an unknown stored time range into Anytime", async () => {
     const { defaultSettings } = await import("./settings");
     localStorage.setItem(

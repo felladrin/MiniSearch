@@ -28,6 +28,7 @@ import {
   updateResponseImmediately,
   updateSuppressNextFollowUp,
   updateTextGenerationState,
+  updateTextSearchLanguageNotApplied,
   updateTextSearchResults,
   updateTextSearchStale,
   updateTextSearchState,
@@ -89,6 +90,7 @@ export function useHistoryRestore(
         // The stored results carry no record of the filter they were found
         // with, so the note belongs to the search that is being replaced.
         updateTextSearchTimeFilterNotApplied(false);
+        updateTextSearchLanguageNotApplied(false);
         const results = hasTextResults(entry)
           ? getResultsFromEntry(entry)
           : null;

@@ -1,4 +1,5 @@
 import { normalizeFollowUpDates } from "@shared/relativeDates";
+import type { SearchLanguage } from "@shared/searchLanguage";
 import type { SearchTimeRange } from "@shared/searchTimeRange";
 import {
   getCurrentSearchRunId,
@@ -18,6 +19,8 @@ import {
   updateImageSearchResults,
   updateLlmTextSearchResults,
   updatePageContents,
+  getTextSearchLanguageNotApplied,
+  updateTextSearchLanguageNotApplied,
   updateTextSearchResults,
   updateTextSearchStale,
   updateTextSearchTimeFilterNotApplied,
@@ -60,6 +63,7 @@ export async function refreshTextSearchResults(
   existingResults: TextSearchResults,
   searchRunId = getCurrentSearchRunId(),
   timeRange?: SearchTimeRange,
+  language?: SearchLanguage,
 ): Promise<TextSearchResults> {
   const invocation = ++textRefreshInvocation;
   latestTextRefreshByRunId.set(searchRunId, invocation);
@@ -75,7 +79,8 @@ export async function refreshTextSearchResults(
     results: freshResults,
     stale,
     timeFilterNotApplied,
-  } = await searchText(searchQuery, resultsLimit, timeRange);
+    languageNotApplied,
+  } = await searchText(searchQuery, resultsLimit, timeRange, language);
 
   if (freshResults.length === 0) return [];
 
@@ -87,9 +92,13 @@ export async function refreshTextSearchResults(
   if (isCurrent()) {
     updateTextSearchStale(stale);
     // A follow-up adds its results below the ones on screen, so it can add
-    // the note but never take it away from results that are still there.
+    // a "not applied" note but never take one away from results that are
+    // still there.
     updateTextSearchTimeFilterNotApplied(
       getTextSearchTimeFilterNotApplied() || Boolean(timeFilterNotApplied),
+    );
+    updateTextSearchLanguageNotApplied(
+      getTextSearchLanguageNotApplied() || Boolean(languageNotApplied),
     );
     updateLlmTextSearchResults(llmResults);
   }
@@ -130,6 +139,7 @@ export async function refreshImageSearchResults(
   existingResults: ImageSearchResults,
   searchRunId = getCurrentSearchRunId(),
   timeRange?: SearchTimeRange,
+  language?: SearchLanguage,
 ): Promise<void> {
   // No newest-refresh check, unlike text: image refreshes merge into the list
   // on screen and into history, so an older one landing after a newer one
@@ -142,6 +152,7 @@ export async function refreshImageSearchResults(
     searchQuery,
     resultsLimit,
     timeRange,
+    language,
   );
 
   if (imageResults.length === 0) return;
@@ -273,6 +284,7 @@ export async function runFollowUpSearch(
         existingTextResults,
         searchRunId,
         settings.searchTimeRange,
+        settings.searchLanguage,
       );
 
       if (
@@ -300,6 +312,7 @@ export async function runFollowUpSearch(
       existingImageResults,
       searchRunId,
       settings.searchTimeRange,
+      settings.searchLanguage,
     ).catch((error) => {
       addLogEntry(`Error in follow-up image search: ${error}`);
     });

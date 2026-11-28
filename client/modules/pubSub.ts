@@ -307,6 +307,18 @@ export const [
   getTextSearchTimeFilterNotApplied,
 ] = textSearchTimeFilterPubSub;
 
+/**
+ * Whether the text results on screen came back in no particular language
+ * although one was asked for, which is the same fallback having answered.
+ */
+export const textSearchLanguagePubSub = createPubSub<boolean>(false);
+
+export const [
+  updateTextSearchLanguageNotApplied,
+  ,
+  getTextSearchLanguageNotApplied,
+] = textSearchLanguagePubSub;
+
 const pageContentsPubSub = createPubSub<PageContents>({});
 
 export const [updatePageContents, , getPageContents] = pageContentsPubSub;
