@@ -1,3 +1,4 @@
+import { getImageIdentity } from "@shared/imageIdentity";
 import Dexie, { type Table, type Transaction } from "dexie";
 import { addLogEntry } from "./logEntries";
 import { getSettings } from "./pubSub";
@@ -355,7 +356,7 @@ export async function updateSearchResults(
 }
 
 function storedImageKey(item: ImageResults["items"][number]): string {
-  return item.sourceUrl || item.thumbnail;
+  return getImageIdentity(item.sourceUrl, item.thumbnail, item.url);
 }
 
 /**

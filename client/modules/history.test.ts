@@ -509,6 +509,60 @@ describe("History Module - Dexie CRUD", () => {
       ]);
     });
 
+    it("stores an image once by its source, whatever thumbnail it came with", async () => {
+      const {
+        addSearchToHistory,
+        mergeSearchImageResults,
+        getRecentSearches,
+        getCurrentSearchRunId,
+      } = await import("./history");
+      const report = (host: string) => ({
+        title: "photo",
+        url: `https://${host}.example.com/post`,
+        thumbnail: `https://${host}.example.com/thumbnail.jpg`,
+        sourceUrl: "https://cdn.example.com/photo.jpg",
+      });
+      await addSearchToHistory("photo", {
+        type: "image",
+        items: [report("one")],
+      });
+
+      await mergeSearchImageResults(getCurrentSearchRunId(), {
+        type: "image",
+        items: [report("two")],
+      });
+
+      const [entry] = await getRecentSearches();
+      expect(entry.imageResults?.items).toEqual([report("two")]);
+    });
+
+    it("tells apart two stored images that have neither a source nor a thumbnail", async () => {
+      const {
+        addSearchToHistory,
+        mergeSearchImageResults,
+        getRecentSearches,
+        getCurrentSearchRunId,
+      } = await import("./history");
+      const bare = (host: string) => ({
+        title: host,
+        url: `https://${host}.example.com/page`,
+        thumbnail: "",
+      });
+      await addSearchToHistory("bare", {
+        type: "image",
+        items: [bare("one")],
+      });
+
+      await mergeSearchImageResults(getCurrentSearchRunId(), {
+        type: "image",
+        items: [bare("two")],
+      });
+
+      // Their page is all that tells them apart, so neither replaces the other.
+      const [entry] = await getRecentSearches();
+      expect(entry.imageResults?.items).toEqual([bare("two"), bare("one")]);
+    });
+
     it("writes nothing when no search has the run id", async () => {
       const { mergeSearchImageResults, getRecentSearches } = await import(
         "./history"

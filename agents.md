@@ -132,7 +132,7 @@ Need to:
 - `client/modules/querySuggestions.ts` - Search suggestion UI, stored in IndexedDB
 - `client/modules/relatedSearchQuery.ts` - Generates related search queries
 - `client/modules/searchResultSelection.ts` - Picks the results the answer reads, by score when they carry one
-- `client/modules/imageResultKey.ts` - Identifies an image result by its full-size source, then its thumbnail, since one page can hold several images
+- `client/modules/imageResultKey.ts` - Identifies an image result tuple through `shared/imageIdentity.ts`: its full-size source, then its thumbnail, then its page, since one page can hold several images. The server's dedupe and the history merge use the same function
 - `client/modules/searchAttempts.ts` - The newest search attempt per search run, so a late result can tell it was replaced by a retry that kept the run id
 - `client/modules/followUpQuestions.ts` - Generates follow-up questions via `followUpQuestionPubSub`
 - `client/modules/accessKey.ts` - Validates and stores access keys using argon2id hashing and localStorage
