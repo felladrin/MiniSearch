@@ -1022,6 +1022,25 @@ describe("searchEndpointServerHook", () => {
       expect(response.end).toHaveBeenCalledWith(JSON.stringify(searxngResults));
     });
 
+    it("gives the supplementary search the same time range", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSupplementarySearXNG).mockResolvedValue([]);
+      const handler = getRegisteredHandler();
+
+      await handler(
+        createRequest(`${query}&time_range=day`),
+        createResponse(),
+        vi.fn(),
+      );
+
+      expect(fetchSupplementarySearXNG).toHaveBeenCalledWith(
+        "site:disney.com disney showtimes",
+        30,
+        expect.any(AbortSignal),
+        "day",
+      );
+    });
+
     it("asks a supplementary search for the named site and merges it behind the first result", async () => {
       vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
       vi.mocked(fetchSupplementarySearXNG).mockResolvedValue(laneResults);
@@ -1037,6 +1056,7 @@ describe("searchEndpointServerHook", () => {
         "site:disney.com disney showtimes",
         30,
         expect.any(AbortSignal),
+        undefined,
       );
       expect(response.end).toHaveBeenCalledWith(
         JSON.stringify([searxngResults[0], laneResults[0], searxngResults[1]]),

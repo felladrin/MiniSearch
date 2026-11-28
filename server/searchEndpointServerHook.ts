@@ -2,6 +2,7 @@ import type { PreviewServer, ViteDevServer } from "vite";
 import { z } from "zod";
 import {
   SEARCH_TIME_RANGE_APPLIED_HEADER,
+  type SearxngTimeRange,
   searxngTimeRanges,
 } from "../shared/searchTimeRange.ts";
 import {
@@ -144,6 +145,7 @@ async function officialLaneResults(
   results: TextResult[],
   limit: number,
   remainingMs: number,
+  timeRange: SearxngTimeRange | undefined,
 ): Promise<TextResult[]> {
   const budgetMs = Math.min(
     MAX_OFFICIAL_LANE_TIMEOUT_MS,
@@ -163,6 +165,7 @@ async function officialLaneResults(
       lane.query,
       limit,
       AbortSignal.timeout(budgetMs),
+      timeRange,
     );
 
     const merged = mergeOfficialLaneResults(results, laneResults, lane.domain);
@@ -337,6 +340,7 @@ export function searchEndpointServerHook<
             results,
             limit,
             remainingMs,
+            timeRange,
           );
         }
 

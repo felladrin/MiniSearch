@@ -15,6 +15,7 @@ vi.mock("./history", () => ({
 vi.mock("./pubSub", () => ({
   getImageSearchResults: vi.fn(() => []),
   getPageContents: vi.fn(() => ({})),
+  getTextSearchTimeFilterNotApplied: vi.fn(() => false),
   updateImageSearchResults: vi.fn(),
   updateLlmTextSearchResults: vi.fn(),
   updatePageContents: vi.fn(),
@@ -51,11 +52,13 @@ import { fetchPageContents } from "./pageContent";
 import {
   getImageSearchResults,
   getPageContents,
+  getTextSearchTimeFilterNotApplied,
   updateImageSearchResults,
   updateLlmTextSearchResults,
   updatePageContents,
   updateTextSearchResults,
   updateTextSearchStale,
+  updateTextSearchTimeFilterNotApplied,
 } from "./pubSub";
 import { generateRelatedSearchQuery } from "./relatedSearchQuery";
 import { searchImages, searchText } from "./search";
@@ -77,6 +80,26 @@ const mockUpdatePageContents = vi.mocked(updatePageContents);
 const mockGenerateRelatedSearchQuery = vi.mocked(generateRelatedSearchQuery);
 
 describe("refreshTextSearchResults", () => {
+  it.each([
+    { shown: true, followUp: false, note: true },
+    { shown: false, followUp: true, note: true },
+    { shown: false, followUp: false, note: false },
+  ])(
+    "shows the time-filter note: $note (results on screen without the filter: $shown, follow-up without it: $followUp)",
+    async ({ shown, followUp, note }) => {
+      vi.mocked(getTextSearchTimeFilterNotApplied).mockReturnValueOnce(shown);
+      mockSearchText.mockResolvedValueOnce({
+        results: [["New", "snippet", "https://new.com"]],
+        stale: false,
+        timeFilterNotApplied: followUp,
+      });
+
+      await refreshTextSearchResults("query", 10, [], undefined, "week");
+
+      expect(updateTextSearchTimeFilterNotApplied).toHaveBeenCalledWith(note);
+    },
+  );
+
   it("deduplicates by URL and appends fresh results", async () => {
     const existing: TextSearchResults = [
       ["Existing", "snippet", "https://existing.com"],

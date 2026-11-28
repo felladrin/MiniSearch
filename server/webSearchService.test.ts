@@ -1257,6 +1257,22 @@ describe("fetchSupplementarySearXNG", () => {
     expect(healthBookkeeping()).toEqual(before);
   });
 
+  it("sends the time range it is given", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(JSON.stringify({ results: [] })),
+    );
+
+    await fetchSupplementarySearXNG(
+      "site:example.com test",
+      30,
+      undefined,
+      "week",
+    );
+
+    const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url.searchParams.get("time_range")).toBe("week");
+  });
+
   it("fails on the first error status, without retrying", async () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 500));
     const before = healthBookkeeping();

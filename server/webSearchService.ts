@@ -482,8 +482,11 @@ export async function fetchSupplementarySearXNG(
   query: string,
   limit: number,
   signal?: AbortSignal,
+  timeRange?: SearxngTimeRange,
 ) {
-  const response = await fetch(buildSearchUrl(query, "text"), {
+  // The lane's results are merged into the main ones, so they have to honor
+  // the same time range, or a filtered search shows unfiltered pages.
+  const response = await fetch(buildSearchUrl(query, "text", timeRange), {
     headers: { Accept: "application/json" },
     signal,
   });

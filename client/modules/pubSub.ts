@@ -301,8 +301,11 @@ export const [updateTextSearchStale, , getTextSearchStale] =
  */
 export const textSearchTimeFilterPubSub = createPubSub<boolean>(false);
 
-export const [updateTextSearchTimeFilterNotApplied] =
-  textSearchTimeFilterPubSub;
+export const [
+  updateTextSearchTimeFilterNotApplied,
+  ,
+  getTextSearchTimeFilterNotApplied,
+] = textSearchTimeFilterPubSub;
 
 const pageContentsPubSub = createPubSub<PageContents>({});
 

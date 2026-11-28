@@ -2,7 +2,10 @@ import {
   CITATION_EXAMPLE,
   DEFAULT_SYSTEM_PROMPT,
 } from "@shared/defaultSystemPrompt";
-import type { SearchTimeRange } from "@shared/searchTimeRange";
+import {
+  type SearchTimeRange,
+  searchTimeRangeOptions,
+} from "@shared/searchTimeRange";
 import {
   DEFAULT_INFERENCE_TYPE,
   DEFAULT_WLLAMA_GPU_MODEL_ID,
@@ -101,7 +104,9 @@ export const defaultSettings = {
  * than a finite number replaced by its default. A cleared Mantine NumberInput
  * emits `""`, which `??` does not catch and `> 0` reads as false, so it would
  * otherwise reach consumers as a `max_tokens` of `""` or a retention that
- * silently stops cleanup. Keys whose default is not a number are left alone.
+ * silently stops cleanup. Keys whose default is not a number are left alone,
+ * except the time range: an unknown one (hand-edited, or renamed in a later
+ * version) would make the server refuse every search, so it becomes Anytime.
  */
 export function coerceNumericSettings(
   settings: typeof defaultSettings,
@@ -116,6 +121,13 @@ export function coerceNumericSettings(
     if (typeof value !== "number" || !Number.isFinite(value)) {
       coerced[key] = fallback;
     }
+  }
+  if (
+    !searchTimeRangeOptions.some(
+      ({ value }) => value === coerced.searchTimeRange,
+    )
+  ) {
+    coerced.searchTimeRange = defaultSettings.searchTimeRange;
   }
   return coerced as typeof defaultSettings;
 }

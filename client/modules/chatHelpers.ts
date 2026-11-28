@@ -14,6 +14,7 @@ import { fetchPageContents } from "./pageContent";
 import {
   getImageSearchResults,
   getPageContents,
+  getTextSearchTimeFilterNotApplied,
   updateImageSearchResults,
   updateLlmTextSearchResults,
   updatePageContents,
@@ -85,7 +86,11 @@ export async function refreshTextSearchResults(
 
   if (isCurrent()) {
     updateTextSearchStale(stale);
-    updateTextSearchTimeFilterNotApplied(Boolean(timeFilterNotApplied));
+    // A follow-up adds its results below the ones on screen, so it can add
+    // the note but never take it away from results that are still there.
+    updateTextSearchTimeFilterNotApplied(
+      getTextSearchTimeFilterNotApplied() || Boolean(timeFilterNotApplied),
+    );
     updateLlmTextSearchResults(llmResults);
   }
 
