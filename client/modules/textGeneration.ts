@@ -29,6 +29,7 @@ import {
   updateSearchPromise,
   updateSuppressNextFollowUp,
   updateTextGenerationState,
+  updateTextSearchLanguageNotApplied,
   updateTextSearchResults,
   updateTextSearchStale,
   updateTextSearchState,
@@ -363,6 +364,8 @@ export async function searchAndRespond() {
   updateTextSearchStale(false);
 
   updateTextSearchTimeFilterNotApplied(false);
+
+  updateTextSearchLanguageNotApplied(false);
 
   updateLlmTextSearchResults([]);
 
@@ -752,16 +755,19 @@ async function startTextSearch(query: string, invocation: number) {
         results: textResults,
         stale,
         timeFilterNotApplied,
+        languageNotApplied,
       } = searchQuery
         ? await searchText(
             searchQuery,
             getSettings().searchResultsLimit,
             getSettings().searchTimeRange,
+            getSettings().searchLanguage,
           )
         : {
             results: [] as TextSearchResults,
             stale: false,
             timeFilterNotApplied: false,
+            languageNotApplied: false,
           };
 
       if (textResults.length === 0) {
@@ -776,10 +782,12 @@ async function startTextSearch(query: string, invocation: number) {
             keywordQuery,
             getSettings().searchResultsLimit,
             getSettings().searchTimeRange,
+            getSettings().searchLanguage,
           );
           textResults = keywordOutcome.results;
           stale = keywordOutcome.stale;
           timeFilterNotApplied = keywordOutcome.timeFilterNotApplied;
+          languageNotApplied = keywordOutcome.languageNotApplied;
         }
       }
 
@@ -793,6 +801,7 @@ async function startTextSearch(query: string, invocation: number) {
       if (isCurrent()) {
         updateTextSearchStale(stale);
         updateTextSearchTimeFilterNotApplied(Boolean(timeFilterNotApplied));
+        updateTextSearchLanguageNotApplied(Boolean(languageNotApplied));
         updateTextSearchState("completed");
         updateTextSearchResults(textResults);
         updateLlmTextSearchResults(resultsForLlm);
@@ -821,6 +830,7 @@ async function startTextSearch(query: string, invocation: number) {
       if (isCurrent()) {
         updateTextSearchStale(false);
         updateTextSearchTimeFilterNotApplied(false);
+        updateTextSearchLanguageNotApplied(false);
         updateTextSearchState("failed");
       }
       textSearchFailed = true;
@@ -876,6 +886,7 @@ async function startImageSearch(
       searchQuery,
       getSettings().searchResultsLimit,
       getSettings().searchTimeRange,
+      getSettings().searchLanguage,
     );
     results.imageResults = imageResults;
 

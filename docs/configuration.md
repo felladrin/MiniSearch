@@ -147,6 +147,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `enableTextSearch`               | boolean | `true`     | Include text results in searches                                                                        |
 | `searchResultsLimit`             | number  | `15`       | Maximum search results to fetch                                                                         |
 | `searchTimeRange`                | string  | `any`      | Only return results published within this period: `any`, `day`, `week`, `month` or `year`               |
+| `searchLanguage`                 | string  | `browser`  | Results language: `browser`, `auto` (from the query), `all` (no preference), or a locale like `pt-BR`   |
 | `systemPrompt`                   | string  | (template) | Custom system prompt template for AI                                                                    |
 | `enterToSubmit`                  | boolean | `true`     | Press Enter to submit query (vs Shift+Enter for new line)                                               |
 | `enableAiResponseScrolling`      | boolean | `true`     | Auto-scroll AI response as it generates                                                                 |

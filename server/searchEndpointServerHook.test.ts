@@ -214,6 +214,7 @@ describe("searchEndpointServerHook", () => {
       undefined,
       expect.any(AbortSignal),
       undefined,
+      undefined,
     );
   });
 
@@ -294,6 +295,7 @@ describe("searchEndpointServerHook", () => {
       undefined,
       expect.any(AbortSignal),
       undefined,
+      undefined,
     );
     expect(incrementTextualSearchesSinceLastRestart).toHaveBeenCalled();
     expect(response.setHeader).toHaveBeenCalledWith(
@@ -322,6 +324,7 @@ describe("searchEndpointServerHook", () => {
       undefined,
       expect.any(AbortSignal),
       undefined,
+      undefined,
     );
   });
 
@@ -342,6 +345,7 @@ describe("searchEndpointServerHook", () => {
           undefined,
           expect.any(AbortSignal),
           timeRange,
+          undefined,
         );
       },
     );
@@ -358,6 +362,7 @@ describe("searchEndpointServerHook", () => {
         undefined,
         expect.any(AbortSignal),
         "month",
+        undefined,
       );
     });
 
@@ -372,6 +377,7 @@ describe("searchEndpointServerHook", () => {
         30,
         undefined,
         expect.any(AbortSignal),
+        undefined,
         undefined,
       );
     });
@@ -400,6 +406,89 @@ describe("searchEndpointServerHook", () => {
     });
   });
 
+  describe("language parameter", () => {
+    it.each(["pt-BR", "en-US", "all", "auto"])(
+      "passes %s through to SearXNG as its language",
+      async (language) => {
+        vi.mocked(fetchSearXNG).mockResolvedValue([]);
+
+        await sendSearch(`/search/text?q=cats&token=abc&language=${language}`);
+
+        expect(fetchSearXNG).toHaveBeenCalledWith(
+          "cats",
+          "text",
+          30,
+          undefined,
+          expect.any(AbortSignal),
+          undefined,
+          language,
+        );
+      },
+    );
+
+    it("passes it on an image search as well", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+
+      await sendSearch("/search/images?q=cats&token=abc&language=pt-BR");
+
+      expect(fetchSearXNG).toHaveBeenCalledWith(
+        "cats",
+        "images",
+        30,
+        undefined,
+        expect.any(AbortSignal),
+        undefined,
+        "pt-BR",
+      );
+    });
+
+    it("passes it next to a time range when the search asked for both", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+
+      await sendSearch(
+        "/search/text?q=cats&token=abc&time_range=week&language=de",
+      );
+
+      expect(fetchSearXNG).toHaveBeenCalledWith(
+        "cats",
+        "text",
+        30,
+        undefined,
+        expect.any(AbortSignal),
+        "week",
+        "de",
+      );
+    });
+
+    it("passes nothing when the request carries no language", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+
+      // An older client or a direct API call: SearXNG keeps its own default,
+      // exactly as it did before the setting existed.
+      await sendSearch("/search/text?q=cats&token=abc");
+
+      const searchArgs = vi.mocked(fetchSearXNG).mock.calls[0];
+      expect(searchArgs.slice(5)).toEqual([undefined, undefined]);
+    });
+
+    it.each(["Portugu%C3%AAs", "pt_BR", "pt-BR-brazil", "english", ""])(
+      "answers 400 to a language SearXNG does not take",
+      async (language) => {
+        const response = await sendSearch(
+          `/search/text?q=cats&token=abc&language=${language}`,
+        );
+
+        // Refused rather than answered in some other language: results in the
+        // wrong one would pass as the ones the caller asked for.
+        expect(response.statusCode).toBe(400);
+        expect(response.end).toHaveBeenCalledWith(
+          JSON.stringify({ error: "Invalid language parameter" }),
+        );
+        expect(fetchSearXNG).not.toHaveBeenCalled();
+      },
+    );
+  });
+
   it("reranks results when the reranker is healthy and returns its reordered output", async () => {
     vi.mocked(fetchSearXNG).mockResolvedValue([
       ["A", "snippet a", "https://a.com"],
@@ -419,6 +508,7 @@ describe("searchEndpointServerHook", () => {
       5,
       undefined,
       expect.any(AbortSignal),
+      undefined,
       undefined,
     );
     expect(rankSearchResults).toHaveBeenCalledWith(
@@ -728,7 +818,7 @@ describe("searchEndpointServerHook", () => {
         );
       });
 
-      it("says nothing when the fallback answers a search with no time range", async () => {
+      it("says nothing when the fallback answers a search with no filter", async () => {
         vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
         failSearxng();
         vi.mocked(fetchFallbackTextResults).mockResolvedValue(fallbackResults);
@@ -738,6 +828,46 @@ describe("searchEndpointServerHook", () => {
         expect(response.statusCode).toBe(200);
         expect(response.setHeader).not.toHaveBeenCalledWith(
           "X-Search-Time-Range-Applied",
+          "false",
+        );
+        expect(response.setHeader).not.toHaveBeenCalledWith(
+          "X-Search-Language-Applied",
+          "false",
+        );
+      });
+
+      it("says the language was not applied when the fallback answers a search that asked for one", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        failSearxng();
+        vi.mocked(fetchFallbackTextResults).mockResolvedValue(fallbackResults);
+
+        const response = await sendSearch(
+          "/search/text?q=cats&token=abc&language=pt-BR",
+        );
+
+        expect(response.statusCode).toBe(200);
+        expect(response.setHeader).toHaveBeenCalledWith(
+          "X-Search-Language-Applied",
+          "false",
+        );
+      });
+
+      it("names both filters when the fallback answers a search that asked for both", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        failSearxng();
+        vi.mocked(fetchFallbackTextResults).mockResolvedValue(fallbackResults);
+
+        const response = await sendSearch(
+          "/search/text?q=cats&token=abc&time_range=week&language=pt-BR",
+        );
+
+        expect(response.statusCode).toBe(200);
+        expect(response.setHeader).toHaveBeenCalledWith(
+          "X-Search-Time-Range-Applied",
+          "false",
+        );
+        expect(response.setHeader).toHaveBeenCalledWith(
+          "X-Search-Language-Applied",
           "false",
         );
       });
@@ -1038,6 +1168,27 @@ describe("searchEndpointServerHook", () => {
         30,
         expect.any(AbortSignal),
         "day",
+        undefined,
+      );
+    });
+
+    it("gives the supplementary search the same language", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSupplementarySearXNG).mockResolvedValue([]);
+      const handler = getRegisteredHandler();
+
+      await handler(
+        createRequest(`${query}&language=pt-BR`),
+        createResponse(),
+        vi.fn(),
+      );
+
+      expect(fetchSupplementarySearXNG).toHaveBeenCalledWith(
+        "site:disney.com disney showtimes",
+        30,
+        expect.any(AbortSignal),
+        undefined,
+        "pt-BR",
       );
     });
 
@@ -1056,6 +1207,7 @@ describe("searchEndpointServerHook", () => {
         "site:disney.com disney showtimes",
         30,
         expect.any(AbortSignal),
+        undefined,
         undefined,
       );
       expect(response.end).toHaveBeenCalledWith(

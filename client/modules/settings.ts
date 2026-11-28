@@ -3,6 +3,10 @@ import {
   DEFAULT_SYSTEM_PROMPT,
 } from "@shared/defaultSystemPrompt";
 import {
+  type SearchLanguage,
+  searchLanguageOptions,
+} from "@shared/searchLanguage";
+import {
   type SearchTimeRange,
   searchTimeRangeOptions,
 } from "@shared/searchTimeRange";
@@ -70,6 +74,7 @@ export const defaultSettings = {
   cpuThreads: getDefaultCpuThreads(),
   searchResultsLimit: 15,
   searchTimeRange: "any" as SearchTimeRange,
+  searchLanguage: "browser" as SearchLanguage,
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   inferenceType: DEFAULT_INFERENCE_TYPE,
   openAiApiBaseUrl: "",
@@ -105,8 +110,9 @@ export const defaultSettings = {
  * emits `""`, which `??` does not catch and `> 0` reads as false, so it would
  * otherwise reach consumers as a `max_tokens` of `""` or a retention that
  * silently stops cleanup. Keys whose default is not a number are left alone,
- * except the time range: an unknown one (hand-edited, or renamed in a later
- * version) would make the server refuse every search, so it becomes Anytime.
+ * except the time range and the search language: an unknown one (hand-edited,
+ * or renamed in a later version) would make the server refuse every search,
+ * so it goes back to its default.
  */
 export function coerceNumericSettings(
   settings: typeof defaultSettings,
@@ -128,6 +134,11 @@ export function coerceNumericSettings(
     )
   ) {
     coerced.searchTimeRange = defaultSettings.searchTimeRange;
+  }
+  if (
+    !searchLanguageOptions.some(({ value }) => value === coerced.searchLanguage)
+  ) {
+    coerced.searchLanguage = defaultSettings.searchLanguage;
   }
   return coerced as typeof defaultSettings;
 }

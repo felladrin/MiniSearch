@@ -30,6 +30,23 @@ function pickTimeRange(label: string) {
   fireEvent.click(within(listbox).getByText(label));
 }
 
+/**
+ * Types `search` into the language select to filter it, then picks the option
+ * with this label. The typing is the point: the list is long enough that a
+ * reader has to search it.
+ */
+function pickLanguage(search: string, label: string) {
+  const select = screen.getByRole("combobox", { name: /search language/i });
+  fireEvent.mouseDown(select);
+  fireEvent.click(select);
+  fireEvent.change(select, { target: { value: search } });
+  const listbox = document.getElementById(
+    select.getAttribute("aria-controls") ?? "",
+  );
+  if (!listbox) throw new Error("The select did not render a listbox");
+  fireEvent.click(within(listbox).getByText(label));
+}
+
 describe("the menu's settings forms", () => {
   beforeEach(() => {
     updateSettings(defaultSettings);
@@ -84,5 +101,21 @@ describe("the menu's settings forms", () => {
     pickTimeRange("Past week");
 
     expect(getSettings()).toMatchObject({ searchTimeRange: "week" });
+  });
+
+  it("writes the language chosen in the search section", () => {
+    render(
+      <MantineProvider>
+        <SearchSettingsForm />
+      </MantineProvider>,
+    );
+
+    expect(
+      screen.getByRole("combobox", { name: /search language/i }),
+    ).toHaveValue("Browser language");
+
+    pickLanguage("portug", "Português (Brasil)");
+
+    expect(getSettings()).toMatchObject({ searchLanguage: "pt-BR" });
   });
 });

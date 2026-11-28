@@ -1,6 +1,10 @@
 import type { PreviewServer, ViteDevServer } from "vite";
 import { z } from "zod";
 import {
+  isSearxngLanguage,
+  SEARCH_LANGUAGE_APPLIED_HEADER,
+} from "../shared/searchLanguage.ts";
+import {
   SEARCH_TIME_RANGE_APPLIED_HEADER,
   type SearxngTimeRange,
   searxngTimeRanges,
@@ -92,6 +96,14 @@ const searchParamsSchema = z.object({
   time_range: z
     .enum(searxngTimeRanges, { error: "Invalid time_range parameter" })
     .optional(),
+  // Refused the same way rather than answered in whatever language SearXNG
+  // happens to guess: results in another language would pass as the ones the
+  // caller asked for. The pattern is SearXNG's own, so anything that gets
+  // through here is something SearXNG takes.
+  language: z
+    .string()
+    .refine(isSearxngLanguage, { error: "Invalid language parameter" })
+    .optional(),
 });
 
 type TextResult = [title: string, content: string, url: string];
@@ -146,6 +158,7 @@ async function officialLaneResults(
   limit: number,
   remainingMs: number,
   timeRange: SearxngTimeRange | undefined,
+  language: string | undefined,
 ): Promise<TextResult[]> {
   const budgetMs = Math.min(
     MAX_OFFICIAL_LANE_TIMEOUT_MS,
@@ -166,6 +179,7 @@ async function officialLaneResults(
       limit,
       AbortSignal.timeout(budgetMs),
       timeRange,
+      language,
     );
 
     const merged = mergeOfficialLaneResults(results, laneResults, lane.domain);
@@ -235,6 +249,7 @@ export function searchEndpointServerHook<
       query: url.searchParams.get("q") ?? undefined,
       limit: url.searchParams.get("limit") ?? DEFAULT_SEARCH_LIMIT,
       time_range: url.searchParams.get("time_range") ?? undefined,
+      language: url.searchParams.get("language") ?? undefined,
     });
 
     if (!parsedParams.success) {
@@ -242,7 +257,7 @@ export function searchEndpointServerHook<
       return;
     }
 
-    const { query, limit, time_range: timeRange } = parsedParams.data;
+    const { query, limit, time_range: timeRange, language } = parsedParams.data;
 
     try {
       const isTextSearch = searchType === "text";
@@ -262,6 +277,7 @@ export function searchEndpointServerHook<
           undefined,
           AbortSignal.timeout(searxngTimeoutMs),
           timeRange,
+          language,
         );
         servedBySearXNG = true;
         recordSearchDuration(searchType, performance.now() - searchStartedAt);
@@ -296,9 +312,12 @@ export function searchEndpointServerHook<
               // The fallback providers take a query and a count only, so the
               // period the search asked for cannot be honored here. Saying so
               // is the difference between a narrow search and a wide one that
-              // looks narrow.
+              // looks narrow. The language is lost the same way.
               if (timeRange) {
                 response.setHeader(SEARCH_TIME_RANGE_APPLIED_HEADER, "false");
+              }
+              if (language) {
+                response.setHeader(SEARCH_LANGUAGE_APPLIED_HEADER, "false");
               }
             } catch (fallbackError) {
               incrementSearchesFailedOnFallback();
@@ -341,6 +360,7 @@ export function searchEndpointServerHook<
             limit,
             remainingMs,
             timeRange,
+            language,
           );
         }
 

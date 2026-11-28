@@ -5,6 +5,7 @@ import {
   imageSearchResultsPubSub,
   imageSearchStatePubSub,
   settingsPubSub,
+  textSearchLanguagePubSub,
   textSearchResultsPubSub,
   textSearchStalePubSub,
   textSearchStatePubSub,
@@ -20,6 +21,7 @@ export default function TextSearchResults() {
   const [results] = usePubSub(textSearchResultsPubSub);
   const [stale] = usePubSub(textSearchStalePubSub);
   const [timeFilterNotApplied] = usePubSub(textSearchTimeFilterPubSub);
+  const [languageNotApplied] = usePubSub(textSearchLanguagePubSub);
   const [imageState] = usePubSub(imageSearchStatePubSub);
   const [imageResults] = usePubSub(imageSearchResultsPubSub);
   const [settings] = usePubSub(settingsPubSub);
@@ -27,6 +29,17 @@ export default function TextSearchResults() {
   if (searchState === "running") {
     return <TextResultsLoadingState />;
   }
+
+  // One note naming whichever filters the results are missing, so a search that
+  // came back wide says so instead of passing for the narrow one that was
+  // asked for.
+  const unappliedNote = [
+    timeFilterNotApplied && "time filter",
+    languageNotApplied && "language",
+  ]
+    .filter(Boolean)
+    .join(" and ")
+    .replace(/^./, (first) => first.toUpperCase());
 
   if (searchState === "completed") {
     if (results.length > 0) {
@@ -44,9 +57,9 @@ export default function TextSearchResults() {
               results are from an earlier search and may be out of date.
             </Alert>
           )}
-          {timeFilterNotApplied && (
+          {unappliedNote && (
             <Text size="xs" c="dimmed" mb="sm">
-              Time filter not applied to these results
+              {unappliedNote} not applied to these results
             </Text>
           )}
           <SearchResultsList searchResults={results} />

@@ -1273,6 +1273,23 @@ describe("fetchSupplementarySearXNG", () => {
     expect(url.searchParams.get("time_range")).toBe("week");
   });
 
+  it("sends the language it is given", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(JSON.stringify({ results: [] })),
+    );
+
+    await fetchSupplementarySearXNG(
+      "site:example.com test",
+      30,
+      undefined,
+      undefined,
+      "pt-BR",
+    );
+
+    const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url.searchParams.get("language")).toBe("pt-BR");
+  });
+
   it("fails on the first error status, without retrying", async () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 500));
     const before = healthBookkeeping();
@@ -1478,5 +1495,63 @@ describe("time_range parameter", () => {
 
     expect(sentParams().get("time_range")).toBe("week");
     expect(sentParams().get("categories")).toBe("images,videos");
+  });
+});
+
+describe("language parameter", () => {
+  /** The query parameters of the SearXNG request the search just made. */
+  const sentParams = () =>
+    new URL(fetchMock.mock.calls[0][0] as string).searchParams;
+
+  it("sends no language when the search asks for none", async () => {
+    fetchMock.mockResolvedValue(successResponse());
+
+    await fetchSearXNG("test", "text", 30);
+
+    expect(sentParams().has("language")).toBe(false);
+    // The `lang` parameter this service used to send is gone: SearXNG reads its
+    // locale from `language` (`parse_lang` in `searx/webadapter.py`), so
+    // `lang=auto` was never read and only hid the instance's own default.
+    expect(sentParams().has("lang")).toBe(false);
+    expect(sentParams().get("format")).toBe("json");
+  });
+
+  it.each(["pt-BR", "en-US", "de", "all", "auto"])(
+    "sends language=%s next to the categories it already sent",
+    async (language) => {
+      fetchMock.mockResolvedValue(successResponse());
+
+      await fetchSearXNG(
+        "test",
+        "text",
+        30,
+        new CircuitBreaker(),
+        undefined,
+        undefined,
+        language,
+      );
+
+      expect(sentParams().get("language")).toBe(language);
+      expect(sentParams().get("categories")).toBe("general");
+    },
+  );
+
+  it("sends it on an image search, next to a time range", async () => {
+    fetchMock.mockResolvedValue(successResponse());
+
+    await fetchSearXNG(
+      "test",
+      "images",
+      30,
+      new CircuitBreaker(),
+      undefined,
+      "week",
+      "pt-BR",
+    );
+
+    const params = sentParams();
+    expect(params.get("categories")).toBe("images,videos");
+    expect(params.get("time_range")).toBe("week");
+    expect(params.get("language")).toBe("pt-BR");
   });
 });

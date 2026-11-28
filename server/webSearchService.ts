@@ -57,8 +57,11 @@ interface SearxngSearchResponse {
   unresponsive_engines?: unknown[];
 }
 
+// No `lang` here: SearXNG reads its locale from `language` (`parse_lang` in
+// `searx/webadapter.py`), so a `lang` parameter is ignored and the instance
+// falls back to its own `default_lang`. `buildSearchUrl` sets `language` for
+// the searches that ask for one.
 const defaultSearchParams = {
-  lang: "auto",
   safesearch: "1",
   format: "json",
 } as const;
@@ -168,13 +171,16 @@ function buildSearchUrl(
   query: string,
   searchType: SearchType,
   timeRange?: SearxngTimeRange,
+  language?: string,
 ) {
   const params = new URLSearchParams(defaultSearchParams);
   params.set("q", query);
   params.set("categories", searchType === "text" ? "general" : "images,videos");
   // Left out rather than sent empty, so a search with no time range reaches
-  // SearXNG exactly as it did before the filter existed.
+  // SearXNG exactly as it did before the filter existed. The same holds for the
+  // language: with none asked for, SearXNG keeps guessing from its own default.
   if (timeRange) params.set("time_range", timeRange);
+  if (language) params.set("language", language);
   return `${SERVICE_BASE_URL}/search?${params.toString()}`;
 }
 
@@ -297,8 +303,9 @@ async function performSearch(
   searchType: SearchType,
   signal?: AbortSignal,
   timeRange?: SearxngTimeRange,
+  language?: string,
 ): Promise<SearxngSearchResult[]> {
-  const searchUrl = buildSearchUrl(query, searchType, timeRange);
+  const searchUrl = buildSearchUrl(query, searchType, timeRange, language);
 
   let retryReason = "";
 
@@ -380,11 +387,12 @@ async function processSearchResults(
   breaker: CircuitBreaker,
   signal?: AbortSignal,
   timeRange?: SearxngTimeRange,
+  language?: string,
 ) {
   // An abort is thrown inside `execute`, so a stalled SearXNG counts as a
   // failure as soon as the deadline passes.
   const results = await breaker.execute(circuitKey(searchType), () =>
-    performSearch(query, searchType, signal, timeRange),
+    performSearch(query, searchType, signal, timeRange, language),
   );
   const openableResults = openableUniqueResults(
     results,
@@ -443,6 +451,10 @@ function reportDiscardedResults<T>(
  *
  * `timeRange` is SearXNG's own `time_range`, and is left out for a search that
  * accepts any time.
+ *
+ * `language` is SearXNG's own `language`, already validated by the caller, and
+ * is left out for a search with no preference so that SearXNG keeps its own
+ * default for it.
  */
 export async function fetchSearXNG(
   query: string,
@@ -451,6 +463,7 @@ export async function fetchSearXNG(
   breaker: CircuitBreaker = searxngCircuitBreaker,
   signal?: AbortSignal,
   timeRange?: SearxngTimeRange,
+  language?: string,
 ) {
   try {
     return await processSearchResults(
@@ -460,6 +473,7 @@ export async function fetchSearXNG(
       breaker,
       signal,
       timeRange,
+      language,
     );
   } catch (error) {
     // Upstream failure (bad status, network error, malformed body, open
@@ -483,13 +497,18 @@ export async function fetchSupplementarySearXNG(
   limit: number,
   signal?: AbortSignal,
   timeRange?: SearxngTimeRange,
+  language?: string,
 ) {
   // The lane's results are merged into the main ones, so they have to honor
-  // the same time range, or a filtered search shows unfiltered pages.
-  const response = await fetch(buildSearchUrl(query, "text", timeRange), {
-    headers: { Accept: "application/json" },
-    signal,
-  });
+  // the same time range and language, or a filtered search shows unfiltered
+  // pages.
+  const response = await fetch(
+    buildSearchUrl(query, "text", timeRange, language),
+    {
+      headers: { Accept: "application/json" },
+      signal,
+    },
+  );
 
   if (!response.ok) {
     await discardBody(response);

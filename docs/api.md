@@ -137,6 +137,7 @@ Query parameters:
 | `token`      | yes      | Search token hash                                                                                                                                                                                                                                                                     |
 | `limit`      | no       | How many of SearXNG's results to consider, default and maximum 30; a value that is not a positive integer falls back to the default. SearXNG is not sent this number: it caps a single SearXNG response after duplicate URLs are dropped, and the score filter below can return fewer |
 | `time_range` | no       | Only results published within this period: `day`, `week`, `month` or `year`. Absent means any time, and the request to SearXNG then carries no `time_range` at all                                                                                                                    |
+| `language`   | no       | Which language the results come back in: a locale with an optional region (`pt`, `pt-BR`, `en-US`), `all` for no preference, or `auto`. Absent means the request to SearXNG carries no `language` at all, leaving SearXNG on its own default                                          |
 
 Responds with a JSON array of tuples, in the order the client renders them:
 
@@ -180,6 +181,7 @@ Failures:
 | `400`  | `{"error":"Missing query parameter"}`                         | `q` missing or blank                                                                                                             |
 | `400`  | `{"error":"Query parameter must not exceed 2000 characters"}` | `q` too long                                                                                                                     |
 | `400`  | `{"error":"Invalid time_range parameter"}`                    | `time_range` is not `day`, `week`, `month` or `year`                                                                             |
+| `400`  | `{"error":"Invalid language parameter"}`                      | `language` is not a locale SearXNG takes: `^[a-z]{2,3}(-[a-zA-Z]{2})?$`, or `all`, or `auto`                                     |
 | `502`  | `{"error":"Search service unavailable"}`                      | SearXNG failed and the text-search fallback was off or failed too, so an outage is distinguishable from a search with no matches |
 | `500`  | `{"error":"Internal server error"}`                           | Anything else                                                                                                                    |
 
@@ -207,12 +209,15 @@ when every provider tried fails, or none could be tried at all, does the
 search fall through to the same `502`.
 
 Those providers take a query and a count, so none of them can apply a
-`time_range`. When one answers a search that asked for one, the response
-carries `X-Search-Time-Range-Applied: false` and the body is unchanged: the
-header is the only signal, so a client that ignores it still parses the
-results. The header is absent on every other response, including a search that
-asked for no time range, and the client says "Time filter not applied to these
-results" above the results it got that way.
+`time_range` or a `language`. When one answers a search that asked for either,
+the response carries `X-Search-Time-Range-Applied: false` and
+`X-Search-Language-Applied: false` for whichever was lost, and the body is
+unchanged: the headers are the only signal, so a client that ignores them still
+parses the results. A header is absent on every other response, including a
+search that asked for no time range and no language, and the client names
+whichever was lost above the results it got that way: "Time filter not applied
+to these results", "Language not applied to these results", or "Time filter and
+language not applied to these results".
 
 ### `GET /search/images`
 

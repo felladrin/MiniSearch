@@ -1,10 +1,12 @@
 import { Select, Slider, Stack, Switch, Text } from "@mantine/core";
+import { searchLanguageOptions } from "@shared/searchLanguage";
 import { searchTimeRangeOptions } from "@shared/searchTimeRange";
 import { useSettingsForm } from "@/hooks/useSettingsForm";
 
 const SETTINGS_KEYS = [
   "searchResultsLimit",
   "searchTimeRange",
+  "searchLanguage",
   "enableTextSearch",
   "enableImageSearch",
 ] as const;
@@ -37,6 +39,16 @@ export default function SearchSettingsForm() {
         label="Time Range"
         description="Only show results published within this period. Anytime applies no time filter."
         data={searchTimeRangeOptions}
+        allowDeselect={false}
+      />
+
+      <Select
+        {...form.getInputProps("searchLanguage")}
+        label="Search Language"
+        // The answer is not what this changes: it keeps following the question.
+        description="Which language the results come back in. Browser language sends your browser's own locale, Detect from the query lets the search engine guess, and Any language asks for no preference. The answer still follows the language of the question."
+        data={searchLanguageOptions}
+        searchable
         allowDeselect={false}
       />
 

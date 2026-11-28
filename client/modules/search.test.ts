@@ -141,6 +141,25 @@ describe("Search Module", () => {
       );
     });
 
+    it("should include the language in the hash so different languages produce different keys", async () => {
+      const { hashQuery } = searchModule.searchServiceInstance;
+      const hashes = await Promise.all(
+        ["pt-BR", "en-US", "de", "all"].map((language) =>
+          hashQuery("test query", 10, undefined, language),
+        ),
+      );
+      expect(new Set(hashes).size).toBe(4);
+    });
+
+    it("should keep the key of a search that sends no language the one it was before the setting existed", async () => {
+      const { hashQuery } = searchModule.searchServiceInstance;
+      // No language adds nothing to the hashed input, so the entries cached
+      // before the setting existed are still the ones such a search reads.
+      expect(await hashQuery("test query", 10, undefined, undefined)).toBe(
+        await hashQuery("test query", 10),
+      );
+    });
+
     it("should return a deterministic hex string of fixed length", async () => {
       const hash =
         await searchModule.searchServiceInstance.hashQuery("any query");
@@ -227,6 +246,65 @@ describe("Search Module", () => {
 
       const calledUrl = mockFetch.mock.calls[0][0] as string;
       expect(calledUrl).not.toContain("time_range");
+    });
+
+    it("should send a chosen locale as the language parameter", async () => {
+      mockFetchResponse([]);
+
+      await searchModule.searchServiceInstance.performSearch<string[][]>(
+        "text",
+        "test",
+        10,
+        undefined,
+        "pt-BR",
+      );
+
+      expect(mockFetch.mock.calls[0][0] as string).toContain("language=pt-BR");
+    });
+
+    it("should send all for Any language", async () => {
+      mockFetchResponse([]);
+
+      await searchModule.searchServiceInstance.performSearch<string[][]>(
+        "text",
+        "test",
+        10,
+        undefined,
+        "all",
+      );
+
+      expect(mockFetch.mock.calls[0][0] as string).toContain("language=all");
+    });
+
+    it("should send the browser's own locale for Browser language", async () => {
+      const browserLanguage = vi
+        .spyOn(Navigator.prototype, "language", "get")
+        .mockReturnValue("pt-BR");
+      mockFetchResponse([]);
+
+      await searchModule.searchText(
+        "browser locale query",
+        10,
+        undefined,
+        "browser",
+      );
+
+      // Resolved at search time, so the server gets a locale it can act on
+      // rather than the guess it would have had to make from the query.
+      expect(mockFetch.mock.calls[0][0] as string).toContain("language=pt-BR");
+      browserLanguage.mockRestore();
+    });
+
+    it("should send no language when the search has none", async () => {
+      mockFetchResponse([]);
+
+      await searchModule.searchServiceInstance.performSearch<string[][]>(
+        "text",
+        "test",
+        10,
+      );
+
+      expect(mockFetch.mock.calls[0][0] as string).not.toContain("language=");
     });
 
     it("should throw on non-OK response", async () => {
@@ -617,6 +695,33 @@ describe("Search Module", () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
+    it("should treat different languages as separate cache entries", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockSearchResponse(mockResults);
+
+      await searchModule.searchText("same query", 5, undefined, "pt-BR");
+      await searchModule.searchText("same query", 5, undefined, "en-US");
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("should read a search with no language from the entry cached before the setting existed", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockSearchResponse(mockResults);
+
+      await searchModule.searchText("no language query", 5);
+      await searchModule.searchText(
+        "no language query",
+        5,
+        undefined,
+        undefined,
+      );
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
     it("should refetch when TTL expires", async () => {
       const mockResults: string[][] = [
         ["Title", "Snippet", "https://example.com"],
@@ -776,6 +881,64 @@ describe("Search Module", () => {
       );
 
       expect(outcome.timeFilterNotApplied).toBe(false);
+    });
+  });
+
+  describe("Language Not Applied", () => {
+    const mockResults: string[][] = [
+      ["Title", "Snippet", "https://example.com"],
+    ];
+    const notApplied = { "X-Search-Language-Applied": "false" };
+
+    it("should report the note when the server says the language was not applied", async () => {
+      mockSearchResponse(mockResults, notApplied);
+
+      const outcome = await searchModule.searchText(
+        "fallback query",
+        5,
+        undefined,
+        "pt-BR",
+      );
+
+      expect(outcome).toEqual({
+        results: mockResults,
+        stale: false,
+        timeFilterNotApplied: false,
+        languageNotApplied: true,
+      });
+    });
+
+    it("should keep the note when those results come back from the cache", async () => {
+      mockSearchResponse(mockResults, notApplied);
+      await searchModule.searchText(
+        "cached fallback query",
+        5,
+        undefined,
+        "pt-BR",
+      );
+
+      const cached = await searchModule.searchText(
+        "cached fallback query",
+        5,
+        undefined,
+        "pt-BR",
+      );
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(cached.languageNotApplied).toBe(true);
+    });
+
+    it("should not report the note when the server applied the language", async () => {
+      mockSearchResponse(mockResults);
+
+      const outcome = await searchModule.searchText(
+        "filtered query",
+        5,
+        undefined,
+        "pt-BR",
+      );
+
+      expect(outcome.languageNotApplied).toBeUndefined();
     });
   });
 
