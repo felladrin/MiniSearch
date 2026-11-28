@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-28
+
+- A follow-up question saved after its search was deleted from History is no longer stored. It used to be written anyway with no search pointing to it, leaving orphaned chat rows in the browser's storage.
+
 ## 2026-11-27
 
 - An answer that finishes after you delete its search from History is no longer saved. It used to be stored anyway, with no search to point to, so it stayed in the browser's storage where you could neither see nor remove it. It still shows in the open tab until you leave the search.

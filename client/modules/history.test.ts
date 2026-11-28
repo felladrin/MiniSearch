@@ -604,6 +604,13 @@ describe("History Module - Dexie CRUD", () => {
       { role: "assistant" as const, content: answer },
     ];
 
+    beforeEach(async () => {
+      await historyDatabase.searches.bulkAdd([
+        { searchRunId: "run-a", query: "query-a", timestamp: 1 },
+        { searchRunId: "run-b", query: "query-b", timestamp: 2 },
+      ]);
+    });
+
     it("stores the messages in the order given", async () => {
       const { replaceChatConversation, getChatMessagesForQuery } = await import(
         "./history"
@@ -660,6 +667,39 @@ describe("History Module - Dexie CRUD", () => {
       const { getChatMessagesForQuery } = await import("./history");
       const messages = await getChatMessagesForQuery("nonexistent-run-id");
       expect(messages).toEqual([]);
+    });
+
+    it("stores nothing when the owning search was deleted", async () => {
+      const {
+        addSearchToHistory,
+        getCurrentSearchRunId,
+        getRecentSearches,
+        replaceChatConversation,
+      } = await import("./history");
+      const runId = getCurrentSearchRunId();
+      await addSearchToHistory("deleted search", oneTextResult());
+      const [entry] = await getRecentSearches();
+      await historyDatabase.deleteSearchesWithChildren([entry]);
+
+      await replaceChatConversation(runId, pair("Q1", "A1"));
+
+      expect(await historyDatabase.chatHistory.count()).toBe(0);
+    });
+
+    it("saves a follow-up for a legacy search without searchRunId under its query", async () => {
+      const { replaceChatConversation, getChatMessagesForQuery } = await import(
+        "./history"
+      );
+      await historyDatabase.searches.add({
+        query: "legacy-query",
+        timestamp: 3,
+      });
+
+      await replaceChatConversation("legacy-query", pair("Q1", "A1"));
+
+      expect(await getChatMessagesForQuery("legacy-query")).toEqual(
+        pair("Q1", "A1"),
+      );
     });
   });
 
