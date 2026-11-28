@@ -1,5 +1,6 @@
 import Dexie from "dexie";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { SearchEntry } from "./history";
 import { getSettings } from "./pubSub";
 
 // Pin auto-cleanup off and avoid pubSub's module-level localStorage reads.
@@ -566,6 +567,52 @@ describe("History Module - Dexie CRUD", () => {
       const response = await getLatestLlmResponseForEntry(entryWithoutRunId);
       expect(response).toBe("answer");
     });
+
+    it("does not save an answer whose search was deleted while it generated", async () => {
+      const {
+        addSearchToHistory,
+        getCurrentSearchRunId,
+        historyDatabase,
+        saveLlmResponseForQuery,
+      } = await import("./history");
+      const runId = getCurrentSearchRunId();
+      const id = await addSearchToHistory(
+        "deleted mid-answer",
+        oneTextResult(),
+      );
+      const search = await historyDatabase.searches.get(id as number);
+      await historyDatabase.deleteSearchesWithChildren([search as SearchEntry]);
+
+      await saveLlmResponseForQuery(
+        "deleted mid-answer",
+        "late answer",
+        "m",
+        runId,
+      );
+
+      expect(await historyDatabase.searches.count()).toBe(0);
+      expect(await historyDatabase.llmResponses.count()).toBe(0);
+    });
+
+    it("saves an answer for a legacy search keyed by its query", async () => {
+      const { historyDatabase, saveLlmResponseForQuery } = await import(
+        "./history"
+      );
+      const id = await historyDatabase.searches.add({
+        query: "legacy query",
+        timestamp: Date.now(),
+      });
+
+      await saveLlmResponseForQuery(
+        "legacy query",
+        "answer",
+        "m",
+        "legacy query",
+      );
+
+      const [record] = await historyDatabase.llmResponses.toArray();
+      expect(record).toMatchObject({ response: "answer", searchId: id });
+    });
   });
 
   describe("replaceChatConversation / getChatMessagesForQuery", () => {
@@ -573,6 +620,40 @@ describe("History Module - Dexie CRUD", () => {
       { role: "user" as const, content: question },
       { role: "assistant" as const, content: answer },
     ];
+
+    // A conversation is stored only while its search exists.
+    beforeEach(async () => {
+      const { historyDatabase } = await import("./history");
+      for (const searchRunId of ["run-a", "run-b"]) {
+        await historyDatabase.searches.add({
+          searchRunId,
+          query: searchRunId,
+          timestamp: Date.now(),
+        });
+      }
+    });
+
+    it("does not store a follow-up whose search was deleted", async () => {
+      const {
+        replaceChatConversation,
+        getChatMessagesForQuery,
+        historyDatabase,
+      } = await import("./history");
+      await replaceChatConversation("run-a", pair("Q1", "A1"));
+      const search = await historyDatabase.searches
+        .where("searchRunId")
+        .equals("run-a")
+        .first();
+      await historyDatabase.deleteSearchesWithChildren([search as SearchEntry]);
+
+      await replaceChatConversation("run-a", [
+        ...pair("Q1", "A1"),
+        ...pair("Q2", "late answer"),
+      ]);
+
+      expect(await getChatMessagesForQuery("run-a")).toEqual([]);
+      expect(await historyDatabase.chatHistory.count()).toBe(0);
+    });
 
     it("stores the messages in the order given", async () => {
       const { replaceChatConversation, getChatMessagesForQuery } = await import(

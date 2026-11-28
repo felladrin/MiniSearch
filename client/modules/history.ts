@@ -506,6 +506,23 @@ export async function getPinnedSearches(): Promise<SearchEntry[]> {
   });
 }
 
+/**
+ * The search whose answers and chat turns are stored under `key`: the one with
+ * that run id, or a legacy search (saved before run ids) with that query.
+ * Callers run it inside their write transaction, so a delete cannot land
+ * between the check and the write.
+ */
+async function findSearchOwning(key: string): Promise<SearchEntry | undefined> {
+  return (
+    (await historyDatabase.searches.where("searchRunId").equals(key).first()) ??
+    (await historyDatabase.searches
+      .where("query")
+      .equals(key)
+      .filter((search) => !search.searchRunId)
+      .first())
+  );
+}
+
 export async function saveLlmResponseForQuery(
   query: string,
   response: string,
@@ -514,19 +531,28 @@ export async function saveLlmResponseForQuery(
 ): Promise<void> {
   if (!isHistoryEnabled()) return;
   try {
-    const latest = await historyDatabase.searches
-      .where("searchRunId")
-      .equals(searchRunId)
-      .first();
-
-    await historyDatabase.llmResponses.add({
-      searchRunId,
-      prompt: query,
-      response,
-      model,
-      timestamp: Date.now(),
-      searchId: latest?.id,
-    });
+    await historyDatabase.transaction(
+      "rw",
+      historyDatabase.searches,
+      historyDatabase.llmResponses,
+      async () => {
+        const search = await findSearchOwning(searchRunId);
+        // Deleted while the answer was generating: no History entry could
+        // reach the answer, and the delete has already removed its rows.
+        if (!search) {
+          addLogEntry("Answer not saved: its search was deleted");
+          return;
+        }
+        await historyDatabase.llmResponses.add({
+          searchRunId,
+          prompt: query,
+          response,
+          model,
+          timestamp: Date.now(),
+          searchId: search.id,
+        });
+      },
+    );
   } catch (error) {
     addLogEntry(`Error saving LLM response: ${error}`);
   }
@@ -569,12 +595,18 @@ export async function replaceChatConversation(
   const firstTimestamp = Date.now();
   await historyDatabase.transaction(
     "rw",
+    historyDatabase.searches,
     historyDatabase.chatHistory,
     async () => {
       await historyDatabase.chatHistory
         .where("conversationId")
         .equals(conversationId)
         .delete();
+      // A follow-up answered after its search was deleted is not stored: no
+      // History entry could reach it.
+      if (messages.length === 0 || !(await findSearchOwning(conversationId))) {
+        return;
+      }
       await historyDatabase.chatHistory.bulkAdd(
         messages.map((message, index) => ({
           role: message.role,
