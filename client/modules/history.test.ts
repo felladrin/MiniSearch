@@ -1135,3 +1135,38 @@ describe("History Module - a search takes its answers and chats with it", () => 
     expect(indexNames).not.toContain("pinned");
   });
 });
+
+describe("saveLlmResponseForQuery - deleted search", () => {
+  beforeEach(async () => {
+    const { historyDatabase, resetSearchRunId } = await import("./history");
+    resetSearchRunId();
+    await Promise.all([
+      historyDatabase.searches.clear(),
+      historyDatabase.llmResponses.clear(),
+      historyDatabase.chatHistory.clear(),
+    ]);
+  });
+
+  it("should not save an answer whose search was deleted while it streamed", async () => {
+    const {
+      addSearchToHistory,
+      getCurrentSearchRunId,
+      saveLlmResponseForQuery,
+      getLatestLlmResponseForEntry,
+      getRecentSearches,
+      historyDatabase,
+    } = await import("./history");
+    const runId = getCurrentSearchRunId();
+    await addSearchToHistory("deleted while streaming", oneTextResult());
+    const [entry] = await getRecentSearches();
+    await historyDatabase.deleteSearchesWithChildren([entry]);
+    await saveLlmResponseForQuery(
+      "deleted while streaming",
+      "late answer",
+      "model-x",
+      runId,
+    );
+    expect(await historyDatabase.llmResponses.count()).toBe(0);
+    await expect(getLatestLlmResponseForEntry(entry)).resolves.toBeNull();
+  });
+});
