@@ -59,8 +59,8 @@ import {
   updateImageSearchResults,
   updateLlmTextSearchResults,
   updatePageContents,
-  updateTextSearchResults,
   updateTextSearchLanguageNotApplied,
+  updateTextSearchResults,
   updateTextSearchStale,
   updateTextSearchTimeFilterNotApplied,
 } from "./pubSub";

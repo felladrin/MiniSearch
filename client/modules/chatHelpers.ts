@@ -15,11 +15,11 @@ import { fetchPageContents } from "./pageContent";
 import {
   getImageSearchResults,
   getPageContents,
+  getTextSearchLanguageNotApplied,
   getTextSearchTimeFilterNotApplied,
   updateImageSearchResults,
   updateLlmTextSearchResults,
   updatePageContents,
-  getTextSearchLanguageNotApplied,
   updateTextSearchLanguageNotApplied,
   updateTextSearchResults,
   updateTextSearchStale,
