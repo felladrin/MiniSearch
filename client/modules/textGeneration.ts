@@ -20,6 +20,7 @@ import {
   listenToSettingsChanges,
   updateChatMessages,
   updateConversationSummary,
+  updateGenerationRate,
   updateImageSearchResults,
   updateImageSearchState,
   updateLlmTextSearchResults,
@@ -356,6 +357,9 @@ export async function searchAndRespond() {
   document.title = getQuery();
 
   updateResponse("");
+  // The speed belongs to the answer it was measured on, so the previous one's
+  // goes here instead of sitting under the new answer until it finishes.
+  updateGenerationRate(undefined);
 
   clearConversationSummary();
 

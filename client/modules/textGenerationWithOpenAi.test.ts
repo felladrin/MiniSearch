@@ -7,6 +7,7 @@ import { addLogEntry } from "@/modules/logEntries";
 import {
   getSettings,
   getTextGenerationState,
+  updateGenerationRate,
   updateResponse,
   updateTextGenerationState,
 } from "@/modules/pubSub";
@@ -20,6 +21,7 @@ vi.mock("@/modules/logEntries", () => ({
 vi.mock("@/modules/pubSub", () => ({
   getSettings: vi.fn(),
   getTextGenerationState: vi.fn().mockReturnValue("idle"),
+  updateGenerationRate: vi.fn(),
   updateResponse: vi.fn(),
   updateTextGenerationState: vi.fn(),
 }));
@@ -120,6 +122,95 @@ describe("textGenerationWithOpenAi", () => {
   });
 
   describe("generateTextWithOpenAi", () => {
+    /**
+     * Answers "Hello" over a held-open stream whose two deltas arrive 5 seconds
+     * apart, so the answer's own span is known, and ends it after `lastChunk`.
+     */
+    async function streamTimedDeltas(lastChunk: unknown) {
+      let now = 0;
+      const nowSpy = vi.spyOn(performance, "now").mockImplementation(() => now);
+      const streams: ReturnType<typeof heldOpenSseResponse>[] = [];
+      mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+        const stream = heldOpenSseResponse(init);
+        streams.push(stream);
+        return Promise.resolve(stream.response);
+      });
+
+      try {
+        const { generateTextWithOpenAi } = await import(
+          "./textGenerationWithOpenAi"
+        );
+        const answer = generateTextWithOpenAi();
+        await vi.waitFor(() => expect(streams).toHaveLength(1));
+
+        now = 1000;
+        streams[0].send({ choices: [{ delta: { content: "Hel" } }] });
+        await vi.waitFor(() =>
+          expect(updateResponse).toHaveBeenCalledWith("Hel"),
+        );
+        now = 6000;
+        streams[0].send({ choices: [{ delta: { content: "lo" } }] });
+        await vi.waitFor(() =>
+          expect(updateResponse).toHaveBeenCalledWith("Hello"),
+        );
+
+        if (lastChunk) streams[0].send(lastChunk);
+        streams[0].close();
+        await expect(answer).resolves.toBe("Hello");
+      } finally {
+        nowSpy.mockRestore();
+      }
+    }
+
+    it("publishes the speed from the completion count the backend reports", async () => {
+      await streamTimedDeltas({
+        choices: [{ delta: {}, finish_reason: "stop" }],
+        usage: { prompt_tokens: 10, completion_tokens: 42, total_tokens: 52 },
+      });
+
+      // 41 of the 42 completion tokens (the first came before the clock)
+      // across the 5 seconds between the first delta and the last, not across
+      // the whole request.
+      expect(updateGenerationRate).toHaveBeenCalledWith("8.2 tokens/s");
+    });
+
+    it("counts only the text tokens when the server kept its reasoning to itself", async () => {
+      await streamTimedDeltas({
+        choices: [{ delta: {}, finish_reason: "stop" }],
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 2042,
+          total_tokens: 2052,
+          completion_tokens_details: { reasoning_tokens: 2000 },
+        },
+      });
+
+      // 2,000 reasoning tokens never streamed, so their time never reached
+      // the clock: only the 42 text tokens count.
+      expect(updateGenerationRate).toHaveBeenCalledWith("8.2 tokens/s");
+    });
+
+    it("asks the server for the token usage of the stream", async () => {
+      const { generateTextWithOpenAi } = await import(
+        "./textGenerationWithOpenAi"
+      );
+      mockFetch.mockResolvedValueOnce(
+        sseResponse([{ choices: [{ delta: { content: "Hello" } }] }]),
+      );
+
+      await generateTextWithOpenAi();
+
+      const body = JSON.parse(String(mockFetch.mock.calls[0]?.[1]?.body));
+      expect(body.stream_options).toEqual({ include_usage: true });
+    });
+
+    it("publishes no speed when the backend reports no usage", async () => {
+      await streamTimedDeltas(undefined);
+
+      // A delta is not a token, so nothing here counts them exactly.
+      expect(updateGenerationRate).toHaveBeenCalledWith(undefined);
+    });
+
     it("streams a text response and updates state", async () => {
       const { generateTextWithOpenAi } = await import(
         "./textGenerationWithOpenAi"

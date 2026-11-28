@@ -4,9 +4,11 @@ import {
   selectRandomModel,
 } from "@shared/openaiModels";
 import { streamText } from "ai";
+import { GenerationRateMeter } from "@/modules/generationRate";
 import { addLogEntry } from "@/modules/logEntries";
 import {
   getSettings,
+  updateGenerationRate,
   updateResponse,
   updateTextGenerationState,
 } from "@/modules/pubSub";
@@ -27,11 +29,19 @@ interface StreamOptions {
   messages: ChatMessage[];
   onUpdate: (text: string, reasoningContent?: string) => void;
   signal?: AbortSignal;
+  /** Times the main answer for the speed line; a chat reply passes none. */
+  rateMeter?: GenerationRateMeter;
 }
 
 interface StreamResult {
   text: string;
   reasoningContent?: string;
+  /**
+   * The completion tokens the backend reported, which is the only exact count
+   * this path has: a streamed delta is not always one token. Only some
+   * OpenAI-compatible backends report usage, and then only at the end.
+   */
+  outputTokens?: number;
 }
 
 /**
@@ -56,11 +66,16 @@ async function createOpenAiStream({
   messages,
   onUpdate,
   signal,
+  rateMeter,
 }: StreamOptions): Promise<StreamResult> {
   const settings = getSettings();
   const openaiProvider = createOpenAICompatible({
     name: settings.openAiApiBaseUrl,
     baseURL: settings.openAiApiBaseUrl,
+    // Asks the server for the token usage at the end of the stream
+    // (`stream_options.include_usage`), the only exact count it gives; the
+    // provider leaves it off unless asked.
+    includeUsage: true,
     apiKey: settings.openAiApiKey,
   });
 
@@ -116,15 +131,27 @@ async function createOpenAiStream({
 
       let text = "";
       let reasoning = "";
+      let outputTokens: number | undefined;
       let streamError: unknown;
 
       for await (const part of result.stream) {
         if (part.type === "reasoning-delta") {
           reasoning += part.text;
+          rateMeter?.onDelta();
           onUpdate(text, reasoning);
         } else if (part.type === "text-delta") {
           text += part.text;
+          rateMeter?.onDelta();
           onUpdate(text, reasoning);
+        } else if (part.type === "finish") {
+          // The completion count includes reasoning tokens. When the server
+          // kept its reasoning to itself, their time never reached the clock,
+          // so only the text tokens are counted against it.
+          outputTokens =
+            reasoning.length > 0
+              ? part.totalUsage.outputTokens
+              : (part.totalUsage.outputTokenDetails?.textTokens ??
+                part.totalUsage.outputTokens);
         } else if (part.type === "error") {
           streamError = part.error;
         }
@@ -157,7 +184,7 @@ async function createOpenAiStream({
         }
       }
 
-      return { text, reasoningContent: reasoning };
+      return { text, reasoningContent: reasoning, outputTokens };
     } catch (error) {
       if (
         signal?.aborted ||
@@ -186,9 +213,12 @@ export async function generateTextWithOpenAi(
 
   let generating = false;
 
+  const rateMeter = new GenerationRateMeter();
+
   const result = await createOpenAiStream({
     messages,
     signal,
+    rateMeter,
     onUpdate: (text, reasoningContent) => {
       if (
         !generating &&
@@ -201,6 +231,9 @@ export async function generateTextWithOpenAi(
       updateResponse(composeResponseText(text, reasoningContent, settings));
     },
   });
+
+  rateMeter.setTokenCount(result.outputTokens);
+  updateGenerationRate(rateMeter.rate());
 
   return composeResponseText(result.text, result.reasoningContent, settings);
 }

@@ -77,12 +77,19 @@ const settings = {
   reasoningEndMarker: "</think>",
 };
 
-function renderContent(textGenerationState: string, response = "Hello world") {
-  // Each render reads the settings, then the speech state.
+function renderContent(
+  textGenerationState: string,
+  response = "Hello world",
+  generationRate?: string,
+) {
+  // Each render reads the settings, the speech state, then the speed.
   let call = 0;
-  vi.mocked(usePubSub).mockImplementation(() =>
-    call++ % 2 === 0 ? [settings, vi.fn()] : ["idle", vi.fn()],
-  );
+  vi.mocked(usePubSub).mockImplementation(() => {
+    const slot = call++ % 3;
+    if (slot === 0) return [settings, vi.fn()];
+    if (slot === 1) return ["idle", vi.fn()];
+    return [generationRate, vi.fn()];
+  });
 
   const ui = (state: string) => (
     <MantineProvider>
@@ -245,5 +252,23 @@ describe("AiResponseContent", () => {
     expect(
       screen.queryByRole("button", { name: "Download as Markdown" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the generation speed once it is known", () => {
+    renderContent("completed", "Hello world", "42 tokens/s");
+
+    expect(screen.getByText("42 tokens/s")).toBeInTheDocument();
+  });
+
+  it("shows no generation speed while the answer is still generating", () => {
+    renderContent("generating", "Hello world", "42 tokens/s");
+
+    expect(screen.queryByText("42 tokens/s")).not.toBeInTheDocument();
+  });
+
+  it("shows no generation speed when none is known", () => {
+    renderContent("completed");
+
+    expect(screen.queryByText(/tokens\/s/)).not.toBeInTheDocument();
   });
 });
