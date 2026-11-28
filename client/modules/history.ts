@@ -354,11 +354,17 @@ export async function updateSearchResults(
   }
 }
 
+function storedImageKey(item: ImageResults["items"][number]): string {
+  return item.sourceUrl || item.thumbnail;
+}
+
 /**
  * Adds `results` to the images stored for the search instead of replacing them.
  * Every image write goes through here: the screen can lack images the stored
  * list has (a late first search merged after the user left and came back), so
- * replacing it with the screen's list would drop them. A URL is stored once.
+ * replacing it with the screen's list would drop them. An image is stored once,
+ * identified as on screen by its full-size source or thumbnail, so several
+ * images from one page are all kept.
  * With `newFirst`, the new images go ahead of the stored ones; otherwise after.
  */
 export async function mergeSearchImageResults(
@@ -381,8 +387,10 @@ export async function mergeSearchImageResults(
             latest.imageResults ??
             (latest.results?.type === "image" ? latest.results : undefined)
           )?.items ?? [];
-        const newUrls = new Set(results.items.map((item) => item.url));
-        const keptItems = storedItems.filter((item) => !newUrls.has(item.url));
+        const newKeys = new Set(results.items.map(storedImageKey));
+        const keptItems = storedItems.filter(
+          (item) => !newKeys.has(storedImageKey(item)),
+        );
         await historyDatabase.searches.update(latest.id, {
           imageResults: {
             type: "image",
