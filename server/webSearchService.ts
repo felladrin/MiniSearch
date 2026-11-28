@@ -497,13 +497,18 @@ export async function fetchSupplementarySearXNG(
   limit: number,
   signal?: AbortSignal,
   timeRange?: SearxngTimeRange,
+  language?: string,
 ) {
   // The lane's results are merged into the main ones, so they have to honor
-  // the same time range, or a filtered search shows unfiltered pages.
-  const response = await fetch(buildSearchUrl(query, "text", timeRange), {
-    headers: { Accept: "application/json" },
-    signal,
-  });
+  // the same time range and language, or a filtered search shows unfiltered
+  // pages.
+  const response = await fetch(
+    buildSearchUrl(query, "text", timeRange, language),
+    {
+      headers: { Accept: "application/json" },
+      signal,
+    },
+  );
 
   if (!response.ok) {
     await discardBody(response);

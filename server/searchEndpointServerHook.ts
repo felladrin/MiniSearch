@@ -158,6 +158,7 @@ async function officialLaneResults(
   limit: number,
   remainingMs: number,
   timeRange: SearxngTimeRange | undefined,
+  language: string | undefined,
 ): Promise<TextResult[]> {
   const budgetMs = Math.min(
     MAX_OFFICIAL_LANE_TIMEOUT_MS,
@@ -178,6 +179,7 @@ async function officialLaneResults(
       limit,
       AbortSignal.timeout(budgetMs),
       timeRange,
+      language,
     );
 
     const merged = mergeOfficialLaneResults(results, laneResults, lane.domain);
@@ -358,6 +360,7 @@ export function searchEndpointServerHook<
             limit,
             remainingMs,
             timeRange,
+            language,
           );
         }
 

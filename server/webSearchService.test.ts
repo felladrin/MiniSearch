@@ -1273,6 +1273,23 @@ describe("fetchSupplementarySearXNG", () => {
     expect(url.searchParams.get("time_range")).toBe("week");
   });
 
+  it("sends the language it is given", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(JSON.stringify({ results: [] })),
+    );
+
+    await fetchSupplementarySearXNG(
+      "site:example.com test",
+      30,
+      undefined,
+      undefined,
+      "pt-BR",
+    );
+
+    const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url.searchParams.get("language")).toBe("pt-BR");
+  });
+
   it("fails on the first error status, without retrying", async () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 500));
     const before = healthBookkeeping();

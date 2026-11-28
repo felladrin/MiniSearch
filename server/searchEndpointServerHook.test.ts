@@ -1168,6 +1168,27 @@ describe("searchEndpointServerHook", () => {
         30,
         expect.any(AbortSignal),
         "day",
+        undefined,
+      );
+    });
+
+    it("gives the supplementary search the same language", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSupplementarySearXNG).mockResolvedValue([]);
+      const handler = getRegisteredHandler();
+
+      await handler(
+        createRequest(`${query}&language=pt-BR`),
+        createResponse(),
+        vi.fn(),
+      );
+
+      expect(fetchSupplementarySearXNG).toHaveBeenCalledWith(
+        "site:disney.com disney showtimes",
+        30,
+        expect.any(AbortSignal),
+        undefined,
+        "pt-BR",
       );
     });
 
@@ -1186,6 +1207,7 @@ describe("searchEndpointServerHook", () => {
         "site:disney.com disney showtimes",
         30,
         expect.any(AbortSignal),
+        undefined,
         undefined,
       );
       expect(response.end).toHaveBeenCalledWith(

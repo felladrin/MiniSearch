@@ -1,8 +1,10 @@
 /**
  * The language choices the client offers, in the order the select lists them.
  * `browser` is MiniSearch's own value and is never sent: the client resolves it
- * to `navigator.language` at search time. `all` is SearXNG's own "no
- * preference", and every other value is a locale code, region included, since
+ * to `navigator.language` at search time. `auto` asks SearXNG to detect the
+ * language from the query, as every search did before this setting existed.
+ * `all` is SearXNG's own "no preference", and every other value is a locale
+ * code, region included, since
  * SearXNG has no separate country parameter — `pt-BR` is Portuguese served by
  * Brazil's engine editions.
  *
@@ -11,6 +13,7 @@
  */
 export const searchLanguageOptions = [
   { value: "browser", label: "Browser language" },
+  { value: "auto", label: "Detect from the query" },
   { value: "all", label: "Any language" },
   { value: "en-US", label: "English (United States)" },
   { value: "en-GB", label: "English (United Kingdom)" },
@@ -46,7 +49,7 @@ const searxngLanguageCode = /^[a-z]{2,3}(-[a-zA-Z]{2})?$/;
 /** Whether SearXNG takes this value for its `language` parameter. */
 export function isSearxngLanguage(value: string): boolean {
   // `all` matches the pattern above on its own; `auto` is the one other value
-  // SearXNG accepts, and only a direct API caller sends it.
+  // SearXNG accepts.
   return value === "auto" || searxngLanguageCode.test(value);
 }
 
@@ -56,16 +59,20 @@ export function isSearxngLanguage(value: string): boolean {
  * the request carries the browser's own locale instead of the guess SearXNG
  * would have to make from the query text.
  *
- * A browser locale SearXNG cannot take is dropped rather than sent: the server
- * answers such a value 400, and a search that cannot state its preference is
- * better served unfiltered than refused outright.
+ * A browser locale SearXNG cannot take, such as Chrome's `es-419` (Latin
+ * American Spanish) or `zh-Hant-TW`, falls back to its language subtag (`es`,
+ * `zh`), and is dropped only when even that does not fit: the server answers
+ * such a value 400, and a search that cannot state its preference is better
+ * served unfiltered than refused outright.
  */
 export function resolveSearchLanguage(
   setting: SearchLanguage | undefined,
   browserLanguage: string,
 ): string | undefined {
   if (setting === "browser") {
-    return isSearxngLanguage(browserLanguage) ? browserLanguage : undefined;
+    if (isSearxngLanguage(browserLanguage)) return browserLanguage;
+    const primary = browserLanguage.split("-")[0] ?? "";
+    return isSearxngLanguage(primary) ? primary : undefined;
   }
   return setting;
 }

@@ -10,15 +10,28 @@ describe("resolveSearchLanguage", () => {
     expect(resolveSearchLanguage("browser", "pt-BR")).toBe("pt-BR");
   });
 
-  it("sends nothing when the browser reports a locale SearXNG cannot take", () => {
+  it.each([
+    ["es-419", "es"],
+    ["zh-Hant-TW", "zh"],
+    ["pt-BR-brazil", "pt"],
+  ])(
+    "falls back to the language subtag of %s, which SearXNG cannot take",
+    (browserLanguage, sent) => {
+      expect(resolveSearchLanguage("browser", browserLanguage)).toBe(sent);
+    },
+  );
+
+  it("sends nothing when even the language subtag does not fit", () => {
     // The server answers such a value 400, so the search is better served
     // without a language than refused outright.
-    expect(resolveSearchLanguage("browser", "pt-BR-brazil")).toBeUndefined();
+    expect(resolveSearchLanguage("browser", "x-klingon")).toBeUndefined();
+    expect(resolveSearchLanguage("browser", "")).toBeUndefined();
   });
 
   it("sends a chosen locale as it is, whatever the browser reports", () => {
     expect(resolveSearchLanguage("pt-BR", "en-US")).toBe("pt-BR");
     expect(resolveSearchLanguage("all", "en-US")).toBe("all");
+    expect(resolveSearchLanguage("auto", "en-US")).toBe("auto");
   });
 
   it("sends nothing for a search that has no language setting at all", () => {
