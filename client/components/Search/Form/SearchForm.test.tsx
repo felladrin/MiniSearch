@@ -118,6 +118,25 @@ describe("SearchForm component", () => {
     await waitForPlaceholder();
   });
 
+  it("offers the five time ranges in the button row", async () => {
+    // Mantine scrolls the selected option into view, which jsdom does not have.
+    Element.prototype.scrollIntoView = vi.fn();
+    const user = userEvent.setup();
+    renderSearchForm("hello", vi.fn());
+    await screen.findByRole("textbox");
+
+    const timeRange = screen.getByRole("combobox", { name: /time range/i });
+    expect(timeRange).toHaveValue("Anytime");
+
+    await user.click(timeRange);
+
+    expect(
+      screen
+        .getAllByRole("option", { hidden: true })
+        .map((option) => option.textContent),
+    ).toEqual(["Anytime", "Past day", "Past week", "Past month", "Past year"]);
+  });
+
   describe("the suggestion for an emptied field", () => {
     it("is taken once when the last character is deleted", async () => {
       const user = userEvent.setup();

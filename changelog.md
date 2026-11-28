@@ -2,9 +2,14 @@
 
 Notable changes, grouped by date, most recent first.
 
-## 2026-11-27
+## 2026-11-28
 
 - An in-browser model that is already downloaded now loads without asking Hugging Face first. Every load used to request the model's file list from the Hugging Face API before it looked at the browser's cache, twice per answer, so an API outage, a rate limit or a blocked `huggingface.co` stopped answers for a model that was already on the device. Models now load straight from their file URL, which is also the address the cache stores them under.
+- Searches can be limited to the past day, week, month or year. The time filter sits next to the Search button and in the search settings, both bound to one setting that survives a reload, and SearXNG gets its `time_range` for it. Anytime is the default and sends nothing, so an unfiltered search reaches SearXNG exactly as it did before. The AI prompt keeps using the query as typed, so only the results are shaped by the period. When SearXNG is down and a fallback provider answers instead, that provider takes only a query and a count and cannot filter by time, so the results now say "Time filter not applied to these results" instead of looking filtered; `/search/text` announces it with an `X-Search-Time-Range-Applied: false` response header, and a search served from the browser's cache keeps saying it.
+
+## 2026-11-27
+
+- An answer that finishes after you delete its search from History is no longer saved. It used to be stored anyway, with no search to point to, so it stayed in the browser's storage where you could neither see nor remove it. It still shows in the open tab until you leave the search.
 - Image search now shows every image the search finds on a page, not just the first. Images were told apart by the page they were found on, so several different images from one gallery page came back as one result, and the carousel showed one photo where there were several. Images are now told apart by their full-size image, or their thumbnail when there is none, when results are deduplicated and reranked, when a follow-up's images are merged in, and when images are saved to history. The same image reported twice is still shown once.
 - The in-browser AI model list now marks the models that are already downloaded. A model whose files are all in the browser's cache shows "• Downloaded" after its name, so a model that starts answering at once no longer looks the same as one that first downloads hundreds of megabytes. A model whose download stopped halfway is not marked, and the list is checked again each time it opens, so a download that finishes during the visit shows up without a reload.
 - Starting a new search from the results page now ends dictation, releases the microphone and discards any pending transcript. You can start dictating again right away.

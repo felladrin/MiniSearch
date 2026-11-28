@@ -32,6 +32,7 @@ import {
   updateTextSearchResults,
   updateTextSearchStale,
   updateTextSearchState,
+  updateTextSearchTimeFilterNotApplied,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
 import { getLatestSearchAttempt, recordSearchAttempt } from "./searchAttempts";
@@ -360,6 +361,8 @@ export async function searchAndRespond() {
   updateTextSearchResults([]);
 
   updateTextSearchStale(false);
+
+  updateTextSearchTimeFilterNotApplied(false);
 
   updateLlmTextSearchResults([]);
 
@@ -745,9 +748,21 @@ async function startTextSearch(query: string, invocation: number) {
     try {
       // A query with no keywords left has nothing to send, which is an empty
       // result set rather than a failed search.
-      let { results: textResults, stale } = searchQuery
-        ? await searchText(searchQuery, getSettings().searchResultsLimit)
-        : { results: [] as TextSearchResults, stale: false };
+      let {
+        results: textResults,
+        stale,
+        timeFilterNotApplied,
+      } = searchQuery
+        ? await searchText(
+            searchQuery,
+            getSettings().searchResultsLimit,
+            getSettings().searchTimeRange,
+          )
+        : {
+            results: [] as TextSearchResults,
+            stale: false,
+            timeFilterNotApplied: false,
+          };
 
       if (textResults.length === 0) {
         const keywordQuery = normalizeRelativeDates(
@@ -760,9 +775,11 @@ async function startTextSearch(query: string, invocation: number) {
           const keywordOutcome = await searchText(
             keywordQuery,
             getSettings().searchResultsLimit,
+            getSettings().searchTimeRange,
           );
           textResults = keywordOutcome.results;
           stale = keywordOutcome.stale;
+          timeFilterNotApplied = keywordOutcome.timeFilterNotApplied;
         }
       }
 
@@ -775,6 +792,7 @@ async function startTextSearch(query: string, invocation: number) {
 
       if (isCurrent()) {
         updateTextSearchStale(stale);
+        updateTextSearchTimeFilterNotApplied(Boolean(timeFilterNotApplied));
         updateTextSearchState("completed");
         updateTextSearchResults(textResults);
         updateLlmTextSearchResults(resultsForLlm);
@@ -802,6 +820,7 @@ async function startTextSearch(query: string, invocation: number) {
       addLogEntry(`Text search failed: ${error}`);
       if (isCurrent()) {
         updateTextSearchStale(false);
+        updateTextSearchTimeFilterNotApplied(false);
         updateTextSearchState("failed");
       }
       textSearchFailed = true;
@@ -856,6 +875,7 @@ async function startImageSearch(
     const { results: imageResults } = await searchImages(
       searchQuery,
       getSettings().searchResultsLimit,
+      getSettings().searchTimeRange,
     );
     results.imageResults = imageResults;
 

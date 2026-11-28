@@ -146,6 +146,7 @@ Settings are stored in browser localStorage and can be changed via the Settings 
 | `enableImageSearch`              | boolean | `true`     | Include image results in searches                                                                       |
 | `enableTextSearch`               | boolean | `true`     | Include text results in searches                                                                        |
 | `searchResultsLimit`             | number  | `15`       | Maximum search results to fetch                                                                         |
+| `searchTimeRange`                | string  | `any`      | Only return results published within this period: `any`, `day`, `week`, `month` or `year`               |
 | `systemPrompt`                   | string  | (template) | Custom system prompt template for AI                                                                    |
 | `enterToSubmit`                  | boolean | `true`     | Press Enter to submit query (vs Shift+Enter for new line)                                               |
 | `enableAiResponseScrolling`      | boolean | `true`     | Auto-scroll AI response as it generates                                                                 |

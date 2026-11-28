@@ -94,6 +94,7 @@ vi.mock("./pubSub", () => ({
   updateTextSearchStale: vi.fn((value: boolean) => {
     harness.state.staleFlag = value;
   }),
+  updateTextSearchTimeFilterNotApplied: vi.fn(),
   getTextSearchStale: () => harness.state.staleFlag,
 }));
 
