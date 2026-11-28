@@ -2,6 +2,10 @@
 
 Notable changes, grouped by date, most recent first.
 
+## 2026-11-28
+
+- Searches can be limited to the past day, week, month or year. The time filter sits next to the Search button and in the search settings, both bound to one setting that survives a reload, and SearXNG gets its `time_range` for it. Anytime is the default and sends nothing, so an unfiltered search reaches SearXNG exactly as it did before. The AI prompt keeps using the query as typed, so only the results are shaped by the period. When SearXNG is down and a fallback provider answers instead, that provider takes only a query and a count and cannot filter by time, so the results now say "Time filter not applied to these results" instead of looking filtered; `/search/text` announces it with an `X-Search-Time-Range-Applied: false` response header, and a search served from the browser's cache keeps saying it.
+
 ## 2026-11-27
 
 - An answer that finishes after you delete its search from History is no longer saved. It used to be stored anyway, with no search to point to, so it stayed in the browser's storage where you could neither see nor remove it. It still shows in the open tab until you leave the search.

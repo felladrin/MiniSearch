@@ -1257,6 +1257,22 @@ describe("fetchSupplementarySearXNG", () => {
     expect(healthBookkeeping()).toEqual(before);
   });
 
+  it("sends the time range it is given", async () => {
+    fetchMock.mockResolvedValue(
+      createMockResponse(JSON.stringify({ results: [] })),
+    );
+
+    await fetchSupplementarySearXNG(
+      "site:example.com test",
+      30,
+      undefined,
+      "week",
+    );
+
+    const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url.searchParams.get("time_range")).toBe("week");
+  });
+
   it("fails on the first error status, without retrying", async () => {
     fetchMock.mockResolvedValue(createMockResponse("", false, 500));
     const before = healthBookkeeping();
@@ -1411,5 +1427,56 @@ describe("failed response bodies", () => {
     );
 
     expect(answer.cancel).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("time_range parameter", () => {
+  /** The query parameters of the SearXNG request the search just made. */
+  function sentParams() {
+    return new URL(fetchMock.mock.calls[0][0] as string).searchParams;
+  }
+
+  it("sends no time_range when the search asks for any time", async () => {
+    fetchMock.mockResolvedValue(successResponse());
+
+    await fetchSearXNG("test", "text", 30);
+
+    expect(sentParams().has("time_range")).toBe(false);
+    expect(sentParams().get("categories")).toBe("general");
+  });
+
+  it.each(["day", "week", "month", "year"] as const)(
+    "sends time_range=%s next to the categories it already sent",
+    async (timeRange) => {
+      fetchMock.mockResolvedValue(successResponse());
+
+      await fetchSearXNG(
+        "test",
+        "text",
+        30,
+        new CircuitBreaker(),
+        undefined,
+        timeRange,
+      );
+
+      expect(sentParams().get("time_range")).toBe(timeRange);
+      expect(sentParams().get("categories")).toBe("general");
+    },
+  );
+
+  it("sends it on an image search too", async () => {
+    fetchMock.mockResolvedValue(successResponse());
+
+    await fetchSearXNG(
+      "test",
+      "images",
+      30,
+      new CircuitBreaker(),
+      undefined,
+      "week",
+    );
+
+    expect(sentParams().get("time_range")).toBe("week");
+    expect(sentParams().get("categories")).toBe("images,videos");
   });
 });

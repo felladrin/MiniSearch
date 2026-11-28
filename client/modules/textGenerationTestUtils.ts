@@ -117,5 +117,6 @@ export function pubSubMock(getSettings: () => unknown) {
     updateTextSearchResults: vi.fn(),
     updateTextSearchStale: vi.fn(),
     updateTextSearchState: vi.fn(),
+    updateTextSearchTimeFilterNotApplied: vi.fn(),
   };
 }
