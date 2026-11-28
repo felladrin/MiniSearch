@@ -20,6 +20,7 @@ vi.mock("./pubSub", () => ({
   updatePageContents: vi.fn(),
   updateTextSearchResults: vi.fn(),
   updateTextSearchStale: vi.fn(),
+  updateTextSearchTimeFilterNotApplied: vi.fn(),
 }));
 vi.mock("./pageContent", () => ({
   fetchPageContents: vi.fn(() => Promise.resolve({})),
@@ -251,6 +252,7 @@ describe("runFollowUpSearch", () => {
       enableImageSearch: true,
       enablePageContentFetch: true,
       searchResultsLimit: 10,
+      searchTimeRange: "any",
       ...overrides,
     }) as unknown as Parameters<typeof runFollowUpSearch>[2];
 
@@ -348,8 +350,8 @@ describe("runFollowUpSearch", () => {
     }
 
     const anchoredQuery = "new series on disney plus next month December 2026";
-    expect(mockSearchText).toHaveBeenCalledWith(anchoredQuery, 10);
-    expect(mockSearchImages).toHaveBeenCalledWith(anchoredQuery, 10);
+    expect(mockSearchText).toHaveBeenCalledWith(anchoredQuery, 10, "any");
+    expect(mockSearchImages).toHaveBeenCalledWith(anchoredQuery, 10, "any");
   });
 
   it("replaces the year the model wrote with the one the question means", async () => {
@@ -382,6 +384,7 @@ describe("runFollowUpSearch", () => {
     expect(mockSearchText).toHaveBeenCalledWith(
       "who won world series 2025",
       10,
+      "any",
     );
   });
 
@@ -491,6 +494,7 @@ describe("follow-up supersession ownership", () => {
       enableImageSearch: true,
       enablePageContentFetch: true,
       searchResultsLimit: 10,
+      searchTimeRange: "any",
       ...overrides,
     }) as unknown as Parameters<typeof runFollowUpSearch>[2];
 

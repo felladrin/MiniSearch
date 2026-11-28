@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
+import type { SearxngTimeRange } from "../shared/searchTimeRange.ts";
 import {
   type EngineFailure,
   getDegradedSearchTypes,
@@ -163,10 +164,17 @@ export async function getWebSearchServiceStatus(
   return getDegradedSearchTypes().length > 0 ? "degraded" : "healthy";
 }
 
-function buildSearchUrl(query: string, searchType: SearchType) {
+function buildSearchUrl(
+  query: string,
+  searchType: SearchType,
+  timeRange?: SearxngTimeRange,
+) {
   const params = new URLSearchParams(defaultSearchParams);
   params.set("q", query);
   params.set("categories", searchType === "text" ? "general" : "images,videos");
+  // Left out rather than sent empty, so a search with no time range reaches
+  // SearXNG exactly as it did before the filter existed.
+  if (timeRange) params.set("time_range", timeRange);
   return `${SERVICE_BASE_URL}/search?${params.toString()}`;
 }
 
@@ -288,8 +296,9 @@ async function performSearch(
   query: string,
   searchType: SearchType,
   signal?: AbortSignal,
+  timeRange?: SearxngTimeRange,
 ): Promise<SearxngSearchResult[]> {
-  const searchUrl = buildSearchUrl(query, searchType);
+  const searchUrl = buildSearchUrl(query, searchType, timeRange);
 
   let retryReason = "";
 
@@ -370,11 +379,12 @@ async function processSearchResults(
   limit: number,
   breaker: CircuitBreaker,
   signal?: AbortSignal,
+  timeRange?: SearxngTimeRange,
 ) {
   // An abort is thrown inside `execute`, so a stalled SearXNG counts as a
   // failure as soon as the deadline passes.
   const results = await breaker.execute(circuitKey(searchType), () =>
-    performSearch(query, searchType, signal),
+    performSearch(query, searchType, signal, timeRange),
   );
   const openableResults = openableUniqueResults(results);
 
@@ -427,6 +437,9 @@ function reportDiscardedResults<T>(
  * `signal` bounds the whole search, retries and backoff included: every fetch
  * gets it, and a backoff ends when it fires. Without one, a stalled SearXNG
  * holds the request for undici's 300 s default.
+ *
+ * `timeRange` is SearXNG's own `time_range`, and is left out for a search that
+ * accepts any time.
  */
 export async function fetchSearXNG(
   query: string,
@@ -434,6 +447,7 @@ export async function fetchSearXNG(
   limit = 30,
   breaker: CircuitBreaker = searxngCircuitBreaker,
   signal?: AbortSignal,
+  timeRange?: SearxngTimeRange,
 ) {
   try {
     return await processSearchResults(
@@ -442,6 +456,7 @@ export async function fetchSearXNG(
       limit,
       breaker,
       signal,
+      timeRange,
     );
   } catch (error) {
     // Upstream failure (bad status, network error, malformed body, open

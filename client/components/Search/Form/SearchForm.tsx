@@ -1,4 +1,5 @@
-import { Button, Group, Stack, Textarea } from "@mantine/core";
+import { Button, Group, Select, Stack, Textarea } from "@mantine/core";
+import { searchTimeRangeOptions } from "@shared/searchTimeRange";
 import { usePubSub } from "create-pubsub/react";
 import {
   type ChangeEvent,
@@ -72,7 +73,7 @@ export default memo(function SearchForm({
   const [dictationSessionKey, setDictationSessionKey] = useState(0);
 
   const [, navigate] = useLocation();
-  const [pubSubSettings] = usePubSub(settingsPubSub);
+  const [pubSubSettings, setPubSubSettings] = usePubSub(settingsPubSub);
   const [isRestoringFromHistory] = usePubSub(isRestoringFromHistoryPubSub);
   const { addToHistory } = useSearchHistory();
   const { restoreSearch } = useHistoryRestore((newQuery) => {
@@ -259,6 +260,23 @@ export default memo(function SearchForm({
         </div>
         <Group gap="xs">
           <HistoryButton onSearchSelect={restoreSearch} />
+          <Select
+            // Compact by design: the row sits under the query field, and the
+            // period it sets is spelled out in the search settings too.
+            size="xs"
+            w={104}
+            aria-label="Time range"
+            data={searchTimeRangeOptions}
+            value={pubSubSettings.searchTimeRange}
+            allowDeselect={false}
+            onChange={(timeRange) => {
+              if (!timeRange) return;
+              setPubSubSettings({
+                ...pubSubSettings,
+                searchTimeRange: timeRange,
+              });
+            }}
+          />
           {state.textAreaValue.length >= 1 && (
             <Button
               size="xs"

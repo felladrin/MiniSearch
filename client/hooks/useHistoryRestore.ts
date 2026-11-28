@@ -30,6 +30,7 @@ import {
   updateTextSearchResults,
   updateTextSearchStale,
   updateTextSearchState,
+  updateTextSearchTimeFilterNotApplied,
 } from "../modules/pubSub";
 import { cancelSearchAnswer } from "../modules/textGeneration";
 import type { ImageSearchResults, TextSearchResults } from "../modules/types";
@@ -84,6 +85,9 @@ export function useHistoryRestore(
         // Replacing the chat also replaces the source material it can use.
         updatePageContents({});
         updateTextSearchStale(false);
+        // The stored results carry no record of the filter they were found
+        // with, so the note belongs to the search that is being replaced.
+        updateTextSearchTimeFilterNotApplied(false);
         const results = hasTextResults(entry)
           ? getResultsFromEntry(entry)
           : null;

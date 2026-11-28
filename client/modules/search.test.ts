@@ -1,3 +1,4 @@
+import type { SearchTimeRange } from "@shared/searchTimeRange";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invalidateConfig } from "./config";
 import { addLogEntry } from "./logEntries";
@@ -18,23 +19,39 @@ vi.mock("./searchTokenHash", () => ({
 
 const mockFetch = vi.fn();
 
-/** Answers every following `/search` fetch with `results`. */
-function mockSearchResponse(results: string[][]) {
-  mockFetch.mockResolvedValue({
+/**
+ * A search response, carrying the `headers` a real `Response` always has: the
+ * module reads one of them to tell an answer that carries no time filter from
+ * one that does.
+ */
+function searchResponse(
+  results: string[][],
+  headers: Record<string, string> = {},
+) {
+  return {
     ok: true,
     json: vi.fn().mockResolvedValue(results),
-  });
+    headers: { get: (name: string) => headers[name] ?? null },
+  };
+}
+
+/** Answers every following `/search` fetch with `results`. */
+function mockSearchResponse(
+  results: string[][],
+  headers?: Record<string, string>,
+) {
+  mockFetch.mockResolvedValue(searchResponse(results, headers));
 }
 vi.stubGlobal("fetch", mockFetch);
 vi.stubGlobal("self", {
   location: new URL("http://localhost:3000"),
 });
 
-const mockFetchResponse = (results: string[][]) => {
-  mockFetch.mockResolvedValue({
-    ok: true,
-    json: vi.fn().mockResolvedValue(results),
-  });
+const mockFetchResponse = (
+  results: string[][],
+  headers?: Record<string, string>,
+) => {
+  mockFetch.mockResolvedValue(searchResponse(results, headers));
 };
 
 describe("Search Module", () => {
@@ -102,6 +119,28 @@ describe("Search Module", () => {
       expect(hashOmitted).toBe(hashUndefined);
     });
 
+    it("should include the time range in the hash so different periods produce different keys", async () => {
+      const { hashQuery } = searchModule.searchServiceInstance;
+      const hashes = await Promise.all(
+        ["any", "day", "week", "month", "year"].map((timeRange) =>
+          hashQuery("test query", 10, timeRange as SearchTimeRange),
+        ),
+      );
+      expect(new Set(hashes).size).toBe(5);
+    });
+
+    it("should keep an Anytime key the one it was before the filter existed", async () => {
+      const { hashQuery } = searchModule.searchServiceInstance;
+      // Anytime adds nothing to the hashed input, so the entries cached before
+      // the setting existed are still the ones an Anytime search reads.
+      expect(await hashQuery("test query", 10, "any")).toBe(
+        await hashQuery("test query", 10),
+      );
+      expect(await hashQuery("test query", 10, undefined)).toBe(
+        await hashQuery("test query", 10),
+      );
+    });
+
     it("should return a deterministic hex string of fixed length", async () => {
       const hash =
         await searchModule.searchServiceInstance.hashQuery("any query");
@@ -160,6 +199,34 @@ describe("Search Module", () => {
 
       const calledUrl = mockFetch.mock.calls[0][0] as string;
       expect(calledUrl).toContain("limit=10");
+    });
+
+    it("should send the time range as a query parameter", async () => {
+      mockFetchResponse([]);
+
+      await searchModule.searchServiceInstance.performSearch<string[][]>(
+        "text",
+        "test",
+        10,
+        "week",
+      );
+
+      const calledUrl = mockFetch.mock.calls[0][0] as string;
+      expect(calledUrl).toContain("time_range=week");
+    });
+
+    it("should send no time range for Anytime", async () => {
+      mockFetchResponse([]);
+
+      await searchModule.searchServiceInstance.performSearch<string[][]>(
+        "text",
+        "test",
+        10,
+        "any",
+      );
+
+      const calledUrl = mockFetch.mock.calls[0][0] as string;
+      expect(calledUrl).not.toContain("time_range");
     });
 
     it("should throw on non-OK response", async () => {
@@ -225,7 +292,7 @@ describe("Search Module", () => {
           "text",
           "a".repeat(2000),
         ),
-      ).resolves.toEqual([]);
+      ).resolves.toEqual({ results: [], timeFilterNotApplied: false });
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -342,17 +409,14 @@ describe("Search Module", () => {
         .mockResolvedValueOnce("fresh-token-hash");
       mockFetch
         .mockResolvedValueOnce({ ok: false, status: 401 })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: vi.fn().mockResolvedValue(mockResults),
-        });
+        .mockResolvedValueOnce(searchResponse(mockResults));
 
       await expect(
         searchModule.searchServiceInstance.performSearch<string[][]>(
           "text",
           "test query",
         ),
-      ).resolves.toEqual(mockResults);
+      ).resolves.toEqual({ results: mockResults, timeFilterNotApplied: false });
 
       expect(invalidateConfig).toHaveBeenCalledTimes(1);
       expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -456,11 +520,19 @@ describe("Search Module", () => {
       mockSearchResponse(mockResults);
 
       const firstResults = await searchModule.searchText("cached query");
-      expect(firstResults).toEqual({ results: mockResults, stale: false });
+      expect(firstResults).toEqual({
+        results: mockResults,
+        stale: false,
+        timeFilterNotApplied: false,
+      });
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       const secondResults = await searchModule.searchText("cached query");
-      expect(secondResults).toEqual({ results: mockResults, stale: false });
+      expect(secondResults).toEqual({
+        results: mockResults,
+        stale: false,
+        timeFilterNotApplied: false,
+      });
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining("Text search: Reused 1 results from the cache"),
@@ -477,11 +549,19 @@ describe("Search Module", () => {
       mockSearchResponse(mockResults);
 
       const firstResults = await searchModule.searchImages("cached images");
-      expect(firstResults).toEqual({ results: mockResults, stale: false });
+      expect(firstResults).toEqual({
+        results: mockResults,
+        stale: false,
+        timeFilterNotApplied: false,
+      });
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       const secondResults = await searchModule.searchImages("cached images");
-      expect(secondResults).toEqual({ results: mockResults, stale: false });
+      expect(secondResults).toEqual({
+        results: mockResults,
+        stale: false,
+        timeFilterNotApplied: false,
+      });
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(addLogEntry).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -515,6 +595,28 @@ describe("Search Module", () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
+    it("should treat different time ranges as separate cache entries", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockSearchResponse(mockResults);
+
+      await searchModule.searchText("same query", 5, "week");
+      await searchModule.searchText("same query", 5, "month");
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("should read an Anytime search from the entry cached without a time range", async () => {
+      const mockResults: string[][] = [
+        ["Title", "Snippet", "https://example.com"],
+      ];
+      mockSearchResponse(mockResults);
+
+      await searchModule.searchText("anytime query", 5);
+      await searchModule.searchText("anytime query", 5, "any");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
     it("should refetch when TTL expires", async () => {
       const mockResults: string[][] = [
         ["Title", "Snippet", "https://example.com"],
@@ -527,7 +629,11 @@ describe("Search Module", () => {
       searchModule.searchServiceInstance.updateCacheConfig({ ttl: 0 });
 
       const secondResults = await searchModule.searchText("ttl query");
-      expect(secondResults).toEqual({ results: mockResults, stale: false });
+      expect(secondResults).toEqual({
+        results: mockResults,
+        stale: false,
+        timeFilterNotApplied: false,
+      });
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
@@ -569,7 +675,11 @@ describe("Search Module", () => {
       mockSearchResponse(mockResults);
 
       const first = await searchModule.searchText("stale query");
-      expect(first).toEqual({ results: mockResults, stale: false });
+      expect(first).toEqual({
+        results: mockResults,
+        stale: false,
+        timeFilterNotApplied: false,
+      });
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       searchModule.searchServiceInstance.updateCacheConfig({ ttl: 0 });
@@ -618,6 +728,55 @@ describe("Search Module", () => {
     // The read-side recheck is the backup for a cleanup pass that failed;
     // pinning it alone would require reaching the internal database, which is
     // not exported, so this test pins the pair (cleanup plus recheck).
+  });
+
+  describe("Time Filter Not Applied", () => {
+    const mockResults: string[][] = [
+      ["Title", "Snippet", "https://example.com"],
+    ];
+    const notApplied = { "X-Search-Time-Range-Applied": "false" };
+
+    it("should report the note when the server says the period was not applied", async () => {
+      mockSearchResponse(mockResults, notApplied);
+
+      const outcome = await searchModule.searchText(
+        "fallback query",
+        5,
+        "week",
+      );
+
+      expect(outcome).toEqual({
+        results: mockResults,
+        stale: false,
+        timeFilterNotApplied: true,
+      });
+    });
+
+    it("should keep the note when those results come back from the cache", async () => {
+      mockSearchResponse(mockResults, notApplied);
+      await searchModule.searchText("cached fallback query", 5, "week");
+
+      const cached = await searchModule.searchText(
+        "cached fallback query",
+        5,
+        "week",
+      );
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(cached.timeFilterNotApplied).toBe(true);
+    });
+
+    it("should not report the note when the server applied the period", async () => {
+      mockSearchResponse(mockResults);
+
+      const outcome = await searchModule.searchText(
+        "filtered query",
+        5,
+        "week",
+      );
+
+      expect(outcome.timeFilterNotApplied).toBe(false);
+    });
   });
 
   describe("URL Construction", () => {

@@ -131,11 +131,12 @@ rate-limit answer. `/thumbnail` sets its own headers, described below.
 
 Query parameters:
 
-| Name    | Required | Description                                                                                                                                                                                                                                                                           |
-| ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `q`     | yes      | Search query, trimmed, 1 to 2000 characters                                                                                                                                                                                                                                           |
-| `token` | yes      | Search token hash                                                                                                                                                                                                                                                                     |
-| `limit` | no       | How many of SearXNG's results to consider, default and maximum 30; a value that is not a positive integer falls back to the default. SearXNG is not sent this number: it caps a single SearXNG response after duplicate URLs are dropped, and the score filter below can return fewer |
+| Name         | Required | Description                                                                                                                                                                                                                                                                           |
+| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `q`          | yes      | Search query, trimmed, 1 to 2000 characters                                                                                                                                                                                                                                           |
+| `token`      | yes      | Search token hash                                                                                                                                                                                                                                                                     |
+| `limit`      | no       | How many of SearXNG's results to consider, default and maximum 30; a value that is not a positive integer falls back to the default. SearXNG is not sent this number: it caps a single SearXNG response after duplicate URLs are dropped, and the score filter below can return fewer |
+| `time_range` | no       | Only results published within this period: `day`, `week`, `month` or `year`. Absent means any time, and the request to SearXNG then carries no `time_range` at all                                                                                                                    |
 
 Responds with a JSON array of tuples, in the order the client renders them:
 
@@ -178,6 +179,7 @@ Failures:
 | ------ | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `400`  | `{"error":"Missing query parameter"}`                         | `q` missing or blank                                                                                                             |
 | `400`  | `{"error":"Query parameter must not exceed 2000 characters"}` | `q` too long                                                                                                                     |
+| `400`  | `{"error":"Invalid time_range parameter"}`                    | `time_range` is not `day`, `week`, `month` or `year`                                                                             |
 | `502`  | `{"error":"Search service unavailable"}`                      | SearXNG failed and the text-search fallback was off or failed too, so an outage is distinguishable from a search with no matches |
 | `500`  | `{"error":"Internal server error"}`                           | Anything else                                                                                                                    |
 
@@ -203,6 +205,14 @@ results, this endpoint responds `200` with `[]`, so the client shows the
 "No results found" alert rather than the "Text search unavailable" one; only
 when every provider tried fails, or none could be tried at all, does the
 search fall through to the same `502`.
+
+Those providers take a query and a count, so none of them can apply a
+`time_range`. When one answers a search that asked for one, the response
+carries `X-Search-Time-Range-Applied: false` and the body is unchanged: the
+header is the only signal, so a client that ignores it still parses the
+results. The header is absent on every other response, including a search that
+asked for no time range, and the client says "Time filter not applied to these
+results" above the results it got that way.
 
 ### `GET /search/images`
 

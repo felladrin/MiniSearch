@@ -1,4 +1,5 @@
 import { normalizeFollowUpDates } from "@shared/relativeDates";
+import type { SearchTimeRange } from "@shared/searchTimeRange";
 import {
   getCurrentSearchRunId,
   type ImageResults,
@@ -17,6 +18,7 @@ import {
   updatePageContents,
   updateTextSearchResults,
   updateTextSearchStale,
+  updateTextSearchTimeFilterNotApplied,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
 import { getLatestSearchAttempt } from "./searchAttempts";
@@ -55,6 +57,7 @@ export async function refreshTextSearchResults(
   resultsLimit: number,
   existingResults: TextSearchResults,
   searchRunId = getCurrentSearchRunId(),
+  timeRange?: SearchTimeRange,
 ): Promise<TextSearchResults> {
   const invocation = ++textRefreshInvocation;
   latestTextRefreshByRunId.set(searchRunId, invocation);
@@ -66,10 +69,11 @@ export async function refreshTextSearchResults(
   const isRunCurrent = () =>
     latestTextRefreshByRunId.get(searchRunId) === invocation && isSameAttempt();
 
-  const { results: freshResults, stale } = await searchText(
-    searchQuery,
-    resultsLimit,
-  );
+  const {
+    results: freshResults,
+    stale,
+    timeFilterNotApplied,
+  } = await searchText(searchQuery, resultsLimit, timeRange);
 
   if (freshResults.length === 0) return [];
 
@@ -80,6 +84,7 @@ export async function refreshTextSearchResults(
 
   if (isCurrent()) {
     updateTextSearchStale(stale);
+    updateTextSearchTimeFilterNotApplied(Boolean(timeFilterNotApplied));
     updateLlmTextSearchResults(llmResults);
   }
 
@@ -118,6 +123,7 @@ export async function refreshImageSearchResults(
   resultsLimit: number,
   existingResults: ImageSearchResults,
   searchRunId = getCurrentSearchRunId(),
+  timeRange?: SearchTimeRange,
 ): Promise<void> {
   // No newest-refresh check, unlike text: image refreshes merge into the list
   // on screen and into history, so an older one landing after a newer one
@@ -129,6 +135,7 @@ export async function refreshImageSearchResults(
   const { results: imageResults } = await searchImages(
     searchQuery,
     resultsLimit,
+    timeRange,
   );
 
   if (imageResults.length === 0) return;
@@ -257,6 +264,7 @@ export async function runFollowUpSearch(
         settings.searchResultsLimit,
         existingTextResults,
         searchRunId,
+        settings.searchTimeRange,
       );
 
       if (
@@ -283,6 +291,7 @@ export async function runFollowUpSearch(
       settings.searchResultsLimit,
       existingImageResults,
       searchRunId,
+      settings.searchTimeRange,
     ).catch((error) => {
       addLogEntry(`Error in follow-up image search: ${error}`);
     });

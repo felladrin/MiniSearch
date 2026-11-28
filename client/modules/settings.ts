@@ -2,6 +2,7 @@ import {
   CITATION_EXAMPLE,
   DEFAULT_SYSTEM_PROMPT,
 } from "@shared/defaultSystemPrompt";
+import type { SearchTimeRange } from "@shared/searchTimeRange";
 import {
   DEFAULT_INFERENCE_TYPE,
   DEFAULT_WLLAMA_GPU_MODEL_ID,
@@ -65,6 +66,7 @@ export const defaultSettings = {
   wllamaModelId: DEFAULT_WLLAMA_MODEL_ID,
   cpuThreads: getDefaultCpuThreads(),
   searchResultsLimit: 15,
+  searchTimeRange: "any" as SearchTimeRange,
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   inferenceType: DEFAULT_INFERENCE_TYPE,
   openAiApiBaseUrl: "",

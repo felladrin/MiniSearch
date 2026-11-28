@@ -1,8 +1,10 @@
-import { Slider, Stack, Switch, Text } from "@mantine/core";
+import { Select, Slider, Stack, Switch, Text } from "@mantine/core";
+import { searchTimeRangeOptions } from "@shared/searchTimeRange";
 import { useSettingsForm } from "@/hooks/useSettingsForm";
 
 const SETTINGS_KEYS = [
   "searchResultsLimit",
+  "searchTimeRange",
   "enableTextSearch",
   "enableImageSearch",
 ] as const;
@@ -29,6 +31,14 @@ export default function SearchSettingsForm() {
           }))}
         />
       </Stack>
+
+      <Select
+        {...form.getInputProps("searchTimeRange")}
+        label="Time Range"
+        description="Only show results published within this period. Anytime applies no time filter."
+        data={searchTimeRangeOptions}
+        allowDeselect={false}
+      />
 
       <Switch
         {...form.getInputProps("enableTextSearch", {

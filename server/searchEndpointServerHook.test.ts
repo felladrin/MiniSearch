@@ -213,6 +213,7 @@ describe("searchEndpointServerHook", () => {
       30,
       undefined,
       expect.any(AbortSignal),
+      undefined,
     );
   });
 
@@ -292,6 +293,7 @@ describe("searchEndpointServerHook", () => {
       30,
       undefined,
       expect.any(AbortSignal),
+      undefined,
     );
     expect(incrementTextualSearchesSinceLastRestart).toHaveBeenCalled();
     expect(response.setHeader).toHaveBeenCalledWith(
@@ -319,7 +321,83 @@ describe("searchEndpointServerHook", () => {
       30,
       undefined,
       expect.any(AbortSignal),
+      undefined,
     );
+  });
+
+  describe("time_range parameter", () => {
+    it.each(["day", "week", "month", "year"] as const)(
+      "passes %s through to SearXNG",
+      async (timeRange) => {
+        vi.mocked(fetchSearXNG).mockResolvedValue([]);
+
+        await sendSearch(
+          `/search/text?q=cats&token=abc&time_range=${timeRange}`,
+        );
+
+        expect(fetchSearXNG).toHaveBeenCalledWith(
+          "cats",
+          "text",
+          30,
+          undefined,
+          expect.any(AbortSignal),
+          timeRange,
+        );
+      },
+    );
+
+    it("passes it on an image search as well", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+
+      await sendSearch("/search/images?q=cats&token=abc&time_range=month");
+
+      expect(fetchSearXNG).toHaveBeenCalledWith(
+        "cats",
+        "images",
+        30,
+        undefined,
+        expect.any(AbortSignal),
+        "month",
+      );
+    });
+
+    it("passes nothing when the request carries no time range", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+
+      await sendSearch("/search/text?q=cats&token=abc");
+
+      expect(fetchSearXNG).toHaveBeenCalledWith(
+        "cats",
+        "text",
+        30,
+        undefined,
+        expect.any(AbortSignal),
+        undefined,
+      );
+    });
+
+    it("answers 400 to a period SearXNG does not know", async () => {
+      const response = await sendSearch(
+        "/search/text?q=cats&token=abc&time_range=fortnight",
+      );
+
+      // Refused rather than answered unfiltered: results from any time would
+      // look like the recent ones the caller asked for.
+      expect(response.statusCode).toBe(400);
+      expect(response.end).toHaveBeenCalledWith(
+        JSON.stringify({ error: "Invalid time_range parameter" }),
+      );
+      expect(fetchSearXNG).not.toHaveBeenCalled();
+    });
+
+    it("answers 400 to an empty time range", async () => {
+      const response = await sendSearch(
+        "/search/text?q=cats&token=abc&time_range=",
+      );
+
+      expect(response.statusCode).toBe(400);
+      expect(fetchSearXNG).not.toHaveBeenCalled();
+    });
   });
 
   it("reranks results when the reranker is healthy and returns its reordered output", async () => {
@@ -341,6 +419,7 @@ describe("searchEndpointServerHook", () => {
       5,
       undefined,
       expect.any(AbortSignal),
+      undefined,
     );
     expect(rankSearchResults).toHaveBeenCalledWith(
       "test",
@@ -603,6 +682,55 @@ describe("searchEndpointServerHook", () => {
         expect(response.statusCode).toBe(200);
         expect(response.end).toHaveBeenCalledWith(
           JSON.stringify(rankedFallbackResults),
+        );
+      });
+
+      it("says the time filter was not applied when the fallback answers a filtered search", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        failSearxng();
+        vi.mocked(fetchFallbackTextResults).mockResolvedValue(fallbackResults);
+
+        const response = await sendSearch(
+          "/search/text?q=cats&token=abc&time_range=week",
+        );
+
+        expect(response.statusCode).toBe(200);
+        expect(response.setHeader).toHaveBeenCalledWith(
+          "X-Search-Time-Range-Applied",
+          "false",
+        );
+        // The body keeps its shape: the note is the header's job alone.
+        expect(response.end).toHaveBeenCalledWith(
+          JSON.stringify(fallbackResults),
+        );
+      });
+
+      it("says nothing when the fallback answers a search with no time range", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        failSearxng();
+        vi.mocked(fetchFallbackTextResults).mockResolvedValue(fallbackResults);
+
+        const response = await sendSearch("/search/text?q=cats&token=abc");
+
+        expect(response.statusCode).toBe(200);
+        expect(response.setHeader).not.toHaveBeenCalledWith(
+          "X-Search-Time-Range-Applied",
+          "false",
+        );
+      });
+
+      it("says nothing when SearXNG answers a filtered search itself", async () => {
+        vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
+        vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+
+        const response = await sendSearch(
+          "/search/text?q=cats&token=abc&time_range=week",
+        );
+
+        expect(response.statusCode).toBe(200);
+        expect(response.setHeader).not.toHaveBeenCalledWith(
+          "X-Search-Time-Range-Applied",
+          "false",
         );
       });
 
