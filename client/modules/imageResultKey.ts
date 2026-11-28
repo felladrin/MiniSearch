@@ -1,14 +1,12 @@
+import { getImageIdentity } from "@shared/imageIdentity";
 import type { ImageSearchResult } from "./types";
 
-/**
- * Identifies an image result by its full-size source, falling back to the
- * thumbnail. The page URL is not enough: one gallery page holds many images.
- */
+/** The identity of an image result tuple, as `getImageIdentity` defines it. */
 export function imageResultKey([
   ,
-  ,
+  url,
   thumbnailUrl,
   sourceUrl,
 ]: ImageSearchResult): string {
-  return sourceUrl || thumbnailUrl;
+  return getImageIdentity(sourceUrl, thumbnailUrl, url);
 }

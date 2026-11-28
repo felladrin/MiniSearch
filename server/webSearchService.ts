@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import debug from "debug";
 import { convert as convertHtmlToPlainText } from "html-to-text";
 import { strip as stripEmojis } from "node-emoji";
+import { getImageIdentity } from "../shared/imageIdentity.ts";
 import type { SearxngTimeRange } from "../shared/searchTimeRange.ts";
 import {
   type EngineFailure,
@@ -525,21 +526,29 @@ export async function fetchSupplementarySearXNG(
   return filterNullResults(textualResults);
 }
 
+function graphicalThumbnailSource(result: SearxngSearchResult) {
+  return result.category === "videos" ? result.thumbnail : result.thumbnail_src;
+}
+
+function graphicalSourceUrl(result: SearxngSearchResult) {
+  // Empty string, not undefined: the client reads the tuple positionally and
+  // treats an empty source as "no link to the full image".
+  return (
+    (result.category === "videos"
+      ? result.iframe_src || result.url
+      : result.img_src) ?? ""
+  );
+}
+
 async function processGraphicalResult(result: SearxngSearchResult) {
-  const thumbnailSource =
-    result.category === "videos" ? result.thumbnail : result.thumbnail_src;
+  const thumbnailSource = graphicalThumbnailSource(result);
 
   // A grid tile is the thumbnail: without one there is nothing to show but the
   // host name, and SearXNG leaves the field out often enough (video engines
   // especially) that keeping these fills the carousel with text placeholders.
   if (!thumbnailSource) return null;
 
-  // Empty string, not undefined: the client reads the tuple positionally and
-  // treats an empty source as "no link to the full image".
-  const sourceUrl =
-    (result.category === "videos"
-      ? result.iframe_src || result.url
-      : result.img_src) ?? "";
+  const sourceUrl = graphicalSourceUrl(result);
 
   return [result.title, result.url, thumbnailSource, sourceUrl] as [
     title: string,
@@ -586,16 +595,13 @@ async function processTextualResult(result: SearxngSearchResult) {
   }
 }
 
-/**
- * What makes an image or video result distinct: the full-size source, then the
- * thumbnail. A gallery page returns many different images under one page URL,
- * so keying on the page would keep only the first of them.
- */
+/** An image or video result's identity, from the same fields its tuple carries. */
 function graphicalResultKey(result: SearxngSearchResult): string {
-  if (result.category === "videos") {
-    return result.iframe_src || result.url;
-  }
-  return result.img_src || result.thumbnail_src || result.url;
+  return getImageIdentity(
+    graphicalSourceUrl(result),
+    graphicalThumbnailSource(result),
+    result.url,
+  );
 }
 
 // Runs before the limit is applied, so a dropped link does not take the slot
