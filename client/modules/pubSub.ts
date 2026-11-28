@@ -295,6 +295,18 @@ export const textSearchStalePubSub = createPubSub<boolean>(false);
 export const [updateTextSearchStale, , getTextSearchStale] =
   textSearchStalePubSub;
 
+/**
+ * Whether the text results on screen carry no time filter although one was
+ * asked for, which is a fallback provider having answered the search.
+ */
+export const textSearchTimeFilterPubSub = createPubSub<boolean>(false);
+
+export const [
+  updateTextSearchTimeFilterNotApplied,
+  ,
+  getTextSearchTimeFilterNotApplied,
+] = textSearchTimeFilterPubSub;
+
 const pageContentsPubSub = createPubSub<PageContents>({});
 
 export const [updatePageContents, , getPageContents] = pageContentsPubSub;

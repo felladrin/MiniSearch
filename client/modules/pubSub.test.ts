@@ -143,6 +143,16 @@ describe("numeric settings never hold an empty string", () => {
     expect(getSettings().historyRetentionDays).toBeGreaterThan(0);
   });
 
+  it("turns an unknown stored time range into Anytime", async () => {
+    const { defaultSettings } = await import("./settings");
+    localStorage.setItem(
+      "settings",
+      JSON.stringify({ ...defaultSettings, searchTimeRange: "fortnight" }),
+    );
+    const { getSettings } = await import("./pubSub");
+    expect(getSettings().searchTimeRange).toBe("any");
+  });
+
   it("repairs a stored empty string on load without a migration", async () => {
     const { defaultSettings } = await import("./settings");
     localStorage.setItem(

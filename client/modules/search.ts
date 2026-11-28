@@ -1,3 +1,7 @@
+import {
+  SEARCH_TIME_RANGE_APPLIED_HEADER,
+  type SearchTimeRange,
+} from "@shared/searchTimeRange";
 import Dexie, { type Table } from "dexie";
 import { sha256 } from "hash-wasm";
 import { invalidateConfig } from "./config";
@@ -117,28 +121,47 @@ interface SearchExecutionConfig {
 }
 
 interface SearchOperations<T extends SearchResults> {
-  hashQuery: (query: string, limit?: number) => Promise<string>;
+  hashQuery: (
+    query: string,
+    limit?: number,
+    timeRange?: SearchTimeRange,
+  ) => Promise<string>;
   performSearch: (
     endpoint: "text" | "images",
     query: string,
     limit?: number,
-  ) => Promise<T>;
+    timeRange?: SearchTimeRange,
+  ) => Promise<SearchFetch<T>>;
+}
+
+/** What one request answered: its results, and what the server said about them. */
+interface SearchFetch<T> {
+  results: T;
+  /** The server answered from a source that could not apply the time range. */
+  timeFilterNotApplied: boolean;
 }
 
 interface CachedSearchOutcome<T> {
   results: T;
   stale: boolean;
+  /**
+   * Set when the results carry no time filter although one was asked for. Left
+   * out rather than set false, so a cache entry written before the flag
+   * existed reads back as "applied" instead of failing to say anything.
+   */
+  timeFilterNotApplied?: boolean;
 }
 
 async function executeCachedSearch<T extends SearchResults>(
   query: string,
   limit: number | undefined,
+  timeRange: SearchTimeRange | undefined,
   context: SearchExecutionConfig,
   operations: SearchOperations<T>,
 ): Promise<CachedSearchOutcome<T>> {
   await db.cleanExpiredCache(context.storeName);
 
-  const key = await operations.hashQuery(query, limit);
+  const key = await operations.hashQuery(query, limit, timeRange);
   const cachedData = await db.getCachedResult<T>(context.storeName, key);
 
   if (cachedData?.fresh) {
@@ -150,27 +173,32 @@ async function executeCachedSearch<T extends SearchResults>(
     );
 
     logAndMaybeResetMetrics();
-    return { results: cachedData.results, stale: false };
+    return {
+      results: cachedData.results,
+      stale: false,
+      timeFilterNotApplied: cachedData.timeFilterNotApplied,
+    };
   }
 
   incrementCacheMetric(context.missMetric);
   cacheMetrics.incrementTotalOperations();
 
   try {
-    const results = await operations.performSearch(
+    const { results, timeFilterNotApplied } = await operations.performSearch(
       context.endpoint,
       query,
       limit,
+      timeRange,
     );
 
-    await db.cacheResult(context.storeName, key, results);
+    await db.cacheResult(context.storeName, key, results, timeFilterNotApplied);
     logAndMaybeResetMetrics();
 
     addLogEntry(
       `${context.logLabel}: Fetched ${results.length} results from the API`,
     );
 
-    return { results, stale: false };
+    return { results, stale: false, timeFilterNotApplied };
   } catch (error) {
     if (
       cachedData &&
@@ -183,7 +211,11 @@ async function executeCachedSearch<T extends SearchResults>(
           error instanceof Error ? error.message : String(error)
         }); serving ${cachedData.results.length} result(s) from a previous search`,
       );
-      return { results: cachedData.results, stale: true };
+      return {
+        results: cachedData.results,
+        stale: true,
+        timeFilterNotApplied: cachedData.timeFilterNotApplied,
+      };
     }
     throw error;
   }
@@ -193,18 +225,24 @@ async function executeCachedSearch<T extends SearchResults>(
 const UNAUTHORIZED_STATUS = 401;
 
 type SearchAttempt<T> =
-  | { ok: true; results: T }
+  | { ok: true; results: T; timeFilterNotApplied: boolean }
   | { ok: false; status: number };
 
 async function buildSearchUrl(
   endpoint: "text" | "images",
   query: string,
-  limit?: number,
+  limit: number | undefined,
+  timeRange: SearchTimeRange | undefined,
 ): Promise<URL> {
   const searchUrl = new URL(`/search/${endpoint}`, self.location.origin);
   searchUrl.searchParams.set("q", query);
   searchUrl.searchParams.set("token", await getSearchTokenHash());
   if (limit) searchUrl.searchParams.set("limit", limit.toString());
+  // Anytime sends no parameter at all, so an unfiltered search asks the server
+  // for exactly what it asked before the filter existed.
+  if (timeRange && timeRange !== "any") {
+    searchUrl.searchParams.set("time_range", timeRange);
+  }
   return searchUrl;
 }
 
@@ -255,7 +293,12 @@ async function attemptSearch<T>(searchUrl: URL): Promise<SearchAttempt<T>> {
       return { ok: false, status: response.status };
     }
 
-    return { ok: true, results: (await response.json()) as T };
+    return {
+      ok: true,
+      results: (await response.json()) as T,
+      timeFilterNotApplied:
+        response.headers.get(SEARCH_TIME_RANGE_APPLIED_HEADER) === "false",
+    };
   } catch (error) {
     throw labelSearchFailure(error, controller.signal);
   } finally {
@@ -266,6 +309,11 @@ async function attemptSearch<T>(searchUrl: URL): Promise<SearchAttempt<T>> {
 interface SearchCacheEntry {
   key: string;
   timestamp: number;
+  /**
+   * Kept with the results so a search served from this cache can still say the
+   * time filter was not applied. Absent on every entry written before it.
+   */
+  timeFilterNotApplied?: boolean;
 }
 
 interface TextSearchCache extends SearchCacheEntry {
@@ -373,12 +421,22 @@ class SearchCacheDatabase extends Dexie {
   async getCachedResult<T extends TextSearchResults | ImageSearchResults>(
     storeName: "textSearchHistory" | "imageSearchHistory",
     key: string,
-  ): Promise<{ results: T; fresh: boolean; timestamp: number } | null> {
+  ): Promise<{
+    results: T;
+    fresh: boolean;
+    timestamp: number;
+    timeFilterNotApplied?: boolean;
+  } | null> {
     if (!cacheConfig.enabled) return null;
 
     try {
       const store = this[storeName] as Table<
-        { key: string; results: T; timestamp: number },
+        {
+          key: string;
+          results: T;
+          timestamp: number;
+          timeFilterNotApplied?: boolean;
+        },
         string
       >;
       const cachedItem = await store.get(key);
@@ -390,6 +448,7 @@ class SearchCacheDatabase extends Dexie {
         results: cachedItem.results,
         fresh,
         timestamp: cachedItem.timestamp,
+        timeFilterNotApplied: cachedItem.timeFilterNotApplied,
       };
     } catch (error) {
       addLogEntry(
@@ -403,18 +462,25 @@ class SearchCacheDatabase extends Dexie {
     storeName: "textSearchHistory" | "imageSearchHistory",
     key: string,
     results: T,
+    timeFilterNotApplied?: boolean,
   ): Promise<void> {
     if (!cacheConfig.enabled) return;
 
     try {
       const store = this[storeName] as Table<
-        { key: string; results: T; timestamp: number },
+        {
+          key: string;
+          results: T;
+          timestamp: number;
+          timeFilterNotApplied?: boolean;
+        },
         string
       >;
       await store.put({
         key,
         results,
         timestamp: Date.now(),
+        timeFilterNotApplied,
       });
 
       const cacheWrites = this._cacheWriteCount;
@@ -444,9 +510,19 @@ db.ensureIntegrity().catch((error) => {
 });
 
 const searchService = {
-  /** The limit is part of the key, so a different limit never reads stale results. */
-  async hashQuery(query: string, limit?: number): Promise<string> {
-    const input = limit !== undefined ? `${query}::limit=${limit}` : query;
+  /**
+   * The limit and the time range are part of the key, so neither a different
+   * limit nor a different period can read another one's results. Anytime adds
+   * nothing, so an unfiltered search keeps reading the entries cached before
+   * the filter existed.
+   */
+  async hashQuery(
+    query: string,
+    limit?: number,
+    timeRange?: SearchTimeRange,
+  ): Promise<string> {
+    let input = limit !== undefined ? `${query}::limit=${limit}` : query;
+    if (timeRange && timeRange !== "any") input += `::time_range=${timeRange}`;
     const hash = await sha256(input);
     // 16 hex chars are enough for a cache key.
     return hash.slice(0, 16);
@@ -456,7 +532,8 @@ const searchService = {
     endpoint: "text" | "images",
     query: string,
     limit?: number,
-  ): Promise<T> {
+    timeRange?: SearchTimeRange,
+  ): Promise<SearchFetch<T>> {
     if (!["text", "images"].includes(endpoint)) {
       throw new Error(
         `Invalid endpoint type: ${endpoint}. Must be "text" or "images"`,
@@ -474,7 +551,7 @@ const searchService = {
     }
 
     let attempt = await attemptSearch<T>(
-      await buildSearchUrl(endpoint, query, limit),
+      await buildSearchUrl(endpoint, query, limit, timeRange),
     );
 
     // Every server process mints its own search token, so a restart leaves
@@ -488,7 +565,7 @@ const searchService = {
       );
       invalidateConfig();
       attempt = await attemptSearch<T>(
-        await buildSearchUrl(endpoint, query, limit),
+        await buildSearchUrl(endpoint, query, limit, timeRange),
       );
     }
 
@@ -496,17 +573,22 @@ const searchService = {
       throw new Error(`HTTP error! status: ${attempt.status}`);
     }
 
-    return attempt.results;
+    return {
+      results: attempt.results,
+      timeFilterNotApplied: attempt.timeFilterNotApplied,
+    };
   },
 
   async searchText(
     query: string,
     limit?: number,
+    timeRange?: SearchTimeRange,
   ): Promise<CachedSearchOutcome<TextSearchResults>> {
     try {
       return await executeCachedSearch<TextSearchResults>(
         query,
         limit,
+        timeRange,
         {
           storeName: "textSearchHistory",
           endpoint: "text",
@@ -532,11 +614,13 @@ const searchService = {
   async searchImages(
     query: string,
     limit?: number,
+    timeRange?: SearchTimeRange,
   ): Promise<CachedSearchOutcome<ImageSearchResults>> {
     try {
       return await executeCachedSearch<ImageSearchResults>(
         query,
         limit,
+        timeRange,
         {
           storeName: "imageSearchHistory",
           endpoint: "images",

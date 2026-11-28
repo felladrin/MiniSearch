@@ -1,4 +1,4 @@
-import { Alert, Button, Group } from "@mantine/core";
+import { Alert, Button, Group, Text } from "@mantine/core";
 import { IconInfoCircle, IconRefresh } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
 import {
@@ -8,6 +8,7 @@ import {
   textSearchResultsPubSub,
   textSearchStalePubSub,
   textSearchStatePubSub,
+  textSearchTimeFilterPubSub,
 } from "@/modules/pubSub";
 import { searchAndRespond } from "@/modules/textGeneration";
 
@@ -18,6 +19,7 @@ export default function TextSearchResults() {
   const [searchState] = usePubSub(textSearchStatePubSub);
   const [results] = usePubSub(textSearchResultsPubSub);
   const [stale] = usePubSub(textSearchStalePubSub);
+  const [timeFilterNotApplied] = usePubSub(textSearchTimeFilterPubSub);
   const [imageState] = usePubSub(imageSearchStatePubSub);
   const [imageResults] = usePubSub(imageSearchResultsPubSub);
   const [settings] = usePubSub(settingsPubSub);
@@ -41,6 +43,11 @@ export default function TextSearchResults() {
               The live search is temporarily unavailable, so some of these
               results are from an earlier search and may be out of date.
             </Alert>
+          )}
+          {timeFilterNotApplied && (
+            <Text size="xs" c="dimmed" mb="sm">
+              Time filter not applied to these results
+            </Text>
           )}
           <SearchResultsList searchResults={results} />
         </>

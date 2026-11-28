@@ -1,5 +1,5 @@
 import { MantineProvider } from "@mantine/core";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { settingsPubSub } from "@/modules/pubSub";
 import { defaultSettings } from "@/modules/settings";
@@ -16,6 +16,18 @@ const [updateSettings, , getSettings] = settingsPubSub;
 
 function toggle(name: RegExp) {
   fireEvent.click(screen.getByRole("switch", { name }));
+}
+
+/** Opens the time-range select and picks the option with this label. */
+function pickTimeRange(label: string) {
+  const select = screen.getByRole("combobox", { name: /time range/i });
+  fireEvent.mouseDown(select);
+  fireEvent.click(select);
+  const listbox = document.getElementById(
+    select.getAttribute("aria-controls") ?? "",
+  );
+  if (!listbox) throw new Error("The select did not render a listbox");
+  fireEvent.click(within(listbox).getByText(label));
 }
 
 describe("the menu's settings forms", () => {
@@ -56,5 +68,21 @@ describe("the menu's settings forms", () => {
       enableAiResponse: true,
       wllamaModelId: "another-model",
     });
+  });
+
+  it("writes the time range chosen in the search section", () => {
+    render(
+      <MantineProvider>
+        <SearchSettingsForm />
+      </MantineProvider>,
+    );
+
+    expect(screen.getByRole("combobox", { name: /time range/i })).toHaveValue(
+      "Anytime",
+    );
+
+    pickTimeRange("Past week");
+
+    expect(getSettings()).toMatchObject({ searchTimeRange: "week" });
   });
 });
