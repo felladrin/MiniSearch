@@ -249,7 +249,6 @@ async function loadDictationModel(
   const { createWllamaInstance } = await import("./wllama");
   const wllama = await createWllamaInstance({
     suppressNativeLog: true,
-    allowOffline: true,
   });
   const abandon = () => {
     void releaseModel(wllama);

@@ -4,6 +4,7 @@ Notable changes, grouped by date, most recent first.
 
 ## 2026-11-28
 
+- An in-browser model that is already downloaded now loads without asking Hugging Face first. Every load used to request the model's file list from the Hugging Face API before it looked at the browser's cache, twice per answer, so an API outage, a rate limit or a blocked `huggingface.co` stopped answers for a model that was already on the device. Models now load straight from their file URL, which is also the address the cache stores them under.
 - A follow-up question saved after its search was deleted from History is no longer stored. It used to be written anyway with no search pointing to it, leaving orphaned chat rows in the browser's storage.
 - Searches can be limited to the past day, week, month or year. The time filter sits next to the Search button and in the search settings, both bound to one setting that survives a reload, and SearXNG gets its `time_range` for it. Anytime is the default and sends nothing, so an unfiltered search reaches SearXNG exactly as it did before. The AI prompt keeps using the query as typed, so only the results are shaped by the period. When SearXNG is down and a fallback provider answers instead, that provider takes only a query and a count and cannot filter by time, so the results now say "Time filter not applied to these results" instead of looking filtered; `/search/text` announces it with an `X-Search-Time-Range-Applied: false` response header, and a search served from the browser's cache keeps saying it.
 

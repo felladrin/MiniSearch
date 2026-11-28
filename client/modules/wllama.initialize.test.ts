@@ -3,7 +3,7 @@ import { addLogEntry } from "./logEntries";
 import { initializeWllama } from "./wllama";
 
 const instance = vi.hoisted(() => ({
-  loadModelFromHF: vi.fn(),
+  loadModelFromUrl: vi.fn(),
   createChatCompletion: vi.fn(),
   exit: vi.fn(),
 }));
@@ -22,7 +22,7 @@ const warmupReply = { choices: [{ message: { content: "a" } }] };
 describe("initializeWllama", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    instance.loadModelFromHF.mockResolvedValue(undefined);
+    instance.loadModelFromUrl.mockResolvedValue(undefined);
     instance.createChatCompletion.mockResolvedValue(warmupReply);
     instance.exit.mockResolvedValue(undefined);
   });
@@ -31,14 +31,24 @@ describe("initializeWllama", () => {
     const result = await initializeWllama("repo", "file.gguf");
 
     expect(result).toBe(instance);
-    expect(instance.loadModelFromHF).toHaveBeenCalledTimes(2);
+    expect(instance.loadModelFromUrl).toHaveBeenCalledTimes(2);
     expect(instance.exit).toHaveBeenCalledTimes(1);
     expect(instance.exit.mock.invocationCallOrder[0]).toBeGreaterThan(
-      instance.loadModelFromHF.mock.invocationCallOrder[0],
+      instance.loadModelFromUrl.mock.invocationCallOrder[0],
     );
     expect(instance.exit.mock.invocationCallOrder[0]).toBeLessThan(
-      instance.loadModelFromHF.mock.invocationCallOrder[1],
+      instance.loadModelFromUrl.mock.invocationCallOrder[1],
     );
+  });
+
+  it("loads the model by its resolve URL, not through the Hugging Face API", async () => {
+    await initializeWllama("repo", "file.gguf");
+
+    for (const call of instance.loadModelFromUrl.mock.calls) {
+      expect(call[0]).toEqual({
+        url: "https://huggingface.co/repo/resolve/main/file.gguf",
+      });
+    }
   });
 
   it("releases the instance when the warm-up fails", async () => {

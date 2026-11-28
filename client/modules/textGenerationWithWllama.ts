@@ -270,7 +270,6 @@ async function initializeWllamaInstance(progressCallback?: ProgressCallback) {
   const wllama = await initializeWllama(model.hfRepoId, model.hfFilePath, {
     wllama: {
       suppressNativeLog: true,
-      allowOffline: true,
     },
     chatTemplateKwargs: model.chatTemplateKwargs,
     model: {
