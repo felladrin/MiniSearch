@@ -72,6 +72,10 @@ async function createOpenAiStream({
   const openaiProvider = createOpenAICompatible({
     name: settings.openAiApiBaseUrl,
     baseURL: settings.openAiApiBaseUrl,
+    // Asks the server for the token usage at the end of the stream
+    // (`stream_options.include_usage`), the only exact count it gives; the
+    // provider leaves it off unless asked.
+    includeUsage: true,
     apiKey: settings.openAiApiKey,
   });
 

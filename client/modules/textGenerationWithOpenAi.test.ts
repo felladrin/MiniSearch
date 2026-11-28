@@ -173,6 +173,20 @@ describe("textGenerationWithOpenAi", () => {
       expect(updateGenerationRate).toHaveBeenCalledWith("8.4 tokens/s");
     });
 
+    it("asks the server for the token usage of the stream", async () => {
+      const { generateTextWithOpenAi } = await import(
+        "./textGenerationWithOpenAi"
+      );
+      mockFetch.mockResolvedValueOnce(
+        sseResponse([{ choices: [{ delta: { content: "Hello" } }] }]),
+      );
+
+      await generateTextWithOpenAi();
+
+      const body = JSON.parse(String(mockFetch.mock.calls[0]?.[1]?.body));
+      expect(body.stream_options).toEqual({ include_usage: true });
+    });
+
     it("publishes no speed when the backend reports no usage", async () => {
       await streamTimedDeltas(undefined);
 
