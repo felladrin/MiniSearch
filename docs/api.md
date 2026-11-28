@@ -207,7 +207,8 @@ circuit breaker. If at least one provider answers with nothing usable and none r
 results, this endpoint responds `200` with `[]`, so the client shows the
 "No results found" alert rather than the "Text search unavailable" one; only
 when every provider tried fails, or none could be tried at all, does the
-search fall through to the same `502`.
+search fall through to the same `502`, except for a unit conversion the plugin
+answered, which stays a `200` with `[]` and its header.
 
 Those providers take a query and a count, so none of them can apply a
 `time_range` or a `language`. When one answers a search that asked for either,
@@ -238,7 +239,8 @@ when its engines returned nothing or reported themselves unresponsive: the
 `502` above is not the answer to a query that was answered, and the body is then
 `[]`. When the engines were the ones that failed and the fallback above is
 switched on, the fallback is asked for web results as it would be for any other
-failed search, and the header stays. The client shows the value above the
+failed search, and the header stays. If the fallback fails, the answer is still
+the `200` with `[]` and the header, not the `502`. The client shows the value above the
 results in a "Unit conversion" card, and keeps it with the cached results, so a
 search served from the cache shows it too.
 
