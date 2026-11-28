@@ -169,6 +169,7 @@ describe("buildAnswerFileName", () => {
 
   it("refuses a name Windows reserves for a device", () => {
     expect(buildAnswerFileName("con")).toBe("_con.md");
+    expect(buildAnswerFileName("con.txt")).toBe("_con.txt.md");
     expect(buildAnswerFileName("com1")).toBe("_com1.md");
   });
 

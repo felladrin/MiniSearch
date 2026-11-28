@@ -64,7 +64,11 @@ export function buildAnswerFileName(query: string): string {
     .replace(/^[-.]+|[-.]+$/g, "")
     .slice(0, maxFileNameBaseLength)
     .replace(/[-. ]+$/g, "");
-  const stem = windowsReservedFileNames.test(base) ? `_${base}` : base;
+  // Windows reserves a device name whatever follows its first dot, so
+  // `con.txt.md` fails as surely as `con.md`.
+  const stem = windowsReservedFileNames.test(base.split(".")[0] ?? "")
+    ? `_${base}`
+    : base;
 
   return `${stem || "answer"}.md`;
 }
