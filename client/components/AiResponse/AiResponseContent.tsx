@@ -12,16 +12,31 @@ import {
 import {
   IconArrowsMaximize,
   IconArrowsMinimize,
+  IconDownload,
   IconHandStop,
   IconInfoCircle,
+  IconMarkdown,
   IconRefresh,
   IconVolume2,
 } from "@tabler/icons-react";
 import { usePubSub } from "create-pubsub/react";
-import { type ReactNode, useMemo } from "react";
-import { settingsPubSub, textToSpeechStatePubSub } from "@/modules/pubSub";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  buildAnswerFileName,
+  buildAnswerMarkdown,
+  downloadAnswerMarkdown,
+} from "@/modules/answerExport";
+import {
+  getLlmTextSearchResults,
+  getQuery,
+  settingsPubSub,
+  textToSpeechStatePubSub,
+} from "@/modules/pubSub";
+import { splitReasoning } from "@/modules/reasoning";
 import { interruptSearch, searchAndRespond } from "@/modules/textGeneration";
+import { imageResultTag } from "@/modules/textGenerationUtilities";
 import { speak } from "@/modules/textToSpeech";
+import type { TextSearchResults } from "@/modules/types";
 import CopyIconButton from "./CopyIconButton";
 import FormattedMarkdown from "./FormattedMarkdown";
 
@@ -36,6 +51,49 @@ export default function AiResponseContent({
   const [textToSpeechState] = usePubSub(textToSpeechStatePubSub);
   const isSpeaking = textToSpeechState === "speaking";
   const isGenerating = textGenerationState === "generating";
+  const isCompleted = textGenerationState === "completed";
+  const query = getQuery();
+  // Taken when the answer finishes: a follow-up replaces the live list with
+  // its own results, and this card still shows the first answer. The image
+  // tag is the prompt's own marker, not part of a title.
+  const [answerSources, setAnswerSources] = useState<TextSearchResults>([]);
+  useEffect(() => {
+    if (!isCompleted || !response) return;
+    setAnswerSources(
+      getLlmTextSearchResults().map(([title, snippet, url]) => [
+        title.startsWith(imageResultTag)
+          ? title.slice(imageResultTag.length)
+          : title,
+        snippet,
+        url,
+      ]),
+    );
+  }, [isCompleted, response]);
+  const exportMarkdown = useMemo(
+    () =>
+      isCompleted
+        ? buildAnswerMarkdown({
+            // The answer only: the reasoning block stays out of the file, as
+            // it stays folded on the card.
+            answer: splitReasoning(
+              response,
+              settings.reasoningStartMarker,
+              settings.reasoningEndMarker,
+            ).answer,
+            sources: answerSources,
+            query,
+            exportedAt: new Date(),
+          })
+        : "",
+    [
+      isCompleted,
+      response,
+      answerSources,
+      query,
+      settings.reasoningStartMarker,
+      settings.reasoningEndMarker,
+    ],
+  );
 
   const ConditionalScrollArea = useMemo(
     () =>
@@ -142,6 +200,34 @@ export default function AiResponseContent({
               </Tooltip>
             )}
             <CopyIconButton value={response} tooltipLabel="Copy response" />
+            {isCompleted && (
+              <>
+                <CopyIconButton
+                  value={exportMarkdown}
+                  tooltipLabel="Copy as Markdown"
+                  icon={<IconMarkdown size={16} />}
+                />
+                <Tooltip
+                  label="Download as Markdown"
+                  withArrow
+                  position="right"
+                >
+                  <ActionIcon
+                    aria-label="Download as Markdown"
+                    onClick={() =>
+                      downloadAnswerMarkdown(
+                        exportMarkdown,
+                        buildAnswerFileName(query),
+                      )
+                    }
+                    variant="subtle"
+                    color="gray"
+                  >
+                    <IconDownload size={16} />
+                  </ActionIcon>
+                </Tooltip>
+              </>
+            )}
           </Group>
         </Group>
       </Card.Section>

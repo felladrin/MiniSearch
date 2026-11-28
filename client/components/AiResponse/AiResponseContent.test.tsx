@@ -1,11 +1,48 @@
 import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { usePubSub } from "create-pubsub/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  buildAnswerFileName,
+  buildAnswerMarkdown,
+  downloadAnswerMarkdown,
+} from "@/modules/answerExport";
 import AiResponseContent from "./AiResponseContent";
 
 vi.mock("create-pubsub/react", () => ({
   usePubSub: vi.fn(),
+}));
+
+const liveSources = vi.hoisted(() => ({
+  current: [["Mercury - Wikipedia", "snippet", "https://en.wikipedia.org"]] as [
+    string,
+    string,
+    string,
+  ][],
+}));
+
+vi.mock("@/modules/pubSub", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/pubSub")>()),
+  getQuery: vi.fn(() => "mercury"),
+  getLlmTextSearchResults: vi.fn(() => liveSources.current),
+}));
+
+vi.mock("@/modules/answerExport", () => ({
+  buildAnswerMarkdown: vi.fn(() => "exported markdown"),
+  buildAnswerFileName: vi.fn(() => "mercury.md"),
+  downloadAnswerMarkdown: vi.fn(),
+}));
+
+// Show the text each copy button would put on the clipboard.
+vi.mock("./CopyIconButton", () => ({
+  default: ({
+    value,
+    tooltipLabel,
+  }: {
+    value: string;
+    tooltipLabel?: string;
+  }) => <button type="button" aria-label={tooltipLabel} data-value={value} />,
 }));
 
 vi.mock("@/modules/textGeneration", () => ({
@@ -34,19 +71,29 @@ vi.mock("./FormattedMarkdown", () => ({
   ),
 }));
 
-function renderContent(textGenerationState: string) {
-  vi.mocked(usePubSub)
-    .mockReturnValueOnce([{ enableAiResponseScrolling: false }, vi.fn()])
-    .mockReturnValueOnce(["idle", vi.fn()]);
+const settings = {
+  enableAiResponseScrolling: false,
+  reasoningStartMarker: "<think>",
+  reasoningEndMarker: "</think>",
+};
 
-  return render(
-    <MantineProvider>
-      <AiResponseContent
-        textGenerationState={textGenerationState}
-        response="Hello world"
-      />
-    </MantineProvider>,
+function renderContent(textGenerationState: string, response = "Hello world") {
+  // Each render reads the settings, then the speech state.
+  let call = 0;
+  vi.mocked(usePubSub).mockImplementation(() =>
+    call++ % 2 === 0 ? [settings, vi.fn()] : ["idle", vi.fn()],
   );
+
+  const ui = (state: string) => (
+    <MantineProvider>
+      <AiResponseContent textGenerationState={state} response={response} />
+    </MantineProvider>
+  );
+  const result = render(ui(textGenerationState));
+  return {
+    ...result,
+    rerenderWith: (state: string) => result.rerender(ui(state)),
+  };
 }
 
 describe("AiResponseContent", () => {
@@ -118,5 +165,85 @@ describe("AiResponseContent", () => {
     expect(
       screen.getByRole("button", { name: "Regenerate response" }),
     ).toBeInTheDocument();
+  });
+
+  it("keeps copying the raw response and adds the export next to it", () => {
+    renderContent("completed");
+
+    expect(buildAnswerMarkdown).toHaveBeenCalledWith(
+      expect.objectContaining({ answer: "Hello world" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Copy response" }),
+    ).toHaveAttribute("data-value", "Hello world");
+    expect(
+      screen.getByRole("button", { name: "Copy as Markdown" }),
+    ).toHaveAttribute("data-value", "exported markdown");
+  });
+
+  it("downloads the built markdown under a name from the query", async () => {
+    renderContent("completed");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Download as Markdown" }),
+    );
+
+    expect(downloadAnswerMarkdown).toHaveBeenCalledWith(
+      "exported markdown",
+      "mercury.md",
+    );
+    expect(buildAnswerFileName).toHaveBeenCalledWith("mercury");
+  });
+
+  it("exports the answer without its reasoning", () => {
+    renderContent("completed", "<think>Let me check.</think>Mercury is small.");
+
+    expect(buildAnswerMarkdown).toHaveBeenLastCalledWith(
+      expect.objectContaining({ answer: "Mercury is small." }),
+    );
+  });
+
+  it("keeps the sources the answer finished with after a follow-up replaces them", () => {
+    const { rerenderWith } = renderContent("completed");
+    liveSources.current = [
+      ["Follow-up result", "snippet", "https://other.org"],
+    ];
+    rerenderWith("completed");
+
+    expect(buildAnswerMarkdown).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sources: [
+          ["Mercury - Wikipedia", "snippet", "https://en.wikipedia.org"],
+        ],
+      }),
+    );
+    liveSources.current = [
+      ["Mercury - Wikipedia", "snippet", "https://en.wikipedia.org"],
+    ];
+  });
+
+  it("strips the prompt's image tag from a source title", () => {
+    liveSources.current = [["(image) A diagram", "", "https://example.com/d"]];
+    renderContent("completed");
+
+    expect(buildAnswerMarkdown).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sources: [["A diagram", "", "https://example.com/d"]],
+      }),
+    );
+    liveSources.current = [
+      ["Mercury - Wikipedia", "snippet", "https://en.wikipedia.org"],
+    ];
+  });
+
+  it("offers the export only once the answer is complete", () => {
+    renderContent("generating");
+
+    expect(
+      screen.queryByRole("button", { name: "Copy as Markdown" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Download as Markdown" }),
+    ).not.toBeInTheDocument();
   });
 });

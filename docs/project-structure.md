@@ -64,6 +64,7 @@ The `client/modules/` directory contains core business logic organized by domain
 | `keyboard.ts`                   | Keyboard shortcut handling                                                                                                        |
 | `pageContent.ts`                | Requests extracted result-page text used to ground answers                                                                        |
 | `systemPrompt.ts`               | System prompt templates                                                                                                           |
+| `answerExport.ts`               | Builds the Markdown export of an answer and the file name it is saved under                                                       |
 | `stringFormatters.ts`           | Text formatting utilities                                                                                                         |
 | `types.ts`                      | Shared TypeScript type definitions                                                                                                |
 
