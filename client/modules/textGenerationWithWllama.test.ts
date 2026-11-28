@@ -3,6 +3,7 @@ import { getConfig } from "./config";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
+  updateGenerationRate,
   updateModelLoadingProgress,
   updateModelSizeInMegabytes,
   updateSettings,
@@ -26,6 +27,7 @@ vi.mock("./pubSub", () => ({
     reasoningEndMarker: "</think>",
   }),
   getTextGenerationState: vi.fn().mockReturnValue("generating"),
+  updateGenerationRate: vi.fn(),
   updateModelLoadingProgress: vi.fn(),
   updateModelSizeInMegabytes: vi.fn(),
   updateResponse: vi.fn(),
@@ -325,6 +327,78 @@ describe("stop strings", () => {
     const { result } = await streamWithStopModel(["no stop ", "here"]);
 
     expect(result).toBe("no stop here");
+  });
+});
+
+describe("generation speed", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /**
+   * Streams `chunks`, each one arriving at its own moment on a clock the test
+   * owns, and answers with the speed the run published.
+   */
+  async function streamOnClock(
+    chunks: { delta: Record<string, string>; at: number }[],
+    signal?: AbortSignal,
+    onChunk?: () => void,
+  ) {
+    let now = 0;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+    vi.mocked(initializeWllama).mockImplementation(
+      async () =>
+        ({
+          createChatCompletion: vi.fn().mockResolvedValue(
+            (async function* () {
+              for (const { delta, at } of chunks) {
+                now = at;
+                yield { choices: [{ delta }] };
+                onChunk?.();
+              }
+            })(),
+          ),
+          exit: vi.fn().mockResolvedValue(undefined),
+          // biome-ignore lint/suspicious/noExplicitAny: minimal Wllama stub
+        }) as any,
+    );
+
+    try {
+      await generateTextWithWllama(signal);
+      return vi.mocked(updateGenerationRate).mock.calls.at(-1)?.[0];
+    } finally {
+      nowSpy.mockRestore();
+    }
+  }
+
+  it("counts one token per chunk that carries text, on either channel", async () => {
+    const rate = await streamOnClock([
+      { delta: { content: "The" }, at: 0 },
+      { delta: { reasoning_content: "hmm" }, at: 1000 },
+      { delta: { content: "answer" }, at: 2000 },
+      // A chunk carrying no text is no token, and it does not move the clock.
+      { delta: {}, at: 4000 },
+    ]);
+
+    // Three tokens from the first to the last, so two seconds.
+    expect(rate).toBe("1.5 tokens/s");
+  });
+
+  it("publishes nothing when the answer is interrupted", async () => {
+    const controller = new AbortController();
+
+    await expect(
+      streamOnClock(
+        [
+          { delta: { content: "an" }, at: 0 },
+          { delta: { content: "swer" }, at: 1000 },
+        ],
+        controller.signal,
+        () => controller.abort(),
+      ),
+    ).rejects.toThrow("Chat generation interrupted");
+
+    expect(updateGenerationRate).not.toHaveBeenCalled();
   });
 });
 

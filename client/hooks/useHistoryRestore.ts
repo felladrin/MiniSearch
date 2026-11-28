@@ -20,6 +20,7 @@ import {
   updateChatMessages,
   updateChatSession,
   updateFollowUpQuestion,
+  updateGenerationRate,
   updateImageSearchResults,
   updateImageSearchState,
   updateIsRestoringFromHistory,
@@ -141,6 +142,8 @@ export function useHistoryRestore(
       }
 
       const savedResponse = await getLatestLlmResponseForEntry(entry);
+      // A stored answer was never timed here, so it shows no speed line.
+      updateGenerationRate(undefined);
       if (savedResponse && savedResponse.trim().length > 0) {
         updateSuppressNextFollowUp(true);
         // The restore publishes the whole stored answer at once; a throttled

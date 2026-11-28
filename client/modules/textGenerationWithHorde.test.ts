@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
+  updateGenerationRate,
   updateResponse,
   updateTextGenerationState,
 } from "./pubSub";
@@ -16,6 +17,7 @@ vi.mock("./logEntries", () => ({
 
 vi.mock("./pubSub", () => ({
   getSettings: vi.fn(),
+  updateGenerationRate: vi.fn(),
   updateResponse: vi.fn(),
   updateTextGenerationState: vi.fn(),
 }));
@@ -113,6 +115,25 @@ describe("textGenerationWithHorde", () => {
       const [startUrl, startInit] = mockFetch.mock.calls[0];
       expect(startUrl).toContain("/generate/text/async");
       expect(JSON.parse(startInit.body).models).toEqual(["chosen-model"]);
+    });
+
+    it("publishes no speed, since the horde sends the whole text at once", async () => {
+      const generateTextWithHorde = await loadHordeGenerator();
+
+      mockFetch.mockResolvedValueOnce(jsonResponse({ id: "gen-rate" }));
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          done: true,
+          is_possible: true,
+          generations: [{ text: "All at once" }],
+        }),
+      );
+
+      await generateTextWithHorde();
+
+      // One poll carries the whole answer, so there is no rate to measure.
+      expect(updateResponse).toHaveBeenCalledWith("All at once");
+      expect(updateGenerationRate).not.toHaveBeenCalled();
     });
 
     it("throws ChatGenerationError when the generation is faulted", async () => {

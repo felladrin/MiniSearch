@@ -1,5 +1,10 @@
+import { GenerationRateMeter } from "./generationRate";
 import { addLogEntry } from "./logEntries";
-import { updateResponse, updateTextGenerationState } from "./pubSub";
+import {
+  updateGenerationRate,
+  updateResponse,
+  updateTextGenerationState,
+} from "./pubSub";
 import { getSearchTokenHash } from "./searchTokenHash";
 import {
   ChatGenerationError,
@@ -13,6 +18,7 @@ import type { ChatMessage } from "./types";
 interface InternalApiStreamPayload {
   error?: unknown;
   choices?: Array<{ delta?: { content?: unknown }; finish_reason?: unknown }>;
+  usage?: { completion_tokens?: unknown };
 }
 
 export async function generateTextWithInternalApi(signal?: AbortSignal) {
@@ -24,6 +30,8 @@ export async function generateTextWithInternalApi(signal?: AbortSignal) {
   );
 
   let generating = false;
+
+  const rateMeter = new GenerationRateMeter();
 
   const streamedMessage = await processStreamResponse(
     messages,
@@ -37,9 +45,11 @@ export async function generateTextWithInternalApi(signal?: AbortSignal) {
     },
     "Generation interrupted",
     signal,
+    rateMeter,
   );
 
   updateResponse(streamedMessage);
+  updateGenerationRate(rateMeter.rate());
 
   return streamedMessage;
 }
@@ -64,12 +74,17 @@ export async function generateChatWithInternalApi(
  * while reading.
  * Cancelling closes the connection, which is how the server learns that the
  * reader is gone and stops streaming the run.
+ *
+ * `rateMeter` times the answer and takes the completion count off the stream's
+ * `usage` when one arrives. The `/inference` proxy forwards no usage today, so
+ * most answers here have no exact count and show no rate.
  */
 async function processStreamResponse(
   messages: ChatMessage[],
   onChunk: (message: string) => void,
   interruptedMessage: string,
   callerSignal?: AbortSignal,
+  rateMeter?: GenerationRateMeter,
 ): Promise<string> {
   const controller = new AbortController();
   const { signal } = controller;
@@ -134,9 +149,15 @@ async function processStreamResponse(
         );
       }
 
+      // Only an exact completion count is usable; a delta is not one token.
+      if (typeof parsedLine?.usage?.completion_tokens === "number") {
+        rateMeter?.setTokenCount(parsedLine.usage.completion_tokens);
+      }
+
       const deltaContent = parsedLine?.choices?.[0]?.delta?.content;
       if (typeof deltaContent === "string" && deltaContent !== "") {
         streamedMessage += deltaContent;
+        rateMeter?.onDelta();
         onChunk(streamedMessage);
       }
     };

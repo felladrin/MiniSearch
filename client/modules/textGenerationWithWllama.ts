@@ -1,8 +1,10 @@
 import type { Wllama } from "@wllama/wllama";
 import { FALLBACK_CONFIG, getConfig } from "./config";
+import { GenerationRateMeter } from "./generationRate";
 import { addLogEntry } from "./logEntries";
 import {
   getSettings,
+  updateGenerationRate,
   updateModelLoadingProgress,
   updateModelSizeInMegabytes,
   updateResponse,
@@ -34,6 +36,7 @@ export async function generateTextWithWllama(
   if (!getSettings().enableAiResponse) return "";
 
   try {
+    const rateMeter = new GenerationRateMeter();
     const response = await generateWithWllama({
       messages: async () => {
         const modelConfig = await getSelectedWllamaModel();
@@ -45,12 +48,14 @@ export async function generateTextWithWllama(
       },
       onUpdate: updateResponse,
       shouldCheckCanRespond: true,
+      rateMeter,
       signal,
     });
     // An abort while the session exits still returns the whole answer.
     if (signal?.aborted)
       throw new ChatGenerationError("Generation interrupted");
     updateResponse(response);
+    updateGenerationRate(rateMeter.rate());
     return response;
   } catch (error) {
     addLogEntry(
@@ -84,6 +89,11 @@ interface WllamaConfig {
   onUpdate: (text: string) => void;
   shouldCheckCanRespond?: boolean;
   signal?: AbortSignal;
+  /**
+   * Times the answer for the speed line. Only the main answer carries one:
+   * a chat reply shows no rate, and it shares this generation code.
+   */
+  rateMeter?: GenerationRateMeter;
 }
 
 /**
@@ -113,6 +123,7 @@ async function runWllamaGeneration({
   messages: messagesOrBuilder,
   onUpdate,
   shouldCheckCanRespond = false,
+  rateMeter,
   signal,
 }: WllamaConfig): Promise<string> {
   let loadingPercentage = 0;
@@ -187,6 +198,10 @@ async function runWllamaGeneration({
         (chunk.choices[0]?.delta as { reasoning_content?: string } | undefined)
           ?.reasoning_content ?? "";
       if (!delta && !reasoningDelta) continue;
+
+      // One chunk is one generated token here, on either channel: the chain of
+      // thought is generated work too, so it counts toward the rate.
+      rateMeter?.onToken();
 
       if (shouldCheckCanRespond && !generating) {
         generating = true;
