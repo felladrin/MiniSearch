@@ -575,7 +575,8 @@ export async function getLatestLlmResponseForEntry(
  * `conversationId`. Regenerate and edit rewrite the conversation rather than
  * append to it, so one transaction deletes the conversation's rows and adds
  * the new ones, with increasing timestamps to keep their order. Other
- * conversations are untouched, and an empty list removes the conversation.
+ * conversations are untouched, an empty list removes the conversation, and
+ * non-empty writes are skipped when no search owns `conversationId`.
  */
 export async function replaceChatConversation(
   conversationId: string,
@@ -585,12 +586,32 @@ export async function replaceChatConversation(
   const firstTimestamp = Date.now();
   await historyDatabase.transaction(
     "rw",
+    historyDatabase.searches,
     historyDatabase.chatHistory,
     async () => {
       await historyDatabase.chatHistory
         .where("conversationId")
         .equals(conversationId)
         .delete();
+      if (messages.length === 0) return;
+
+      const owner =
+        (await historyDatabase.searches
+          .where("searchRunId")
+          .equals(conversationId)
+          .first()) ??
+        (await historyDatabase.searches
+          .where("query")
+          .equals(conversationId)
+          .filter((search) => !search.searchRunId)
+          .first());
+      if (!owner) {
+        addLogEntry(
+          `Skipped saving chat conversation for deleted search: ${conversationId}`,
+        );
+        return;
+      }
+
       await historyDatabase.chatHistory.bulkAdd(
         messages.map((message, index) => ({
           role: message.role,
