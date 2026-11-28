@@ -286,7 +286,15 @@ export default memo(function SearchForm({
               Clear
             </Button>
           )}
-          <Button type="submit" size="xs" variant="default" flex={1}>
+          {/* Wraps to its own line on a narrow screen instead of shrinking
+              below its label, now that the time-range select shares the row. */}
+          <Button
+            type="submit"
+            size="xs"
+            variant="default"
+            flex={1}
+            miw="fit-content"
+          >
             Search
           </Button>
           {additionalButtons}
