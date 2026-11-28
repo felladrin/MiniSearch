@@ -942,6 +942,48 @@ describe("Search Module", () => {
     });
   });
 
+  describe("Unit Conversion", () => {
+    const mockResults: string[][] = [
+      ["Title", "Snippet", "https://example.com"],
+    ];
+    // Exactly what the server puts in the header: the answer, percent-encoded.
+    const withConversion = { "X-Search-Unit-Conversion": "16.4041994751%20ft" };
+
+    it("should read the conversion off the response header", async () => {
+      mockSearchResponse(mockResults, withConversion);
+
+      const outcome = await searchModule.searchText("5 m to ft", 5);
+
+      expect(outcome).toEqual({
+        results: mockResults,
+        stale: false,
+        timeFilterNotApplied: false,
+        unitConversion: "16.4041994751 ft",
+      });
+    });
+
+    it("should keep the conversion when those results come back from the cache", async () => {
+      mockSearchResponse(mockResults, withConversion);
+      await searchModule.searchText("cached conversion query", 5);
+
+      const cached = await searchModule.searchText(
+        "cached conversion query",
+        5,
+      );
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(cached.unitConversion).toBe("16.4041994751 ft");
+    });
+
+    it("should report no conversion when the header is absent", async () => {
+      mockSearchResponse(mockResults);
+
+      const outcome = await searchModule.searchText("plain query", 5);
+
+      expect(outcome.unitConversion).toBeUndefined();
+    });
+  });
+
   describe("URL Construction", () => {
     it("should include the search token hash in the request URL", async () => {
       mockFetchResponse([]);

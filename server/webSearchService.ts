@@ -56,6 +56,51 @@ interface SearxngSearchResponse {
   results?: SearxngSearchResult[];
   number_of_results?: number;
   unresponsive_engines?: unknown[];
+  answers?: unknown;
+}
+
+/**
+ * What one SearXNG search produced: the results, and the unit conversion its
+ * `unit_converter` plugin worked out for the query, if it worked one out.
+ */
+interface SearxngSearchOutcome<T> {
+  results: T;
+  /**
+   * The converted value as the plugin wrote it (for example
+   * `16.4041994751 ft`). Left out when the plugin answered nothing.
+   */
+  unitConversion?: string;
+}
+
+/** The `engine` SearXNG reports for an answer from its unit converter plugin. */
+const UNIT_CONVERTER_ENGINE = "plugin: unit_converter";
+
+/**
+ * Picks the conversion SearXNG's own unit converter plugin computed for the
+ * query out of the response's `answers`, which holds one entry per answerer.
+ *
+ * Only that plugin is read. The same response carries answers from search
+ * engines, and those misread a conversion query often enough to be unusable:
+ * `5 m to ft` came back with `5.0 LSL = 97.4461855875 HUF` from the currency
+ * engine, next to the right answer from the plugin.
+ */
+function parseUnitConverterAnswer(answers: unknown): string | undefined {
+  if (!Array.isArray(answers)) return undefined;
+
+  for (const answer of answers) {
+    if (typeof answer !== "object" || answer === null) continue;
+
+    const { engine, answer: text } = answer as {
+      engine?: unknown;
+      answer?: unknown;
+    };
+    if (engine !== UNIT_CONVERTER_ENGINE || typeof text !== "string") continue;
+
+    const conversion = text.trim();
+    if (conversion) return conversion;
+  }
+
+  return undefined;
 }
 
 // No `lang` here: SearXNG reads its locale from `language` (`parse_lang` in
@@ -305,7 +350,7 @@ async function performSearch(
   signal?: AbortSignal,
   timeRange?: SearxngTimeRange,
   language?: string,
-): Promise<SearxngSearchResult[]> {
+): Promise<SearxngSearchOutcome<SearxngSearchResult[]>> {
   const searchUrl = buildSearchUrl(query, searchType, timeRange, language);
 
   let retryReason = "";
@@ -337,6 +382,7 @@ async function performSearch(
 
     const data = (await response.json()) as SearxngSearchResponse;
     const results = Array.isArray(data.results) ? data.results : [];
+    const unitConversion = parseUnitConverterAnswer(data.answers);
 
     if (results.length === 0) {
       const unresponsiveEngines = parseUnresponsiveEngines(
@@ -348,7 +394,13 @@ async function performSearch(
       // the search layer is down arrives in `unresponsive_engines`. Returned as
       // an empty array it is indistinguishable from a query that genuinely
       // matches nothing.
-      if (unresponsiveEngines.length > 0) {
+      //
+      // A conversion the plugin worked out is the one case where that empty
+      // set is not a failed search: the plugin reads the query itself and needs
+      // no engine, so it answers even where every engine is blocked. The search
+      // is served with its answer and no web results instead of being retried
+      // and thrown away on a 502.
+      if (unresponsiveEngines.length > 0 && !unitConversion) {
         if (allEnginesSuspended(unresponsiveEngines)) {
           failWithUnresponsiveEngines(searchType, unresponsiveEngines);
         }
@@ -365,7 +417,9 @@ async function performSearch(
 
       incrementSearchesWithoutResultsSinceLastRestart();
       printMessage(
-        "No results returned from SearXNG. No engine errors were reported; all engines returned zero results.",
+        unitConversion
+          ? "No results returned from SearXNG, but its unit converter plugin answered the query."
+          : "No results returned from SearXNG. No engine errors were reported; all engines returned zero results.",
       );
     }
 
@@ -373,13 +427,24 @@ async function performSearch(
     // recorded on an earlier search stops being reported as current.
     recordRespondingEngines(searchType);
 
-    return results;
+    return { results, unitConversion };
   }
 
   throw new Error(
     `SearXNG request failed with status 500 after ${MAX_RETRIES} retries`,
   );
 }
+
+/** A text result as the endpoint is handed it. */
+type ProcessedTextResult = [title: string, content: string, url: string];
+
+/** An image or video result as the endpoint is handed it. */
+type ProcessedGraphicalResult = [
+  title: string,
+  url: string,
+  thumbnailSource: string,
+  sourceUrl: string,
+];
 
 async function processSearchResults(
   query: string,
@@ -389,11 +454,14 @@ async function processSearchResults(
   signal?: AbortSignal,
   timeRange?: SearxngTimeRange,
   language?: string,
-) {
+): Promise<
+  SearxngSearchOutcome<ProcessedTextResult[] | ProcessedGraphicalResult[]>
+> {
   // An abort is thrown inside `execute`, so a stalled SearXNG counts as a
   // failure as soon as the deadline passes.
-  const results = await breaker.execute(circuitKey(searchType), () =>
-    performSearch(query, searchType, signal, timeRange, language),
+  const { results, unitConversion } = await breaker.execute(
+    circuitKey(searchType),
+    () => performSearch(query, searchType, signal, timeRange, language),
   );
   const openableResults = openableUniqueResults(
     results,
@@ -405,11 +473,14 @@ async function processSearchResults(
     const textualResults = await Promise.all(
       consideredResults.map(processTextualResult),
     );
-    return reportDiscardedResults(
-      filterNullResults(textualResults),
-      consideredResults.length,
-      searchType,
-    );
+    return {
+      results: reportDiscardedResults(
+        filterNullResults(textualResults),
+        consideredResults.length,
+        searchType,
+      ),
+      unitConversion,
+    };
   }
 
   // Dropped before the limit applies, so images without a thumbnail at the top
@@ -417,11 +488,14 @@ async function processSearchResults(
   const graphicalResults = await Promise.all(
     openableResults.map(processGraphicalResult),
   );
-  return reportDiscardedResults(
-    filterNullResults(graphicalResults).slice(0, limit),
-    openableResults.length,
-    searchType,
-  );
+  return {
+    results: reportDiscardedResults(
+      filterNullResults(graphicalResults).slice(0, limit),
+      openableResults.length,
+      searchType,
+    ),
+    unitConversion,
+  };
 }
 
 /**

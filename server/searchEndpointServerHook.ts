@@ -9,6 +9,7 @@ import {
   type SearxngTimeRange,
   searxngTimeRanges,
 } from "../shared/searchTimeRange.ts";
+import { SEARCH_UNIT_CONVERSION_HEADER } from "../shared/unitConversion.ts";
 import {
   assertSearchFallbackConfiguration,
   fetchFallbackTextResults,
@@ -264,13 +265,14 @@ export function searchEndpointServerHook<
 
       let searchResults: TextResult[] | ImageResult[] | null;
       let servedBySearXNG = false;
+      let unitConversion: string | undefined;
       const searchStartedAt = performance.now();
       const fallbackPossible = isTextSearch && isSearchFallbackEnabled();
       const searxngTimeoutMs = fallbackPossible
         ? SEARCH_DEADLINE_MS - SEARXNG_FALLBACK_RESERVE_MS
         : SEARCH_DEADLINE_MS;
       try {
-        searchResults = await fetchSearXNG(
+        const search = await fetchSearXNG(
           query,
           searchType,
           limit,
@@ -279,6 +281,8 @@ export function searchEndpointServerHook<
           timeRange,
           language,
         );
+        searchResults = search.results;
+        unitConversion = search.unitConversion;
         servedBySearXNG = true;
         recordSearchDuration(searchType, performance.now() - searchStartedAt);
       } catch {
@@ -372,6 +376,16 @@ export function searchEndpointServerHook<
         );
 
         incrementTextualSearchesSinceLastRestart();
+
+        // The body is an array of results and has no room for the conversion the
+        // plugin worked out, so it travels in a header, percent-encoded because
+        // a header value cannot carry every character the answer can.
+        if (unitConversion) {
+          response.setHeader(
+            SEARCH_UNIT_CONVERSION_HEADER,
+            encodeURIComponent(unitConversion),
+          );
+        }
 
         response.setHeader("Content-Type", "application/json");
         response.end(JSON.stringify(rankedResults));

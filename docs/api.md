@@ -219,6 +219,27 @@ whichever was lost above the results it got that way: "Time filter not applied
 to these results", "Language not applied to these results", or "Time filter and
 language not applied to these results".
 
+A text search can also carry a unit conversion, in
+`X-Search-Unit-Conversion`. SearXNG runs a `unit_converter` plugin over the
+query itself, which answers a query shaped `<number> <unit> to|in|as <unit>`
+(`5 m to ft` gives `16.4041994751 ft`), and the plugin needs no search engine.
+Only its answers are sent, and only its own: the same `answers` field carries
+answers from search engines, and those misread such queries (the currency
+engine read `5 m to ft` as `5.0 LSL = 97.4461855875 HUF`). The body is an array
+of results and has no room for the value, so the header is the only place it
+goes, percent-encoded with `encodeURIComponent` because a header value cannot
+carry every character the answer can; read it back with `decodeURIComponent`. It
+is absent whenever the plugin answered nothing, which is every search that is
+not a conversion.
+
+Because the plugin answered, such a search is served rather than failed even
+when its engines returned nothing or reported themselves unresponsive: the
+`502` above is not the answer to a query that was answered, and the body is then
+`[]`. On a Hugging Face Space, where every web engine is blocked, that is the
+only thing a conversion query needs. The client shows the value above the
+results in a "Unit conversion" card, and keeps it with the cached results, so a
+search served from the cache shows it too.
+
 ### `GET /search/images`
 
 Same parameters and failures as `/search/text`, except that the text-search

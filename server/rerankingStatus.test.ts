@@ -81,7 +81,7 @@ beforeEach(async () => {
   vi.spyOn(performance, "now").mockImplementation(() => model.now);
   const { fetchSearXNG } = await import("./webSearchService.ts");
   vi.mocked(fetchSearXNG).mockImplementation(async (_query, type) =>
-    type === "text" ? textResults : imageResults,
+    type === "text" ? { results: textResults } : { results: imageResults },
   );
   const { addVerifiedToken } = await import("./verifiedTokens.ts");
   addVerifiedToken("fixture-session");
@@ -187,7 +187,7 @@ describe("search reranking counters through HTTP status", () => {
       byType: { text: emptyStats, images: emptyStats },
     });
     const { fetchSearXNG } = await import("./webSearchService.ts");
-    vi.mocked(fetchSearXNG).mockResolvedValue([]);
+    vi.mocked(fetchSearXNG).mockResolvedValue({ results: [] });
     for (const type of ["text", "images"]) {
       expect(
         await request(`/search/${type}?q=empty&token=fixture-session`),

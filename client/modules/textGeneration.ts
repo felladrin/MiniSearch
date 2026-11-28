@@ -34,6 +34,7 @@ import {
   updateTextSearchStale,
   updateTextSearchState,
   updateTextSearchTimeFilterNotApplied,
+  updateTextSearchUnitConversion,
 } from "./pubSub";
 import { searchImages, searchText } from "./search";
 import { getLatestSearchAttempt, recordSearchAttempt } from "./searchAttempts";
@@ -366,6 +367,8 @@ export async function searchAndRespond() {
   updateTextSearchTimeFilterNotApplied(false);
 
   updateTextSearchLanguageNotApplied(false);
+
+  updateTextSearchUnitConversion(null);
 
   updateLlmTextSearchResults([]);
 
@@ -756,6 +759,7 @@ async function startTextSearch(query: string, invocation: number) {
         stale,
         timeFilterNotApplied,
         languageNotApplied,
+        unitConversion,
       } = searchQuery
         ? await searchText(
             searchQuery,
@@ -768,6 +772,7 @@ async function startTextSearch(query: string, invocation: number) {
             stale: false,
             timeFilterNotApplied: false,
             languageNotApplied: false,
+            unitConversion: undefined,
           };
 
       if (textResults.length === 0) {
@@ -788,6 +793,7 @@ async function startTextSearch(query: string, invocation: number) {
           stale = keywordOutcome.stale;
           timeFilterNotApplied = keywordOutcome.timeFilterNotApplied;
           languageNotApplied = keywordOutcome.languageNotApplied;
+          unitConversion = keywordOutcome.unitConversion;
         }
       }
 
@@ -802,6 +808,7 @@ async function startTextSearch(query: string, invocation: number) {
         updateTextSearchStale(stale);
         updateTextSearchTimeFilterNotApplied(Boolean(timeFilterNotApplied));
         updateTextSearchLanguageNotApplied(Boolean(languageNotApplied));
+        updateTextSearchUnitConversion(unitConversion ?? null);
         updateTextSearchState("completed");
         updateTextSearchResults(textResults);
         updateLlmTextSearchResults(resultsForLlm);
@@ -831,6 +838,7 @@ async function startTextSearch(query: string, invocation: number) {
         updateTextSearchStale(false);
         updateTextSearchTimeFilterNotApplied(false);
         updateTextSearchLanguageNotApplied(false);
+        updateTextSearchUnitConversion(null);
         updateTextSearchState("failed");
       }
       textSearchFailed = true;

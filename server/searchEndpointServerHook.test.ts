@@ -190,7 +190,7 @@ describe("searchEndpointServerHook", () => {
   });
 
   it("takes the search type from the path alone", async () => {
-    vi.mocked(fetchSearXNG).mockResolvedValue([]);
+    vi.mocked(fetchSearXNG).mockResolvedValue({ results: [] });
     const handler = getRegisteredHandler();
     const unknown = createResponse();
 
@@ -283,9 +283,9 @@ describe("searchEndpointServerHook", () => {
   });
 
   it("returns ranked text results and increments the textual search counter", async () => {
-    vi.mocked(fetchSearXNG).mockResolvedValue([
-      ["Title", "Snippet", "https://example.com"],
-    ]);
+    vi.mocked(fetchSearXNG).mockResolvedValue({
+      results: [["Title", "Snippet", "https://example.com"]],
+    });
     const response = await sendSearch("/search/text?q=cats&token=abc");
 
     expect(fetchSearXNG).toHaveBeenCalledWith(
@@ -308,7 +308,7 @@ describe("searchEndpointServerHook", () => {
   });
 
   it("clamps the requested result limit to the server maximum", async () => {
-    vi.mocked(fetchSearXNG).mockResolvedValue([]);
+    vi.mocked(fetchSearXNG).mockResolvedValue({ results: [] });
     const handler = getRegisteredHandler();
 
     await handler(
@@ -332,7 +332,7 @@ describe("searchEndpointServerHook", () => {
     it.each(["day", "week", "month", "year"] as const)(
       "passes %s through to SearXNG",
       async (timeRange) => {
-        vi.mocked(fetchSearXNG).mockResolvedValue([]);
+        vi.mocked(fetchSearXNG).mockResolvedValue({ results: [] });
 
         await sendSearch(
           `/search/text?q=cats&token=abc&time_range=${timeRange}`,
@@ -351,7 +351,7 @@ describe("searchEndpointServerHook", () => {
     );
 
     it("passes it on an image search as well", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: [] });
 
       await sendSearch("/search/images?q=cats&token=abc&time_range=month");
 
@@ -367,7 +367,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("passes nothing when the request carries no time range", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: [] });
 
       await sendSearch("/search/text?q=cats&token=abc");
 
@@ -410,7 +410,7 @@ describe("searchEndpointServerHook", () => {
     it.each(["pt-BR", "en-US", "all", "auto"])(
       "passes %s through to SearXNG as its language",
       async (language) => {
-        vi.mocked(fetchSearXNG).mockResolvedValue([]);
+        vi.mocked(fetchSearXNG).mockResolvedValue({ results: [] });
 
         await sendSearch(`/search/text?q=cats&token=abc&language=${language}`);
 
@@ -427,7 +427,7 @@ describe("searchEndpointServerHook", () => {
     );
 
     it("passes it on an image search as well", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: [] });
 
       await sendSearch("/search/images?q=cats&token=abc&language=pt-BR");
 
@@ -443,7 +443,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("passes it next to a time range when the search asked for both", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: [] });
 
       await sendSearch(
         "/search/text?q=cats&token=abc&time_range=week&language=de",
@@ -461,7 +461,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("passes nothing when the request carries no language", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([]);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: [] });
 
       // An older client or a direct API call: SearXNG keeps its own default,
       // exactly as it did before the setting existed.
@@ -490,10 +490,12 @@ describe("searchEndpointServerHook", () => {
   });
 
   it("reranks results when the reranker is healthy and returns its reordered output", async () => {
-    vi.mocked(fetchSearXNG).mockResolvedValue([
-      ["A", "snippet a", "https://a.com"],
-      ["B", "snippet b", "https://b.com"],
-    ]);
+    vi.mocked(fetchSearXNG).mockResolvedValue({
+      results: [
+        ["A", "snippet a", "https://a.com"],
+        ["B", "snippet b", "https://b.com"],
+      ],
+    });
     vi.mocked(getRerankerStatus).mockResolvedValue(true);
     vi.mocked(rankSearchResults).mockResolvedValue([
       ["B", "snippet b", "https://b.com", 0.9],
@@ -532,14 +534,16 @@ describe("searchEndpointServerHook", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       throw new Error("the search endpoint must not fetch thumbnails");
     });
-    vi.mocked(fetchSearXNG).mockResolvedValue([
-      [
-        "Cat picture",
-        "https://example.com/cat.jpg",
-        "https://thumb.example.com/cat.jpg",
-        "https://example.com/cat",
+    vi.mocked(fetchSearXNG).mockResolvedValue({
+      results: [
+        [
+          "Cat picture",
+          "https://example.com/cat.jpg",
+          "https://thumb.example.com/cat.jpg",
+          "https://example.com/cat",
+        ],
       ],
-    ]);
+    });
 
     const response = await sendSearch("/search/images?q=cats&token=abc");
 
@@ -581,7 +585,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("returns unranked results when the reranker is down", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: searxngResults });
       vi.mocked(getRerankerStatus).mockResolvedValue(false);
 
       const response = await sendSearch("/search/text?q=cats&token=abc");
@@ -592,7 +596,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("returns unranked results when reranking throws mid-request", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: searxngResults });
       vi.mocked(getRerankerStatus).mockResolvedValue(true);
       vi.mocked(rankSearchResults).mockRejectedValue(
         new Error("Reranker model is not loaded"),
@@ -605,7 +609,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("still serves image results when the reranker is down", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: [imageResult] });
       vi.mocked(getRerankerStatus).mockResolvedValue(false);
 
       const response = await sendSearch("/search/images?q=cats&token=abc");
@@ -616,7 +620,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("still serves image results when reranking throws mid-request", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: [imageResult] });
       vi.mocked(getRerankerStatus).mockResolvedValue(true);
       vi.mocked(rankSearchResults).mockRejectedValue(
         new Error("Reranker model is not loaded"),
@@ -638,7 +642,7 @@ describe("searchEndpointServerHook", () => {
             `https://example.com/${name}.gif`,
           ] as [string, string, string, string],
       );
-      vi.mocked(fetchSearXNG).mockResolvedValue(galleryImages);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: galleryImages });
       vi.mocked(getRerankerStatus).mockResolvedValue(true);
       vi.mocked(rankSearchResults).mockResolvedValue([
         ["Gallery second", "", "https://example.com/gallery", 0.9],
@@ -652,7 +656,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("drops an image the reranker returns under an unknown URL", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([imageResult]);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: [imageResult] });
       vi.mocked(getRerankerStatus).mockResolvedValue(true);
       vi.mocked(rankSearchResults).mockResolvedValue([
         [
@@ -747,7 +751,7 @@ describe("searchEndpointServerHook", () => {
       });
 
       it("gives SearXNG the whole deadline when no fallback can follow", async () => {
-        vi.mocked(fetchSearXNG).mockResolvedValue([]);
+        vi.mocked(fetchSearXNG).mockResolvedValue({ results: [] });
         const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
 
         const handler = getRegisteredHandler();
@@ -874,7 +878,7 @@ describe("searchEndpointServerHook", () => {
 
       it("says nothing when SearXNG answers a filtered search itself", async () => {
         vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
-        vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+        vi.mocked(fetchSearXNG).mockResolvedValue({ results: searxngResults });
 
         const response = await sendSearch(
           "/search/text?q=cats&token=abc&time_range=week",
@@ -989,7 +993,7 @@ describe("searchEndpointServerHook", () => {
 
       it("never consults the fallback when SearXNG answers", async () => {
         vi.mocked(isSearchFallbackEnabled).mockReturnValue(true);
-        vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+        vi.mocked(fetchSearXNG).mockResolvedValue({ results: searxngResults });
 
         const response = await sendSearch("/search/text?q=cats&token=abc");
 
@@ -1005,9 +1009,9 @@ describe("searchEndpointServerHook", () => {
   });
 
   it("responds 500 when an unexpected error is thrown", async () => {
-    vi.mocked(fetchSearXNG).mockResolvedValue([
-      ["Title", "Snippet", "https://example.com"],
-    ]);
+    vi.mocked(fetchSearXNG).mockResolvedValue({
+      results: [["Title", "Snippet", "https://example.com"]],
+    });
     vi.mocked(getRerankerStatus).mockRejectedValue(new Error("reranker down"));
 
     const response = await sendSearch("/search/text?q=cats&token=abc");
@@ -1018,11 +1022,94 @@ describe("searchEndpointServerHook", () => {
     );
   });
 
+  describe("unit conversion header", () => {
+    const conversion = "16.4041994751 ft";
+
+    it("carries the conversion the plugin worked out, beside unchanged results", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue({
+        results: [["Title", "Snippet", "https://example.com"]],
+        unitConversion: conversion,
+      });
+
+      const response = await sendSearch("/search/text?q=5+m+to+ft&token=abc");
+
+      expect(response.statusCode).toBe(200);
+      expect(response.setHeader).toHaveBeenCalledWith(
+        "X-Search-Unit-Conversion",
+        encodeURIComponent(conversion),
+      );
+      // The body is the same array it has always been: the conversion is the
+      // header's job alone.
+      expect(response.end).toHaveBeenCalledWith(
+        JSON.stringify([["Title", "Snippet", "https://example.com"]]),
+      );
+    });
+
+    it("encodes a conversion that a header cannot carry raw", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue({
+        results: [],
+        unitConversion: "10 \u00b0C = 50 \u00b0F",
+      });
+
+      const response = await sendSearch("/search/text?q=10c+to+f&token=abc");
+
+      expect(response.setHeader).toHaveBeenCalledWith(
+        "X-Search-Unit-Conversion",
+        "10%20%C2%B0C%20%3D%2050%20%C2%B0F",
+      );
+    });
+
+    it("serves a conversion a search with no results at all could not carry", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue({
+        results: [],
+        unitConversion: conversion,
+      });
+
+      const response = await sendSearch("/search/text?q=5+m+to+ft&token=abc");
+
+      expect(response.statusCode).toBe(200);
+      expect(response.end).toHaveBeenCalledWith(JSON.stringify([]));
+      expect(response.setHeader).toHaveBeenCalledWith(
+        "X-Search-Unit-Conversion",
+        encodeURIComponent(conversion),
+      );
+    });
+
+    it("sends no conversion header for a search the plugin did not answer", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue({
+        results: [["Title", "Snippet", "https://example.com"]],
+      });
+
+      const response = await sendSearch("/search/text?q=cats&token=abc");
+
+      expect(response.statusCode).toBe(200);
+      expect(response.setHeader).not.toHaveBeenCalledWith(
+        "X-Search-Unit-Conversion",
+        expect.any(String),
+      );
+    });
+
+    it("sends no conversion header on an image search", async () => {
+      vi.mocked(fetchSearXNG).mockResolvedValue({
+        results: [["Title", "https://example.com", "thumb.jpg", "full.jpg"]],
+        unitConversion: conversion,
+      });
+
+      const response = await sendSearch("/search/images?q=5+m+to+ft&token=abc");
+
+      expect(response.statusCode).toBe(200);
+      expect(response.setHeader).not.toHaveBeenCalledWith(
+        "X-Search-Unit-Conversion",
+        expect.any(String),
+      );
+    });
+  });
+
   describe("search path counters", () => {
     it("records how long SearXNG took on a text search", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue([
-        ["Title", "Snippet", "https://example.com"],
-      ]);
+      vi.mocked(fetchSearXNG).mockResolvedValue({
+        results: [["Title", "Snippet", "https://example.com"]],
+      });
       const handler = getRegisteredHandler();
 
       await handler(
@@ -1054,9 +1141,9 @@ describe("searchEndpointServerHook", () => {
       const { getRerankingStats } = await import("./rerankingSinceLastRestart");
       const before = getRerankingStats();
       vi.mocked(getRerankerStatus).mockResolvedValue(false);
-      vi.mocked(fetchSearXNG).mockResolvedValue([
-        ["Title", "Snippet", "https://example.com"],
-      ]);
+      vi.mocked(fetchSearXNG).mockResolvedValue({
+        results: [["Title", "Snippet", "https://example.com"]],
+      });
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const handler = getRegisteredHandler();
 
@@ -1080,9 +1167,9 @@ describe("searchEndpointServerHook", () => {
       const before = getRerankingStats();
       vi.mocked(getRerankerStatus).mockResolvedValue(true);
       vi.mocked(rankSearchResults).mockRejectedValue(new Error("model gone"));
-      vi.mocked(fetchSearXNG).mockResolvedValue([
-        ["Title", "Snippet", "https://example.com"],
-      ]);
+      vi.mocked(fetchSearXNG).mockResolvedValue({
+        results: [["Title", "Snippet", "https://example.com"]],
+      });
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const handler = getRegisteredHandler();
 
@@ -1120,7 +1207,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("never gives the lane the last five seconds of the search deadline", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: searxngResults });
       vi.mocked(fetchSupplementarySearXNG).mockResolvedValue([]);
       // SearXNG answered at 19 s of the 25 s deadline: 6 s remain, and the
       // lane may only spend what is left after the last 5.
@@ -1136,7 +1223,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("skips the lane when no more than five seconds remain", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: searxngResults });
       // SearXNG answered at 21 s: the 4 s left all belong to the ranking.
       vi.spyOn(performance, "now")
         .mockReturnValueOnce(0)
@@ -1153,7 +1240,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("gives the supplementary search the same time range", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: searxngResults });
       vi.mocked(fetchSupplementarySearXNG).mockResolvedValue([]);
       const handler = getRegisteredHandler();
 
@@ -1173,7 +1260,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("gives the supplementary search the same language", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: searxngResults });
       vi.mocked(fetchSupplementarySearXNG).mockResolvedValue([]);
       const handler = getRegisteredHandler();
 
@@ -1193,7 +1280,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("asks a supplementary search for the named site and merges it behind the first result", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: searxngResults });
       vi.mocked(fetchSupplementarySearXNG).mockResolvedValue(laneResults);
       const handler = getRegisteredHandler();
       const response = createResponse();
@@ -1233,7 +1320,7 @@ describe("searchEndpointServerHook", () => {
     });
 
     it("serves the search it already has when the lane fails", async () => {
-      vi.mocked(fetchSearXNG).mockResolvedValue(searxngResults);
+      vi.mocked(fetchSearXNG).mockResolvedValue({ results: searxngResults });
       vi.mocked(fetchSupplementarySearXNG).mockRejectedValue(
         new Error("This operation was aborted"),
       );

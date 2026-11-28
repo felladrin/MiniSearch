@@ -33,6 +33,7 @@ import {
   updateTextSearchStale,
   updateTextSearchState,
   updateTextSearchTimeFilterNotApplied,
+  updateTextSearchUnitConversion,
 } from "../modules/pubSub";
 import { cancelSearchAnswer } from "../modules/textGeneration";
 import type { ImageSearchResults, TextSearchResults } from "../modules/types";
@@ -91,6 +92,7 @@ export function useHistoryRestore(
         // with, so the note belongs to the search that is being replaced.
         updateTextSearchTimeFilterNotApplied(false);
         updateTextSearchLanguageNotApplied(false);
+        updateTextSearchUnitConversion(null);
         const results = hasTextResults(entry)
           ? getResultsFromEntry(entry)
           : null;
