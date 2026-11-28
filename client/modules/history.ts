@@ -533,7 +533,7 @@ export async function saveLlmResponseForQuery(
           timestamp: Date.now(),
           searchId: latest.id,
         });
-      }  ,
+        },
   );
   } catch (error) {
     addLogEntry(`Error saving LLM response: ${error}`);
